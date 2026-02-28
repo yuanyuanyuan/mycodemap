@@ -1,0 +1,15 @@
+{
+  "$schema": "https://codemap.dev/schema.json",
+  "mode": "fast",
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules/**",
+    "dist/**",
+    "build/**",
+    "*.test.ts",
+    "*.spec.ts"
+  ],
+  "output": ".codemap"
+}

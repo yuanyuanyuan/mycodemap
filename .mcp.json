@@ -1,0 +1,22 @@
+{
+    "mcpServers": {
+        "cloudflare-docs": {
+            "command": "npx",
+            "args": [
+                "mcp-remote",
+                "https://docs.mcp.cloudflare.com/mcp"
+            ]
+        },
+        "MiniMax": {
+            "command": "uvx",
+            "args": [
+                "minimax-coding-plan-mcp",
+                "-y"
+            ],
+            "env": {
+                "MINIMAX_API_KEY": "sk-cp-oLk9SpW_VjWHK5ZUOiLQI1GTOVp_XQ-H_Pm1JsRO3Y5EHS-MgNr-vU25-PxRMG6byL-5f2cJgtOs1DYvsL_Zvx1T7pqbmLecD8yn_YIws9tLbfOSvNKEq2A",
+                "MINIMAX_API_HOST": "https://api.minimax.io"
+            }
+        }
+    }
+}

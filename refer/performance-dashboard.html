@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeMap Performance Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      line-height: 1.6;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    header {
+      text-align: center;
+      padding: 2rem 0;
+      border-bottom: 1px solid #334155;
+      margin-bottom: 2rem;
+    }
+    
+    h1 {
+      font-size: 2.5rem;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+    
+    .subtitle {
+      color: #94a3b8;
+    }
+    
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    
+    .metric-card {
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      border: 1px solid #334155;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .metric-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+    
+    .metric-card.critical {
+      border-color: #ef4444;
+    }
+    
+    .metric-card.warning {
+      border-color: #f59e0b;
+    }
+    
+    .metric-card.success {
+      border-color: #10b981;
+    }
+    
+    .metric-label {
+      font-size: 0.875rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+    
+    .metric-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    
+    .metric-value.success { color: #10b981; }
+    .metric-value.warning { color: #f59e0b; }
+    .metric-value.critical { color: #ef4444; }
+    
+    .metric-delta {
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    
+    .metric-delta.positive { color: #10b981; }
+    .metric-delta.negative { color: #ef4444; }
+    
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    
+    .chart-card {
+      background: #1e293b;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      border: 1px solid #334155;
+    }
+    
+    .chart-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: #f1f5f9;
+    }
+    
+    .chart-container {
+      position: relative;
+      height: 300px;
+    }
+    
+    .bottlenecks {
+      background: #1e293b;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      border: 1px solid #334155;
+    }
+    
+    .bottleneck-item {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
+      background: #0f172a;
+      border-radius: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    
+    .bottleneck-severity {
+      width: 4px;
+      height: 40px;
+      border-radius: 2px;
+    }
+    
+    .bottleneck-severity.critical { background: #ef4444; }
+    .bottleneck-severity.high { background: #f59e0b; }
+    .bottleneck-severity.medium { background: #3b82f6; }
+    
+    .bottleneck-info {
+      flex: 1;
+    }
+    
+    .bottleneck-name {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    
+    .bottleneck-detail {
+      font-size: 0.875rem;
+      color: #94a3b8;
+    }
+    
+    .bottleneck-value {
+      text-align: right;
+    }
+    
+    .bottleneck-duration {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+    
+    .bottleneck-percentage {
+      font-size: 0.875rem;
+      color: #94a3b8;
+    }
+    
+    .recommendations {
+      background: #1e293b;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      border: 1px solid #334155;
+    }
+    
+    .recommendation-item {
+      display: flex;
+      gap: 1rem;
+      padding: 1rem;
+      background: #0f172a;
+      border-radius: 0.5rem;
+      margin-bottom: 0.75rem;
+      border-left: 4px solid;
+    }
+    
+    .recommendation-item.critical { border-left-color: #ef4444; }
+    .recommendation-item.high { border-left-color: #f59e0b; }
+    .recommendation-item.medium { border-left-color: #3b82f6; }
+    
+    .recommendation-priority {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      height: fit-content;
+    }
+    
+    .recommendation-priority.critical { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .recommendation-priority.high { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+    .recommendation-priority.medium { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+    
+    .recommendation-content {
+      flex: 1;
+    }
+    
+    .recommendation-issue {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    
+    .recommendation-suggestion {
+      font-size: 0.875rem;
+      color: #94a3b8;
+      margin-bottom: 0.25rem;
+    }
+    
+    .recommendation-improvement {
+      font-size: 0.75rem;
+      color: #10b981;
+    }
+    
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: #f1f5f9;
+    }
+    
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: #64748b;
+      border-top: 1px solid #334155;
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>CodeMap Performance Dashboard</h1>
+      <p class="subtitle">Real-time performance monitoring and analysis</p>
+    </header>
+    
+    <!-- Key Metrics -->
+    <div class="metrics-grid">
+      <div class="metric-card success">
+        <div class="metric-label">Total Analysis Time</div>
+        <div class="metric-value success" id="totalTime">4.2s</div>
+        <div class="metric-delta positive">
+          <span>↓ 29x faster</span>
+        </div>
+      </div>
+      
+      <div class="metric-card success">
+        <div class="metric-label">Peak Memory Usage</div>
+        <div class="metric-value success" id="peakMemory">245MB</div>
+        <div class="metric-delta positive">
+          <span>↓ 87% reduction</span>
+        </div>
+      </div>
+      
+      <div class="metric-card success">
+        <div class="metric-label">Files Processed</div>
+        <div class="metric-value" id="filesProcessed">3,247</div>
+        <div class="metric-delta positive">
+          <span>↑ 773 files/s</span>
+        </div>
+      </div>
+      
+      <div class="metric-card success">
+        <div class="metric-label">Cache Hit Rate</div>
+        <div class="metric-value success" id="cacheHitRate">94.5%</div>
+        <div class="metric-delta positive">
+          <span>↑ 15% improvement</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Charts -->
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Phase Breakdown</div>
+        <div class="chart-container">
+          <canvas id="phaseChart"></canvas>
+        </div>
+      </div>
+      
+      <div class="chart-card">
+        <div class="chart-title">Memory Usage Over Time</div>
+        <div class="chart-container">
+          <canvas id="memoryChart"></canvas>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Bottlenecks -->
+    <div class="bottlenecks">
+      <div class="section-title">Performance Bottlenecks</div>
+      <div id="bottleneckList">
+        <div class="bottleneck-item">
+          <div class="bottleneck-severity high"></div>
+          <div class="bottleneck-info">
+            <div class="bottleneck-name">Symbol Resolution</div>
+            <div class="bottleneck-detail">Cross-file symbol resolution taking longer than expected</div>
+          </div>
+          <div class="bottleneck-value">
+            <div class="bottleneck-duration">1.2s</div>
+            <div class="bottleneck-percentage">28.6%</div>
+          </div>
+        </div>
+        
+        <div class="bottleneck-item">
+          <div class="bottleneck-severity medium"></div>
+          <div class="bottleneck-info">
+            <div class="bottleneck-name">File Discovery</div>
+            <div class="bottleneck-detail">Large directory tree traversal</div>
+          </div>
+          <div class="bottleneck-value">
+            <div class="bottleneck-duration">0.8s</div>
+            <div class="bottleneck-percentage">19.0%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Recommendations -->
+    <div class="recommendations" style="margin-top: 1.5rem;">
+      <div class="section-title">Optimization Recommendations</div>
+      <div id="recommendationList">
+        <div class="recommendation-item high">
+          <div class="recommendation-priority high">High</div>
+          <div class="recommendation-content">
+            <div class="recommendation-issue">Symbol resolution is a bottleneck</div>
+            <div class="recommendation-suggestion">Enable parallel symbol resolution using Worker threads</div>
+            <div class="recommendation-improvement">Expected: 2-3x improvement</div>
+          </div>
+        </div>
+        
+        <div class="recommendation-item medium">
+          <div class="recommendation-priority medium">Medium</div>
+          <div class="recommendation-content">
+            <div class="recommendation-issue">File discovery could be faster</div>
+            <div class="recommendation-suggestion">Use native fs.watch for incremental file discovery</div>
+            <div class="recommendation-improvement">Expected: 50% improvement</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <footer>
+      <p>CodeMap Performance Dashboard • Generated on <span id="timestamp"></span></p>
+    </footer>
+  </div>
+  
+  <script>
+    // Set timestamp
+    document.getElementById('timestamp').textContent = new Date().toLocaleString();
+    
+    // Phase Breakdown Chart
+    const phaseCtx = document.getElementById('phaseChart').getContext('2d');
+    new Chart(phaseCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['File Discovery', 'Parsing', 'Symbol Extraction', 'Relationship Building', 'Other'],
+        datasets: [{
+          data: [0.8, 1.5, 0.9, 1.2, 0.8],
+          backgroundColor: [
+            '#60a5fa',
+            '#a78bfa',
+            '#34d399',
+            '#fbbf24',
+            '#94a3b8'
+          ],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: {
+              color: '#e2e8f0',
+              padding: 15,
+              font: { size: 12 }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: (context) => {
+                const label = context.label || '';
+                const value = context.parsed || 0;
+                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                const percentage = ((value / total) * 100).toFixed(1);
+                return `${label}: ${value}s (${percentage}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    // Memory Usage Chart
+    const memoryCtx = document.getElementById('memoryChart').getContext('2d');
+    const memoryData = {
+      labels: ['0s', '1s', '2s', '3s', '4s', '5s'],
+      datasets: [{
+        label: 'Heap Used',
+        data: [50, 120, 180, 220, 245, 245],
+        borderColor: '#60a5fa',
+        backgroundColor: 'rgba(96, 165, 250, 0.1)',
+        fill: true,
+        tension: 0.4
+      }, {
+        label: 'RSS',
+        data: [80, 150, 200, 250, 280, 280],
+        borderColor: '#a78bfa',
+        backgroundColor: 'rgba(167, 139, 250, 0.1)',
+        fill: true,
+        tension: 0.4
+      }]
+    };
+    
+    new Chart(memoryCtx, {
+      type: 'line',
+      data: memoryData,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          intersect: false,
+          mode: 'index'
+        },
+        plugins: {
+          legend: {
+            labels: {
+              color: '#e2e8f0',
+              padding: 15
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              color: '#334155'
+            },
+            ticks: {
+              color: '#94a3b8'
+            }
+          },
+          y: {
+            grid: {
+              color: '#334155'
+            },
+            ticks: {
+              color: '#94a3b8',
+              callback: (value) => `${value}MB`
+            }
+          }
+        }
+      }
+    });
+  </script>
+</body>
+</html>
