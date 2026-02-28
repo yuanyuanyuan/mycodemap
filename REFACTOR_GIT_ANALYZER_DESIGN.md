@@ -1,6 +1,6 @@
 # Git 分析器详细设计
 
-> 版本: 2.4
+> 版本: 2.5
 > 所属模块: 编排层 - Git 分析器
 > 更新日期: 2026-02-28
 
@@ -267,24 +267,30 @@ calculateRiskScore(
   };
   
   const lastTypes = fileFeeds.map(f => f.heat.lastType);
-  const avgTagRisk = lastTypes.reduce((sum, t) => sum + (tagWeights[t] || 0.5), 0) / 
+  const avgTagRisk = lastTypes.reduce((sum, t) => sum + (tagWeights[t] || 0.5), 0) /
                      (lastTypes.length || 1);
-  const heatScore = freqScore * 0.5 + avgTagRisk * 0.5;
 
   // 4. 计算 IMPACT (影响面)
   const totalDependents = fileFeeds.reduce((sum, f) => sum + f.dependents.length, 0);
   const impactScore = Math.min(totalDependents / 50, 1);
 
-  // 5. 稳定性调整
+  // 5. 稳定性调整（与需求文档一致：不稳定文件增加风险）
   const unstableCount = fileFeeds.filter(f => f.meta.stable === false).length;
-  const stabilityPenalty = unstableCount / (fileFeeds.length || 1) * 0.2;
+  const unstableRatio = unstableCount / (fileFeeds.length || 1);
+  const stabilityBoost = unstableRatio * 0.15;
 
-  // 6. 综合评分
-  const totalScore = 
-    gravityScore * 0.3 + 
-    heatScore * 0.25 + 
-    impactScore * 0.1 -
-    stabilityPenalty;
+  // 6. 综合评分（单一真源：REFACTOR_REQUIREMENTS.md 8.6）
+  const totalScore = Math.min(
+    Math.max(
+      gravityScore * 0.30 +
+      freqScore * 0.15 +
+      avgTagRisk * 0.10 +
+      stabilityBoost +
+      impactScore * 0.10,
+      0
+    ),
+    1
+  );
 
   const riskFactors: string[] = [];
   if (gravityScore > 0.7) riskFactors.push('高依赖复杂度');
@@ -589,9 +595,10 @@ class CommitValidator {
 | 维度 | 指标 | 计算方式 | 权重 |
 |------|------|----------|------|
 | **GRAVITY** | 依赖复杂度 | (出度 + 入度) / 20 | 30% |
-| **HEAT** | 修改热度 | (30天修改次数 / 10) * 0.5 + 标签风险 * 0.5 | 25% |
+| **HEAT.freq30d** | 修改频率 | 30天修改次数 / 10 | 15% |
+| **HEAT.lastType** | 最后提交标签 | 标签风险值 | 10% |
 | **IMPACT** | 影响面 | 被依赖文件数 / 50 | 10% |
-| **STABILITY** | 稳定性 | 不稳定文件比例 * -0.2 | - |
+| **STABILITY** | 稳定性 | 不稳定文件比例 * 0.15 | 15% |
 
 ### 6.2 标签风险权重
 

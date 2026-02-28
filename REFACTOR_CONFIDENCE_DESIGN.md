@@ -1,6 +1,6 @@
 # 置信度机制详细设计
 
-> 版本: 2.3
+> 版本: 2.4
 > 所属模块: 编排层 - 置信度计算
 
 ---
@@ -189,9 +189,9 @@ function getThreshold(intent: IntentType, level: 'high' | 'medium'): number {
 ```typescript
 // 工作流阶段的置信度要求
 
-const PHASE_CONFIDENCE_REQUIREMENTS: Record<string, { min: number; auto: boolean }> = {
-  reference: { min: 0.3, auto: true },   // 参考搜索：置信度 > 0.7 可自动推进
-  impact: { min: 0.4, auto: true },      // 影响分析：置信度 > 0.7 可自动推进
+const PHASE_CONFIDENCE_REQUIREMENTS: Record<string, { min: number; auto: boolean; autoThreshold?: number }> = {
+  reference: { min: 0.3, auto: true, autoThreshold: 0.7 },   // >=0.7 自动推进
+  impact: { min: 0.4, auto: true, autoThreshold: 0.7 },      // >=0.7 自动推进
   risk: { min: 0, auto: false },         // 风险评估：始终需要用户确认
   implementation: { min: 0, auto: false }, // 代码实现：需要用户触发
   commit: { min: 0, auto: false },       // 提交：需要用户触发

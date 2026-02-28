@@ -1,6 +1,6 @@
 # 测试关联器详细设计
 
-> 版本: 2.3
+> 版本: 2.4
 > 所属模块: 编排层 - 测试关联器
 
 ---
@@ -170,20 +170,17 @@ findRelatedTests(sourceFiles: string[]): string[] {
 ```typescript
 private inferSourceFile(testFile: string): string | null {
   // lru-cache.test.ts → lru-cache.ts
-  // lru-cache.spec.ts → lru-cache.ts
-  // __tests__/lru-cache.test.ts → ../lru-cache.ts
-  const patterns = [
-    /^(.+?)\.(test|spec)\.ts$/,
-    /^__tests__\/(.+?)\.(test|spec)\.ts$/
-  ];
+  // src/cache/__tests__/lru-cache.test.ts → src/cache/lru-cache.ts
+  const normalized = testFile.replace(/\\/g, '/');
+  const baseMatch = normalized.match(/^(.+?)\.(test|spec)\.ts$/);
+  if (!baseMatch) return null;
 
-  for (const pattern of patterns) {
-    const match = testFile.match(pattern);
-    if (match) {
-      return match[1] + '.ts';
-    }
+  const base = baseMatch[1];
+  // 处理任意层级的 __tests__ 目录
+  if (base.includes('/__tests__/')) {
+    return base.replace('/__tests__/', '/') + '.ts';
   }
-  return null;
+  return base + '.ts';
 }
 ```
 

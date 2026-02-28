@@ -1,8 +1,8 @@
 # CodeMap 编排层重构设计方案 - 概要设计
 
-> 版本: 2.4
+> 版本: 2.5
 > 日期: 2026-02-28
-> 状态: 待实施（含 CI 门禁设计）
+> 状态: 待实施（含 CI 门禁与契约修订）
 
 ---
 
@@ -193,7 +193,7 @@ interface ExpansionConfig {
 |------|------|----------|------|--------|
 | **CodeMap 核心** | 代码结构提取、依赖图生成、复杂度分析、影响评估、项目概览 | 本地调用 | 0.9 | 用户可见 |
 | **ast-grep** | 代码模式匹配、语义搜索、AST 分析（v1 聚焦 TS/JS） | fork 子进程 | 1.0 | 用户可见 |
-| **rg** | 快速文本搜索（仅内部调试用，默认关闭） | fork 子进程 | 0.7 | **仅内部** |
+| **rg-internal** | 内部兜底文本搜索（默认关闭） | fork 子进程 | 0.7 | **仅内部** |
 | **AI 饲料** | 结构化代码元数据、风险评估数据 | 本地调用 | 0.85 | 用户可见 (v2.4 新增) |
 
 ### 输出协议版本化
@@ -290,6 +290,8 @@ tests/golden/
 - 计算 GRAVITY/HEAT/IMPACT 三维评分
 - 输出 `.codemap/ai-feed.txt`
 
+> 风险评分公式统一以 `REFACTOR_REQUIREMENTS.md` 第 8.6 节为单一真源。
+
 **详见**: [REFACTOR_GIT_ANALYZER_DESIGN.md](./REFACTOR_GIT_ANALYZER_DESIGN.md) 第4节
 
 ### 4.7 CI 门禁护栏 (v2.4 新增)
@@ -341,6 +343,7 @@ codemap ci check-output-contract # 验证输出契约（schemaVersion、Top-K、
 # 工作流命令 (v2.5 规划)
 codemap workflow start            # 启动交互式工作流
 codemap workflow status          # 查看当前工作流状态
+codemap workflow proceed         # 推进到下一阶段
 codemap workflow resume          # 恢复中断的工作流
 codemap workflow checkpoint      # 手动创建检查点
 ```
@@ -398,11 +401,19 @@ const AnalyzeArgsSchema = {
       type: 'boolean',
       default: false,
       description: 'JSON 格式输出'
+    },
+    outputMode: {
+      type: 'string',
+      enum: ['machine', 'human'],
+      default: 'human',
+      description: '输出模式。machine 模式禁止额外日志，保证纯 JSON'
     }
   },
   required: []
 } as const;
 ```
+
+> 当 `json=true` 时，必须自动切换或强制要求 `outputMode='machine'`，以确保输出可被 `JSON.parse` 直接消费。
 
 #### 错误码表
 

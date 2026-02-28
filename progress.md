@@ -16,3 +16,8 @@
 - 按要求再次执行 `node dist/cli/index.js generate`（等效 `codemap generate`）。
 - 产物对比（基线：`/tmp/codemap-before-3dumZ5`）：新增 4 个文件，变更 55 个文件，删除 0。
 - 重点修复确认：`actualMode` 从 `fast` 修正为 `smart`；`context/README.md` 链接修正；`claude.md` 的 `Imported By` 已恢复为 `src/ai/factory.ts`。
+
+## 2026-02-28 新任务：重构设计文档 Review
+- 已创建 `task_plan.md` 并定义 DoD、约束和失败模式。
+- 下一步：逐份读取 8 个文档并做交叉一致性校验。
+- 已完成 8 份文档交叉审查，形成高/中风险问题清单并准备输出带行号证据的 review。

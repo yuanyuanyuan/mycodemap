@@ -1,6 +1,6 @@
 # 多工具结果融合详细设计
 
-> 版本: 2.4
+> 版本: 2.5
 > 所属模块: 编排层 - 结果融合
 > 更新日期: 2026-02-28
 
@@ -110,8 +110,11 @@ class ResultFusion {
     const sorted = Array.from(seen.values())
       .sort((a, b) => b.relevance - a.relevance);
 
-    // 4. 关键词加权
-    const keywordBoosted = this.applyKeywordBoost(sorted, options.keywordWeights);
+    // 4. 风险加权（v2.4）
+    const riskBoosted = this.applyRiskBoost(sorted);
+
+    // 5. 关键词加权
+    const keywordBoosted = this.applyKeywordBoost(riskBoosted, options.keywordWeights);
 
     return keywordBoosted.slice(0, options.topK);
   }
@@ -211,11 +214,31 @@ function formatAIFeedContent(f: AIFeed): string {
 function calculateRiskLevel(f: AIFeed): 'high' | 'medium' | 'low' {
   // 风险评分公式以 REFACTOR_REQUIREMENTS.md 为单一真源
   // 此处实现应与需求文档保持一致
-  const score =
-    (f.gravity / 20) * 0.3 +
-    (Math.min(f.heat.freq30d, 10) / 10) * 0.25 +
-    (f.dependents.length / 50) * 0.1 +
-    (f.meta.stable ? 0 : 0.15);
+  const tagWeights: Record<string, number> = {
+    BUGFIX: 0.9,
+    FEATURE: 0.7,
+    REFACTOR: 0.8,
+    CONFIG: 0.5,
+    DOCS: 0.2,
+    DELETE: 0.1,
+    UNKNOWN: 0.5
+  };
+  const gravityNorm = Math.min(f.gravity / 20, 1);
+  const freqNorm = Math.min(f.heat.freq30d / 10, 1);
+  const tagWeight = tagWeights[f.heat.lastType] ?? tagWeights.UNKNOWN;
+  const stableBoost = f.meta.stable ? 0 : 0.15;
+  const impactNorm = Math.min(f.dependents.length / 50, 1);
+  const score = Math.min(
+    Math.max(
+      gravityNorm * 0.30 +
+      freqNorm * 0.15 +
+      tagWeight * 0.10 +
+      stableBoost +
+      impactNorm * 0.10,
+      0
+    ),
+    1
+  );
 
   if (score > 0.7) return 'high';
   if (score > 0.4) return 'medium';

@@ -1,6 +1,6 @@
 # CLI 命令与编排层详细设计
 
-> 版本: 2.3
+> 版本: 2.5
 > 所属模块: 编排层 - CLI 命令与工具编排器
 
 ---
@@ -153,7 +153,7 @@ class AstGrepAdapter implements ToolAdapter {
 
   /**
    * 检测 ast-grep 是否可用
-   * 如果不可用，后续调用会自动回退到 rg
+   * 如果不可用，后续调用会自动回退到内部文本兜底链路
    */
   async isAvailable(): Promise<boolean> {
     if (this.available !== null) return this.available;
@@ -275,6 +275,7 @@ export class AnalyzeCommand {
 
   async run(args: AnalyzeArgs): Promise<void> {
     const intent = this.router.route(args);
+    const outputMode = args.outputMode || 'human';
 
     switch (intent.intent) {
       case 'impact':
@@ -300,12 +301,15 @@ export class AnalyzeCommand {
       case 'overview':
       case 'documentation':
       case 'refactor':
-        // 新功能，走编排器（带置信度和回退）
+      // 新功能，走编排器（带置信度和回退）
         const { results, tool, confidence } = await this.orchestrator.executeWithFallback(
           intent,
           intent.tool
         );
-        console.log(`Tool: ${tool}, Confidence: ${confidence.level} (${confidence.score.toFixed(2)})`);
+        // machine/json 模式禁止额外前缀日志，保证纯 JSON 输出契约
+        if (outputMode === 'human' && !args.json) {
+          console.log(`Tool: ${tool}, Confidence: ${confidence.level} (${confidence.score.toFixed(2)})`);
+        }
         return this.output(results);
     }
   }
@@ -377,7 +381,7 @@ AnalyzeCommand (analyze.ts)
   │              │
   │              ├─────▶ AstGrepAdapter (ast-grep-adapter.ts)
   │              ├─────▶ CodemapAdapter (codemap-adapter.ts)
-  │              ├─────▶ RgAdapter (rg-adapter.ts)
+  │              ├─────▶ RgInternalAdapter (rg-adapter.ts, 内部兜底)
   │              │
   │              └─────▶ ResultFusion (result-fusion.ts)
   │                           │
@@ -396,7 +400,7 @@ AnalyzeCommand (analyze.ts)
     "enabled": true,
     "tools": {
       "ast-grep": { "enabled": true, "command": "sg", "required": false },
-      "rg": { "enabled": true, "command": "rg", "required": true }
+      "rg-internal": { "enabled": false, "command": "rg", "required": false }
     },
     "output": {
       "topK": 8,
@@ -447,7 +451,9 @@ type WorkflowPhase =
 
 interface PhaseDefinition {
   name: WorkflowPhase;
-  intent: string;                    // 对应的 analyze intent
+  action: 'analyze' | 'ci' | 'manual'; // 阶段执行方式
+  analyzeIntent?: IntentType;        // 仅 action=analyze 时需要
+  ciCommand?: string;                // 仅 action=ci 时需要
   entryCondition: PhaseCondition;   // 入口条件
   deliverables: Deliverable[];       // 交付物
   nextPhase?: WorkflowPhase;         // 下一阶段
@@ -562,11 +568,13 @@ class WorkflowOrchestrator {
     this.context.phaseStatus = 'running';
     await this.persistence.save(this.context);
 
-    // 执行分析
-    const results = await this.runAnalysis(definition.intent, analyzeArgs);
+    // 按阶段执行方式运行（避免将非 analyze 阶段误当作 intent）
+    const results = await this.runPhase(definition, analyzeArgs);
 
-    // 计算置信度
-    const confidence = calculateConfidence(results, definition.intent as IntentType);
+    // 仅 analyze 阶段计算置信度
+    const confidence = definition.action === 'analyze' && definition.analyzeIntent
+      ? calculateConfidence(results, definition.analyzeIntent)
+      : { score: 1, level: 'high', reasons: ['non-analyze phase'] };
 
     // 保存产物
     const artifacts: PhaseArtifacts = {
@@ -584,6 +592,20 @@ class WorkflowOrchestrator {
     await this.persistence.save(this.context);
 
     return { artifacts, confidence, canProceed: this.checkProceedCondition(confidence) };
+  }
+
+  private async runPhase(
+    definition: PhaseDefinition,
+    analyzeArgs: AnalyzeArgs
+  ): Promise<UnifiedResult[]> {
+    if (definition.action === 'analyze' && definition.analyzeIntent) {
+      return this.runAnalysis(definition.analyzeIntent, analyzeArgs);
+    }
+    if (definition.action === 'ci' && definition.ciCommand) {
+      await this.runCICommand(definition.ciCommand);
+      return [];
+    }
+    return [];
   }
 
   /**
@@ -643,8 +665,9 @@ class WorkflowOrchestrator {
    */
   async getStatus(): Promise<WorkflowStatus> {
     if (!this.context) {
-      return { active: false };
+      this.context = await this.persistence.loadActive();
     }
+    if (!this.context) return { active: false };
 
     return {
       active: true,
@@ -666,7 +689,8 @@ class WorkflowOrchestrator {
     return new Map([
       ['reference', {
         name: 'reference',
-        intent: 'reference',
+        action: 'analyze',
+        analyzeIntent: 'reference',
         entryCondition: { minConfidence: 0.3 },
         deliverables: [
           { name: 'reference-results', path: '.codemap/workflow/reference.json', validator: () => true }
@@ -676,7 +700,8 @@ class WorkflowOrchestrator {
       }],
       ['impact', {
         name: 'impact',
-        intent: 'impact',
+        action: 'analyze',
+        analyzeIntent: 'impact',
         entryCondition: { minConfidence: 0.4 },
         deliverables: [
           { name: 'impact-report', path: '.codemap/workflow/impact.json', validator: () => true }
@@ -686,7 +711,8 @@ class WorkflowOrchestrator {
       }],
       ['risk', {
         name: 'risk',
-        intent: 'assess-risk',
+        action: 'ci',
+        ciCommand: 'codemap ci assess-risk --threshold 0.7',
         entryCondition: {},
         deliverables: [
           { name: 'risk-assessment', path: '.codemap/workflow/risk.json', validator: () => true }
@@ -696,7 +722,7 @@ class WorkflowOrchestrator {
       }],
       ['implementation', {
         name: 'implementation',
-        intent: 'implementation',
+        action: 'manual',
         entryCondition: {},
         deliverables: [
           { name: 'implementation', path: 'src/', validator: () => true }
@@ -706,7 +732,7 @@ class WorkflowOrchestrator {
       }],
       ['commit', {
         name: 'commit',
-        intent: 'commit',
+        action: 'manual',
         entryCondition: {},
         deliverables: [
           { name: 'commit', path: '.git/COMMIT_EDITMSG', validator: () => true }
@@ -716,7 +742,8 @@ class WorkflowOrchestrator {
       }],
       ['ci', {
         name: 'ci',
-        intent: 'ci',
+        action: 'ci',
+        ciCommand: 'npm test && codemap ci check-commits && codemap ci check-headers && codemap ci check-output-contract',
         entryCondition: {},
         deliverables: [],
         commands: []
@@ -733,6 +760,7 @@ class WorkflowOrchestrator {
 
 class WorkflowPersistence {
   private storagePath = '.codemap/workflow';
+  private activePath = '.codemap/workflow/active.json';
 
   async save(context: WorkflowContext): Promise<void> {
     const fs = require('fs').promises;
@@ -742,7 +770,8 @@ class WorkflowPersistence {
     await fs.mkdir(this.storagePath, { recursive: true });
 
     const filePath = path.join(this.storagePath, `${context.id}.json`);
-    await fs.writeFile(filePath, JSON.stringify(context, null, 2));
+    await fs.writeFile(filePath, JSON.stringify(this.serialize(context), null, 2));
+    await fs.writeFile(this.activePath, JSON.stringify({ id: context.id }, null, 2));
   }
 
   async load(id: string): Promise<WorkflowContext | null> {
@@ -753,7 +782,18 @@ class WorkflowPersistence {
 
     try {
       const content = await fs.readFile(filePath, 'utf-8');
-      return JSON.parse(content);
+      return this.deserialize(JSON.parse(content));
+    } catch {
+      return null;
+    }
+  }
+
+  async loadActive(): Promise<WorkflowContext | null> {
+    const fs = require('fs').promises;
+    try {
+      const content = await fs.readFile(this.activePath, 'utf-8');
+      const { id } = JSON.parse(content);
+      return id ? this.load(id) : null;
     } catch {
       return null;
     }
@@ -796,6 +836,24 @@ class WorkflowPersistence {
 
     const filePath = path.join(this.storagePath, `${id}.json`);
     await fs.unlink(filePath);
+  }
+
+  private serialize(context: WorkflowContext) {
+    return {
+      ...context,
+      artifacts: Array.from(context.artifacts.entries()),
+      userConfirmed: Array.from(context.userConfirmed.values())
+    };
+  }
+
+  private deserialize(raw: any): WorkflowContext {
+    return {
+      ...raw,
+      artifacts: new Map(raw.artifacts || []),
+      userConfirmed: new Set(raw.userConfirmed || []),
+      startedAt: new Date(raw.startedAt),
+      updatedAt: new Date(raw.updatedAt)
+    };
   }
 }
 ```
@@ -868,8 +926,12 @@ workflow.command('proceed')
       return;
     }
 
-    // 显示当前阶段结果摘要
-    // ...
+    if (status.phaseStatus !== 'completed' && !options.force) {
+      console.log(`Current phase ${status.currentPhase} is not completed. Use --force to override.`);
+      return;
+    }
+
+    const next = await orchestrator.proceedToNextPhase();
 
     console.log(`
 [PHASE COMPLETED]
@@ -877,6 +939,7 @@ workflow.command('proceed')
 
 Current phase: ${status.currentPhase}
 Status: ${status.phaseStatus}
+Next phase: ${next}
 
 Type "codemap workflow proceed" to continue to next phase.
 `);

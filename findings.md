@@ -27,3 +27,13 @@
 - 基线目录：`/tmp/codemap-before-3dumZ5`
 - `codemap generate` 后：新增 4、变更 55、删除 0
 - 新增文件：`CONTEXT.md`、`dependency-graph.md`、`context/src/core/__tests__/analyzer.test.md`、`context/src/generator/__tests__/context.test.md`
+
+## 2026-02-28 文档 Review（进行中）
+- 待填充：8 份重构/CI 设计文档交叉审查结论。
+- [高] 工作流上下文使用 `Map/Set`，但持久化采用 `JSON.stringify`，恢复后类型丢失，`status`/`artifacts.keys()` 路径会失效。
+- [高] 工作流阶段 intent 与 analyze intent 契约不一致（`assess-risk`/`implementation`/`commit`/`ci` 不在 IntentType）。
+- [高] 风险评分公式在多个文档不一致，且 GitAnalyzer 公式上限低于 high 阈值，导致 high 分级理论上不可达。
+- [高] `ci check-output-contract` 依赖 `--json` 纯 JSON 输出，但 analyze 设计中存在无条件日志前缀，JSON 解析会失败。
+- [中] `workflow status/proceed` 每次新建 orchestrator 实例且未恢复上下文，`proceed` 示例代码未调用推进方法。
+- [中] TestLinker 的 `__tests__` 路径推断正则与注释示例不一致，易将测试文件映射回错误源路径。
+- [中] rg 可见性策略冲突：架构声明“仅内部且默认关闭”，需求场景却将 rg 作为用户可见回退链路。

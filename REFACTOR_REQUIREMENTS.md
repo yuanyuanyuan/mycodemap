@@ -1,18 +1,21 @@
 # CodeMap 编排层重构设计方案 - 需求与用户场景
 
-> 版本: 2.4
+> 版本: 2.5
 > 日期: 2026-02-28
 > 状态: 待实施（含 CI 门禁设计）
 
 ---
 
-## 修订说明 (v2.4)
+## 修订说明 (v2.5)
 
 ### 新增内容
 - **CI 门禁护栏**：增加 Git Hook + GitHub Actions 双门禁
 - **极简 Commit 格式**：`[TAG] scope: message` 格式，AI 可正则解析
 - **文件头注释强制**：所有 TS 文件必须有 `[META]` 和 `[WHY]` 注释
 - **AI 饲料生成器**：`codemap generate` 生成 `.codemap/ai-feed.txt`
+- **工作流上下文持久化协议**：`Map/Set` 显式序列化，恢复时反序列化
+- **机器输出契约**：`--output-mode machine --json` 必须为纯 JSON（无前缀日志）
+- **风险评分单一真源**：以本文第 8.6 节公式为唯一实现依据
 
 ### 设计原则更新
 - **极简落地**：总代码量控制在 150 行以内
@@ -134,9 +137,9 @@ codemap analyze --intent search --keywords foobar
 | 2 | 意图路由 | `IntentRouter.route()` | `{ tool: 'ast-grep' }` |
 | 3 | 主工具执行 | `AstGrepAdapter.execute(['foobar'])` | `SearchResult[]` (1 个文件, score: 0.3) |
 | 4 | 置信度计算 | `calculateConfidence(results, 'search')` | `{ score: 0.28, level: 'low', reasons: ['仅找到 1 个结果'] }` |
-| 5 | 触发回退 | `score < 0.3` → 尝试 rg | |
-| 6 | 回退执行 | `RgAdapter.execute(['foobar'])` | `SearchResult[]` (2 个文件) |
-| 7 | 结果融合 | `mergeResults(ast-grep, rg)` | 去重后 2 个结果 |
+| 5 | 触发回退 | `score < 0.3` → 启动内部兜底链路 | |
+| 6 | 回退执行 | `InternalFallbackAdapter.execute(['foobar'])` | `SearchResult[]` (2 个文件) |
+| 7 | 结果融合 | `mergeResults(ast-grep, internal-fallback)` | 去重后 2 个结果 |
 | 8 | 重新计算置信度 | `calculateConfidence(merged, 'search')` | `{ score: 0.45, level: 'medium' }` |
 | 9 | 输出 | `formatOutput()` | 带回退说明的结果 |
 
@@ -151,10 +154,10 @@ Keyword: "foobar"
    // 原始结果来自 ast-grep
 
 2. src/config/default.ts:12 (relevance: 25%)
-   // 来自 rg 回退搜索
+   // 来自内部兜底链路
 
-[Note]: Results limited, rg fallback enabled
-Tools: ast-grep → rg, Confidence: medium (0.45)
+[Note]: Results limited, internal fallback enabled
+Tools: ast-grep → internal-fallback, Confidence: medium (0.45)
 ```
 
 ### 8.3 场景三：代码搜索（高置信度场景）
@@ -222,9 +225,9 @@ codemap analyze --intent documentation --keywords "系统架构"
 
 | 步骤 | 操作 | 代码执行 | 输出 |
 |------|------|----------|------|
-| 1 | 命令解析 | `analyze.ts` : 'documentation', keywords: ['系统架构'] }` |
-| 2 | 意图路由解析 | `{ intent | `IntentRouter.route()` | `{ tool: 'rg', pattern: '*.md' }` |
-| 3 | 主工具执行 | `RgAdapter.execute({ pattern: '*.md', keywords: ['系统架构'] })` | `SearchResult[]` (3 个文档) |
+| 1 | 命令解析 | `analyze.ts` 解析 | `{ intent: 'documentation', keywords: ['系统架构'] }` |
+| 2 | 意图路由 | `IntentRouter.route()` | `{ tool: 'codemap' }` |
+| 3 | 主工具执行 | `CodemapAdapter.queryDocs({ keywords: ['系统架构'] })` | `SearchResult[]` (3 个文档) |
 | 4 | 置信度计算 | `calculateConfidence(results, 'documentation')` | `{ score: 0.65, level: 'medium' }` |
 | 5 | 结果融合 | 转换为 UnifiedResult | 统一格式 |
 | 6 | 排序裁剪 | 按 relevance 排序 | Top-8 |
@@ -368,7 +371,7 @@ git commit -m "[FEATURE] git-analyzer: add risk scoring"
 | 3 | Commit 格式检查 | `codemap ci check-commits` | ❌ 阻止合并 |
 | 4 | 文件头注释检查 | `codemap ci check-headers` | ❌ 阻止合并 |
 | 5 | 生成并验证 AI 饲料 | `codemap generate && git diff --exit-code` | ❌ 阻止合并 |
-| 6 | 危险置信度评估 | `codemap ci assess-risk` | ⚠️ 高风险需审批 |
+| 6 | 危险置信度评估 | `codemap ci assess-risk` | ❌ 高风险阻断，需补充缓解说明后重试 |
 
 **CI 通过** → 允许合并
 
@@ -457,13 +460,26 @@ Claude 读取 `.codemap/ai-feed.txt`：
 
 **危险置信度计算**（AI 饲料维度）：
 
+> **单一真源说明**：风险评分实现（`GitAnalyzer`、`ResultFusion`、`codemap ci assess-risk`）必须严格使用本节公式与阈值。
+
 | 维度 | 来源 | 权重 | 说明 |
 |------|------|------|------|
-| **GRAVITY** | 依赖数 | 30% | 出度+入度，复杂度指标 |
-| **HEAT.freq30d** | 30天修改次数 | 15% | 频繁修改 = 不稳定 |
-| **HEAT.lastType** | 最后提交标签 | 10% | BUGFIX > FEATURE > DOCS |
-| **META.stable** | 是否稳定 | 15% | stable:false = 不稳定 |
-| **IMPACT** | 被依赖文件数 | 10% | 影响面广 = 风险高 |
+| **GRAVITY** | 依赖数 | 30% | `gravityNorm = min(gravity/20, 1)` |
+| **HEAT.freq30d** | 30天修改次数 | 15% | `freqNorm = min(freq30d/10, 1)` |
+| **HEAT.lastType** | 最后提交标签 | 10% | `tagWeight(lastType)` |
+| **META.stable** | 是否稳定 | 15% | `stableBoost = stable ? 0 : 0.15` |
+| **IMPACT** | 被依赖文件数 | 10% | `impactNorm = min(impact/50, 1)` |
+
+**统一公式**：
+
+```text
+score = gravityNorm * 0.30
+      + freqNorm * 0.15
+      + tagWeight(lastType) * 0.10
+      + stableBoost
+      + impactNorm * 0.10
+score = clamp(score, 0, 1)
+```
 
 **风险等级**：
 - `high`: 分数 > 0.7 → 需要 commit body 说明风险缓解措施
@@ -731,7 +747,7 @@ git add src && git commit -/features/rename/m "[FEATURE] file-rename: add batch 
 | 4 | Commit 格式 | `codemap ci check-commits` | ❌ 阻止合并 |
 | 5 | 文件头注释 | `codemap ci check-headers` | ❌ 阻止合并 |
 | 6 | AI 饲料验证 | `codemap generate && git diff --exit-code` | ❌ 阻止合并 |
-| 7 | 风险评估 | `codemap ci assess-risk --threshold 0.7` | ⚠️ 警告 |
+| 7 | 风险评估 | `codemap ci assess-risk --threshold 0.7` | ❌ 高风险阻断 |
 
 **CI 通过** → 允许合并
 

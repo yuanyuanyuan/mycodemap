@@ -1,6 +1,6 @@
 # CI 门禁护栏详细设计
 
-> 版本: 1.0
+> 版本: 1.1
 > 所属模块: CI/CD - Git 工作流门禁
 > 日期: 2026-02-28
 
@@ -233,6 +233,10 @@ jobs:
     # 5. 评估危险置信度
     - name: Assess risk
       run: npx codemap ci assess-risk --threshold=0.7
+
+    # 6. 输出契约检查（machine/json）
+    - name: Check output contract
+      run: npx codemap ci check-output-contract --schema-version v1.0.0 --top-k 8 --max-tokens 160
 ```
 
 ### 4.2 CI 子命令实现
@@ -317,12 +321,33 @@ ci.command('assess-risk')
     
     // 计算风险分数
     const changedFeed = feed.filter(f => changedFiles.includes(f.file));
+    const tagWeights = {
+      BUGFIX: 0.9,
+      FEATURE: 0.7,
+      REFACTOR: 0.8,
+      CONFIG: 0.5,
+      DOCS: 0.2,
+      DELETE: 0.1,
+      UNKNOWN: 0.5
+    };
     const highRiskFiles = changedFeed.filter(f => {
-      const score = 
-        (f.gravity / 20) * 0.3 +
-        (Math.min(f.heat.freq30d, 10) / 10) * 0.25 +
-        (f.dependents.length / 50) * 0.1 +
-        (f.meta.stable ? 0 : 0.15);
+      // 风险公式与 REFACTOR_REQUIREMENTS.md 8.6 保持一致
+      const gravityNorm = Math.min(f.gravity / 20, 1);
+      const freqNorm = Math.min(f.heat.freq30d / 10, 1);
+      const tagWeight = tagWeights[f.heat.lastType] ?? tagWeights.UNKNOWN;
+      const stableBoost = f.meta.stable ? 0 : 0.15;
+      const impactNorm = Math.min(f.dependents.length / 50, 1);
+      const score = Math.min(
+        Math.max(
+          gravityNorm * 0.30 +
+            freqNorm * 0.15 +
+            tagWeight * 0.10 +
+            stableBoost +
+            impactNorm * 0.10,
+          0
+        ),
+        1
+      );
       return score > parseFloat(options.threshold);
     });
     
@@ -350,11 +375,11 @@ ci.command('check-output-contract')
     const topK = parseInt(options.topK) || 8;
     const maxTokens = parseInt(options.maxTokens) || 160;
 
-    // 运行 analyze 命令获取输出
+    // 运行 analyze 命令获取输出（machine 模式必须为纯 JSON）
     const { execSync } = require('child_process');
     let output;
     try {
-      output = execSync('npx codemap analyze --intent search --keywords test --json', {
+      output = execSync('npx codemap analyze --intent search --keywords test --output-mode machine --json', {
         encoding: 'utf-8',
         timeout: 30000
       });
