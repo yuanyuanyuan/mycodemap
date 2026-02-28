@@ -1,0 +1,40 @@
+# 任务元数据
+# 用于任务追溯和复用
+
+metadata:
+  task_id: ""              # 任务唯一标识
+  task_name: ""            # 任务名称
+  version: "1.0.0"         # 当前版本
+  created_at: ""           # 创建时间（ISO 8601）
+  updated_at: ""           # 更新时间
+
+# 任务属性
+task:
+  type: ""                 # code_generation/migration/refactoring/optimization/review
+  difficulty: ""            # easy/medium/hard
+  estimated_minutes: 30   # 预估完成时间
+
+# 能力维度
+capabilities:
+  tested:                  # 测试的能力
+    - ""
+  required_knowledge:      # 需要的知识
+    - ""
+
+# 陷阱设计
+traps:
+  - name: ""              # 陷阱名称
+    description: ""       # 陷阱描述
+    severity: ""          # critical/high/medium/low
+
+# 反例场景
+counter_examples:
+  - user_type: ""        # 反例用户类型
+    scenario: ""         # 不适用场景
+    reason: ""           # 原因
+
+# 版本历史
+version_history:
+  - version: "1.0.0"
+    date: ""
+    changes: ""

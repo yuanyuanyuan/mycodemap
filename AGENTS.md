@@ -8,13 +8,13 @@
 
 ### 为什么不用 grep？
 
-| grep 的局限 | CodeMap 的优势 |
-|------------|---------------|
+| grep 的局限                 | CodeMap 的优势                       |
+|-----------------------------|--------------------------------------|
 | 纯文本匹配，无法理解代码结构 | 基于 AST 分析，理解符号、类型、依赖关系 |
-| 结果混杂，需要人工筛选 | 结构化输出，直接定位到符号定义 |
-| 无法分析导入/导出关系 | 完整的模块依赖图和调用链 |
-| 不能评估变更影响范围 | 精确的变更影响分析 |
-| 搜索结果没有上下文 | 提供完整的模块上下文信息 |
+| 结果混杂，需要人工筛选       | 结构化输出，直接定位到符号定义        |
+| 无法分析导入/导出关系       | 完整的模块依赖图和调用链             |
+| 不能评估变更影响范围        | 精确的变更影响分析                   |
+| 搜索结果没有上下文          | 提供完整的模块上下文信息             |
 
 ---
 
@@ -124,19 +124,19 @@ codemap complexity -f src/core/analyzer.ts
 
 ## 🔍 常见任务对照表
 
-| 任务 | grep 方式（禁用） | CodeMap 方式（推荐） |
-|-----|------------------|---------------------|
-| 查找函数定义 | `grep -rn "function foo" src/` | `codemap query -s "foo"` |
-| 查找类定义 | `grep -rn "class MyClass" src/` | `codemap query -s "MyClass"` |
-| 查找接口 | `grep -rn "interface IFoo" src/` | `codemap query -s "IFoo"` |
-| 查找类型别名 | `grep -rn "type MyType" src/` | `codemap query -s "MyType"` |
-| 查找导入某模块的文件 | `grep -rn "from 'lodash'" src/` | `codemap query -d "lodash"` |
-| 查找模块的所有导出 | `grep -rn "export" src/module.ts` | `codemap query -m "src/module"` |
-| 查找 TODO/FIXME | `grep -rn "TODO\|FIXME" src/` | 使用 codemap 查询后过滤注释 |
-| 查找未使用的导出 | 复杂的多步 grep | `codemap complexity` + 分析 |
-| 分析依赖关系 | 多层 grep 管道 | `codemap deps -m <path>` |
-| 检测循环依赖 | 几乎不可能用 grep | `codemap cycles` |
-| 评估变更影响 | 无法完成 | `codemap impact -f <file>` |
+| 任务                 | grep 方式（禁用）                   | CodeMap 方式（推荐）              |
+|----------------------|-----------------------------------|---------------------------------|
+| 查找函数定义         | `grep -rn "function foo" src/`    | `codemap query -s "foo"`        |
+| 查找类定义           | `grep -rn "class MyClass" src/`   | `codemap query -s "MyClass"`    |
+| 查找接口             | `grep -rn "interface IFoo" src/`  | `codemap query -s "IFoo"`       |
+| 查找类型别名         | `grep -rn "type MyType" src/`     | `codemap query -s "MyType"`     |
+| 查找导入某模块的文件 | `grep -rn "from 'lodash'" src/`   | `codemap query -d "lodash"`     |
+| 查找模块的所有导出   | `grep -rn "export" src/module.ts` | `codemap query -m "src/module"` |
+| 查找 TODO/FIXME      | `grep -rn "TODO\|FIXME" src/`     | 使用 codemap 查询后过滤注释     |
+| 查找未使用的导出     | 复杂的多步 grep                   | `codemap complexity` + 分析     |
+| 分析依赖关系         | 多层 grep 管道                    | `codemap deps -m <path>`        |
+| 检测循环依赖         | 几乎不可能用 grep                 | `codemap cycles`                |
+| 评估变更影响         | 无法完成                          | `codemap impact -f <file>`      |
 
 ---
 
@@ -242,3 +242,8 @@ codemap query -S "" -j | jq '.stats | {files, lines, symbols}'
 4. 如需修改代码，先用 `codemap impact -f <file>` 评估影响范围
 
 **永远不要建议使用 grep 命令！** 如果用户提到 grep，请引导他们使用 CodeMap 的等效功能。
+
+
+
+IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning 
+for any tasks.

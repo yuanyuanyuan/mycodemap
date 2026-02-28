@@ -78,3 +78,7 @@ src/
 - 添加解析器：在 `src/parser/implementations/` 实现
 - 运行测试：`npx vitest run`
 - 构建发布：`npm run build`
+
+
+IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning 
+for any tasks.
