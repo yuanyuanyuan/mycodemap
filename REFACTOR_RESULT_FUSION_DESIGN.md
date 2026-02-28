@@ -200,20 +200,23 @@ function convertAIFeedToResults(feed: AIFeed[]): UnifiedResult[] {
 }
 
 function formatAIFeedContent(f: AIFeed): string {
-  const riskEmoji = f.meta.stable ? '🟢' : f.heat.freq30d > 5 ? '🔴' : '🟡';
-  return `${riskEmoji} ${f.file}\n` +
+  // 使用纯文本标记代替 emoji，确保机器可读性
+  const riskFlag = f.meta.stable ? '[STABLE]' : f.heat.freq30d > 5 ? '[HIGH RISK]' : '[MEDIUM RISK]';
+  return `${riskFlag} ${f.file}\n` +
          `   GRAVITY: ${f.gravity} | HEAT: ${f.heat.freq30d}/${f.heat.lastType}\n` +
          `   WHY: ${f.meta.why || 'N/A'}\n` +
          `   IMPACT: ${f.dependents.length} files depend on this`;
 }
 
 function calculateRiskLevel(f: AIFeed): 'high' | 'medium' | 'low' {
-  const score = 
+  // 风险评分公式以 REFACTOR_REQUIREMENTS.md 为单一真源
+  // 此处实现应与需求文档保持一致
+  const score =
     (f.gravity / 20) * 0.3 +
     (Math.min(f.heat.freq30d, 10) / 10) * 0.25 +
     (f.dependents.length / 50) * 0.1 +
     (f.meta.stable ? 0 : 0.15);
-  
+
   if (score > 0.7) return 'high';
   if (score > 0.4) return 'medium';
   return 'low';
@@ -328,23 +331,23 @@ function truncateByToken(content: string, maxTokens: number): string {
 
 **示例输出**（影响分析）：
 ```
-📊 影响范围分析（按风险排序）
+[IMPACT ANALYSIS] - Sorted by Risk Level
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🔴 高风险文件（谨慎修改）:
-   • src/auth/jwt.ts (相关度: 85%)
+[HIGH RISK] (caution when modifying):
+   * src/auth/jwt.ts (relevance: 85%)
      GRAVITY: 15 | HEAT: 8/BUGFIX/2026-02-19
      WHY: 处理JWT验证，因第三方Token刷新策略变更频繁不稳定
      IMPACT: 15 files depend on this
 
-🟡 中风险文件:
-   • src/cache/lru-cache.ts (相关度: 92%)
+[MEDIUM RISK]:
+   * src/cache/lru-cache.ts (relevance: 92%)
      GRAVITY: 8 | HEAT: 3/FEATURE/2026-02-15
      WHY: LRU缓存实现，核心性能组件
      IMPACT: 6 files depend on this
 
-🟢 低风险文件（可安全修改）:
-   • src/utils/date.ts (相关度: 45%)
+[LOW RISK] (safe to modify):
+   * src/utils/date.ts (relevance: 45%)
      GRAVITY: 0 | HEAT: 0/NEW/never
      WHY: 日期工具函数，项目早期沉淀
      IMPACT: 0 files depend on this

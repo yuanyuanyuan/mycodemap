@@ -34,6 +34,7 @@
 | Token 消耗降低 | >= 40% | 统计 analyze 输出 token 数 vs rg/grep 基准 |
 | Hit@8 | >= 90% | Top-8 结果中包含用户期望结果的比率 |
 | 默认输出规则 | Top-K=8、每条<=160 token | 代码约束 |
+| 输出模式 | `--output-mode machine\|human` | CI/AI 链路使用 machine 模式 |
 | 基准集 | 30 条查询 | 预先定义的典型查询 |
 | 搜索范围 | TS/JS + Markdown | 配置约束 |
 | Commit 格式 | `[TAG] scope: message` | 强制标签化 |
@@ -81,34 +82,34 @@ codemap analyze --intent impact --targets src/cache/ --scope transitive --includ
 
 **返回结果**：
 ```
-📊 影响范围分析
+[IMPACT ANALYSIS]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-目标: src/cache/
+Target: src/cache/
 
-🔍 相关文件 (ast-grep):
-   • src/cache/lru-cache.ts (相关度: 95%)
-   • src/cache/file-hash-cache.ts (相关度: 92%)
-   • src/cache/parse-cache.ts (相关度: 88%)
+[Related Files] (ast-grep):
+   * src/cache/lru-cache.ts (relevance: 95%)
+   * src/cache/file-hash-cache.ts (relevance: 92%)
+   * src/cache/parse-cache.ts (relevance: 88%)
 
-⚠️ 风险等级: 高
-   直接依赖: 12 个模块
-   传递依赖: 38 个模块 (全项目 73%)
+[Risk Level]: HIGH
+   Direct dependencies: 12 modules
+   Transitive dependencies: 38 modules (73% of project)
 
-🔴 危险因素:
-   • src/types/index.ts 被 35 个模块引用
+[Danger Factors]:
+   * src/types/index.ts is depended on by 35 modules
 
-📜 Git 历史:
-   • 12 次相关提交
-   • 近 30 天修改 8 次 (高频率)
+[Git History]:
+   * 12 related commits
+   * 8 modifications in last 30 days (high frequency)
 
-🧪 相关测试:
-   • src/cache/__tests__/lru-cache.test.ts
-   • src/cache/__tests__/file-hash-cache.test.ts
+[Related Tests]:
+   * src/cache/__tests__/lru-cache.test.ts
+   * src/cache/__tests__/file-hash-cache.test.ts
 
-💡 建议: 先修改接口定义，保持向后兼容
+[Suggestion]: Modify interface definitions first, maintain backward compatibility
 
-使用工具: codemap + ast-grep, 置信度: high (0.82)
+Tools: codemap + ast-grep, Confidence: high (0.82)
 ```
 
 ### 8.2 场景二：置信度触发回退
@@ -141,19 +142,19 @@ codemap analyze --intent search --keywords foobar
 
 **返回结果**：
 ```
-🔍 搜索结果
+[SEARCH RESULTS]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-关键词: "foobar"
+Keyword: "foobar"
 
-1. src/utils/helper.ts:45 (相关度: 30%)
+1. src/utils/helper.ts:45 (relevance: 30%)
    // 原始结果来自 ast-grep
 
-2. src/config/default.ts:12 (相关度: 25%)
+2. src/config/default.ts:12 (relevance: 25%)
    // 来自 rg 回退搜索
 
-⚠️ 结果较少，已启用 rg 回退搜索
-使用工具: ast-grep → rg, 置信度: medium (0.45)
+[Note]: Results limited, rg fallback enabled
+Tools: ast-grep → rg, Confidence: medium (0.45)
 ```
 
 ### 8.3 场景三：代码搜索（高置信度场景）
@@ -184,23 +185,23 @@ codemap analyze --intent search --keywords parser --top-k 8
 
 **返回结果**：
 ```
-🔍 搜索结果
+[SEARCH RESULTS]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-关键词: "parser"
+Keyword: "parser"
 
-1. src/parser/index.ts:15 (相关度: 98%)
+1. src/parser/index.ts:15 (relevance: 98%)
    class SmartParser { ... }
 
-2. src/parser/index.ts:8 (相关度: 95%)
+2. src/parser/index.ts:8 (relevance: 95%)
    export function createParser(...)
 
-3. src/parser/implementations/fast-parser.ts:12 (相关度: 92%)
+3. src/parser/implementations/fast-parser.ts:12 (relevance: 92%)
    class FastParser implements IParser { ... }
 
-... (显示前 8 条)
+... (showing first 8 results)
 
-使用工具: ast-grep, 置信度: high (0.85) ✓
+Tool: ast-grep, Confidence: high (0.85) [OK]
 ```
 
 ### 8.4 场景四：文档搜索（多工具融合）
@@ -230,20 +231,20 @@ codemap analyze --intent documentation --keywords "系统架构"
 
 **返回结果**：
 ```
-📚 文档搜索结果
+[DOCUMENTATION SEARCH]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-关键词: "系统架构"
+Keyword: "系统架构"
 
-1. docs/architecture.md (相关度: 94%)
-   片段: CodeMap 采用分层架构...
-   位置: 第 15-20 行
+1. docs/architecture.md (relevance: 94%)
+   Fragment: CodeMap 采用分层架构...
+   Location: Line 15-20
 
-2. refer/codemap-architecture-design.md (相关度: 87%)
-   片段: 架构设计文档...
-   位置: 第 1-10 行
+2. refer/codemap-architecture-design.md (relevance: 87%)
+   Fragment: 架构设计文档...
+   Location: Line 1-10
 
-使用工具: rg, 置信度: medium (0.65)
+Tool: codemap, Confidence: medium (0.65)
 ```
 
 ### 8.5 场景五：功能实现辅助（参考现有实现）
@@ -276,33 +277,33 @@ codemap analyze --intent reference --keywords "编辑" --targets src/features/ -
 
 **返回结果**：
 ```
-📋 功能实现参考
+[REFERENCE IMPLEMENTATION]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-目标: 实现编辑页面功能
-关键词: 编辑, edit, form
+Target: 实现编辑页面功能
+Keywords: 编辑, edit, form
 
-🔍 相关代码参考:
-   • src/features/user/components/UserEdit.tsx (相关度: 95%)
+[Code References]:
+   * src/features/user/components/UserEdit.tsx (relevance: 95%)
      - 用户编辑表单组件，包含姓名、邮箱、角色字段
      - 使用 React Hook Form + Zod 验证
-     - 依赖: api/user.ts, types/user.ts
+     - Dependencies: api/user.ts, types/user.ts
 
-   • src/features/product/components/ProductForm.tsx (相关度: 88%)
+   * src/features/product/components/ProductForm.tsx (relevance: 88%)
      - 产品编辑表单，包含名称、描述、价格、分类
      - 使用 Ant Design Form
-     - 依赖: api/product.ts, types/product.ts
+     - Dependencies: api/product.ts, types/product.ts
 
-📦 依赖模块:
-   • src/types/edit-form.ts (共享编辑表单类型)
-   • src/hooks/useEditForm.ts (编辑表单 Hook)
-   • src/components/FormField/ (通用表单字段组件)
+[Related Modules]:
+   * src/types/edit-form.ts (共享编辑表单类型)
+   * src/hooks/useEditForm.ts (编辑表单 Hook)
+   * src/components/FormField/ (通用表单字段组件)
 
-🧪 相关测试:
-   • src/features/user/__tests__/UserEdit.test.tsx
-   • src/features/product/__tests__/ProductForm.test.tsx
+[Related Tests]:
+   * src/features/user/__tests__/UserEdit.test.tsx
+   * src/features/product/__tests__/ProductForm.test.tsx
 
-💡 实现建议:
+[Implementation Suggestions]:
    1. 参考 UserEdit.tsx 的结构
    2. 使用 useEditForm Hook 处理表单逻辑
    3. 参考 ProductForm.tsx 的验证规则
@@ -443,12 +444,12 @@ Claude 读取 `.codemap/ai-feed.txt`：
 
 **瞬间输出**：
 ```
-⚠️ 检测到高风险文件: src/auth/jwt.ts
-   - 30天内修改 8 次，最后为 BUGFIX
-   - 15 个文件依赖此模块
-   - 标记为 unstable
-   
-💡 建议: 修改前请先运行相关测试
+[WARNING] High risk file detected: src/auth/jwt.ts
+   - 8 modifications in last 30 days, last change: BUGFIX
+   - 15 files depend on this module
+   - Marked as unstable
+
+[Suggestion] Run related tests before modifying:
    npm test src/auth/
 ```
 
@@ -468,6 +469,8 @@ Claude 读取 `.codemap/ai-feed.txt`：
 - `high`: 分数 > 0.7 → 需要 commit body 说明风险缓解措施
 - `medium`: 分数 > 0.4 → 警告提示
 - `low`: 分数 ≤ 0.4 → 正常通过
+
+> **注意**: 风险评分范围为 [0, 1]，使用 `Math.min(Math.max(score, 0), 1)` 进行 clamp。
 
 ---
 

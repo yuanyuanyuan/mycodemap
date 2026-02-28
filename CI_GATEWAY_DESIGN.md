@@ -34,7 +34,8 @@
 | **服务端** | Commit 格式 | ❌ 阻止合并 | `codemap ci check-commits` |
 | **服务端** | 文件头注释 | ❌ 阻止合并 | `codemap ci check-headers` |
 | **服务端** | AI 饲料同步 | ❌ 阻止合并 | `git diff --exit-code` |
-| **服务端** | 危险置信度 | ⚠️ 高风险需审批 | `codemap ci assess-risk` |
+| **服务端** | 危险置信度 | ❌ 阻止合并 | `codemap ci assess-risk` |
+| **服务端** | 输出契约校验 | ❌ 阻止合并 | `codemap ci check-output-contract` |
 
 ---
 
@@ -205,7 +206,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
         cache: 'npm'
     
     - name: Install dependencies
@@ -326,15 +327,87 @@ ci.command('assess-risk')
     });
     
     if (highRiskFiles.length > 0) {
-      console.log('WARNING: High risk files detected:');
+      console.log('ERROR: High risk files detected:');
       for (const f of highRiskFiles) {
         console.log(`  - ${f.file} (HEAT: ${f.heat.freq30d}/${f.heat.lastType})`);
       }
-      console.log('\nConsider adding risk mitigation notes to commit body.');
-      // 不退出，仅警告
+      console.log('\nRisk mitigation notes required. Add explanation to commit body.');
+      // 高风险必须阻断
+      process.exit(1);
     } else {
       console.log('✓ Risk assessment passed');
     }
+  });
+
+// 输出契约校验 (P1-1 新增)
+ci.command('check-output-contract')
+  .description('Validate output contract (schemaVersion, Top-K, token limit)')
+  .option('-s, --schema-version <version>', 'Expected schema version', 'v1.0.0')
+  .option('-k, --top-k <number>', 'Expected Top-K limit', '8')
+  .option('-t, --max-tokens <number>', 'Max tokens per result', '160')
+  .action(async (options) => {
+    const schemaVersion = options.schemaVersion || 'v1.0.0';
+    const topK = parseInt(options.topK) || 8;
+    const maxTokens = parseInt(options.maxTokens) || 160;
+
+    // 运行 analyze 命令获取输出
+    const { execSync } = require('child_process');
+    let output;
+    try {
+      output = execSync('npx codemap analyze --intent search --keywords test --json', {
+        encoding: 'utf-8',
+        timeout: 30000
+      });
+    } catch (error) {
+      // 如果命令失败，尝试其他方式获取输出
+      console.error('ERROR: Failed to run analyze command');
+      process.exit(1);
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(output);
+    } catch {
+      console.error('ERROR: Invalid JSON output');
+      process.exit(1);
+    }
+
+    let errors = 0;
+
+    // 1. 校验 schemaVersion
+    if (!parsed.schemaVersion) {
+      console.error('ERROR: Missing schemaVersion in output');
+      errors++;
+    } else if (parsed.schemaVersion !== schemaVersion) {
+      console.error(`ERROR: schemaVersion mismatch: expected ${schemaVersion}, got ${parsed.schemaVersion}`);
+      errors++;
+    }
+
+    // 2. 校验 Top-K
+    const resultCount = parsed.results?.length || 0;
+    if (resultCount > topK) {
+      console.error(`ERROR: Result count ${resultCount} exceeds Top-K limit ${topK}`);
+      errors++;
+    }
+
+    // 3. 校验 token 限制 (简单估算)
+    if (parsed.results) {
+      for (const result of parsed.results) {
+        const tokenEstimate = result.content?.split(/[\s\u4e00-\u9fa5]/).filter(Boolean).length || 0;
+        if (tokenEstimate > maxTokens) {
+          console.error(`ERROR: Result token count ${tokenEstimate} exceeds limit ${maxTokens}`);
+          errors++;
+          break; // 只报告一次
+        }
+      }
+    }
+
+    if (errors > 0) {
+      console.error(`\n${errors} output contract violations detected`);
+      process.exit(1);
+    }
+
+    console.log(`✓ Output contract validated (schema: ${schemaVersion}, topK: ≤${topK}, tokens: ≤${maxTokens})`);
   });
 
 export default ci;
@@ -474,7 +547,8 @@ CI Gateway
     ├── CLI Commands (src/cli/commands/ci.ts)
     │   ├── check-commits
     │   ├── check-headers
-    │   └── assess-risk
+    │   ├── assess-risk
+    │   └── check-output-contract (P1-1 新增)
     │
     └── Dependencies
         ├── GitAnalyzer (解析 commit tag)
@@ -493,7 +567,8 @@ CI Gateway
 | 文件头 `[META]` | ✅ | ✅ | `pre-commit hook` / `codemap ci check-headers` |
 | 文件头 `[WHY]` | ✅ | ✅ | `pre-commit hook` / `codemap ci check-headers` |
 | AI 饲料生成 | ⚠️ | ✅ | `codemap generate` |
-| 危险置信度评估 | ❌ | ⚠️ | `codemap ci assess-risk` |
+| 危险置信度评估 | ❌ | ✅ (P0-2) | `codemap ci assess-risk` |
+| 输出契约校验 | ❌ | ✅ (P1-1) | `codemap ci check-output-contract` |
 
 ---
 

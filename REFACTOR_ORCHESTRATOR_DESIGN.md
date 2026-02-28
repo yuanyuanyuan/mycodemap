@@ -99,7 +99,7 @@ async executeWithFallback(
     const fallbackTools = this.fallbackChains[primaryTool] || [];
 
     for (const fallbackTool of fallbackTools) {
-      console.warn(`⚠️ ${primaryTool} 置信度低 (${confidence.score.toFixed(2)})，尝试 ${fallbackTool}...`);
+      console.warn(`[LOW CONFIDENCE] ${primaryTool} confidence: ${confidence.score.toFixed(2)}, trying ${fallbackTool}...`);
 
       const fallbackResults = await this.runTool(fallbackTool, intent);
       const fallbackConfidence = calculateConfidence(fallbackResults, intent.intent);
@@ -251,7 +251,7 @@ class IntentRouter {
 | `--intent complexity` | `ComplexityCommand` | + Token 裁剪 |
 | `--intent search` | 新实现 | 使用 ast-grep + 置信度 |
 | `--intent overview` | 新实现 | 使用 Codemap 核心 |
-| `--intent documentation` | 新实现 | 使用 rg 搜索 Markdown 文件 |
+| `--intent documentation` | 新实现 | 使用 codemap 搜索 Markdown 文件 |
 | `--intent refactor` | 新实现 | 使用 ast-grep |
 
 ---
@@ -305,7 +305,7 @@ export class AnalyzeCommand {
           intent,
           intent.tool
         );
-        console.log(`使用工具: ${tool}, 置信度: ${confidence.level} (${confidence.score.toFixed(2)})`);
+        console.log(`Tool: ${tool}, Confidence: ${confidence.level} (${confidence.score.toFixed(2)})`);
         return this.output(results);
     }
   }

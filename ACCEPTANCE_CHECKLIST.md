@@ -1,9 +1,9 @@
 # CodeMap 编排层重构 - 验收测试清单
 
-> 版本: 1.0
+> 版本: 1.1
 > 日期: 2026-02-28
 > 状态: 待执行
-> 依据文档: REFACTOR_ARCHITECTURE_DESIGN.md, REFACTOR_ORCHESTRATOR_DESIGN.md, REFACTOR_CONFIDENCE_DESIGN.md, REFACTOR_RESULT_FUSION_DESIGN.md, REFACTOR_TEST_LINKER_DESIGN.md, REFACTOR_GIT_ANALYZER_DESIGN.md, REFACTOR_DESIGN_REVIEW_REPORT.md, REFACTOR_REQUIREMENTS.md
+> 依据文档: REFACTOR_ARCHITECTURE_DESIGN.md, REFACTOR_ORCHESTRATOR_DESIGN.md, REFACTOR_CONFIDENCE_DESIGN.md, REFACTOR_RESULT_FUSION_DESIGN.md, REFACTOR_TEST_LINKER_DESIGN.md, REFACTOR_GIT_ANALYZER_DESIGN.md, REFACTOR_DESIGN_REVIEW_REPORT.md, REFACTOR_REQUIREMENTS.md, CI_GATEWAY_DESIGN.md
 
 ---
 
@@ -91,7 +91,7 @@
 | dependency | `--intent dependency --targets src/` | codemap | - (内部 rg-internal) |
 | complexity | `--intent complexity --targets src/` | codemap | - |
 | search | `--intent search --keywords foo` | ast-grep | - (内部 rg-internal) |
-| documentation | `--intent documentation --keywords arch` | ast-grep | - |
+| documentation | `--intent documentation --keywords arch` | codemap | - |
 | overview | `--intent overview` | codemap | - |
 | refactor | `--intent refactor --keywords foo` | ast-grep | - (内部 rg-internal) |
 | reference | `--intent reference --keywords foo --targets src/` | ast-grep + codemap | - (内部 rg-internal) |
@@ -453,6 +453,35 @@
 
 ---
 
+### 5.3 AI 饲料融合测试 (v2.4 新增)
+
+#### TC-FUSION-006: AI 饲料数据转换
+**测试内容**: 验证 AI 饲料数据转换为 UnifiedResult
+**测试步骤**:
+1. 构造 AI 饲料数据 `{ gravity: 15, heat: { freq30d: 5, lastType: 'BUGFIX' }, meta: { stable: false }, dependents: [...] }`
+2. 调用 `convertAIFeedToResults()`
+**预期结果**:
+- 返回 source 为 'ai-feed' 的 UnifiedResult
+- toolScore = gravity / 20
+- metadata 包含 gravity、heatScore、riskLevel
+**为什么这样设计**: AI 饲料是 v2.4 新增数据源
+**优先级**: P1 | **类型**: 功能
+
+---
+
+#### TC-FUSION-007: 风险感知排序
+**测试内容**: 验证影响分析场景按风险排序
+**测试步骤**:
+1. 构造不同风险等级的结果: high(0.8), medium(0.5), low(0.3)
+2. 调用 `fuseWithAIFeed(intent='impact')`
+**预期结果**:
+- 高风险文件排在最前面
+- 同风险等级按 relevance 排序
+**为什么这样设计**: 风险感知是 v2.4 核心功能
+**优先级**: P1 | **类型**: 功能
+
+---
+
 ## 六、测试关联器测试 (Test Linker)
 
 ### 6.1 配置加载测试
@@ -599,6 +628,85 @@
 - 多余关键词被忽略
 **为什么这样设计**: 防止 DoS 攻击
 **优先级**: P1 | **类型**: 安全
+
+---
+
+### 7.3 AI 饲料生成器测试 (v2.4 新增)
+
+#### TC-GIT-006: AI 饲料生成
+**测试内容**: 验证 `.codemap/ai-feed.txt` 文件生成
+**测试步骤**:
+1. 执行 `codemap generate`
+2. 检查输出文件
+**预期结果**:
+- 生成 `.codemap/ai-feed.txt` 文件
+- 文件包含 GRAVITY、HEAT、META、IMPACT 字段
+**为什么这样设计**: AI 饲料是 v2.4 核心功能
+**优先级**: P0 | **类型**: 功能
+
+---
+
+#### TC-GIT-007: 文件头注释扫描
+**测试内容**: 验证 `[META]`、`[WHY]`、`[DEPS]` 注释扫描
+**测试步骤**:
+1. 扫描包含文件头注释的源文件
+2. 扫描缺少注释的源文件
+**预期结果**:
+- 正确解析 `[META]` 的 since、owner、stable 字段
+- 正确解析 `[WHY]` 的内容
+- 正确解析 `[DEPS]` 的依赖列表
+- 缺少注释时返回空值
+**为什么这样设计**: 文件头注释是 CI 门禁的基础
+**优先级**: P0 | **类型**: 功能
+
+---
+
+#### TC-GIT-008: Commit Tag 解析
+**测试内容**: 验证极简 Commit 格式解析
+**测试步骤**:
+1. 解析 `[BUGFIX] parser: fix token bug`
+2. 解析 `[FEATURE] cli: add new command`
+3. 解析无效格式 `fix: bug`
+**预期结果**:
+- 正确返回 type、scope、subject
+- type 为 'BUGFIX'、'FEATURE' 等
+- 无效格式返回 undefined
+**为什么这样设计**: Commit Tag 是风险评分的基础
+**优先级**: P1 | **类型**: 功能
+
+---
+
+### 7.4 风险评分算法测试 (v2.4 重构)
+
+#### TC-GIT-009: 风险评分计算
+**测试内容**: 验证三维风险评分算法
+**测试步骤**:
+1. 提供测试数据：gravity=15, heat.freq30d=8, heat.lastType='BUGFIX', dependents=15, stable=false
+2. 计算风险评分
+**预期结果**:
+- gravityScore = 15/20 * 0.3 = 0.225
+- heatScore = (8/10)*0.5 + 0.9*0.5 = 0.85
+- impactScore = 15/50 * 0.1 = 0.03
+- stabilityPenalty = 1 * 0.2 = 0.2
+- totalScore ≈ 0.225 + 0.2125 + 0.03 - 0.2 = 0.2675
+- level = 'low' (因为 < 0.4)
+**为什么这样设计**: 风险评分是影响分析的核心
+**优先级**: P1 | **类型**: 算法
+
+---
+
+#### TC-GIT-010: 风险等级判定
+**测试内容**: 验证风险等级边界
+**测试步骤**:
+1. 构造分数 0.75 的场景
+2. 构造分数 0.45 的场景
+3. 构造分数 0.35 的场景
+**预期结果**:
+- 0.75 → 'high'
+- 0.45 → 'medium'
+- 0.35 → 'low'
+**为什么这样设计**: 风险等级是 CI 门禁决策依据
+**优先级**: P1 | **类型**: 边界
 
 ---
 
@@ -895,6 +1003,242 @@
 
 ---
 
+## 十四、CI 门禁测试 (CI Gateway) (v2.4 新增)
+
+### 14.1 Commit 格式验证
+
+#### TC-CI-001: Commit 格式验证 - 有效格式
+**测试内容**: 验证 `[TAG] scope: message` 格式
+**测试步骤**:
+1. 测试 `[BUGFIX] parser: fix token bug`
+2. 测试 `[FEATURE] cli: add command`
+3. 测试 `[REFACTOR] cache: simplify logic`
+**预期结果**:
+- 返回 valid: true
+- 正确解析 type、scope、subject
+**为什么这样设计**: Commit 格式是 CI 门禁的核心
+**优先级**: P0 | **类型**: 功能
+
+---
+
+#### TC-CI-002: Commit 格式验证 - 无效格式
+**测试内容**: 验证无效格式被拒绝
+**测试步骤**:
+1. 测试 `fix: bug` (缺少标签)
+2. 测试 `[FIX] parser: bug` (无效标签)
+3. 测试 `[BUGFIX] : message` (缺少 scope)
+**预期结果**:
+- 返回 valid: false
+- 包含清晰的错误信息
+**为什么这样设计**: 防止不合规的提交
+**优先级**: P0 | **类型**: 边界
+
+---
+
+#### TC-CI-003: Commit 标签类型
+**测试内容**: 验证所有标签类型
+**测试步骤**:
+测试以下标签: BUGFIX, FEATURE, REFACTOR, CONFIG, DOCS, DELETE
+**预期结果**:
+- 所有标签都能正确解析
+- type 字段正确映射
+**为什么这样设计**: 覆盖所有支持的标签
+**优先级**: P1 | **类型**: 功能
+
+---
+
+### 14.2 文件头注释验证
+
+#### TC-CI-004: 文件头注释完整性
+**测试内容**: 验证 `[META]` 和 `[WHY]` 必填
+**测试步骤**:
+1. 文件包含完整注释: `[META]` + `[WHY]`
+2. 文件缺少 `[META]`
+3. 文件缺少 `[WHY]`
+**预期结果**:
+- 完整文件返回 valid: true
+- 缺少 `[META]` 返回 missing: ['[META] since']
+- 缺少 `[WHY]` 返回 missing: ['[WHY]']
+**为什么这样设计**: 文件头是代码元数据的基础
+**优先级**: P0 | **类型**: 功能
+
+---
+
+#### TC-CI-005: 文件头解析准确性
+**测试内容**: 验证各字段正确解析
+**测试步骤**:
+1. 解析 `// [META] since:2024-03 | owner:backend-team | stable:false`
+2. 解析 `// [WHY] 处理JWT验证，因第三方Token刷新策略变更频繁不稳定`
+3. 解析 `// [DEPS] src/db/connection.ts, src/types/auth.d.ts`
+**预期结果**:
+- [META] 解析出 since='2024-03', owner='backend-team', stable=false
+- [WHY] 解析出完整内容
+- [DEPS] 解析出依赖数组
+**为什么这样设计**: 确保字段正确提取
+**优先级**: P1 | **类型**: 功能
+
+---
+
+### 14.3 CI 命令测试
+
+#### TC-CI-006: ci check-commits 命令
+**测试内容**: 验证 commit 批量检查
+**测试步骤**:
+1. 执行 `codemap ci check-commits`
+2. 提供有效/无效的 commit 历史
+**预期结果**:
+- 列出格式错误的 commit
+- 返回错误计数
+**为什么这样设计**: 服务端 CI 需要此功能
+**优先级**: P0 | **类型**: 功能
+
+---
+
+#### TC-CI-007: ci check-headers 命令
+**测试内容**: 验证文件头批量检查
+**测试步骤**:
+1. 执行 `codemap ci check-headers`
+2. 检查包含/不包含文件头的项目
+**预期结果**:
+- 列出缺少注释的文件
+- 返回错误计数
+**为什么这样设计**: 服务端 CI 需要此功能
+**优先级**: P0 | **类型**: 功能
+
+---
+
+#### TC-CI-008: ci assess-risk 命令
+**测试内容**: 验证风险评估
+**测试步骤**:
+1. 执行 `codemap ci assess-risk --threshold=0.7`
+2. 包含高风险文件的代码变更
+**预期结果**:
+- 检测到高风险文件
+- 输出错误信息
+- 退出码为 1（阻止提交）
+**为什么这样设计**: 高风险必须阻断以保证质量
+**优先级**: P0 | **类型**: 功能
+
+---
+
+### 14.4 本地 Hook 测试
+
+#### TC-CI-009: commit-msg Hook
+**测试内容**: 验证本地 commit 格式检查
+**测试步骤**:
+1. 尝试提交无效格式
+2. 尝试提交有效格式
+**预期结果**:
+- 无效格式被阻止
+- 有效格式通过
+**为什么这样设计**: 本地门禁是第一道防线
+**优先级**: P0 | **类型**: 功能
+
+---
+
+#### TC-CI-010: pre-commit Hook
+**测试内容**: 验证本地测试和文件头检查
+**测试步骤**:
+1. 尝试提交测试失败
+2. 尝试提交缺少文件头
+3. 正常提交
+**预期结果**:
+- 测试失败阻止提交
+- 缺少文件头阻止提交
+- 正常通过
+**为什么这样设计**: 本地门禁确保代码质量
+**优先级**: P0 | **类型**: 功能
+
+---
+
+### 14.5 GitHub Actions 测试
+
+#### TC-CI-011: CI Pipeline 执行
+**测试内容**: 验证 CI Pipeline 正常运行
+**测试步骤**:
+1. 触发 push 到 main
+2. 触发 PR 到 main
+**预期结果**:
+- 所有步骤正常执行
+- 失败的检查阻止合并
+**为什么这样设计**: 服务端门禁是最终防线
+**优先级**: P0 | **类型**: 集成
+
+---
+
+#### TC-CI-012: ci check-output-contract 命令 (P1-1 新增)
+**测试内容**: 验证输出契约校验
+**测试步骤**:
+1. 执行 `codemap ci check-output-contract`
+2. 验证 schemaVersion、Top-K、token 限制
+**预期结果**:
+- 校验通过时显示成功信息
+- 校验失败时退出码为 1
+- 输出包含 schemaVersion、topK、maxTokens 验证
+**为什么这样设计**: 确保输出格式稳定，可回归
+**优先级**: P1 | **类型**: 功能
+
+---
+
+## 十五、AI 饲料集成测试 (AI Feed Integration) (v2.4 新增)
+
+### 15.1 generate 命令测试
+
+#### TC-AIFEED-001: generate 命令输出
+**测试内容**: 验证 `codemap generate` 输出 AI 饲料
+**测试步骤**:
+1. 执行 `codemap generate`
+2. 检查输出文件
+**预期结果**:
+- 生成 `.codemap/ai-feed.txt`
+- 包含所有源文件的元数据
+- 格式符合规范
+**为什么这样设计**: AI 饲料是 v2.4 核心功能
+**优先级**: P0 | **类型**: E2E
+
+---
+
+#### TC-AIFEED-002: 源文件扫描完整性
+**测试内容**: 验证所有 TS 文件被扫描
+**测试步骤**:
+1. 执行 generate
+2. 统计扫描文件数
+**预期结果**:
+- 所有 `.ts` 文件（排除 test）都被扫描
+- 包含 gravity、heat、meta 信息
+**为什么这样设计**: 完整覆盖是 AI 饲料的基础
+**优先级**: P1 | **类型**: 功能
+
+---
+
+### 15.2 风险评估集成测试
+
+#### TC-AIFEED-003: 影响分析风险输出
+**测试内容**: 验证风险信息在影响分析中展示
+**测试步骤**:
+1. 执行 `codemap analyze --intent impact --targets src/`
+2. 检查输出
+**预期结果**:
+- 包含 GRAVITY、HEAT、IMPACT 信息
+- 高风险文件被标注
+**为什么这样设计**: 风险评估需要直观展示
+**优先级**: P1 | **类型**: E2E
+
+---
+
+#### TC-AIFEED-004: 风险缓解建议
+**测试内容**: 验证高风险文件的风险缓解建议
+**测试步骤**:
+1. 分析高风险文件
+2. 检查建议内容
+**预期结果**:
+- 建议修改前运行测试
+- 提示相关测试文件位置
+**为什么这样设计**: 风险评估需要提供行动指导
+**优先级**: P1 | **类型**: 功能
+
+---
+
 ## 测试执行清单汇总
 
 | 类别 | 数量 | P0 | P1 | 说明 |
@@ -903,32 +1247,39 @@
 | 置信度机制测试 | 6 | 3 | 3 | 核心算法 |
 | 工具编排器测试 | 5 | 3 | 2 | 超时、错误隔离 |
 | 工具适配器测试 | 6 | 5 | 1 | 多工具支持 |
-| 结果融合测试 | 5 | 3 | 2 | 融合算法 |
+| 结果融合测试 | 7 | 3 | 4 | 融合算法 + AI 饲料 (v2.4) |
 | 测试关联器测试 | 6 | 1 | 5 | 测试发现 |
-| Git 分析器测试 | 5 | 1 | 4 | Git 集成 |
+| Git 分析器测试 | 10 | 2 | 8 | Git 集成 + AI 饲料 (v2.4) |
 | 向后兼容测试 | 4 | 4 | 0 | 兼容性保障 |
 | 性能与指标测试 | 5 | 3 | 2 | 核心指标 |
 | 平台测试 | 2 | 2 | 0 | Ubuntu 优先 |
 | 工程实践测试 | 3 | 1 | 2 | 代码质量 |
 | 场景测试 | 4 | 3 | 1 | E2E 场景 |
 | 配置测试 | 1 | 0 | 1 | 配置系统 |
-| **总计** | **57** | **33** | **24** | |
+| CI 门禁测试 | 11 | 7 | 4 | CI Gateway (v2.4 新增) |
+| AI 饲料集成测试 | 4 | 1 | 3 | AI Feed 集成 (v2.4 新增) |
+| **总计** | **79** | **42** | **37** | |
 
 ---
 
 ## 验收通过标准
 
 ### 必须满足 (P0)
-- [ ] 所有 P0 测试用例通过 (33 个)
+- [ ] 所有 P0 测试用例通过 (42 个)
 - [ ] Hit@8 >= 90% (代码场景)
 - [ ] Token 消耗降低 >= 40%
 - [ ] 现有命令输出保持兼容
 - [ ] 无命令注入漏洞
 - [ ] 无超时/挂起问题
 - [ ] Ubuntu 平台所有功能正常
+- [ ] **AI 饲料生成正常 (v2.4 新增)**
+- [ ] **CI 门禁本地 Hook 正常工作 (v2.4 新增)**
+- [ ] **CI 门禁服务端检查通过 (v2.4 新增)**
+- [ ] **Commit 格式 `[TAG]` 验证通过 (v2.4 新增)**
+- [ ] **文件头注释 `[META]`/`[WHY]` 完整 (v2.4 新增)**
 
 ### 应该满足 (P1)
-- [ ] 所有 P1 测试用例通过 (24 个)
+- [ ] 所有 P1 测试用例通过 (37 个)
 - [ ] 单元测试覆盖率 >= 60%
 - [ ] 文档和注释完善
 
@@ -970,8 +1321,15 @@
 | TC-FUSION-003 | 结果排序 | P0 | 5.1 |
 | TC-FUSION-004 | Token 截断 | P1 | 5.2 |
 | TC-FUSION-005 | 中文 Token 计算 | P1 | 5.2 |
+| TC-FUSION-006 | AI 饲料数据转换 | P1 | 5.3 (v2.4) |
+| TC-FUSION-007 | 风险感知排序 | P1 | 5.3 (v2.4) |
 | TC-TESTLINK-001~006 | 测试关联器 | P0/P1 | 6.x |
 | TC-GIT-001~005 | Git 分析器 | P0/P1 | 7.x |
+| TC-GIT-006 | AI 饲料生成 | P0 | 7.3 (v2.4) |
+| TC-GIT-007 | 文件头注释扫描 | P0 | 7.3 (v2.4) |
+| TC-GIT-008 | Commit Tag 解析 | P1 | 7.3 (v2.4) |
+| TC-GIT-009 | 风险评分计算 | P1 | 7.4 (v2.4) |
+| TC-GIT-010 | 风险等级判定 | P1 | 7.4 (v2.4) |
 | TC-COMPAT-001~004 | 向后兼容 | P0 | 8.x |
 | TC-PERF-001~004 | 性能与约束 | P0/P1 | 9.1/9.2 |
 | TC-METRIC-001~002 | 质量指标 | P0 | 9.3 |
@@ -979,8 +1337,11 @@
 | TC-ENG-001~003 | 工程实践 | P0/P1 | 11.x |
 | TC-SCENE-001~004 | 场景测试 | P0/P1 | 12.x |
 | TC-CONFIG-001 | 配置测试 | P1 | 13 |
+| TC-CI-001~011 | CI 门禁测试 | P0/P1 | 14.x (v2.4) |
+| TC-AIFEED-001~004 | AI 饲料集成测试 | P0/P1 | 15.x (v2.4) |
 
 ---
 
 *文档生成时间: 2026-02-28*
-*基于设计文档版本: v2.3*
+*基于设计文档版本: v2.4*
+*更新说明: 新增 CI 门禁测试章节 (14.x)、AI 饲料集成测试 (15.x)、AI 饲料融合测试 (5.3)、Git 分析器扩展测试 (7.3-7.4)*

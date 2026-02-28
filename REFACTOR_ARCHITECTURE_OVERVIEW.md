@@ -320,9 +320,10 @@ codemap complexity    # 复杂度分析
 codemap query         # 查询
 
 # CI 门禁命令 (v2.4 新增)
-codemap ci check-commits     # 验证 Commit 格式
-codemap ci check-headers     # 验证文件头注释
-codemap ci assess-risk       # 评估危险置信度
+codemap ci check-commits          # 验证 Commit 格式
+codemap ci check-headers         # 验证文件头注释
+codemap ci assess-risk           # 评估危险置信度
+codemap ci check-output-contract # 验证输出契约（schemaVersion、Top-K、token限制）
 ```
 
 ### analyze 命令参数
