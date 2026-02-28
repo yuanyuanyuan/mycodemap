@@ -306,6 +306,111 @@ function truncateByToken(content: string, maxTokens: number): string {
         └── ToolOrchestrator (tool-orchestrator.ts)
         └── AnalyzeCommand (analyze.ts)
         └── CIGateway (ci-gateway.ts) (v2.4 新增)
+        └── WorkflowOrchestrator (workflow-orchestrator.ts) (v2.5 新增)
+```
+
+---
+
+## 8. 工作流上下文融合 (v2.5 规划)
+
+### 8.1 跨阶段结果传递
+
+在工作流中，每个阶段的分析结果需要传递给下一阶段：
+
+```typescript
+// 工作流上下文中的结果缓存
+
+interface WorkflowFusionContext {
+  phaseResults: Map<WorkflowPhase, UnifiedResult[]>;
+  accumulatedContext: Map<string, UnifiedResult>;
+}
+
+// 跨阶段结果合并策略
+class WorkflowResultFusion {
+  /**
+   * 将新阶段结果与已有上下文合并
+   */
+  mergeWithContext(
+    newResults: UnifiedResult[],
+    context: WorkflowFusionContext
+  ): UnifiedResult[] {
+    // 1. 合并所有历史结果
+    const allResults = [
+      ...Array.from(context.phaseResults.values()).flat(),
+      ...newResults
+    ];
+
+    // 2. 应用工作流特定的加权
+    const workflowWeighted = this.applyWorkflowWeights(allResults, context);
+
+    // 3. 按工作流阶段优先级排序
+    return this.sortByWorkflowPriority(workflowWeighted);
+  }
+
+  /**
+   * 工作流阶段权重
+   * 越近期的阶段权重越高
+   */
+  private applyWorkflowWeights(
+    results: UnifiedResult[],
+    context: WorkflowFusionContext
+  ): UnifiedResult[] {
+    const phaseWeights: Record<WorkflowPhase, number> = {
+      'reference': 0.8,
+      'impact': 0.9,
+      'risk': 1.0,
+      'implementation': 0.7,
+      'commit': 0.6,
+      'ci': 0.5
+    };
+
+    return results.map(r => {
+      // 根据结果来源确定阶段权重
+      const sourcePhase = this.inferPhase(r.source);
+      const weight = phaseWeights[sourcePhase] || 0.5;
+
+      return {
+        ...r,
+        relevance: r.relevance * weight
+      };
+    });
+  }
+}
+```
+
+### 8.2 阶段间结果继承
+
+```typescript
+// 阶段间的结果继承逻辑
+
+class PhaseInheritance {
+  /**
+   * 获取下一阶段应该继承的结果
+   */
+  getInheritedResults(
+    currentPhase: WorkflowPhase,
+    allResults: UnifiedResult[]
+  ): UnifiedResult[] {
+    switch (currentPhase) {
+      case 'reference':
+        // 影响分析继承参考搜索的结果
+        return allResults.filter(r =>
+          r.source === 'ast-grep' || r.source === 'codemap'
+        );
+
+      case 'impact':
+        // 风险评估继承影响分析 + 参考搜索
+        return allResults;
+
+      case 'risk':
+        // 代码实现继承所有分析结果
+        return allResults;
+
+      default:
+        return allResults;
+    }
+  }
+}
 ```
 
 ---

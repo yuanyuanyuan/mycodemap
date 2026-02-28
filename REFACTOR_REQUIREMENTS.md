@@ -474,6 +474,461 @@ Claude 读取 `.codemap/ai-feed.txt`：
 
 ---
 
+### 8.7 场景七：完整 E2E 开发流程（串联所有功能）
+
+**场景**：开发者需要实现一个新的"文件重命名"功能，贯穿整个开发流程
+
+**背景**：
+- 项目是一个 TypeScript 代码分析工具
+- 用户希望添加一个新功能：批量重命名文件并自动更新所有引用
+- 这是一个中等复杂度的功能，涉及多个模块
+
+---
+
+#### 第一阶段：需求理解与参考搜索
+
+**用户输入（Claude Code 处理）**：
+```
+我需要在项目中实现一个"文件重命名"功能，可以批量重命名文件并自动更新所有引用。先帮我找找项目中有没有类似的实现可以参考。
+```
+
+**Claude Code 翻译**：
+```bash
+codemap analyze --intent reference --keywords "重命名" "rename" "file" --targets src/ --include-tests
+```
+
+**Codemap 执行流程**：
+
+| 步骤 | 操作 | 代码执行 | 输出 |
+|------|------|----------|------|
+| 1 | 命令解析 | `src/cli/commands/analyze.ts` 解析参数 | `{ intent: 'reference', keywords: ['重命名', 'rename', 'file'], targets: ['src/'], includeTests: true }` |
+| 2 | 意图路由 | `src/orchestrator/intent-router.ts` 路由 | `{ tools: ['ast-grep', 'codemap'], strategy: 'parallel' }` |
+| 3 | 并行执行 | `ToolOrchestrator.executeParallel()` | 同时调用多个工具 |
+| 3.1 | ast-grep 搜索 | `AstGrepAdapter.execute(['重命名', 'rename', 'file', 'mv', 'move'])` | `SearchResult[]` (8 个相关文件) |
+| 3.2 | codemap 依赖分析 | `CodemapAdapter.querySymbols({ keywords: ['rename', 'file'] })` | 符号查询结果 |
+| 3.3 | 测试文件关联 | `TestLinker.searchTestFiles(['file', 'rename'])` | 潜在测试文件 |
+| 4 | 结果融合 | `ResultFusion.fuse(resultsByTool, { topK: 8 })` | `UnifiedResult[]` |
+| 5 | 置信度计算 | `calculateConfidence(results, 'reference')` | `{ score: 0.75, level: 'high' }` |
+| 6 | 输出格式化 | `formatOutput(results, { mode: 'human' })` | Markdown 格式输出 |
+
+**返回结果**：
+```
+[REFERENCE IMPLEMENTATION]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Target: 文件重命名功能
+Keywords: 重命名, rename, file, mv, move
+
+[Code References]:
+   * src/watcher/file-watcher.ts (relevance: 92%)
+     - 文件监听器，监控文件变化事件
+     - Methods: onFileChange(), onFileCreate(), onFileDelete()
+     - DEPS: src/utils/fs.ts, src/types/events.ts
+
+   * src/cache/file-hash-cache.ts (relevance: 88%)
+     - 文件哈希缓存，管理文件路径映射
+     - Methods: get(), set(), invalidate(), rename()
+     - DEPS: src/utils/md5.ts, src/types/cache.ts
+
+   * src/parser/path-resolver.ts (relevance: 75%)
+     - 路径解析器，处理相对/绝对路径转换
+     - Methods: resolve(), relative(), rename()
+
+[Similar Features]:
+   * src/cli/commands/rename.ts - 已废弃的重命名命令 (参考价值: 低)
+
+[Test References]:
+   * src/watcher/__tests__/file-watcher.test.ts
+   * src/cache/__tests__/file-hash-cache.test.ts
+
+[Implementation Suggestions]:
+   1. 复用 file-watcher.ts 的文件事件机制
+   2. 参考 file-hash-cache.ts 的 invalidate/rename 逻辑
+   3. 使用 path-resolver.ts 处理路径转换
+   4. 需要处理: 原子操作、回滚机制、引用更新
+```
+
+---
+
+#### 第二阶段：影响分析
+
+**用户输入**：
+```
+好的，我了解了现有实现。现在帮我分析一下实现这个功能会影响哪些模块？
+```
+
+**Claude Code 翻译**：
+```bash
+codemap analyze --intent impact --targets src/watcher/,src/cache/ --scope transitive --include-git-history
+```
+
+**Codemap 执行流程**：
+
+| 步骤 | 操作 | 代码执行 | 输出 |
+|------|------|----------|------|
+| 1 | 命令解析 | `analyze.ts` 解析 | `{ intent: 'impact', targets: ['src/watcher/', 'src/cache/'], scope: 'transitive' }` |
+| 2 | 意图路由 | `IntentRouter.route()` | `{ tool: 'codemap', secondary: 'ast-grep' }` |
+| 3 | codemap 影响分析 | `CodemapAdapter.analyzeImpact({ targets: [...], scope: 'transitive' })` | `DependencyResult` |
+| 3.1 | 直接依赖 | `DependencyGraph.getDirectDependents(targets)` | 15 个直接依赖 |
+| 3.2 | 传递依赖 | `DependencyGraph.getTransitiveDependents(targets)` | 42 个传递依赖 |
+| 4 | ast-grep 补充搜索 | `AstGrepAdapter.execute(['依赖', 'import', 'require'])` | 相关引用 |
+| 5 | 结果融合 | `ResultFusion.fuse()` | 合并结果 |
+| 6 | 置信度计算 | `calculateConfidence(results, 'impact')` | `{ score: 0.88, level: 'high' }` |
+| 7 | Git 历史分析 | `GitAnalyzer.analyzeRelatedCommits(targets)` | 近期变更记录 |
+| 8 | 输出 | `formatOutput()` | 影响分析报告 |
+
+**返回结果**：
+```
+[IMPACT ANALYSIS]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Target: src/watcher/, src/cache/
+
+[Impact Scope]:
+   Direct dependents: 15 modules
+   Transitive dependents: 42 modules (68% of project)
+
+[High Risk Modules]:
+   * src/types/index.ts - 被 38 个模块依赖
+   * src/core/analyzer.ts - 被 24 个模块依赖
+   * src/utils/fs.ts - 被 18 个模块依赖
+
+[Git History]:
+   * src/watcher/file-watcher.ts: 5 commits (30天内)
+     - [BUGFIX] watcher: fix race condition (2026-02-20)
+     - [FEATURE] watcher: add debounce support (2026-02-15)
+   * src/cache/file-hash-cache.ts: 3 commits (30天内)
+     - [REFACTOR] cache: optimize hash calculation (2026-02-10)
+
+[Safety Suggestion]:
+   1. 新功能应独立于现有 watcher/cache 核心逻辑
+   2. 使用依赖注入，避免直接依赖高风险模块
+   3. 优先修改稳定模块（如 fs.ts），避免 types/index.ts
+
+Confidence: high (0.88)
+```
+
+---
+
+#### 第三阶段：风险评估（AI 饲料）
+
+**用户输入**：
+```
+这个功能风险评估怎么样？提交代码时需要注意什么？
+```
+
+**Claude Code 翻译**：
+```bash
+codemap generate --output .codemap/ai-feed.txt
+codemap ci assess-risk --files src/features/rename/
+```
+
+**Codemap 执行流程**：
+
+| 步骤 | 操作 | 代码执行 | 输出 |
+|------|------|----------|------|
+| 1 | 生成 AI 饲料 | `AIFeedGenerator.generate()` | 更新 `.codemap/ai-feed.txt` |
+| 2 | 风险文件识别 | `RiskAssessor.identifyHighRiskFiles()` | 高风险文件列表 |
+| 3 | 风险评分计算 | `RiskAssessor.calculateRiskScore(files)` | 每文件风险分 |
+| 4 | 风险聚合 | `RiskAssessor.aggregateRisk()` | 整体风险评估 |
+| 5 | 缓解建议 | `RiskAssessor.getMitigationSuggestions()` | 风险缓解措施 |
+
+**返回结果**：
+```
+[RISK ASSESSMENT]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Feature: src/features/rename/
+Calculated Risk: 0.52 (MEDIUM)
+
+[Risk Breakdown]:
+   * New feature: GRAVITY=5 (new module, no dependents)
+   * Dependencies: 15 files, HEAT=avg(3.2), mostly STABLE=true
+   * Test coverage: 0% (new module)
+
+[Risk Factors]:
+   ✓ Low: New module, no existing dependencies to break
+   ⚠ Medium: Modifies file-watcher.ts and file-hash-cache.ts
+   ⚠ Medium: No existing tests for rename functionality
+
+[Mitigation Suggestions]:
+   1. [REQUIRED] Add tests before commit: src/features/rename/__tests__/
+   2. [REQUIRED] Add file header comments with [META] and [WHY]
+   3. [SUGGESTED] Implement rollback mechanism for atomic operations
+   4. [SUGGESTED] Add integration test with actual file operations
+```
+
+---
+
+#### 第四阶段：代码实现与测试
+
+**开发者编写代码**：
+
+```typescript
+// src/features/rename/file-rename.ts
+// [META] since:2026-02 | owner:feature-team | stable:false
+// [WHY] 实现文件批量重命名功能，自动更新所有引用
+// [DEPS] src/watcher/file-watcher.ts, src/cache/file-hash-cache.ts, src/parser/path-resolver.ts
+
+import { FileWatcher } from "../../watcher/file-watcher";
+import { FileHashCache } from "../../cache/file-hash-cache";
+import { PathResolver } from "../../parser/path-resolver";
+
+export class FileRename {
+  private watcher: FileWatcher;
+  private cache: FileHashCache;
+  private resolver: PathResolver;
+
+  // ... 实现代码
+}
+```
+
+**运行本地测试**：
+
+| 步骤 | 操作 | 命令 | 结果 |
+|------|------|------|------|
+| 1 | 单元测试 | `npm test src/features/rename/` | ✅ 通过 |
+| 2 | 集成测试 | `npm test -- --grep "rename"` | ✅ 通过 |
+| 3 | 类型检查 | `npx tsc --noEmit` | ✅ 通过 |
+
+---
+
+#### 第五阶段：提交代码（CI 门禁）
+
+**用户输入**：
+```
+代码写完了，帮我提交并检查是否符合规范
+```
+
+**Claude Code 翻译**：
+```bash
+git add src && git commit -/features/rename/m "[FEATURE] file-rename: add batch rename with auto-ref-update"
+```
+
+**pre-commit Hook 执行流程**：
+
+| 步骤 | 检查项 | 代码执行 | 结果 |
+|------|--------|----------|------|
+| 1 | 测试通过 | `npm test` | ✅ 全部通过 |
+| 2 | 类型检查 | `npx tsc --noEmit` | ✅ 通过 |
+| 3 | Commit 格式 | `CommitValidator.validate('[FEATURE] file-rename: ...')` | ✅ 符合规范 |
+| 4 | 文件头注释 | `FileHeaderScanner.validate('src/features/rename/')` | ✅ 有 [META] + [WHY] |
+| 5 | 生成 AI 饲料 | `AIFeedGenerator.generate()` | ✅ 更新完成 |
+
+**提交成功** → 推送代码
+
+---
+
+#### 第六阶段：CI 流水线验证
+
+**GitHub Actions 执行流程**：
+
+| 步骤 | 检查项 | 执行命令 | 失败处理 |
+|------|--------|----------|----------|
+| 1 | 安装依赖 | `npm ci` | ❌ 阻止合并 |
+| 2 | 运行测试 | `npm test` | ❌ 阻止合并 |
+| 3 | 类型检查 | `npx tsc --noEmit` | ❌ 阻止合并 |
+| 4 | Commit 格式 | `codemap ci check-commits` | ❌ 阻止合并 |
+| 5 | 文件头注释 | `codemap ci check-headers` | ❌ 阻止合并 |
+| 6 | AI 饲料验证 | `codemap generate && git diff --exit-code` | ❌ 阻止合并 |
+| 7 | 风险评估 | `codemap ci assess-risk --threshold 0.7` | ⚠️ 警告 |
+
+**CI 通过** → 允许合并
+
+---
+
+#### 完整流程图
+
+```
+用户: "实现文件重命名功能"
+         │
+         ▼
+    ┌────────────────────────────────────────────────────────────┐
+    │ 阶段一：参考搜索 (intent=reference)                          │
+    │   ├── IntentRouter → parallel (ast-grep + codemap)         │
+    │   ├── ResultFusion → confidence=0.75                        │
+    │   └── 返回参考实现列表                                       │
+    └────────────────────────────────────────────────────────────┘
+         │
+         ▼
+    ┌────────────────────────────────────────────────────────────┐
+    │ 阶段二：影响分析 (intent=impact)                             │
+    │   ├── CodemapAdapter.analyzeImpact()                       │
+    │   ├── GitAnalyzer.analyzeRelatedCommits()                 │
+    │   ├── ResultFusion → confidence=0.88                       │
+    │   └── 输出影响范围和高风险模块                               │
+    └────────────────────────────────────────────────────────────┘
+         │
+         ▼
+    ┌────────────────────────────────────────────────────────────┐
+    │ 阶段三：风险评估 (CI 维度)                                  │
+    │   ├── AIFeedGenerator.generate()                           │
+    │   ├── RiskAssessor.calculateRiskScore()                   │
+    │   └── 返回风险等级和缓解建议                                │
+    └────────────────────────────────────────────────────────────┘
+         │
+         ▼
+    ┌────────────────────────────────────────────────────────────┐
+    │ 阶段四：代码实现                                            │
+    │   ├── 开发者编写 src/features/rename/                      │
+    │   ├── 添加单元测试                                         │
+    │   └── 验证通过                                              │
+    └────────────────────────────────────────────────────────────┘
+         │
+         ▼
+    ┌────────────────────────────────────────────────────────────┐
+    │ 阶段五：提交 (pre-commit hook)                              │
+    │   ├── CommitValidator.validate()                          │
+    │   ├── FileHeaderScanner.validate()                        │
+    │   └── AIFeedGenerator.generate()                          │
+    └────────────────────────────────────────────────────────────┘
+         │
+         ▼
+    ┌────────────────────────────────────────────────────────────┐
+    │ 阶段六：CI 流水线                                           │
+    │   ├── npm test → npm run build                             │
+    │   ├── codemap ci check-commits                             │
+    │   ├── codemap ci check-headers                             │
+    │   └── codemap ci assess-risk                               │
+    └────────────────────────────────────────────────────────────┘
+         │
+         ▼
+    合并成功 ✓
+```
+
+---
+
+#### 涉及的组件调用汇总
+
+| 组件 | 调用时机 | 场景 |
+|------|----------|------|
+| `IntentRouter` | 阶段一、二 | 路由到合适的工具 |
+| `AstGrepAdapter` | 阶段一 | 搜索关键词代码 |
+| `CodemapAdapter` | 阶段一、二 | 依赖分析和符号查询 |
+| `ResultFusion` | 阶段一、二 | 融合多工具结果 |
+| `ConfidenceCalculator` | 阶段一、二 | 计算置信度 |
+| `GitAnalyzer` | 阶段二 | 分析 Git 历史 |
+| `AIFeedGenerator` | 阶段三、五 | 生成 AI 饲料 |
+| `RiskAssessor` | 阶段三、六 | 风险评估 |
+| `CommitValidator` | 阶段五、六 | Commit 格式校验 |
+| `FileHeaderScanner` | 阶段五、六 | 文件头注释校验 |
+
+---
+
+## 9. 工作流编排器设计 (v2.5 规划)
+
+### 9.1 问题分析
+
+当前场景设计存在阶段割裂问题：
+
+| 问题 | 表现 | 影响 |
+|------|------|------|
+| 阶段连接不紧密 | 每个场景是独立单元测试 | 实际操作中容易迷失 |
+| 上下文不传递 | 每个场景独立执行 | 重复分析，效率低 |
+| 交付物不明确 | 没有检查点机制 | 无法验证阶段完成 |
+| 中断无法恢复 | 无状态管理 | 长流程难以维护 |
+
+### 9.2 解决方案：工作流编排器
+
+**核心机制**：
+
+1. **状态机**：每个阶段有 `pending` → `running` → `completed` → `verified` 状态转换
+2. **检查点**：每个阶段结束时必须产出"交付物"才能进入下一阶段
+3. **上下文持久化**：阶段间自动传递数据和产物到 `.codemap/workflow/`
+4. **交互式引导**：CLI 交互式推进各阶段
+
+### 9.3 阶段契约定义
+
+| 阶段 | 入口条件 | 出口交付物 | 验证方法 |
+|------|----------|------------|----------|
+| 参考搜索 | 用户需求描述 | `reference-results.json` | 置信度 > 0.3 |
+| 影响分析 | 参考结果 | `impact-report.json` | 风险文件已标注 |
+| 风险评估 | 影响分析报告 | `risk-assessment.json` | 风险分 < 0.7 |
+| 代码实现 | 风险评估 | PR/Commit 已创建 | CI 通过 |
+| 提交验证 | Commit | `workflow-complete.json` | CI 全量通过 |
+
+### 9.4 工作流命令
+
+```bash
+# 启动交互式工作流
+codemap workflow start "实现文件重命名功能"
+
+# 查看当前状态
+codemap workflow status
+
+# 推进到下一阶段
+codemap workflow proceed
+
+# 恢复中断的工作流
+codemap workflow resume <workflow-id>
+
+# 手动创建检查点
+codemap workflow checkpoint
+```
+
+### 9.5 交互式引导示例
+
+```bash
+$ codemap workflow start "实现文件重命名功能"
+
+🤖 CodeMap 工作流引导
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[1/6] 📚 参考搜索
+  └─ 目标: 找到可参考的实现
+  └─ 命令: codemap analyze --intent reference --keywords ...
+  └─ 交付物: 参考代码列表
+  └─ 状态: ⏳ 待开始
+
+> 选择操作: [R]开始 [S]跳过 [Q]退出
+```
+
+### 9.6 上下文持久化
+
+```json
+// .codemap/workflow/{workflow-id}.json
+{
+  "id": "wf-20260228-001",
+  "task": "实现文件重命名功能",
+  "currentPhase": "impact",
+  "phaseStatus": "completed",
+  "artifacts": {
+    "reference": {
+      "phase": "reference",
+      "results": [...],
+      "confidence": { "score": 0.75, "level": "high" },
+      "createdAt": "2026-02-28T10:00:00Z"
+    },
+    "impact": {
+      "phase": "impact",
+      "results": [...],
+      "confidence": { "score": 0.88, "level": "high" },
+      "createdAt": "2026-02-28T10:05:00Z"
+    }
+  },
+  "cachedResults": {
+    "reference": [...],
+    "impact": [...]
+  }
+}
+```
+
+### 9.7 实施建议
+
+**推荐组合：轻量状态机 + CLI 交互**
+
+1. **底层**：工作流上下文持久化（JSON 文件）
+2. **上层**：CLI 交互式引导（用户友好）
+3. **扩展**：置信度驱动的自动推进
+
+**预期效果**：
+- ✅ 自动推进，无需用户记忆
+- ✅ 中断可恢复
+- ✅ 每个阶段有明确交付物
+- ✅ 进度可视化
+
+---
+
 ## 附录
 
 ### A. 相关文档
@@ -484,6 +939,7 @@ Claude 读取 `.codemap/ai-feed.txt`：
 - Git 分析器设计: `REFACTOR_GIT_ANALYZER_DESIGN.md` (含 AI 饲料生成器)
 - CI 门禁设计: `CI_GATEWAY_DESIGN.md`
 - 结果融合设计: `REFACTOR_RESULT_FUSION_DESIGN.md`
+- 编排层设计: `REFACTOR_ORCHESTRATOR_DESIGN.md` (含工作流编排器 v2.5 规划)
 
 ### B. 参考资源
 

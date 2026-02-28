@@ -631,6 +631,116 @@ Git 分析器 (git-analyzer.ts)
     └── 被以下模块使用:
         └── AnalyzeCommand (analyze.ts)
         └── CI Gateway (ci-gateway.ts)
+        └── WorkflowOrchestrator (workflow-orchestrator.ts) (v2.5 新增)
+```
+
+---
+
+## 10. 工作流上下文集成 (v2.5 规划)
+
+### 10.1 Git 历史在工作流中的角色
+
+在工作流编排中，Git 分析器提供每个阶段的上下文信息：
+
+```typescript
+// 工作流阶段的 Git 分析配置
+
+const PHASE_GIT_CONFIG: Record<WorkflowPhase, GitAnalysisConfig> = {
+  reference: {
+    // 参考搜索：查找相关提交作为参考
+    analysisType: 'find-similar-commits',
+    maxCommits: 10,
+    includeHistory: true,
+    extractPatterns: ['*.ts']
+  },
+  impact: {
+    // 影响分析：查找目标文件的修改历史
+    analysisType: 'file-history',
+    maxCommits: 20,
+    includeHistory: true,
+    extractPatterns: ['*.ts']
+  },
+  risk: {
+    // 风险评估：计算文件热度
+    analysisType: 'heat-analysis',
+    maxCommits: 30,
+    includeHistory: true,
+    timeWindow: '30d'
+  },
+  implementation: {
+    // 代码实现：记录实现意图
+    analysisType: 'none',
+    maxCommits: 0,
+    includeHistory: false
+  },
+  commit: {
+    // 提交：验证 Commit 格式
+    analysisType: 'validate-commit',
+    maxCommits: 1,
+    includeHistory: false
+  },
+  ci: {
+    // CI：完整历史分析
+    analysisType: 'full-analysis',
+    maxCommits: 50,
+    includeHistory: true
+  }
+};
+```
+
+### 10.2 工作流 Git 分析器集成
+
+```typescript
+class WorkflowGitAnalyzer {
+  private analyzer: GitAnalyzer;
+
+  /**
+   * 根据当前阶段执行 Git 分析
+   */
+  async analyzeForPhase(
+    phase: WorkflowPhase,
+    targetFiles: string[],
+    context: WorkflowContext
+  ): Promise<GitAnalysisResult> {
+    const config = PHASE_GIT_CONFIG[phase];
+
+    if (config.analysisType === 'none') {
+      return { type: 'skipped', results: [] };
+    }
+
+    // 从上下文获取历史结果（避免重复分析）
+    const cachedHistory = context.artifacts.get('impact')?.metadata?.gitHistory;
+    if (cachedHistory && phase !== 'risk') {
+      return { type: 'cached', results: cachedHistory };
+    }
+
+    // 执行新的分析
+    switch (config.analysisType) {
+      case 'find-similar-commits':
+        return this.analyzer.findRelatedCommits(
+          context.task.split(' '),
+          targetFiles,
+          { maxCommits: config.maxCommits, projectRoot: process.cwd() }
+        );
+
+      case 'file-history':
+        return this.analyzer.findRelatedCommits(
+          [],
+          targetFiles,
+          { maxCommits: config.maxCommits, projectRoot: process.cwd() }
+        );
+
+      case 'heat-analysis':
+        return this.analyzer.calculateFileHeat(targetFiles);
+
+      case 'validate-commit':
+        return this.analyzer.validateCommit(context.task);
+
+      default:
+        return { type: 'none', results: [] };
+    }
+  }
+}
 ```
 
 ---

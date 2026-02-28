@@ -175,11 +175,68 @@ function getThreshold(intent: IntentType, level: 'high' | 'medium'): number {
     │
     └── 被以下模块使用:
         └── ToolOrchestrator (tool-orchestrator.ts)
+        └── WorkflowOrchestrator (workflow-orchestrator.ts) (v2.5 新增)
 ```
 
 ---
 
-## 6. 风险与缓解
+## 6. 工作流阶段的置信度指导 (v2.5 规划)
+
+### 6.1 置信度与阶段推进
+
+在编排层工作流中，置信度用于决定阶段推进策略：
+
+```typescript
+// 工作流阶段的置信度要求
+
+const PHASE_CONFIDENCE_REQUIREMENTS: Record<string, { min: number; auto: boolean }> = {
+  reference: { min: 0.3, auto: true },   // 参考搜索：置信度 > 0.7 可自动推进
+  impact: { min: 0.4, auto: true },      // 影响分析：置信度 > 0.7 可自动推进
+  risk: { min: 0, auto: false },         // 风险评估：始终需要用户确认
+  implementation: { min: 0, auto: false }, // 代码实现：需要用户触发
+  commit: { min: 0, auto: false },       // 提交：需要用户触发
+  ci: { min: 0, auto: false }           // CI：自动执行
+};
+```
+
+### 6.2 置信度事件
+
+```typescript
+// 置信度触发的工作流事件
+
+interface ConfidenceEvent {
+  phase: string;
+  confidence: ConfidenceResult;
+  event: 'high-confidence' | 'medium-confidence' | 'low-confidence' | 'fallback-triggered';
+  recommendation: string;
+}
+
+// 事件处理
+function handleConfidenceEvent(event: ConfidenceEvent): void {
+  switch (event.event) {
+    case 'high-confidence':
+      // 自动推进到下一阶段
+      workflow.proceedToNextPhase();
+      break;
+    case 'medium-confidence':
+      // 提示用户确认
+      console.log(`[WARNING] Medium confidence: ${event.confidence.reasons.join(', ')}`);
+      break;
+    case 'low-confidence':
+      // 阻止推进，要求更多分析
+      console.log(`[ERROR] Low confidence, cannot proceed: ${event.recommendation}`);
+      break;
+    case 'fallback-triggered':
+      // 记录回退事件
+      logFallbackEvent(event);
+      break;
+  }
+}
+```
+
+---
+
+## 7. 风险与缓解
 
 | 风险 | 影响 | 缓解措施 |
 |------|------|----------|

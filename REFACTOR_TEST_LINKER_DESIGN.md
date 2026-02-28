@@ -209,6 +209,99 @@ private inferSourceFile(testFile: string): string | null {
     │
     └── 被以下模块使用:
         └── AnalyzeCommand (analyze.ts)
+        └── WorkflowOrchestrator (workflow-orchestrator.ts) (v2.5 新增)
+```
+
+---
+
+## 7. 工作流阶段的测试关联 (v2.5 规划)
+
+### 7.1 阶段特定的测试策略
+
+```typescript
+// 工作流阶段与测试关联的映射
+
+const PHASE_TEST_STRATEGY: Record<WorkflowPhase, TestStrategy> = {
+  reference: {
+    // 参考搜索阶段：查找相关测试作为参考
+    mode: 'find-similar',
+    includePatterns: ['**/*.test.ts', '**/*.spec.ts'],
+    excludePatterns: []
+  },
+  impact: {
+    // 影响分析阶段：查找所有可能受影响的测试
+    mode: 'find-affected',
+    includePatterns: ['**/*.test.ts', '**/*.spec.ts'],
+    excludePatterns: []
+  },
+  risk: {
+    // 风险评估阶段：关注高风险模块的测试
+    mode: 'focus-high-risk',
+    includePatterns: ['**/*.test.ts'],
+    excludePatterns: [],
+    priority: 'high-risk-first'
+  },
+  implementation: {
+    // 代码实现阶段：需要通过的测试
+    mode: 'required-tests',
+    includePatterns: ['**/*.test.ts', '**/*.spec.ts'],
+    excludePatterns: []
+  },
+  commit: {
+    // 提交阶段：验证测试通过
+    mode: 'verify',
+    includePatterns: ['**/*.test.ts', '**/*.spec.ts'],
+    excludePatterns: []
+  },
+  ci: {
+    // CI 阶段：完整测试套件
+    mode: 'full-suite',
+    includePatterns: ['**/*.test.ts', '**/*.spec.ts', '**/*.test.js'],
+    excludePatterns: []
+  }
+};
+```
+
+### 7.2 工作流测试建议生成
+
+```typescript
+class WorkflowTestLinker {
+  /**
+   * 根据当前工作流阶段生成测试建议
+   */
+  getTestSuggestions(
+    phase: WorkflowPhase,
+    sourceFiles: string[],
+    context: WorkflowContext
+  ): TestSuggestion[] {
+    const strategy = PHASE_TEST_STRATEGY[phase];
+    const testFiles = this.findRelatedTests(sourceFiles, strategy);
+
+    return testFiles.map(testFile => ({
+      file: testFile,
+      relevance: this.calculateRelevance(testFile, sourceFiles),
+      action: this.getSuggestedAction(phase, testFile),
+      priority: this.getPriority(phase, testFile, context)
+    }));
+  }
+
+  private getSuggestedAction(phase: WorkflowPhase, testFile: string): string {
+    switch (phase) {
+      case 'reference':
+        return '参考此测试的实现模式';
+      case 'impact':
+        return '修改后需运行此测试';
+      case 'risk':
+        return '重点关注此测试，确保通过';
+      case 'implementation':
+        return '实现完成后运行此测试';
+      case 'commit':
+        return '提交前确保此测试通过';
+      case 'ci':
+        return 'CI 会自动运行此测试';
+    }
+  }
+}
 ```
 
 ---

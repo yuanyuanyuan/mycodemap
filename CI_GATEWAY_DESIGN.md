@@ -558,6 +558,91 @@ CI Gateway
 
 ---
 
+## 11. 工作流集成 (v2.5 规划)
+
+### 11.1 工作流阶段的 CI 验证
+
+在编排层工作流中，CI 门禁作为最后一个阶段自动执行：
+
+```typescript
+// 工作流阶段的 CI 集成
+
+const PHASE_CI_CONFIG: Record<WorkflowPhase, CIConfig> = {
+  reference: {
+    preChecks: [],
+    postChecks: [],
+    required: false
+  },
+  impact: {
+    preChecks: [],
+    postChecks: [],
+    required: false
+  },
+  risk: {
+    preChecks: ['assess-risk'],
+    postChecks: [],
+    required: true
+  },
+  implementation: {
+    preChecks: ['check-headers'],
+    postChecks: [],
+    required: true
+  },
+  commit: {
+    preChecks: ['check-commits', 'check-headers'],
+    postChecks: [],
+    required: true
+  },
+  ci: {
+    preChecks: ['check-commits', 'check-headers', 'assess-risk', 'check-output-contract'],
+    postChecks: ['npm test'],
+    required: true
+  }
+};
+```
+
+### 11.2 工作流 CI 执行器
+
+```typescript
+class WorkflowCIExecutor {
+  private ciCommands: Map<string, () => Promise<CICheckResult>>;
+
+  /**
+   * 在指定阶段执行 CI 检查
+   */
+  async executePhaseChecks(phase: WorkflowPhase): Promise<CIExecutionResult> {
+    const config = PHASE_CI_CONFIG[phase];
+    const results: CICheckResult[] = [];
+
+    // 执行预检查
+    for (const check of config.preChecks) {
+      const executor = this.ciCommands.get(check);
+      if (executor) {
+        const result = await executor();
+        results.push(result);
+
+        if (!result.passed && config.required) {
+          return {
+            phase,
+            passed: false,
+            results,
+            failedCheck: check
+          };
+        }
+      }
+    }
+
+    return {
+      phase,
+      passed: results.every(r => r.passed),
+      results
+    };
+  }
+}
+```
+
+---
+
 ## 9. 检查项汇总
 
 | 检查项 | 本地 | 服务端 | 工具 |

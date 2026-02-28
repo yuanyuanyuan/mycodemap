@@ -414,3 +414,576 @@ AnalyzeCommand (analyze.ts)
   }
 }
 ```
+
+---
+
+## 8. 工作流编排器设计 (v2.5 规划)
+
+### 8.1 设计目标
+
+串联所有模块的"粘合剂"，解决阶段割裂问题：
+
+| 问题 | 解决方案 |
+|------|----------|
+| 阶段连接不紧密 | 状态机 + 检查点机制 |
+| 容易迷失阶段 | 交互式工作流引导 |
+| 中断后无法恢复 | 上下文持久化 |
+| 交付物不明确 | 阶段契约定义 |
+
+### 8.2 核心概念
+
+#### 工作流阶段定义
+
+```typescript
+// src/orchestrator/workflow/types.ts
+
+type WorkflowPhase =
+  | 'reference'    // 参考搜索
+  | 'impact'       // 影响分析
+  | 'risk'         // 风险评估
+  | 'implementation' // 代码实现
+  | 'commit'       // 提交验证
+  | 'ci';          // CI 流水线
+
+interface PhaseDefinition {
+  name: WorkflowPhase;
+  intent: string;                    // 对应的 analyze intent
+  entryCondition: PhaseCondition;   // 入口条件
+  deliverables: Deliverable[];       // 交付物
+  nextPhase?: WorkflowPhase;         // 下一阶段
+  commands: string[];               // 可执行的命令
+}
+
+interface PhaseCondition {
+  minConfidence?: number;            // 最低置信度
+  requiredArtifacts?: string[];       // 必需的产物
+}
+
+interface Deliverable {
+  name: string;
+  path: string;
+  validator: (path: string) => boolean;
+}
+```
+
+#### 工作流上下文
+
+```typescript
+// src/orchestrator/workflow/workflow-context.ts
+
+interface WorkflowContext {
+  id: string;                        // 工作流实例 ID
+  task: string;                      // 用户任务描述
+  currentPhase: WorkflowPhase;
+  phaseStatus: PhaseStatus;
+
+  // 阶段产物（自动传递）
+  artifacts: Map<WorkflowPhase, PhaseArtifacts>;
+
+  // 分析结果缓存
+  cachedResults: {
+    reference?: UnifiedResult[];
+    impact?: UnifiedResult[];
+    risk?: RiskScore;
+  };
+
+  // 用户确认状态
+  userConfirmed: Set<WorkflowPhase>;
+
+  // 时间戳
+  startedAt: Date;
+  updatedAt: Date;
+}
+
+interface PhaseArtifacts {
+  phase: WorkflowPhase;
+  results?: UnifiedResult[];
+  confidence?: ConfidenceResult;
+  metadata?: Record<string, unknown>;
+  createdAt: Date;
+}
+
+type PhaseStatus = 'pending' | 'running' | 'completed' | 'verified' | 'skipped';
+```
+
+### 8.3 工作流编排器类
+
+```typescript
+// src/orchestrator/workflow/workflow-orchestrator.ts
+
+class WorkflowOrchestrator {
+  private context: WorkflowContext | null = null;
+  private phaseDefinitions: Map<WorkflowPhase, PhaseDefinition>;
+  private persistence: WorkflowPersistence;
+
+  constructor() {
+    this.phaseDefinitions = this.initializePhaseDefinitions();
+    this.persistence = new WorkflowPersistence();
+  }
+
+  /**
+   * 启动新的工作流
+   */
+  async start(task: string): Promise<WorkflowContext> {
+    this.context = {
+      id: this.generateId(),
+      task,
+      currentPhase: 'reference',
+      phaseStatus: 'pending',
+      artifacts: new Map(),
+      cachedResults: {},
+      userConfirmed: new Set(),
+      startedAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // 保存初始状态
+    await this.persistence.save(this.context);
+
+    return this.context;
+  }
+
+  /**
+   * 执行当前阶段
+   */
+  async executeCurrentPhase(analyzeArgs: AnalyzeArgs): Promise<PhaseResult> {
+    if (!this.context) {
+      throw new Error('No active workflow. Call start() first.');
+    }
+
+    const phase = this.context.currentPhase;
+    const definition = this.phaseDefinitions.get(phase);
+
+    if (!definition) {
+      throw new Error(`Unknown phase: ${phase}`);
+    }
+
+    // 更新状态为 running
+    this.context.phaseStatus = 'running';
+    await this.persistence.save(this.context);
+
+    // 执行分析
+    const results = await this.runAnalysis(definition.intent, analyzeArgs);
+
+    // 计算置信度
+    const confidence = calculateConfidence(results, definition.intent as IntentType);
+
+    // 保存产物
+    const artifacts: PhaseArtifacts = {
+      phase,
+      results,
+      confidence,
+      createdAt: new Date()
+    };
+    this.context.artifacts.set(phase, artifacts);
+    this.context.cachedResults[phase] = results;
+
+    // 更新状态为 completed
+    this.context.phaseStatus = 'completed';
+    this.context.updatedAt = new Date();
+    await this.persistence.save(this.context);
+
+    return { artifacts, confidence, canProceed: this.checkProceedCondition(confidence) };
+  }
+
+  /**
+   * 验证是否可以进入下一阶段
+   */
+  private checkProceedCondition(confidence: ConfidenceResult): boolean {
+    const phase = this.context!.currentPhase;
+    const definition = this.phaseDefinitions.get(phase);
+
+    if (!definition) return false;
+
+    const { entryCondition } = definition;
+
+    // 检查置信度
+    if (entryCondition.minConfidence && confidence.score < entryCondition.minConfidence) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * 推进到下一阶段
+   */
+  async proceedToNextPhase(): Promise<WorkflowPhase> {
+    if (!this.context) {
+      throw new Error('No active workflow');
+    }
+
+    const current = this.context.currentPhase;
+    const definition = this.phaseDefinitions.get(current);
+
+    if (!definition?.nextPhase) {
+      throw new Error('No next phase available');
+    }
+
+    // 验证当前阶段已完成
+    if (this.context.phaseStatus !== 'completed') {
+      throw new Error(`Current phase ${current} is not completed`);
+    }
+
+    // 标记当前阶段为 verified
+    this.context.phaseStatus = 'verified';
+
+    // 推进到下一阶段
+    this.context.currentPhase = definition.nextPhase;
+    this.context.phaseStatus = 'pending';
+    this.context.updatedAt = new Date();
+
+    await this.persistence.save(this.context);
+
+    return definition.nextPhase;
+  }
+
+  /**
+   * 获取工作流状态
+   */
+  async getStatus(): Promise<WorkflowStatus> {
+    if (!this.context) {
+      return { active: false };
+    }
+
+    return {
+      active: true,
+      task: this.context.task,
+      currentPhase: this.context.currentPhase,
+      phaseStatus: this.context.phaseStatus,
+      progress: this.calculateProgress(),
+      artifacts: Array.from(this.context.artifacts.keys())
+    };
+  }
+
+  private calculateProgress(): number {
+    const totalPhases = this.phaseDefinitions.size;
+    const completedPhases = Array.from(this.context!.artifacts.keys()).length;
+    return (completedPhases / totalPhases) * 100;
+  }
+
+  private initializePhaseDefinitions(): Map<WorkflowPhase, PhaseDefinition> {
+    return new Map([
+      ['reference', {
+        name: 'reference',
+        intent: 'reference',
+        entryCondition: { minConfidence: 0.3 },
+        deliverables: [
+          { name: 'reference-results', path: '.codemap/workflow/reference.json', validator: () => true }
+        ],
+        nextPhase: 'impact',
+        commands: ['codemap analyze --intent reference']
+      }],
+      ['impact', {
+        name: 'impact',
+        intent: 'impact',
+        entryCondition: { minConfidence: 0.4 },
+        deliverables: [
+          { name: 'impact-report', path: '.codemap/workflow/impact.json', validator: () => true }
+        ],
+        nextPhase: 'risk',
+        commands: ['codemap analyze --intent impact']
+      }],
+      ['risk', {
+        name: 'risk',
+        intent: 'assess-risk',
+        entryCondition: {},
+        deliverables: [
+          { name: 'risk-assessment', path: '.codemap/workflow/risk.json', validator: () => true }
+        ],
+        nextPhase: 'implementation',
+        commands: ['codemap ci assess-risk']
+      }],
+      ['implementation', {
+        name: 'implementation',
+        intent: 'implementation',
+        entryCondition: {},
+        deliverables: [
+          { name: 'implementation', path: 'src/', validator: () => true }
+        ],
+        nextPhase: 'commit',
+        commands: []
+      }],
+      ['commit', {
+        name: 'commit',
+        intent: 'commit',
+        entryCondition: {},
+        deliverables: [
+          { name: 'commit', path: '.git/COMMIT_EDITMSG', validator: () => true }
+        ],
+        nextPhase: 'ci',
+        commands: ['git commit']
+      }],
+      ['ci', {
+        name: 'ci',
+        intent: 'ci',
+        entryCondition: {},
+        deliverables: [],
+        commands: []
+      }]
+    ]);
+  }
+}
+```
+
+### 8.4 工作流持久化
+
+```typescript
+// src/orchestrator/workflow/workflow-persistence.ts
+
+class WorkflowPersistence {
+  private storagePath = '.codemap/workflow';
+
+  async save(context: WorkflowContext): Promise<void> {
+    const fs = require('fs').promises;
+    const path = require('path');
+
+    // 确保目录存在
+    await fs.mkdir(this.storagePath, { recursive: true });
+
+    const filePath = path.join(this.storagePath, `${context.id}.json`);
+    await fs.writeFile(filePath, JSON.stringify(context, null, 2));
+  }
+
+  async load(id: string): Promise<WorkflowContext | null> {
+    const fs = require('fs').promises;
+    const path = require('path');
+
+    const filePath = path.join(this.storagePath, `${id}.json`);
+
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      return JSON.parse(content);
+    } catch {
+      return null;
+    }
+  }
+
+  async list(): Promise<WorkflowSummary[]> {
+    const fs = require('fs').promises;
+    const path = require('path');
+
+    const dir = path.join(process.cwd(), this.storagePath);
+
+    try {
+      const files = await fs.readdir(dir);
+      const summaries: WorkflowSummary[] = [];
+
+      for (const file of files) {
+        if (!file.endsWith('.json')) continue;
+
+        const content = await fs.readFile(path.join(dir, file), 'utf-8');
+        const ctx = JSON.parse(content);
+
+        summaries.push({
+          id: ctx.id,
+          task: ctx.task,
+          currentPhase: ctx.currentPhase,
+          phaseStatus: ctx.phaseStatus,
+          updatedAt: ctx.updatedAt
+        });
+      }
+
+      return summaries;
+    } catch {
+      return [];
+    }
+  }
+
+  async delete(id: string): Promise<void> {
+    const fs = require('fs').promises;
+    const path = require('path');
+
+    const filePath = path.join(this.storagePath, `${id}.json`);
+    await fs.unlink(filePath);
+  }
+}
+```
+
+### 8.5 工作流 CLI 交互
+
+```typescript
+// src/cli/commands/workflow.ts
+
+import { WorkflowOrchestrator } from '../../orchestrator/workflow/workflow-orchestrator';
+import { Command } from 'commander';
+
+const workflow = new Command('workflow').description('Workflow management');
+
+workflow.command('start')
+  .description('Start a new development workflow')
+  .argument('<task>', 'Task description')
+  .action(async (task: string) => {
+    const orchestrator = new WorkflowOrchestrator();
+    const context = await orchestrator.start(task);
+
+    console.log(`
+[WORKFLOW STARTED]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Task: ${task}
+ID: ${context.id}
+Phase: ${context.currentPhase}
+
+Next steps:
+  1. codemap workflow status    # 查看当前状态
+  2. codemap analyze --intent reference --keywords ...
+  3. codemap workflow proceed    # 进入下一阶段
+`);
+  });
+
+workflow.command('status')
+  .description('Show current workflow status')
+  .action(async () => {
+    const orchestrator = new WorkflowOrchestrator();
+    const status = await orchestrator.getStatus();
+
+    if (!status.active) {
+      console.log('No active workflow. Run "codemap workflow start" first.');
+      return;
+    }
+
+    console.log(`
+[WORKFLOW STATUS]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Task: ${status.task}
+Phase: ${status.currentPhase}
+Status: ${status.phaseStatus}
+Progress: ${status.progress.toFixed(0)}%
+
+Completed phases: ${status.artifacts?.join(', ') || 'none'}
+`);
+  });
+
+workflow.command('proceed')
+  .description('Proceed to next phase')
+  .option('-f, --force', 'Skip verification')
+  .action(async (options) => {
+    const orchestrator = new WorkflowOrchestrator();
+    const status = await orchestrator.getStatus();
+
+    if (!status.active) {
+      console.log('No active workflow.');
+      return;
+    }
+
+    // 显示当前阶段结果摘要
+    // ...
+
+    console.log(`
+[PHASE COMPLETED]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Current phase: ${status.currentPhase}
+Status: ${status.phaseStatus}
+
+Type "codemap workflow proceed" to continue to next phase.
+`);
+  });
+
+export default workflow;
+```
+
+### 8.6 阶段连接机制
+
+#### 检查点验证
+
+```typescript
+// 每个阶段结束时验证交付物
+
+class PhaseCheckpoint {
+  /**
+   * 验证阶段交付物
+   */
+  async validate(phase: WorkflowPhase, artifacts: PhaseArtifacts): Promise<CheckpointResult> {
+    const definition = this.getPhaseDefinition(phase);
+    const results: CheckItem[] = [];
+
+    for (const deliverable of definition.deliverables) {
+      const exists = await this.checkFileExists(deliverable.path);
+      const valid = deliverable.validator(deliverable.path);
+
+      results.push({
+        name: deliverable.name,
+        path: deliverable.path,
+        exists,
+        valid
+      });
+    }
+
+    return {
+      passed: results.every(r => r.exists && r.valid),
+      items: results
+    };
+  }
+}
+```
+
+#### 置信度引导
+
+```typescript
+// 根据置信度决定是否自动推进或等待用户确认
+
+class ConfidenceGuide {
+  /**
+   * 获取置信度指导建议
+   */
+  getGuidance(confidence: ConfidenceResult, phase: WorkflowPhase): Guidance {
+    if (confidence.level === 'high') {
+      return {
+        action: 'auto-proceed',
+        message: `High confidence (${confidence.score.toFixed(2)}), proceeding to next phase...`
+      };
+    }
+
+    if (confidence.level === 'medium') {
+      return {
+        action: 'confirm-proceed',
+        message: `Medium confidence (${confidence.score.toFixed(2)}), review results before proceeding?`,
+        suggestion: 'Run additional analysis with broader scope'
+      };
+    }
+
+    return {
+      action: 'hold',
+      message: `Low confidence (${confidence.score.toFixed(2)}), current phase needs more work`,
+      suggestion: confidence.reasons.join('; ')
+    };
+  }
+}
+```
+
+### 8.7 模块依赖图
+
+```
+工作流编排器 (workflow-orchestrator.ts)
+    │
+    ├── 依赖: IntentRouter (intent-router.ts)
+    ├── 依赖: ToolOrchestrator (tool-orchestrator.ts)
+    ├── 依赖: ConfidenceCalculator (confidence.ts)
+    ├── 依赖: ResultFusion (result-fusion.ts)
+    ├── 依赖: GitAnalyzer (git-analyzer.ts)
+    ├── 依赖: AIFeedGenerator (ai-feed-generator.ts)
+    ├── 依赖: TestLinker (test-linker.ts)
+    │
+    └── 被以下模块使用:
+        └── CLI Commands (workflow.ts)
+```
+
+### 8.8 配置扩展
+
+```json
+{
+  "workflow": {
+    "enabled": true,
+    "autoProceedThreshold": 0.7,
+    "persistencePath": ".codemap/workflow",
+    "phases": {
+      "reference": { "minConfidence": 0.3 },
+      "impact": { "minConfidence": 0.4 },
+      "risk": { "minConfidence": 0 }
+    }
+  }
+}
+```

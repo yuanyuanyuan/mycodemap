@@ -18,6 +18,7 @@
 | 测试关联器 | [REFACTOR_TEST_LINKER_DESIGN.md](./REFACTOR_TEST_LINKER_DESIGN.md) |
 | Git 分析器 | [REFACTOR_GIT_ANALYZER_DESIGN.md](./REFACTOR_GIT_ANALYZER_DESIGN.md) |
 | **CI 门禁护栏** | **[CI_GATEWAY_DESIGN.md](./CI_GATEWAY_DESIGN.md)** (v2.4 新增) |
+| **工作流编排器** | **[REFACTOR_ORCHESTRATOR_DESIGN.md](./REFACTOR_ORCHESTRATOR_DESIGN.md)** (v2.5 规划) |
 
 ---
 
@@ -303,6 +304,18 @@ tests/golden/
 
 **详见**: [CI_GATEWAY_DESIGN.md](./CI_GATEWAY_DESIGN.md)
 
+### 4.8 工作流编排器 (v2.5 规划)
+
+串联所有模块的"粘合剂"，提供开发流程的阶段管理、上下文传递和检查点机制。
+
+**功能**:
+- 阶段状态机管理（pending → running → completed → verified）
+- 阶段间上下文持久化（WorkflowContext）
+- 阶段交付物检查点（PhaseCheckpoint）
+- 交互式工作流引导（WorkflowCLI）
+
+**详见**: [工作流编排器设计](./REFACTOR_ORCHESTRATOR_DESIGN.md#8-工作流编排器设计-v25-规划)
+
 ---
 
 ## 5. CLI 命令结构
@@ -324,6 +337,12 @@ codemap ci check-commits          # 验证 Commit 格式
 codemap ci check-headers         # 验证文件头注释
 codemap ci assess-risk           # 评估危险置信度
 codemap ci check-output-contract # 验证输出契约（schemaVersion、Top-K、token限制）
+
+# 工作流命令 (v2.5 规划)
+codemap workflow start            # 启动交互式工作流
+codemap workflow status          # 查看当前工作流状态
+codemap workflow resume          # 恢复中断的工作流
+codemap workflow checkpoint      # 手动创建检查点
 ```
 
 ### analyze 命令参数
