@@ -19,10 +19,11 @@ class ToolOrchestrator {
   // 日志记录器
   private logger = console;
 
-  // 预定义回退链
+  // 预定义回退链（仅内部调试用，默认关闭）
+  // 用户可见输出必须走 CodeMap 语义链路
   private fallbackChains: Record<string, string[]> = {
-    'ast-grep': ['rg'],        // AST搜索 → 文本搜索
-    'codemap': ['rg'],         // 结构分析 → 文本搜索
+    'ast-grep': ['rg-internal'],   // AST搜索 → 文本搜索（内部）
+    'codemap': ['rg-internal'],    // 结构分析 → 文本搜索（内部）
   };
 }
 ```

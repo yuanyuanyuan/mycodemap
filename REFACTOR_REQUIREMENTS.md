@@ -1,22 +1,23 @@
 # CodeMap 编排层重构设计方案 - 需求与用户场景
 
-> 版本: 2.3
+> 版本: 2.4
 > 日期: 2026-02-28
-> 状态: 待实施（修订版）
+> 状态: 待实施（含 CI 门禁设计）
 
 ---
 
-## 修订说明 (v2.3)
+## 修订说明 (v2.4)
 
-基于 Codex 评审意见修正：
+### 新增内容
+- **CI 门禁护栏**：增加 Git Hook + GitHub Actions 双门禁
+- **极简 Commit 格式**：`[TAG] scope: message` 格式，AI 可正则解析
+- **文件头注释强制**：所有 TS 文件必须有 `[META]` 和 `[WHY]` 注释
+- **AI 饲料生成器**：`codemap generate` 生成 `.codemap/ai-feed.txt`
 
-### 需求范围更新
-- **移除 qmd**：工具池从 `codemap + ast-grep + qmd + rg` 调整为 `codemap + ast-grep + rg`
-- `--intent documentation` 场景保留，但改用 rg 替代 qmd
-
-### 技术约束更新
-- 所有外部命令调用改用安全参数方式（execFile）
-- Token 计量使用 tokenizer 而非字符截断
+### 设计原则更新
+- **极简落地**：总代码量控制在 150 行以内
+- **AI 优先**：纯文本结构化输出，无 emoji、无颜色
+- **苏格拉底问题**：每个文件头回答"为什么存在"
 
 ---
 
@@ -35,11 +36,15 @@
 | 默认输出规则 | Top-K=8、每条<=160 token | 代码约束 |
 | 基准集 | 30 条查询 | 预先定义的典型查询 |
 | 搜索范围 | TS/JS + Markdown | 配置约束 |
+| Commit 格式 | `[TAG] scope: message` | 强制标签化 |
+| 文件头注释 | `[META]`/`[WHY]` 必填 | CI 门禁 |
+| AI 饲料 | `.codemap/ai-feed.txt` | 自动生成 |
 
 ### 1.3 技术约束
 
 - 入口：单 CLI 编排（优先快速落地）
 - 集成方式：fork 子进程调用外部工具
+- CI 门禁：本地 pre-commit + 服务端 GitHub Actions
 
 ---
 
@@ -331,6 +336,141 @@ Claude Code 根据参考生成代码
 
 ---
 
+### 8.6 场景六：CI 门禁护栏（新增 v2.4）
+
+**场景**：开发者提交代码，触发 CI 门禁检查
+
+**本地提交流程**：
+```bash
+git commit -m "[FEATURE] git-analyzer: add risk scoring"
+```
+
+**pre-commit Hook 执行**：
+
+| 步骤 | 检查项 | 代码执行 | 结果 |
+|------|--------|----------|------|
+| 1 | 测试通过 | `npm test` | ✅ 所有测试通过 |
+| 2 | Commit 格式 | `CommitValidator.validate()` | ✅ 符合 `[TAG]` 格式 |
+| 3 | 文件头注释 | `FileHeaderScanner.validate()` | ✅ 所有修改文件有 `[META]`+`[WHY]` |
+| 4 | 生成 AI 饲料 | `AIFeedGenerator.generate()` | ✅ 更新 `.codemap/ai-feed.txt` |
+
+**提交成功** → 推送代码
+
+---
+
+**服务端 CI 流程 (GitHub Actions)**：
+
+| 步骤 | 检查项 | 执行命令 | 失败处理 |
+|------|--------|----------|----------|
+| 1 | 安装依赖 | `npm ci` | ❌ 阻止合并 |
+| 2 | 运行测试 | `npm test` | ❌ 阻止合并 |
+| 3 | Commit 格式检查 | `codemap ci check-commits` | ❌ 阻止合并 |
+| 4 | 文件头注释检查 | `codemap ci check-headers` | ❌ 阻止合并 |
+| 5 | 生成并验证 AI 饲料 | `codemap generate && git diff --exit-code` | ❌ 阻止合并 |
+| 6 | 危险置信度评估 | `codemap ci assess-risk` | ⚠️ 高风险需审批 |
+
+**CI 通过** → 允许合并
+
+---
+
+**Commit 格式规范**：
+
+```
+[TAG] scope: message
+
+TAG 类型:
+  [BUGFIX]   - 修复问题 (风险值: 0.9)
+  [FEATURE]  - 新功能 (风险值: 0.7)
+  [REFACTOR] - 重构 (风险值: 0.8)
+  [CONFIG]   - 配置变更 (风险值: 0.5)
+  [DOCS]     - 文档 (风险值: 0.2)
+  [DELETE]   - 删除代码 (风险值: 0.1)
+
+示例:
+  [BUGFIX] git-analyzer: fix risk score calculation
+  [FEATURE] orchestrator: add confidence scoring
+  [REFACTOR] parser: simplify token handling
+```
+
+---
+
+**文件头注释规范**（所有 TS 文件强制）：
+
+```typescript
+// [META] since:2024-01 | owner:backend-team | stable:false
+// [WHY] 处理JWT验证，因第三方Token刷新策略变更频繁不稳定
+// [DEPS] src/db/connection.ts, src/types/auth.d.ts
+
+// 实际代码从这里开始...
+import { db } from "./db/connection";
+```
+
+| 标签 | 必填 | 说明 |
+|------|------|------|
+| `[META]` | ✅ | `since:日期` \| `owner:团队` \| `stable:布尔` |
+| `[WHY]` | ✅ | 回答"为什么存在"（苏格拉底问题）|
+| `[DEPS]` | ❌ | 关键依赖路径 |
+
+---
+
+**AI 饲料输出示例**（`.codemap/ai-feed.txt`）：
+
+```text
+# CODEMAP AI FEED
+# Generated: 2026-02-28T19:30:00Z
+
+FILE: src/orchestrator/git-analyzer.ts
+GRAVITY: 15 | HEAT: 5/BUGFIX/2026-02-19
+META: since=2024-03 stable=false why=分析Git历史，评估文件修改风险
+IMPACT: 8 files depend on this
+DEPS: src/types/index.ts, src/utils/exec.ts
+---
+FILE: src/utils/date.ts
+GRAVITY: 0 | HEAT: 0/NEW/never
+META: since=2023-06 stable=true why=日期工具函数，项目早期沉淀
+IMPACT: 0 files depend on this
+DEPS: none
+---
+```
+
+**AI 使用场景**：
+
+> 用户: "我要改 auth 模块，有什么风险？"
+
+Claude 读取 `.codemap/ai-feed.txt`：
+- `jwt.ts`: GRAVITY=12, HEAT=8/BUGFIX, IMPACT=15 → **火山灰，高风险**
+- `date.ts`: GRAVITY=0, HEAT=0, IMPACT=0 → **沉积岩，低风险**
+
+**瞬间输出**：
+```
+⚠️ 检测到高风险文件: src/auth/jwt.ts
+   - 30天内修改 8 次，最后为 BUGFIX
+   - 15 个文件依赖此模块
+   - 标记为 unstable
+   
+💡 建议: 修改前请先运行相关测试
+   npm test src/auth/
+```
+
+---
+
+**危险置信度计算**（AI 饲料维度）：
+
+| 维度 | 来源 | 权重 | 说明 |
+|------|------|------|------|
+| **GRAVITY** | 依赖数 | 30% | 出度+入度，复杂度指标 |
+| **HEAT.freq30d** | 30天修改次数 | 15% | 频繁修改 = 不稳定 |
+| **HEAT.lastType** | 最后提交标签 | 10% | BUGFIX > FEATURE > DOCS |
+| **META.stable** | 是否稳定 | 15% | stable:false = 不稳定 |
+| **IMPACT** | 被依赖文件数 | 10% | 影响面广 = 风险高 |
+
+**风险等级**：
+- `high`: 分数 > 0.7 → 需要 commit body 说明风险缓解措施
+- `medium`: 分数 > 0.4 → 警告提示
+- `low`: 分数 ≤ 0.4 → 正常通过
+
+---
+
 ## 附录
 
 ### A. 相关文档
@@ -338,6 +478,9 @@ Claude Code 根据参考生成代码
 - 评估报告: `CODEMAP_ASSESSMENT_REPORT.md`
 - 方案对比: `MULTI_TOOL_REFACTOR_OPTIONS.md`
 - 系统架构与功能设计: `REFACTOR_ARCHITECTURE_DESIGN.md`
+- Git 分析器设计: `REFACTOR_GIT_ANALYZER_DESIGN.md` (含 AI 饲料生成器)
+- CI 门禁设计: `CI_GATEWAY_DESIGN.md`
+- 结果融合设计: `REFACTOR_RESULT_FUSION_DESIGN.md`
 
 ### B. 参考资源
 

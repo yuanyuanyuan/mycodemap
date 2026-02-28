@@ -87,14 +87,16 @@
 **测试步骤**:
 | Intent | 命令 | 预期主工具 | 预期回退工具 |
 |--------|------|-----------|-------------|
-| impact | `--intent impact --targets src/` | codemap + ast-grep | rg |
-| dependency | `--intent dependency --targets src/` | codemap | rg |
+| impact | `--intent impact --targets src/` | codemap + ast-grep | - (内部 rg-internal) |
+| dependency | `--intent dependency --targets src/` | codemap | - (内部 rg-internal) |
 | complexity | `--intent complexity --targets src/` | codemap | - |
-| search | `--intent search --keywords foo` | ast-grep | rg |
-| documentation | `--intent documentation --keywords arch` | rg | - |
+| search | `--intent search --keywords foo` | ast-grep | - (内部 rg-internal) |
+| documentation | `--intent documentation --keywords arch` | ast-grep | - |
 | overview | `--intent overview` | codemap | - |
-| refactor | `--intent refactor --keywords foo` | ast-grep | rg |
-| reference | `--intent reference --keywords foo --targets src/` | ast-grep + codemap | rg |
+| refactor | `--intent refactor --keywords foo` | ast-grep | - (内部 rg-internal) |
+| reference | `--intent reference --keywords foo --targets src/` | ast-grep + codemap | - (内部 rg-internal) |
+
+> ⚠️ **重要**：rg 仅作为内部调试工具（默认关闭），不暴露给用户可见输出
 
 **为什么这样设计**: 意图路由是整个架构的核心，每种 intent 的映射必须准确
 **优先级**: P0 | **类型**: 功能
@@ -136,12 +138,12 @@
 **测试内容**: 验证低置信度时触发回退机制
 **测试步骤**:
 1. 搜索罕见术语 "xyznotexist123"（预期返回极少结果）
-2. 观察回退行为
+2. 观察置信度
 **预期结果**:
 - 初始置信度 < 0.25 (search intent 的中阈值)
-- 触发 rg 回退搜索
-- 最终输出包含回退提示
-**为什么这样设计**: 核心功能 - 低置信度时自动回退
+- 不再触发外部 rg 回退（rg-internal 仅内部调试用）
+- 输出包含置信度提示
+**为什么这样设计**: 核心功能 - 低置信度时返回提示而非回退
 **优先级**: P0 | **类型**: 功能
 
 ---
@@ -250,24 +252,24 @@
 2. 执行需要 ast-grep 的搜索
 **预期结果**:
 - ast-grep 失败被捕获
-- 自动回退到 rg
+- 不再触发外部回退（rg-internal 仅内部调试用）
 - 整体流程不中断
 **为什么这样设计**: 单点故障不应导致整个流程失败
 **优先级**: P0 | **类型**: 稳定性
 
 ---
 
-#### TC-ORCH-004: 回退链执行
-**测试内容**: 验证完整回退链执行
+#### TC-ORCH-004: 置信度计算与提示
+**测试内容**: 验证低置信度时正确计算并返回提示
 **测试步骤**:
-1. 模拟 ast-grep 返回低置信度结果
-2. 观察回退到 rg
-3. 再次模拟 rg 也返回低置信度
+1. 模拟 ast-grep 返回低置信度结果（< 0.25）
+2. 观察内部日志（rg-internal 仅调试用）
+3. 验证置信度提示
 **预期结果**:
-- ast-grep → rg 的回退正确执行
-- 结果合并后重新计算置信度
+- 不再触发外部 rg 回退
+- 正确计算置信度并返回提示
 - 即使最终置信度低也能返回结果
-**为什么这样设计**: 确保回退链完整工作
+**为什么这样设计**: 确保置信度机制正常工作
 **优先级**: P0 | **类型**: 功能
 
 ---
@@ -299,7 +301,7 @@
 2. 在未安装 ast-grep 的环境运行
 **预期结果**:
 - 已安装: isAvailable() 返回 true
-- 未安装: isAvailable() 返回 false，自动回退到 rg
+- 未安装: isAvailable() 返回 false，记录日志（rg-internal 仅内部调试）
 **为什么这样设计**: ast-grep 是可选依赖，必须优雅降级
 **优先级**: P0 | **类型**: 兼容
 
@@ -332,18 +334,20 @@
 
 ---
 
-### 4.2 rg 适配器测试
+### 4.2 rg-internal 适配器测试（仅内部调试用，默认关闭）
 
-#### TC-ADAPTER-004: rg 基础搜索
-**测试内容**: 验证 rg 基础搜索功能
+> ⚠️ **重要**：rg 仅作为内部调试工具，不暴露给用户可见输出
+
+#### TC-ADAPTER-004: rg-internal 基础搜索
+**测试内容**: 验证 rg-internal 基础搜索功能（仅调试用）
 **测试步骤**:
 1. 搜索关键词 "parser"
 2. 搜索正则模式 `class.*Parser`
 **预期结果**:
 - 返回匹配的代码片段
 - 包含文件路径、行号、内容
-**为什么这样设计**: rg 是兜底工具，必须可靠
-**优先级**: P0 | **类型**: 功能
+**为什么这样设计**: 内部调试工具
+**优先级**: P3 | **类型**: 功能
 
 ---
 
@@ -383,11 +387,11 @@
 **测试内容**: 验证工具权重正确应用
 **测试步骤**:
 1. 构造 ast-grep 结果（原始相关度 0.9）
-2. 构造 rg 结果（原始相关度 0.9）
+2. 构造 rg-internal 结果（原始相关度 0.9）
 3. 执行融合
 **预期结果**:
 - ast-grep 结果相关度 = 0.9 * 1.0 = 0.9
-- rg 结果相关度 = 0.9 * 0.7 = 0.63
+- rg-internal 结果相关度 = 0.9 * 0.7 = 0.63（仅内部调试用）
 **为什么这样设计**: 工具权重是融合的核心逻辑
 **优先级**: P0 | **类型**: 算法
 
@@ -398,7 +402,7 @@
 **测试步骤**:
 1. 构造两个工具返回相同位置的结果:
    - ast-grep: `{ file: 'a.ts', line: 10, relevance: 0.9 }`
-   - rg: `{ file: 'a.ts', line: 10, relevance: 0.8 }`
+   - rg-internal: `{ file: 'a.ts', line: 10, relevance: 0.8 }`
 2. 执行融合
 **预期结果**:
 - 去重后只剩一条
@@ -768,8 +772,9 @@
 2. 检查 `git` 是否安装
 3. 检查 `sg` (ast-grep) 是否安装（可选）
 **预期结果**:
-- rg 和 git 为必需依赖，缺失时报错并提示安装
-- ast-grep 为可选依赖，缺失时自动回退到 rg
+- git 为必需依赖
+- rg-internal 为内部调试依赖（默认关闭，不安装也不报错）
+- ast-grep 为可选依赖，缺失时记录日志（rg-internal 仅内部调试用）
 **为什么这样设计**: 明确依赖要求，提供清晰的错误提示
 **优先级**: P0 | **类型**: 兼容
 
@@ -854,7 +859,7 @@
 1. 搜索罕见术语: `codemap analyze --intent search --keywords xyznotexist123`
 **预期结果**:
 - ast-grep 返回低置信度
-- 触发 rg 回退
+- 内部日志记录（rg-internal 调试用）
 - 返回合并结果
 - 输出包含回退提示
 **为什么这样设计**: 验证回退机制在真实场景工作
@@ -957,7 +962,7 @@
 | TC-ADAPTER-001 | ast-grep 可用性检测 | P0 | 4.1 |
 | TC-ADAPTER-002 | ast-grep 命令注入防护 | P0 | 4.1 |
 | TC-ADAPTER-003 | ast-grep JSON 解析 | P1 | 4.1 |
-| TC-ADAPTER-004 | rg 基础搜索 | P0 | 4.2 |
+| TC-ADAPTER-004 | rg-internal 基础搜索（仅内部调试用） | P3 | 4.2 |
 | TC-ADAPTER-005 | rg 命令注入防护 | P0 | 4.2 |
 | TC-ADAPTER-006 | CodeMap 依赖分析 | P0 | 4.3 |
 | TC-FUSION-001 | 加权合并 | P0 | 5.1 |

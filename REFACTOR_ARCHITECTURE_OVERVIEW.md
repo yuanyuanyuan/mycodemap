@@ -1,8 +1,8 @@
 # CodeMap 编排层重构设计方案 - 概要设计
 
-> 版本: 2.3
+> 版本: 2.4
 > 日期: 2026-02-28
-> 状态: 待实施
+> 状态: 待实施（含 CI 门禁设计）
 
 ---
 
@@ -17,6 +17,7 @@
 | CLI 命令与编排层 | [REFACTOR_ORCHESTRATOR_DESIGN.md](./REFACTOR_ORCHESTRATOR_DESIGN.md) |
 | 测试关联器 | [REFACTOR_TEST_LINKER_DESIGN.md](./REFACTOR_TEST_LINKER_DESIGN.md) |
 | Git 分析器 | [REFACTOR_GIT_ANALYZER_DESIGN.md](./REFACTOR_GIT_ANALYZER_DESIGN.md) |
+| **CI 门禁护栏** | **[CI_GATEWAY_DESIGN.md](./CI_GATEWAY_DESIGN.md)** (v2.4 新增) |
 
 ---
 
@@ -37,10 +38,19 @@ Codemap (结构化输入 → 执行分析)
 结果返回
 ```
 
-**优势**：
-- Codemap 意图分类器大幅简化
-- 准确性由 Claude Code 保障
-- 问题定位更清晰
+**约束**：
+- **禁止 grep 体系**：所有用户可见输出必须走 CodeMap 语义链路
+- rg 仅作为**内部调试工具**（默认关闭），不暴露给上游 AI Agent
+
+#### 本地兜底校验层
+
+即使上游 AI 理解正确，本地仍需三重校验防止故障放大：
+
+| 校验层 | 检查内容 | 失败处理 |
+|--------|----------|----------|
+| **Intent 白名单** | 请求的 intent 是否在允许列表 | 返回 E0001，提示有效 intent |
+| **参数完整性** | 必填参数是否存在、类型正确 | 返回 E0002，提示缺少参数 |
+| **低置信度降级** | 输出置信度低于阈值时 | 返回 E0006 + 建议，而非错误 |
 
 ---
 
@@ -59,11 +69,63 @@ Codemap (结构化输入 → 执行分析)
 | 默认输出规则 | Top-K=8、每条<=160 token | 代码约束 |
 | 基准集 | 30 条查询 | 预先定义的典型查询 |
 | 搜索范围 | TS/JS + Markdown | 配置约束 |
+| Commit 格式 | `[TAG] scope: message` | 强制标签化 (v2.4 新增) |
+| 文件头注释 | `[META]`/`[WHY]` 必填 | CI 门禁 (v2.4 新增) |
+| AI 饲料 | `.codemap/ai-feed.txt` | 自动生成 (v2.4 新增) |
+
+### 2.3 Benchmark 协议
+
+#### 数据集位置
+- 基准查询集: `refer/benchmark.ts` (30 条预定义查询)
+- 测试项目: `/data/codemap` 自身作为测试目标
+
+#### 执行命令
+```bash
+# Token 消耗测量
+node dist/cli/index.js analyze --intent search --keywords <keyword> --json | \
+  jq '[.results[].content] | map(. | split(" ") | length) | add'
+
+# 对比基准 (rg)
+rg <keyword> --json | jq '[.[] | .lines | split(" ") | length] | add'
+```
+
+#### Token 统计方法
+- 使用 cl100k_base 估算
+- 统计公式: `输出 token = sum(result.content.split(/\s/) | length)`
+
+#### 固定版本
+- Node.js: v20.x LTS
+- TypeScript: 5.x
+- codemap: 当前版本 (通过 `codemap --version` 获取)
 
 ### 2.3 技术约束
 
 - 入口：单 CLI 编排（优先快速落地）
 - 集成方式：fork 子进程调用外部工具
+
+### 2.4 版本范围
+
+#### v1.0 范围（本期实施）
+
+| 维度 | 支持范围 | 非目标 |
+|------|----------|--------|
+| **语言** | TypeScript、JavaScript、Markdown | Python、Go、Rust 等 |
+| **文件类型** | `.ts`、`.tsx`、`.js`、`.jsx`、`.md` | 二进制、配置(yaml/json) |
+| **Intent** | impact, dependency, search, documentation, complexity, overview, refactor, reference | - |
+| **工具链** | CodeMap 核心 + ast-grep | qmd 其他外部工具 |
+
+#### v2.0 扩展开关（规划中）
+
+```typescript
+// 配置开关 - v2.0 启用
+interface ExpansionConfig {
+  enableMultiLanguage: boolean;    // 多语言支持
+  enableBinaryAnalysis: boolean;   // 二进制分析
+  enableMoreTools: string[];      // 扩展工具列表
+}
+```
+
+> ⚠️ **注意**：ast-grep 本身支持多语言，但 v1.0 聚焦 TS/JS 场景，其他语言作为可选扩展。
 
 ---
 
@@ -97,9 +159,9 @@ Codemap (结构化输入 → 执行分析)
          │                 │                 │
          ▼                 ▼                 ▼
 ┌─────────────────┐ ┌─────────────┐ ┌─────────────────┐
-│   CodeMap 核心   │ │  ast-grep   │
-│  (依赖/复杂度/  │ │ (代码搜索/  │
-│   影响评估/概览) │ │  AST分析)   │
+│   CodeMap 核心   │ │  ast-grep   │ │   内部工具      │
+│  (依赖/复杂度/  │ │ (代码搜索/  │ │ (rg 仅调试用)   │
+│   影响评估/概览) │ │  AST分析)   │ │   默认关闭      │
 └─────────────────┘ └─────────────┘ └─────────────────┘
          │                 │                 │
          └─────────────────┼─────────────────┘
@@ -109,15 +171,79 @@ Codemap (结构化输入 → 执行分析)
 │                    结果归一化 + 输出裁剪                     │
 │                  统一格式 + Top-K + Token 限制               │
 └─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 AI 饲料生成器 (v2.4 新增)                    │
+│         扫描文件头 → 分析 Git 历史 → 生成 ai-feed.txt        │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  CI 门禁护栏 (v2.4 新增)                     │
+│       本地 Hook (pre-commit) + 服务端 CI (GitHub Actions)    │
+│          Commit 格式验证 → 文件头检查 → 风险评估              │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ### 工具职责划分
 
-| 工具 | 职责 | 调用方式 | 权重 |
-|------|------|----------|------|
-| **CodeMap 核心** | 代码结构提取、依赖图生成、复杂度分析、影响评估、项目概览 | 本地调用 | 0.9 |
-| **ast-grep** | 代码模式匹配、语义搜索、AST 分析、多语言支持 | fork 子进程 | 1.0 |
-| **rg** | 快速文本搜索、正则匹配（兜底） | fork 子进程 | 0.7 |
+| 工具 | 职责 | 调用方式 | 权重 | 可见性 |
+|------|------|----------|------|--------|
+| **CodeMap 核心** | 代码结构提取、依赖图生成、复杂度分析、影响评估、项目概览 | 本地调用 | 0.9 | 用户可见 |
+| **ast-grep** | 代码模式匹配、语义搜索、AST 分析（v1 聚焦 TS/JS） | fork 子进程 | 1.0 | 用户可见 |
+| **rg** | 快速文本搜索（仅内部调试用，默认关闭） | fork 子进程 | 0.7 | **仅内部** |
+| **AI 饲料** | 结构化代码元数据、风险评估数据 | 本地调用 | 0.85 | 用户可见 (v2.4 新增) |
+
+### 输出协议版本化
+
+#### 统一输出格式
+
+```typescript
+interface CodemapOutput {
+  schemaVersion: string;      // 格式: "v1.0.0"
+  intent: string;             // 执行的 intent 类型
+  tool: string;              // 主要工具
+  confidence: {
+    score: number;           // 0-1
+    level: 'high' | 'medium' | 'low';
+  };
+  results: UnifiedResult[]; // 结果列表
+  metadata?: {
+    executionTime: number;   // 毫秒
+    resultCount: number;
+  };
+}
+```
+
+#### 稳定字段列表（向后兼容）
+
+| 字段 | 兼容性 | 说明 |
+|------|--------|------|
+| `schemaVersion` | **必须** | 版本标识 |
+| `intent` | **必须** | intent 类型 |
+| `confidence.score` | **必须** | 置信度分数 |
+| `confidence.level` | **必须** | 置信度级别 |
+| `results[].id` | **必须** | 唯一标识 |
+| `results[].file` | **必须** | 文件路径 |
+| `results[].content` | **必须** | 内容（可能被截断） |
+
+#### 向后兼容策略
+
+1. **新增字段**：可选字段，旧版本忽略
+2. **废弃字段**：先标记弃用 (deprecated)，下个主版本移除
+3. **破坏性变更**：仅在主版本号升级时（如 v1 → v2）
+
+#### Golden Files 测试
+
+```bash
+# 测试用例位置
+tests/golden/
+  ├── v1.0.0-impact.json     # 影响分析输出
+  ├── v1.0.0-search.json     # 搜索输出
+  ├── v1.0.0-dependency.json # 依赖输出
+  └── ...
+```
 
 ---
 
@@ -153,13 +279,37 @@ Codemap (结构化输入 → 执行分析)
 
 **详见**: [REFACTOR_GIT_ANALYZER_DESIGN.md](./REFACTOR_GIT_ANALYZER_DESIGN.md)
 
+### 4.6 AI 饲料生成器 (v2.4 新增)
+
+生成结构化 AI 消费数据，包含文件元数据、依赖复杂度、修改热度等维度。
+
+**功能**:
+- 扫描文件头注释 `[META]`/`[WHY]`/`[DEPS]`
+- 分析 Git 历史（30天修改频率、标签分布）
+- 计算 GRAVITY/HEAT/IMPACT 三维评分
+- 输出 `.codemap/ai-feed.txt`
+
+**详见**: [REFACTOR_GIT_ANALYZER_DESIGN.md](./REFACTOR_GIT_ANALYZER_DESIGN.md) 第4节
+
+### 4.7 CI 门禁护栏 (v2.4 新增)
+
+双层次 CI 门禁：本地 pre-commit hook + 服务端 GitHub Actions。
+
+**功能**:
+- Commit 格式验证 `[TAG]`
+- 文件头注释强制检查
+- 危险置信度评估
+- AI 饲料同步验证
+
+**详见**: [CI_GATEWAY_DESIGN.md](./CI_GATEWAY_DESIGN.md)
+
 ---
 
 ## 5. CLI 命令结构
 
 ```bash
 # 核心命令
-codemap generate      # 生成代码地图
+codemap generate      # 生成代码地图（含 AI 饲料）
 codemap analyze       # 全面分析（主要入口）
 
 # 细分命令（直接调用底层能力）
@@ -168,18 +318,100 @@ codemap deps          # 依赖查看
 codemap cycles        # 循环依赖检测
 codemap complexity    # 复杂度分析
 codemap query         # 查询
+
+# CI 门禁命令 (v2.4 新增)
+codemap ci check-commits     # 验证 Commit 格式
+codemap ci check-headers     # 验证文件头注释
+codemap ci assess-risk       # 评估危险置信度
 ```
 
 ### analyze 命令参数
 
+#### 参数契约（JSON Schema）
+
+```typescript
+// CLI 参数契约
+const AnalyzeArgsSchema = {
+  type: 'object',
+  properties: {
+    intent: {
+      type: 'string',
+      enum: ['impact', 'dependency', 'search', 'documentation', 'complexity', 'overview', 'refactor', 'reference'],
+      default: 'search',
+      description: '意图类型'
+    },
+    keywords: {
+      type: 'array',
+      items: { type: 'string', maxLength: 100 },
+      maxItems: 10,
+      description: '搜索关键词'
+    },
+    targets: {
+      type: 'array',
+      items: { type: 'string' },
+      description: '目标文件/模块路径'
+    },
+    scope: {
+      type: 'string',
+      enum: ['direct', 'transitive'],
+      default: 'direct',
+      description: '搜索范围'
+    },
+    topK: {
+      type: 'number',
+      minimum: 1,
+      maximum: 100,
+      default: 8,
+      description: '返回结果数量'
+    },
+    includeTests: {
+      type: 'boolean',
+      default: false,
+      description: '是否包含测试文件'
+    },
+    includeGitHistory: {
+      type: 'boolean',
+      default: false,
+      description: '是否包含 Git 历史'
+    },
+    json: {
+      type: 'boolean',
+      default: false,
+      description: 'JSON 格式输出'
+    }
+  },
+  required: []
+} as const;
+```
+
+#### 错误码表
+
+| 错误码 | 含义 | 用户提示 | 可观测字段 |
+|--------|------|----------|------------|
+| E0001 | 无效 intent 值 | `无效的 intent: ${value}，允许值: ${enum}` | `intent`, `validIntents` |
+| E0002 | 缺少必要参数 | `缺少必要参数: ${param}` | `missingParams` |
+| E0003 | 目标路径不存在 | `目标路径不存在: ${path}` | `path` |
+| E0004 | 工具执行超时 | `${tool} 执行超时 (${timeout}ms)` | `tool`, `timeout` |
+| E0005 | 工具执行失败 | `${tool} 执行失败: ${error}` | `tool`, `error` |
+| E0006 | 置信度过低 | `结果置信度过低 (${score})，建议调整关键词` | `confidence`, `suggestion` |
+| **E0007** | **Commit 格式错误** | **提交信息必须以 [TAG] 开头** | **message** (v2.4 新增) |
+| **E0008** | **文件头缺失** | **文件缺少 [META] 或 [WHY] 注释** | **file** (v2.4 新增) |
+| **E0009** | **高风险文件** | **修改高风险文件需说明缓解措施** | **file, riskLevel** (v2.4 新增) |
+
+#### CLI 示例
+
 ```bash
-codemap analyze \
-  --intent <intent_type> \
-  --keywords <关键词> \
-  --targets <文件/模块路径> \
-  --scope <direct|transitive> \
-  --top-k <数字> \
-  --json
+# 影响分析
+codemap analyze --intent impact --targets src/cache/ --scope transitive --include-tests
+
+# 代码搜索
+codemap analyze --intent search --keywords parser --top-k 8 --json
+
+# 依赖分析
+codemap analyze --intent dependency --targets src/core/
+
+# 文档搜索
+codemap analyze --intent documentation --keywords "系统架构"
 ```
 
 ---
@@ -190,40 +422,59 @@ codemap analyze \
 src/
 ├── cli/
 │   ├── commands/
-│   │   ├── analyze.ts      # 统一入口
-│   │   ├── impact.ts       # 现有命令
-│   │   ├── deps.ts         # 现有命令
-│   │   └── complexity.ts   # 现有命令
+│   │   ├── analyze.ts           # 统一入口
+│   │   ├── ci.ts                # CI 门禁 (v2.4 新增)
+│   │   ├── impact.ts            # 现有命令
+│   │   ├── deps.ts              # 现有命令
+│   │   └── complexity.ts        # 现有命令
 │   └── index.ts
-├── orchestrator/           # 编排层
+├── orchestrator/                # 编排层
 │   ├── index.ts
-│   ├── types.ts           # 统一结果格式
-│   ├── intent-router.ts   # 意图路由
-│   ├── tool-orchestrator.ts # 工具编排 + 回退
-│   ├── confidence.ts      # 置信度计算
-│   ├── result-fusion.ts    # 结果融合
-│   ├── adapters/           # 工具适配器
-│   ├── test-linker.ts     # 测试关联
-│   └── git-analyzer.ts    # Git 分析
+│   ├── types.ts                 # 统一结果格式
+│   ├── intent-router.ts         # 意图路由
+│   ├── tool-orchestrator.ts     # 工具编排 + 回退
+│   ├── confidence.ts            # 置信度计算
+│   ├── result-fusion.ts         # 结果融合
+│   ├── adapters/                # 工具适配器
+│   ├── test-linker.ts           # 测试关联
+│   ├── git-analyzer.ts          # Git 分析
+│   ├── ai-feed-generator.ts     # AI 饲料生成 (v2.4 新增)
+│   ├── file-header-scanner.ts   # 文件头扫描 (v2.4 新增)
+│   └── commit-validator.ts      # Commit 验证 (v2.4 新增)
 └── ...
-```
+
+# CI 配置文件 (v2.4 新增)
+.github/
+└── workflows/
+    └── ci-gateway.yml           # GitHub Actions 门禁
+.git/hooks/                      # 本地 Hook (v2.4 新增)
+├── commit-msg                   # Commit 格式验证
+└── pre-commit                   # 测试 + 文件头检查
 
 ---
 
 ## 7. 实施计划
 
-| 阶段 | 周期 | 内容 | 交付物 |
-|------|------|------|--------|
-| **Phase 1** | 1 天 | 定义 `UnifiedResult` 接口 + 适配器基类 | 统一格式规范 |
-| **Phase 2** | 1 天 | 实现置信度计算 `calculateConfidence` | 置信度机制 |
-| **Phase 3** | 1 天 | 实现 `ResultFusion` 融合逻辑 | 多工具融合 |
-| **Phase 4** | 1 天 | 实现 `ToolOrchestrator` + 回退链 | 编排器 |
-| **Phase 5** | 1 天 | 改造现有命令为可调用模式 | 复用能力 |
-| **Phase 6** | 1 天 | 实现 `AnalyzeCommand` + 测试关联 | 统一入口 |
-| **Phase 7** | 1 天 | 实现 Git 分析器 | Git 风险评分 |
-| **Phase 8** | 1 天 | 测试 + 基准验证 | 30 条查询评测 |
+| 阶段 | 周期 | 内容 | 交付物 | DoD (Definition of Done) | 阻塞条件 | 回滚点 |
+|------|------|------|--------|--------------------------|----------|--------|
+| **Phase 1** | 1 天 | 定义 `UnifiedResult` 接口 + 适配器基类 | 统一格式规范 | TypeScript 接口定义完成，单元测试覆盖 | - | 本阶段回滚：删除新增文件 |
+| **Phase 2** | 1 天 | 实现置信度计算 `calculateConfidence` | 置信度机制 | 置信度计算函数实现，三级阈值可配置 | Phase 1 完成 | 本阶段回滚：保留接口定义 |
+| **Phase 3** | 1 天 | 实现 `ResultFusion` 融合逻辑 | 多工具融合 | 加权合并、去重、排序逻辑测试通过 | Phase 2 完成 | 本阶段回滚：保留置信度模块 |
+| **Phase 4** | 1 天 | 实现 `ToolOrchestrator` + 回退链 | 编排器 | 超时控制、错误隔离、回退触发测试通过 | Phase 3 完成 | 本阶段回滚：保留融合逻辑 |
+| **Phase 5** | 1 天 | 改造现有命令为可调用模式 | 复用能力 | 现有命令模块化，可被编排器调用 | Phase 4 完成 | 本阶段回滚：保留编排器 |
+| **Phase 6** | 1 天 | 实现 `AnalyzeCommand` + 测试关联 | 统一入口 | CLI 入口测试通过，测试关联功能正常 | Phase 5 完成 | 本阶段回滚：保留模块化命令 |
+| **Phase 7** | 1 天 | 实现 Git 分析器 | Git 风险评分 | Git 历史分析、风险评分功能正常 | Phase 6 完成 | 本阶段回滚：保留入口命令 |
+| **Phase 8** | 1 天 | 实现 AI 饲料生成器 | `.codemap/ai-feed.txt` | 生成结构化 AI 消费数据 | Phase 7 完成 | 本阶段回滚：保留 Git 分析 |
+| **Phase 9** | 1 天 | 实现 CI 门禁护栏 | CI Gateway | Commit 格式、文件头检查、风险评级 | Phase 8 完成 | 本阶段回滚：保留 AI 饲料 |
+| **Phase 10** | 1 天 | 测试 + 基准验证 | 30 条查询评测 | Hit@8 >= 90%, Token 降低 >= 40% | Phase 9 完成 | 本阶段回滚：保留完整功能 |
 
-**预计周期**：8 天
+**预计周期**：10 天 (v2.4 新增 CI 门禁阶段)
+
+### 门禁规则
+
+- **进入条件**：上一阶段 DoD 验收通过
+- **退出条件**：本阶段交付物 + 最小验收测试通过
+- **阻塞处理**：若阶段阻塞超过 2 天，启动回滚
 
 ---
 
@@ -236,6 +487,11 @@ src/
 - [ ] 多工具结果正确融合（去重+排序）
 - [ ] 测试关联基于 Jest/Vitest 配置
 - [ ] Git 提交历史风险评分正常
+- [ ] **AI 饲料生成正常 (v2.4 新增)**
+- [ ] **CI 门禁本地 Hook 正常工作 (v2.4 新增)**
+- [ ] **CI 门禁服务端检查通过 (v2.4 新增)**
+- [ ] **Commit 格式 `[TAG]` 验证通过 (v2.4 新增)**
+- [ ] **文件头注释 `[META]`/`[WHY]` 完整 (v2.4 新增)**
 - [ ] 现有命令保持兼容
 - [ ] 输出符合 Top-K=8、每条<=160 token
 - [ ] Hit@8 >= 90%
@@ -250,6 +506,7 @@ src/
 - 评估报告: `CODEMAP_ASSESSMENT_REPORT.md`
 - 方案对比: `MULTI_TOOL_REFACTOR_OPTIONS.md`
 - 需求与用户场景: `REFACTOR_REQUIREMENTS.md`
+- **CI 门禁设计: `CI_GATEWAY_DESIGN.md` (v2.4 新增)**
 
 ### 参考资源
 

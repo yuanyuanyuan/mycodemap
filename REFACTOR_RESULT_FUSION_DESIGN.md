@@ -1,7 +1,8 @@
 # 多工具结果融合详细设计
 
-> 版本: 2.3
+> 版本: 2.4
 > 所属模块: 编排层 - 结果融合
+> 更新日期: 2026-02-28
 
 ---
 
@@ -23,11 +24,11 @@ interface UnifiedResult {
   id: string;
 
   // 来源信息
-  source: 'codemap' | 'ast-grep' | 'rg';
+  source: 'codemap' | 'ast-grep' | 'rg-internal' | 'ai-feed';
   toolScore: number;        // 工具返回的原始分数
 
   // 内容信息
-  type: 'file' | 'symbol' | 'code' | 'documentation';
+  type: 'file' | 'symbol' | 'code' | 'documentation' | 'risk-assessment';
   file: string;
   line?: number;
   content: string;           // 截断后的内容
@@ -43,8 +44,22 @@ interface UnifiedResult {
     dependencies?: string[];
     testFile?: string;
     commitCount?: number;
+    // v2.4 新增: AI 饲料维度
+    gravity?: number;         // 依赖复杂度
+    heatScore?: HeatScore;    // 热度评分
+    impactCount?: number;     // 影响文件数
+    stability?: boolean;      // 是否稳定
+    riskLevel?: 'high' | 'medium' | 'low';
   };
 }
+
+// v2.4 新增: 热度评分结构
+interface HeatScore {
+  freq30d: number;          // 30天修改次数
+  lastType: string;         // 最后提交标签
+  lastDate: string;         // 最后修改日期
+}
+```
 ```
 
 ---
@@ -103,11 +118,32 @@ class ResultFusion {
 
   private getToolWeight(tool: string): number {
     const weights: Record<string, number> = {
-      'ast-grep': 1.0,   // AST 分析最准确
-      'codemap': 0.9,    // 结构分析次之
-      'rg': 0.7          // 文本搜索兜底
+      'ast-grep': 1.0,      // AST 分析最准确
+      'codemap': 0.9,       // 结构分析次之
+      'ai-feed': 0.85,      // AI 饲料数据 (v2.4 新增)
+      'rg-internal': 0.7    // 文本搜索兜底（仅内部调试用）
     };
     return weights[tool] || 0.5;
+  }
+
+  // v2.4 新增: 基于 AI 饲料的风险加权
+  private applyRiskBoost(results: UnifiedResult[]): UnifiedResult[] {
+    return results.map(r => {
+      if (!r.metadata?.riskLevel) return r;
+      
+      // 高风险文件略微降权（提示用户谨慎）
+      // 低风险文件略微加权（推荐优先修改）
+      const riskBoost = {
+        'high': -0.1,
+        'medium': 0,
+        'low': 0.05
+      }[r.metadata.riskLevel] || 0;
+      
+      return {
+        ...r,
+        relevance: Math.max(0, Math.min(1, r.relevance + riskBoost))
+      };
+    });
   }
 
   /**
@@ -137,9 +173,106 @@ class ResultFusion {
 
 ---
 
-## 4. Token 截断
+## 4. AI 饲料结果融合 (v2.4 新增)
 
-### 4.1 按 token 数量截断内容
+### 4.1 AI 饲料数据源
+
+```typescript
+// 将 AI 饲料转换为 UnifiedResult
+function convertAIFeedToResults(feed: AIFeed[]): UnifiedResult[] {
+  return feed.map(f => ({
+    id: `ai-feed-${f.file}`,
+    source: 'ai-feed',
+    toolScore: f.gravity / 20,  // 归一化
+    type: 'risk-assessment',
+    file: f.file,
+    content: formatAIFeedContent(f),
+    relevance: calculateAIFeedRelevance(f),
+    keywords: [f.heat.lastType, f.meta.why || ''].filter(Boolean),
+    metadata: {
+      gravity: f.gravity,
+      heatScore: f.heat,
+      impactCount: f.dependents.length,
+      stability: f.meta.stable,
+      riskLevel: calculateRiskLevel(f)
+    }
+  }));
+}
+
+function formatAIFeedContent(f: AIFeed): string {
+  const riskEmoji = f.meta.stable ? '🟢' : f.heat.freq30d > 5 ? '🔴' : '🟡';
+  return `${riskEmoji} ${f.file}\n` +
+         `   GRAVITY: ${f.gravity} | HEAT: ${f.heat.freq30d}/${f.heat.lastType}\n` +
+         `   WHY: ${f.meta.why || 'N/A'}\n` +
+         `   IMPACT: ${f.dependents.length} files depend on this`;
+}
+
+function calculateRiskLevel(f: AIFeed): 'high' | 'medium' | 'low' {
+  const score = 
+    (f.gravity / 20) * 0.3 +
+    (Math.min(f.heat.freq30d, 10) / 10) * 0.25 +
+    (f.dependents.length / 50) * 0.1 +
+    (f.meta.stable ? 0 : 0.15);
+  
+  if (score > 0.7) return 'high';
+  if (score > 0.4) return 'medium';
+  return 'low';
+}
+```
+
+### 4.2 风险感知排序
+
+在影响分析场景中，结合 AI 饲料数据优化结果排序：
+
+```typescript
+class ResultFusion {
+  fuseWithAIFeed(
+    resultsByTool: Map<string, UnifiedResult[]>,
+    aiFeed: AIFeed[],
+    options: { intent: string; topK: number }
+  ): UnifiedResult[] {
+    // 1. 转换 AI 饲料为 UnifiedResult
+    const aiFeedResults = convertAIFeedToResults(aiFeed);
+    
+    // 2. 合并所有结果
+    const allResults = [
+      ...(resultsByTool.get('codemap') || []),
+      ...(resultsByTool.get('ast-grep') || []),
+      ...aiFeedResults
+    ];
+    
+    // 3. 根据意图调整排序策略
+    if (options.intent === 'impact') {
+      // 影响分析场景：优先显示高风险文件
+      return this.sortByRiskImpact(allResults).slice(0, options.topK);
+    }
+    
+    // 4. 默认按相关度排序
+    return allResults
+      .sort((a, b) => b.relevance - a.relevance)
+      .slice(0, options.topK);
+  }
+  
+  private sortByRiskImpact(results: UnifiedResult[]): UnifiedResult[] {
+    return results.sort((a, b) => {
+      // 高风险优先
+      const riskOrder = { 'high': 0, 'medium': 1, 'low': 2 };
+      const riskDiff = riskOrder[a.metadata?.riskLevel || 'low'] - 
+                       riskOrder[b.metadata?.riskLevel || 'low'];
+      if (riskDiff !== 0) return riskDiff;
+      
+      // 同风险等级按相关度排序
+      return b.relevance - a.relevance;
+    });
+  }
+}
+```
+
+---
+
+## 5. Token 截断
+
+### 5.1 按 token 数量截断内容
 
 ```typescript
 /**
@@ -157,26 +290,62 @@ function truncateByToken(content: string, maxTokens: number): string {
 
 ---
 
-## 5. 模块依赖
+## 6. 模块依赖
 
 ```
 结果融合模块 (result-fusion.ts)
     │
     ├── 依赖类型: UnifiedResult (输入/输出)
+    ├── 依赖: AIFeed (v2.4 新增)
+    │   └── 来源: AIFeedGenerator (ai-feed-generator.ts)
     │
     └── 被以下模块使用:
         └── ToolOrchestrator (tool-orchestrator.ts)
         └── AnalyzeCommand (analyze.ts)
+        └── CIGateway (ci-gateway.ts) (v2.4 新增)
 ```
 
 ---
 
-## 6. 融合策略总结
+## 7. 融合策略总结
 
 | 阶段 | 策略 | 说明 |
 |------|------|------|
 | 1 | 加权合并 | 按工具权重调整 relevance |
-| 2 | 去重 | 基于 file:line 作为 key |
-| 3 | 排序 | 按 relevance 降序 |
-| 4 | 关键词加权 | 提升匹配关键词的结果 |
-| 5 | 截断 | Top-K + Token 限制 |
+| 2 | AI 饲料融合 | 转换并合并 AI 饲料数据 (v2.4 新增) |
+| 3 | 风险加权 | 基于 GRAVITY/HEAT/IMPACT 调整 (v2.4 新增) |
+| 4 | 去重 | 基于 file:line 作为 key |
+| 5 | 排序 | 按 relevance 降序（影响分析场景按风险排序）|
+| 6 | 关键词加权 | 提升匹配关键词的结果 |
+| 7 | 截断 | Top-K + Token 限制 |
+
+### v2.4 新增: 风险感知融合
+
+在影响分析场景中，结果融合会：
+1. **优先展示高风险文件**（火山灰文件）
+2. **标注稳定文件**（沉积岩文件，可安全修改）
+3. **提供 WHY 上下文**（回答苏格拉底问题）
+
+**示例输出**（影响分析）：
+```
+📊 影响范围分析（按风险排序）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔴 高风险文件（谨慎修改）:
+   • src/auth/jwt.ts (相关度: 85%)
+     GRAVITY: 15 | HEAT: 8/BUGFIX/2026-02-19
+     WHY: 处理JWT验证，因第三方Token刷新策略变更频繁不稳定
+     IMPACT: 15 files depend on this
+
+🟡 中风险文件:
+   • src/cache/lru-cache.ts (相关度: 92%)
+     GRAVITY: 8 | HEAT: 3/FEATURE/2026-02-15
+     WHY: LRU缓存实现，核心性能组件
+     IMPACT: 6 files depend on this
+
+🟢 低风险文件（可安全修改）:
+   • src/utils/date.ts (相关度: 45%)
+     GRAVITY: 0 | HEAT: 0/NEW/never
+     WHY: 日期工具函数，项目早期沉淀
+     IMPACT: 0 files depend on this
+```
