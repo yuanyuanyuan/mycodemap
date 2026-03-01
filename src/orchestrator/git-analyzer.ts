@@ -95,7 +95,7 @@ export interface AIFeed {
  * 标签风险权重映射
  * 基于 REFACTOR_REQUIREMENTS.md 第 8.6 节
  */
-const TAG_WEIGHTS: Record<string, number> = {
+export const TAG_WEIGHTS: Record<string, number> = {
   'BUGFIX': 0.9,     // 修复过的代码 = 曾经有问题
   'REFACTOR': 0.8,   // 重构过的代码 = 复杂度较高
   'FEATURE': 0.7,    // 新功能 = 可能不稳定
@@ -109,7 +109,7 @@ const TAG_WEIGHTS: Record<string, number> = {
  * 提交标签正则表达式
  * 匹配格式: [TAG] scope: message
  */
-const COMMIT_TAG_REGEX = /^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]\s*(.+?)?:\s*(.+)$/;
+export const COMMIT_TAG_REGEX = /^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]\s*(.+?)?:\s*(.+)$/;
 
 /**
  * GitAnalyzer 类
