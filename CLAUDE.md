@@ -50,6 +50,28 @@ src/
 <!-- TASK-GENERATOR-CONTEXT-START -->
 [Task Knowledge Index]|version:1|root: ./.tasks|IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning for task execution.|If context missing, regenerate: node .claude/skills/task-generator/scripts/create-triad-artifacts.js
 
+## 任务技能闭环流程
+
+任务管理遵循**生成 → 执行 → 分析 → 改进**的闭环流程：
+
+| 阶段 | 技能 | 用途 | 触发词 |
+|------|------|------|--------|
+| 生成 | `task-generator` | 生成任务四件套 | 创建任务、设计任务 |
+| 执行 | `task-executor` | 执行任务四件套 | 执行任务、跑任务 |
+| 分析 | `task-analyzer` | 分析审计任务质量 | 审计任务、分析任务 |
+| 改进 | - | 根据审计结果重新生成或修复 | - |
+
+```
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│   生成任务    │ -> │   执行任务    │ -> │   审计分析    │
+│task-generator│    │task-executor │    │task-analyzer │
+└──────────────┘    └──────────────┘    └──────────────┘
+       ^                                         │
+       └──────────────── 发现问题，改进优化 <─────┘
+```
+
+> **重要**: 三个技能必须配套使用，形成完整的任务管理闭环。
+
 ## 重构任务批次 1 (Phase 1-5)
 
 | 任务                     | 描述                                | 依赖           |
