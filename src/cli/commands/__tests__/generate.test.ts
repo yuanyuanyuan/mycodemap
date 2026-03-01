@@ -186,6 +186,8 @@ describe('Generate CLI', () => {
     }, 30000);
 
     it('should handle AI overview generation failure gracefully', async () => {
+      // 强制启用 AI 以绕过 Claude Code 会话检测
+      process.env.CODEMAP_ENABLE_AI = 'true';
       mockCreateSubagentCaller.mockReturnValue({
         isAvailable: vi.fn().mockResolvedValue(true),
         generateOverview: vi.fn().mockRejectedValue(new Error('AI service unavailable')),
@@ -195,6 +197,8 @@ describe('Generate CLI', () => {
     }, 30000);
 
     it('should skip AI overview when subagent is not available', async () => {
+      // 强制启用 AI 以绕过 Claude Code 会话检测
+      process.env.CODEMAP_ENABLE_AI = 'true';
       mockCreateSubagentCaller.mockReturnValue({
         isAvailable: vi.fn().mockResolvedValue(false),
         generateOverview: vi.fn(),
