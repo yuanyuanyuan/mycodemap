@@ -1,0 +1,9 @@
+version: 1
+agent:
+  name: task-supervisor
+  system_prompt_path: ./task-supervisor.md
+  tools:
+    - "kimi_cli.tools.shell:Shell"
+    - "kimi_cli.tools.file:ReadFile"
+    - "kimi_cli.tools.file:Glob"
+    - "kimi_cli.tools.file:Grep"

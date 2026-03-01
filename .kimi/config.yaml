@@ -1,0 +1,34 @@
+version: 1
+agent:
+  name: codemap-checker
+  extend: default
+  system_prompt_path: ./system.md
+  tools:
+    - "kimi_cli.tools.multiagent:CreateSubagent"
+    - "kimi_cli.tools.multiagent:Task"
+    - "kimi_cli.tools.shell:Shell"
+    - "kimi_cli.tools.file:ReadFile"
+    - "kimi_cli.tools.file:WriteFile"
+    - "kimi_cli.tools.file:Glob"
+    - "kimi_cli.tools.file:Grep"
+  subagents:
+    # Triad 核心团队
+    task-generator:
+      path: ./subagents/task-generator.yaml
+      description: "任务生成器 - 生成任务四件套和 Triad 工件"
+    task-qa:
+      path: ./subagents/task-qa.yaml
+      description: "质量验收员 - 验收任务四件套质量"
+    task-supervisor:
+      path: ./subagents/task-supervisor.yaml
+      description: "监督复核员 - 语义判定和最终放行"
+    # 辅助团队
+    task-analyzer:
+      path: ./subagents/task-analyzer.yaml
+      description: "任务审计分析员 - 扫描存量任务、检测质量问题"
+    task-executor:
+      path: ./subagents/task-executor.yaml
+      description: "任务执行员 - 执行已生成的任务"
+    ci-checker:
+      path: ./subagents/ci-checker.yaml
+      description: "CI Gateway 设计检查员"

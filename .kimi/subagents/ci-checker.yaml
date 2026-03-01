@@ -1,0 +1,9 @@
+version: 1
+agent:
+  name: ci-checker
+  system_prompt_path: ./prompt.md
+  tools:
+    - "kimi_cli.tools.shell:Shell"
+    - "kimi_cli.tools.file:ReadFile"
+    - "kimi_cli.tools.file:Glob"
+    - "kimi_cli.tools.file:Grep"
