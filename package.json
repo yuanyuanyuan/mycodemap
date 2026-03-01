@@ -12,7 +12,8 @@
     "dev": "tsc --watch",
     "test": "vitest run",
     "lint": "eslint src --ext .ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "postinstall": "sh scripts/hooks/install-hooks.sh"
   },
   "keywords": [
     "typescript",

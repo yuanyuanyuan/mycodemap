@@ -25,3 +25,9 @@ export type { FusionOptions } from './result-fusion.js';
 
 export { calculateConfidence } from './confidence.js';
 export type { ConfidenceResult } from './confidence.js';
+
+export { validateCommitMessage, validateRecentCommits, VALID_TAGS } from './commit-validator.js';
+export type { CommitValidationResult } from './commit-validator.js';
+
+export { scanDirectory, assessRisk, SUPPORTED_EXTENSIONS } from './file-header-scanner.js';
+export type { FileHeaderResult, RiskAssessment } from './file-header-scanner.js';

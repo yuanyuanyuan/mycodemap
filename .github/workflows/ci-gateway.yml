@@ -1,0 +1,127 @@
+name: CI Gateway
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  commit-format:
+    name: Commit Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate commit messages
+        run: |
+          # 获取所有 commits
+          COMMITS=$(git log --format=%s origin/main..HEAD)
+
+          VALID_TAGS="feat fix refactor docs chore test style perf ci build revert"
+
+          for commit in $COMMITS; do
+            # 检查是否以 [TAG] 格式开头
+            if ! echo "$commit" | grep -qE '^\[[a-z]+\]'; then
+              echo "❌ Invalid commit format: $commit"
+              echo "   Expected format: [TAG] message"
+              echo "   Valid tags: $VALID_TAGS"
+              exit 1
+            fi
+
+            # 提取并验证 TAG
+            TAG=$(echo "$commit" | sed -E 's/^\[([a-z]+)\].*/\1/')
+            if ! echo "$VALID_TAGS" | grep -qw "$TAG"; then
+              echo "❌ Invalid tag: [$TAG]"
+              echo "   Valid tags: $VALID_TAGS"
+              exit 1
+            fi
+
+            echo "✅ Valid: $commit"
+          done
+
+  file-headers:
+    name: File Header Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check file headers
+        run: |
+          # 检查 src 目录下的所有 TypeScript/JavaScript 文件
+          echo "Checking file headers..."
+
+          TOTAL=0
+          INVALID=0
+
+          for file in $(find src -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" \) 2>/dev/null); do
+            TOTAL=$((TOTAL + 1))
+
+            if ! head -n 20 "$file" | grep -qi '\[META\]\|\[WHY\]'; then
+              echo "❌ E0008: $file - Missing [META] or [WHY] comment"
+              INVALID=$((INVALID + 1))
+            fi
+          done
+
+          echo ""
+          echo "Total files checked: $TOTAL"
+          echo "Invalid files: $INVALID"
+
+          if [ $INVALID -gt 0 ]; then
+            echo ""
+            echo "❌ File header check failed."
+            exit 1
+          fi
+
+          echo "✅ All file headers are valid"
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run unit tests
+        run: npm test
+
+  typecheck:
+    name: TypeScript Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TypeScript type check
+        run: npx tsc --noEmit

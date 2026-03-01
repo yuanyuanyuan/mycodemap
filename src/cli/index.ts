@@ -10,6 +10,7 @@ import { cyclesCommand } from './commands/cycles.js';
 import { complexityCommand } from './commands/complexity.js';
 import { impactCommand } from './commands/impact.js';
 import { analyzeCommand } from './commands/analyze.js';
+import { ciCommand } from './commands/ci.js';
 
 const program = new Command();
 
@@ -108,5 +109,8 @@ program
     ];
     await analyzeCommand(argv);
   });
+
+// CI Gateway 命令
+program.addCommand(ciCommand);
 
 program.parse();
