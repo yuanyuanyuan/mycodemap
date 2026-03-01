@@ -1,0 +1,55 @@
+#!/bin/sh
+# Pre-commit hook: 验证文件头注释
+
+echo "🔍 Checking file headers..."
+
+# 获取 node_modules 的路径
+NODE_PATH=$(pwd)/node_modules
+
+# 检查是否安装了必要的依赖
+if [ ! -f "$NODE_PATH/.bin/tsc" ]; then
+    echo "⚠️  TypeScript not found, skipping header check"
+    exit 0
+fi
+
+# 扫描源代码目录
+SRC_DIR="src"
+
+# 定义需要检查的文件扩展名
+EXTENSIONS="ts tsx js jsx mjs cjs"
+
+# 统计变量
+TOTAL=0
+INVALID=0
+
+for ext in $EXTENSIONS; do
+    # 查找所有匹配的文件，排除 node_modules, dist, test 等目录
+    FILES=$(find "$SRC_DIR" -type f -name "*.$ext" 2>/dev/null | grep -v node_modules | grep -v dist | grep -v __tests__ | grep -v "\.test\." | grep -v "\.spec\.")
+
+    for file in $FILES; do
+        TOTAL=$((TOTAL + 1))
+
+        # 检查文件头是否包含 [META] 或 [WHY]
+        if ! head -n 20 "$file" | grep -qi '\[META\]\|\[WHY\]'; then
+            echo "❌ E0008: $file - Missing [META] or [WHY] comment"
+            INVALID=$((INVALID + 1))
+        fi
+    done
+done
+
+echo ""
+echo "Total files checked: $TOTAL"
+echo "Invalid files: $INVALID"
+
+if [ $INVALID -gt 0 ]; then
+    echo ""
+    echo "❌ File header check failed. Please add [META] or [WHY] comment to the files above."
+    echo "   Example:"
+    echo "   /**"
+    echo "    * [META] Description of this file"
+    echo "    */"
+    exit 1
+fi
+
+echo "✅ All file headers are valid"
+exit 0
