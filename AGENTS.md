@@ -6,6 +6,32 @@
 <!-- TASK-GENERATOR-CONTEXT-START -->
 [Task Knowledge Index]|version:1|root: ./.tasks|IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning for task execution.|If context missing, regenerate: node .claude/skills/task-generator/scripts/create-triad-artifacts.js
 
+## 可用技能
+
+| 技能 | 路径 | 用途 | 触发词 |
+|------|------|------|--------|
+| task-generator | `.claude/skills/task-generator/` | 生成任务四件套 | 创建任务、设计任务 |
+| **task-executor** | `.claude/skills/task-executor/` | **执行任务四件套** | **执行任务、跑任务** |
+
+### task-executor 快速使用
+
+```bash
+# 验证任务完整性
+node .claude/skills/task-executor/scripts/validate-task.js --task <task-name>
+
+# 执行单个任务
+node .claude/skills/task-executor/scripts/execute-task.js --task <task-name>
+
+# 批量执行任务
+node .claude/skills/task-executor/scripts/batch-executor.js --tasks task1,task2
+
+# 带依赖编排执行
+node .claude/skills/task-executor/scripts/batch-executor.js --with-dependencies <task-name>
+
+# 更新任务元数据
+node .claude/skills/task-executor/scripts/update-metadata.js --task <task-name> --status completed --score 85
+```
+
 ## 重构任务批次 1 (Phase 1-5)
 
 | 任务                     | 描述                                | 依赖           |
@@ -42,6 +68,16 @@
 | fix-analyze-orchestrator-integration | Analyze 命令接入 ToolOrchestrator/ResultFusion | FINAL_REVIEW:6.2 | critical |
 | fix-output-contract | 修复输出契约校验和字段完整性 | FINAL_REVIEW:6.3 | critical |
 | fix-timeout-mechanism | 修复 ToolOrchestrator 超时控制机制 | FINAL_REVIEW:6.4 | high |
+
+## 重构修复批次 (基于 DEEP_REVIEW_REPORT)
+
+> 这些任务基于 `/data/codemap/DEEP_REVIEW_REPORT.md` 中指出的高优先级缺失生成
+
+| 任务 | 描述 | 当前完成度 | 优先级 |
+|------|------|------------|--------|
+| test-linker-core-functionality | 测试关联器核心功能实现 (buildMapping, findRelatedTests, scanTestImports) | 35% | critical |
+| ci-gateway-completion | CI Gateway 完整性完善 (pre-commit test, AI feed, GitHub Actions) | 75% | high |
+| ast-grep-adapter | ast-grep 适配器实现 | 0% | high |
 
 ## 设计文档索引
 

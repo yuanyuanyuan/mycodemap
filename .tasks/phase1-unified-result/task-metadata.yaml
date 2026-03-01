@@ -1,115 +1,104 @@
-# 任务元数据
-# 用于任务追溯和复用
-
 metadata:
-  task_id: "codemap-phase-001"
-  task_name: "Phase 1 - 定义 UnifiedResult 统一结果接口与适配器基类"
-  version: "1.0.0"
-  created_at: "2026-03-01"
-  updated_at: "2026-03-01"
-
-# 任务属性
+  task_id: codemap-phase-001
+  task_name: Phase 1 - 定义 UnifiedResult 统一结果接口与适配器基类
+  version: 1.0.0
+  created_at: '2026-03-01'
+  updated_at: '2026-03-01'
 task:
-  type: "code_generation"
-  difficulty: "medium"
+  type: code_generation
+  difficulty: medium
   estimated_minutes: 45
-
-# 能力维度
 capabilities:
   tested:
-    - "TypeScript 接口设计"
-    - "类型安全实践"
-    - "字面量联合类型使用"
-    - "模块导出管理"
-    - "架构契约设计"
+    - TypeScript 接口设计
+    - 类型安全实践
+    - 字面量联合类型使用
+    - 模块导出管理
+    - 架构契约设计
   required_knowledge:
-    - "TypeScript 严格模式"
-    - "interface vs class 区别"
-    - "字面量联合类型 vs enum"
-    - "JSON 序列化约束"
-    - "适配器模式"
-
-# 陷阱设计
+    - TypeScript 严格模式
+    - interface vs class 区别
+    - 字面量联合类型 vs enum
+    - JSON 序列化约束
+    - 适配器模式
 traps:
-  - name: "any_type_trap"
-    description: "使用 any 类型定义字段，失去类型检查保护"
-    severity: "high"
-  - name: "optional_field_trap"
-    description: "将核心字段设为可选（?），导致结果融合时可能缺失关键字段"
-    severity: "high"
-  - name: "class_vs_interface_trap"
-    description: "使用 class 而非 interface 定义数据结构，增加运行时开销"
-    severity: "medium"
-  - name: "enum_vs_union_trap"
-    description: "使用 enum 而非字面量联合类型，与项目约定不符"
-    severity: "medium"
-  - name: "missing_export_trap"
-    description: "忘记导出公共类型，导致其他模块无法导入"
-    severity: "medium"
-
-# 反例场景
+  - name: any_type_trap
+    description: 使用 any 类型定义字段，失去类型检查保护
+    severity: high
+  - name: optional_field_trap
+    description: 将核心字段设为可选（?），导致结果融合时可能缺失关键字段
+    severity: high
+  - name: class_vs_interface_trap
+    description: 使用 class 而非 interface 定义数据结构，增加运行时开销
+    severity: medium
+  - name: enum_vs_union_trap
+    description: 使用 enum 而非字面量联合类型，与项目约定不符
+    severity: medium
+  - name: missing_export_trap
+    description: 忘记导出公共类型，导致其他模块无法导入
+    severity: medium
 counter_examples:
-  - user_type: "类型安全忽视者"
-    scenario: "使用 any 类型定义所有字段"
-    reason: "失去编译时类型检查，运行时错误难以发现"
-  - user_type: "可选字段滥用者"
-    scenario: "将所有字段设为可选（?）"
-    reason: "结果融合依赖字段完整性，可选字段会导致逻辑错误"
-  - user_type: "OOP 惯性思维者"
-    scenario: "使用 class 定义纯数据结构"
-    reason: "增加运行时开销，不必要的实例化逻辑，interface 更适合纯类型定义"
-
-# 三角色工作流（硬约束）
+  - user_type: 类型安全忽视者
+    scenario: 使用 any 类型定义所有字段
+    reason: 失去编译时类型检查，运行时错误难以发现
+  - user_type: 可选字段滥用者
+    scenario: 将所有字段设为可选（?）
+    reason: 结果融合依赖字段完整性，可选字段会导致逻辑错误
+  - user_type: OOP 惯性思维者
+    scenario: 使用 class 定义纯数据结构
+    reason: 增加运行时开销，不必要的实例化逻辑，interface 更适合纯类型定义
 workflow:
   batch:
     requested_count: 1
     max_allowed: 5
   triad:
     generator:
-      agent: "task-generator"
-      agent_definition: ".agents/task-generator.agent.md"
-      status: "completed"
-      evidence: "四件套文件已生成"
+      agent: task-generator
+      agent_definition: .agents/task-generator.agent.md
+      status: completed
+      evidence: 四件套文件已生成
     qa:
-      agent: "task-qa"
-      agent_definition: ".agents/task-qa.agent.md"
-      status: "completed"
-      evidence: "QA验收通过：四件套完整性、章节完整性、EVAL分层、SCORING总分、metadata字段全部通过"
+      agent: task-qa
+      agent_definition: .agents/task-qa.agent.md
+      status: completed
+      evidence: QA验收通过：四件套完整性、章节完整性、EVAL分层、SCORING总分、metadata字段全部通过
     supervisor:
-      agent: "task-supervisor"
-      agent_definition: ".agents/task-supervisor.agent.md"
-      status: "completed"
-      evidence: "语义判定完成：score=96, threshold=85, 无critical failures"
+      agent: task-supervisor
+      agent_definition: .agents/task-supervisor.agent.md
+      status: completed
+      evidence: 语义判定完成：score=96, threshold=85, 无critical failures
       semantic_review:
-        prompt_template: ".agents/task-supervisor.semantic.prompt.md"
-        report_file: "SUPERVISOR_SEMANTIC_REVIEW.md"
+        prompt_template: .agents/task-supervisor.semantic.prompt.md
+        report_file: SUPERVISOR_SEMANTIC_REVIEW.md
         score: 96
         threshold: 85
         critical_failures: 0
-        status: "completed"
+        status: completed
   approved: true
-
-# 依赖关系
+  execution:
+    status: completed
+    updated_at: '2026-03-01T14:18:35.478Z'
+    executed_by: task-executor
+    final_score: 95
+    evidence: 测试通过
+    artifacts:
+      last_update: '2026-03-01T14:18:35.478Z'
 dependencies:
   requires: []
   required_by:
-    - "phase2-confidence"
-    - "phase3-result-fusion"
-    - "phase4-tool-orchestrator"
-
-# 参考文档
+    - phase2-confidence
+    - phase3-result-fusion
+    - phase4-tool-orchestrator
 references:
   design_docs:
-    - "REFACTOR_ARCHITECTURE_OVERVIEW.md"
-    - "REFACTOR_RESULT_FUSION_DESIGN.md"
-    - "REFACTOR_ORCHESTRATOR_DESIGN.md"
+    - REFACTOR_ARCHITECTURE_OVERVIEW.md
+    - REFACTOR_RESULT_FUSION_DESIGN.md
+    - REFACTOR_ORCHESTRATOR_DESIGN.md
   code_references:
-    - "src/orchestrator/types.ts"
-    - "src/orchestrator/adapters/base-adapter.ts"
-    - "src/orchestrator/adapters/index.ts"
-
-# 版本历史
+    - src/orchestrator/types.ts
+    - src/orchestrator/adapters/base-adapter.ts
+    - src/orchestrator/adapters/index.ts
 version_history:
-  - version: "1.0.0"
-    date: "2026-03-01"
-    changes: "初始版本，定义 UnifiedResult 接口与适配器基类"
+  - version: 1.0.0
+    date: '2026-03-01'
+    changes: 初始版本，定义 UnifiedResult 接口与适配器基类

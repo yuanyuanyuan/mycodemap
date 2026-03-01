@@ -1,0 +1,83 @@
+# 任务元数据
+# 用于任务追溯和复用
+
+metadata:
+  task_id: "test-linker-core-functionality"
+  task_name: "测试关联器核心功能实现"
+  version: "1.0.0"
+  created_at: "2026-03-01T00:00:00Z"
+  updated_at: "2026-03-01T00:00:00Z"
+
+# 任务属性
+task:
+  type: "code_generation"
+  difficulty: "medium"
+  estimated_minutes: 60
+
+# 能力维度
+capabilities:
+  tested:
+    - "TypeScript ESM 模块系统"
+    - "文件系统和 AST 解析"
+    - "测试框架配置解析"
+  required_knowledge:
+    - "src/orchestrator/test-linker.ts 现有实现"
+    - "docs/REFACTOR_TEST_LINKER_DESIGN.md 设计文档"
+    - "Vitest/Jest 配置格式"
+
+# 陷阱设计
+traps:
+  - name: "ESM vs CommonJS 混用"
+    description: "使用 require() 而非 ESM import，导致与项目模块系统不兼容"
+    severity: "critical"
+  - name: "动态 import 无法静态分析"
+    description: "动态 import() 调用无法被 scanTestImports 捕获"
+    severity: "medium"
+  - name: "非标准测试目录"
+    description: "项目使用非标准测试目录结构时，默认模式可能失效"
+    severity: "medium"
+
+# 反例场景
+counter_examples:
+  - user_type: "非标准测试目录项目"
+    scenario: "测试文件放在 tests/unit/ 而非 __tests__/"
+    reason: "默认模式无法匹配"
+  - user_type: "动态导入用户"
+    scenario: "使用 const module = await import(path) 动态导入"
+    reason: "静态分析无法捕获"
+
+# 三角色工作流（硬约束）
+workflow:
+  batch:
+    requested_count: 3
+    max_allowed: 5
+  triad:
+    generator:
+      agent: "task-generator"
+      agent_definition: ".agents/task-generator.agent.md"
+      status: "completed"
+      evidence: "任务四件套已生成"
+    qa:
+      agent: "task-qa"
+      agent_definition: ".agents/task-qa.agent.md"
+      status: "pending"
+      evidence: ""
+    supervisor:
+      agent: "task-supervisor"
+      agent_definition: ".agents/task-supervisor.agent.md"
+      status: "pending"
+      evidence: ""
+      semantic_review:
+        prompt_template: ".agents/task-supervisor.semantic.prompt.md"
+        report_file: "SUPERVISOR_SEMANTIC_REVIEW.md"
+        score: 0
+        threshold: 85
+        critical_failures: 0
+        status: "pending"
+  approved: false
+
+# 版本历史
+version_history:
+  - version: "1.0.0"
+    date: "2026-03-01"
+    changes: "初始版本"

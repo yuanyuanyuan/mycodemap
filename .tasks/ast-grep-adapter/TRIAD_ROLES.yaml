@@ -1,0 +1,20 @@
+triad:
+  roles:
+    generator:
+      name: "task-generator"
+      status: "completed"
+      evidence: "任务四件套已生成"
+    qa:
+      name: "task-qa"
+      status: "pending"
+      evidence: ""
+    supervisor:
+      name: "task-supervisor"
+      status: "pending"
+      evidence: ""
+  semantic_review:
+    score: 0
+    threshold: 85
+    critical_failures: 0
+    status: "pending"
+  approved: false

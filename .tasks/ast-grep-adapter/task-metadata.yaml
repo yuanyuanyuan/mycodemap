@@ -1,0 +1,80 @@
+# 任务元数据
+# 用于任务追溯和复用
+
+metadata:
+  task_id: "ast-grep-adapter"
+  task_name: "ast-grep 适配器实现"
+  version: "1.0.0"
+  created_at: "2026-03-01T00:00:00Z"
+  updated_at: "2026-03-01T00:00:00Z"
+
+# 任务属性
+task:
+  type: "code_generation"
+  difficulty: "medium"
+  estimated_minutes: 45
+
+# 能力维度
+capabilities:
+  tested:
+    - "TypeScript AST 分析"
+    - "外部工具集成"
+    - "适配器模式实现"
+  required_knowledge:
+    - "docs/REFACTOR_ARCHITECTURE_OVERVIEW.md 架构文档"
+    - "src/orchestrator/adapters/base-adapter.ts 基类"
+    - "src/orchestrator/adapters/codemap-adapter.ts 参考实现"
+
+# 陷阱设计
+traps:
+  - name: "未实现 ToolAdapter 接口"
+    description: "缺少必要方法导致与 ToolOrchestrator 集成失败"
+    severity: "critical"
+  - name: "ESM/CommonJS 混用"
+    description: "使用 require() 而非 ESM import"
+    severity: "high"
+
+# 反例场景
+counter_examples:
+  - user_type: "非 TypeScript 项目"
+    scenario: "项目不包含 .ts 文件"
+    reason: "ast-grep 主要用于 TypeScript"
+  - user_type: "未安装 ast-grep"
+    scenario: "无法运行 npx ast-grep"
+    reason: "需要依赖或 npx 调用"
+
+# 三角色工作流（硬约束）
+workflow:
+  batch:
+    requested_count: 3
+    max_allowed: 5
+  triad:
+    generator:
+      agent: "task-generator"
+      agent_definition: ".agents/task-generator.agent.md"
+      status: "completed"
+      evidence: "任务四件套已生成"
+    qa:
+      agent: "task-qa"
+      agent_definition: ".agents/task-qa.agent.md"
+      status: "pending"
+      evidence: ""
+    supervisor:
+      agent: "task-supervisor"
+      agent_definition: ".agents/task-supervisor.agent.md"
+      status: "pending"
+      evidence: ""
+      semantic_review:
+        prompt_template: ".agents/task-supervisor.semantic.prompt.md"
+        report_file: "SUPERVISOR_SEMANTIC_REVIEW.md"
+        score: 0
+        threshold: 85
+        critical_failures: 0
+        status: "pending"
+  approved: false
+
+# 版本历史
+version_history:
+  - version: "1.0.0"
+    date: "2026-03-01"
+    changes: "初始版本"
