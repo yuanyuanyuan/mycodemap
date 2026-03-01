@@ -1,0 +1,213 @@
+# TRIAD_ROLES.yaml
+# Triad 工作流角色定义
+# 任务ID: group-a-core-001
+
+# ============================================================================
+# 角色 1: Generator (任务生成器)
+# ============================================================================
+role_generator:
+  name: "generator"
+  display_name: "任务生成器"
+  
+  responsibilities:
+    - "生成任务四件套 (PROMPT.md, EVAL.ts, SCORING.md, task-metadata.yaml)"
+    - "生成 Triad 工件 (TRIAD_ROLES.yaml, TRIAD_WORKFLOW.md, TRIAD_ACCEPTANCE.md)"
+    - "确保需求完整性"
+    - "确保评估标准可量化"
+    - "确保评分规则总分等于100"
+  
+  constraints:
+    - "必须使用固定模板"
+    - "不得跳过 Phase 4"
+    - "必须包含 retrieval-led 指令"
+    - "单次生成任务数不得超过5个"
+  
+  inputs:
+    - "源文件路径"
+    - "设计文档路径"
+    - "任务描述"
+  
+  outputs:
+    - "PROMPT.md"
+    - "EVAL.ts"
+    - "SCORING.md"
+    - "task-metadata.yaml"
+    - "TRIAD_ROLES.yaml"
+    - "TRIAD_WORKFLOW.md"
+    - "TRIAD_ACCEPTANCE.md"
+  
+  quality_checks:
+    - "PROMPT.md 包含所有必需字段"
+    - "EVAL.ts 包含所有检查点"
+    - "SCORING.md 总分等于100"
+    - "task-metadata.yaml 包含完整 workflow 定义"
+
+# ============================================================================
+# 角色 2: QA Engineer (质量工程师)
+# ============================================================================
+role_qa_engineer:
+  name: "qa-engineer"
+  display_name: "质量工程师"
+  
+  responsibilities:
+    - "审核任务四件套质量"
+    - "验证评估标准的合理性"
+    - "验证评分规则的完整性"
+    - "识别潜在风险"
+    - "提出改进建议"
+  
+  constraints:
+    - "必须独立审核"
+    - "不能仅做格式检查"
+    - "必须提供具体反馈"
+  
+  inputs:
+    - "PROMPT.md"
+    - "EVAL.ts"
+    - "SCORING.md"
+    - "task-metadata.yaml"
+    - "TRIAD_ROLES.yaml"
+    - "TRIAD_WORKFLOW.md"
+    - "TRIAD_ACCEPTANCE.md"
+  
+  outputs:
+    - "QA审核报告"
+    - "改进建议列表"
+    - "通过/不通过决定"
+  
+  checklist:
+    - id: "QA-1"
+      item: "PROMPT.md 需求是否清晰完整？"
+      weight: "critical"
+      
+    - id: "QA-2"
+      item: "EVAL.ts 检查点是否可测试？"
+      weight: "critical"
+      
+    - id: "QA-3"
+      item: "SCORING.md 分值总和是否等于100？"
+      weight: "critical"
+      
+    - id: "QA-4"
+      item: "验收标准是否具体可衡量？"
+      weight: "high"
+      
+    - id: "QA-5"
+      item: "是否有遗漏的边界条件？"
+      weight: "high"
+      
+    - id: "QA-6"
+      item: "风险识别是否充分？"
+      weight: "medium"
+
+# ============================================================================
+# 角色 3: Supervisor (监督者)
+# ============================================================================
+role_supervisor:
+  name: "supervisor"
+  display_name: "监督者"
+  
+  responsibilities:
+    - "最终审批任务"
+    - "评估任务可行性"
+    - "确认资源需求"
+    - "批准任务发布"
+    - "协调角色间冲突"
+  
+  constraints:
+    - "不能跳过 QA 审核"
+    - "必须基于客观标准决策"
+    - "必须记录审批理由"
+  
+  inputs:
+    - "Generator 输出"
+    - "QA Engineer 审核报告"
+    - "task-metadata.yaml"
+  
+  outputs:
+    - "审批决定 (通过/拒绝/需修改)"
+    - "审批意见"
+    - "任务发布指令"
+  
+  decision_criteria:
+    - id: "SC-1"
+      criterion: "QA 审核是否通过？"
+      required: true
+      
+    - id: "SC-2"
+      criterion: "任务是否在团队能力范围内？"
+      required: true
+      
+    - id: "SC-3"
+      criterion: "资源是否充足？"
+      required: true
+      
+    - id: "SC-4"
+      criterion: "风险是否可控？"
+      required: true
+  
+  approval_levels:
+    - level: "auto-approve"
+      condition: "QA全通过且低风险"
+      authority: "supervisor"
+      
+    - level: "conditional-approve"
+      condition: "QA基本通过但有小问题"
+      authority: "supervisor"
+      
+    - level: "reject"
+      condition: "QA未通过或高风险"
+      authority: "supervisor"
+
+# ============================================================================
+# 角色交互规则
+# ============================================================================
+interaction_rules:
+  - rule: "Generator 完成 → QA Engineer 审核"
+    type: "sequential"
+    description: "Generator 生成完成后，QA Engineer 必须审核"
+    
+  - rule: "QA Engineer 通过 → Supervisor 审批"
+    type: "sequential"
+    description: "QA 审核通过后，Supervisor 进行最终审批"
+    
+  - rule: "QA Engineer 不通过 → Generator 修改"
+    type: "loop"
+    description: "QA 审核不通过时，返回 Generator 修改"
+    max_iterations: 3
+    
+  - rule: "Supervisor 拒绝 → Generator 重新生成"
+    type: "loop"
+    description: "Supervisor 拒绝时，返回 Generator 重新生成"
+    max_iterations: 2
+
+# ============================================================================
+# 角色能力要求
+# ============================================================================
+role_requirements:
+  generator:
+    skills:
+      - "熟悉任务模板"
+      - "理解 TypeScript 测试"
+      - "了解 Vitest 框架"
+    tools:
+      - "模板系统"
+      - "文件读写"
+      
+  qa_engineer:
+    skills:
+      - "测试设计能力"
+      - "风险评估能力"
+      - "质量度量能力"
+    tools:
+      - "检查清单"
+      - "评分系统"
+      
+  supervisor:
+    skills:
+      - "决策能力"
+      - "资源评估能力"
+      - "冲突协调能力"
+    tools:
+      - "审批工作流"
+      - "决策矩阵"

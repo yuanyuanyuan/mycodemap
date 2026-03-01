@@ -1,0 +1,159 @@
+# Group B - 适配器模块测试任务：三角色配置
+triad_roles:
+  # ====== 角色 1: Generator (任务生成器) ======
+  generator:
+    name: generator
+    display_name: 任务生成器
+    responsibilities:
+      - 创建任务四件套 (PROMPT.md, EVAL.ts, SCORING.md, task-metadata.yaml)
+      - 创建 Triad 工件 (TRIAD_ROLES.yaml, TRIAD_WORKFLOW.md, TRIAD_ACCEPTANCE.md)
+      - 定义清晰的验收标准和约束条件
+      - 确保关键失败项 (CF-1~CF-4) 被明确标识
+    
+    inputs:
+      - 用户需求和修复要求
+      - 目标源代码路径
+      - 已知失败项和修复清单
+    
+    outputs:
+      - PROMPT.md: 完整任务描述和约束
+      - EVAL.ts: 分层检查点评估脚本
+      - SCORING.md: 评分标准和关键失败项
+      - task-metadata.yaml: 任务元数据
+      - TRIAD_ROLES.yaml: 三角色配置
+      - TRIAD_WORKFLOW.md: 工作流定义
+      - TRIAD_ACCEPTANCE.md: 验收标准
+    
+    constraints:
+      - 不得跳过任何模板字段
+      - 必须包含所有关键失败项 (CF-1~CF-4)
+      - 必须包含 "Prefer retrieval-led reasoning" 指令
+      - 单次生成任务数不得超过 5 个
+    
+    handoff_to: qa
+
+  # ====== 角色 2: QA (质量检查员) ======
+  qa:
+    name: qa-engineer
+    display_name: 质量检查员
+    responsibilities:
+      - 审查 Generator 创建的任务四件套
+      - 验证关键失败项 (CF-1~CF-4) 是否被正确捕获
+      - 检查 EVAL.ts 检查点是否可验证
+      - 确保 Mock 策略和导入要求正确
+      - 提供改进建议
+    
+    inputs:
+      - 任务四件套
+      - 目标源代码（可选，用于验证）
+    
+    outputs:
+      - QA_FEEDBACK.md: 审查反馈和改进建议
+      - CHECKLIST.md: QA 检查清单
+    
+    checklist:
+      cf_checks:
+        - id: CF-1
+          item: 测试导入实际源代码（非自建模拟类）
+          verify_in: [PROMPT.md, EVAL.ts]
+        - id: CF-2
+          item: 存在 index.test.ts 测试所有导出
+          verify_in: [PROMPT.md, EVAL.ts, task-metadata.yaml]
+        - id: CF-3
+          item: Mock 使用 node:child_process 和 globby
+          verify_in: [PROMPT.md, EVAL.ts]
+        - id: CF-4
+          item: 测试行为与源代码一致
+          verify_in: [PROMPT.md]
+      
+      eval_checks:
+        - item: EVAL.ts 检查点可执行
+        - item: 每个检查点有明确的 test() 函数
+        - item: 分数计算正确（总分 100）
+        - item: 有明确的通过/失败判定
+      
+      scoring_checks:
+        - item: 总分等于 100
+        - item: 评分等级定义清晰
+        - item: 关键失败项有惩罚机制
+    
+    approval_criteria:
+      - 所有 CF 检查点明确标识
+      - EVAL.ts 可执行
+      - SCORING.md 总分 100
+      - 无明显遗漏或错误
+    
+    handoff_to: supervisor
+
+  # ====== 角色 3: Supervisor (任务主管) ======
+  supervisor:
+    name: supervisor
+    display_name: 任务主管
+    responsibilities:
+      - 最终审批任务是否可发布
+      - 确认任务完整性和可执行性
+      - 批准或拒绝任务发布
+      - 生成最终报告
+    
+    inputs:
+      - 任务四件套
+      - Triad 工件
+      - QA 反馈
+    
+    outputs:
+      - APPROVAL_STATUS.md: 审批状态和理由
+      - FINAL_REPORT.md: 最终报告
+    
+    decision_matrix:
+      approve:
+        condition: QA 通过且无重大问题
+        action: 标记任务为 READY_FOR_PUBLISH
+      
+      conditional:
+        condition: 有轻微问题但不影响核心功能
+        action: 标记任务为 READY_WITH_NOTES
+      
+      reject:
+        condition: 有关键失败项未修复或严重问题
+        action: 返回 Generator 重新生成
+    
+    thresholds:
+      pass: 90
+      conditional: 70
+      fail: 50
+    
+    final_authority: true
+
+# 角色关系
+role_relationships:
+  - from: generator
+    to: qa
+    handoff_artifacts:
+      - PROMPT.md
+      - EVAL.ts
+      - SCORING.md
+      - task-metadata.yaml
+      - TRIAD_ROLES.yaml
+      - TRIAD_WORKFLOW.md
+      - TRIAD_ACCEPTANCE.md
+  
+  - from: qa
+    to: supervisor
+    handoff_artifacts:
+      - QA_FEEDBACK.md
+      - CHECKLIST.md
+  
+  - from: supervisor
+    to: generator
+    condition: rejection
+    handoff_artifacts:
+      - REJECTION_REASON.md
+
+# 工作流状态
+workflow_states:
+  - CREATED
+  - QA_REVIEW
+  - SUPERVISOR_REVIEW
+  - APPROVED
+  - REJECTED
+  - READY_FOR_PUBLISH

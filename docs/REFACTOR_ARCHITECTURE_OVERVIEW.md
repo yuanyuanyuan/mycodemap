@@ -77,11 +77,17 @@ Codemap (结构化输入 → 执行分析)
 ### 2.3 Benchmark 协议
 
 #### 数据集位置
-- 基准查询集: `refer/benchmark.ts` (30 条预定义查询)
+- 基准查询集: `refer/benchmark-quality.ts` (30 条预定义查询)
 - 测试项目: `/data/codemap` 自身作为测试目标
 
 #### 执行命令
 ```bash
+# 基准测试（直接运行）
+npx ts-node refer/benchmark-quality.ts
+
+# 基准测试（Vitest 集成）
+npx vitest run refer/benchmark-quality.test.ts
+
 # Token 消耗测量
 node dist/cli/index.js analyze --intent search --keywords <keyword> --json | \
   jq '[.results[].content] | map(. | split(" ") | length) | add'

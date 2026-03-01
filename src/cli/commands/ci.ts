@@ -47,8 +47,18 @@ async function getChangedFiles(options: { files?: string }): Promise<string[]> {
 
   const { execSync } = await import('child_process');
 
+  // 检测是否存在 remote
+  let baseBranch = 'main';
   try {
-    const output = execSync('git diff --name-only origin/main...HEAD', {
+    execSync('git remote get-url origin', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
+    baseBranch = 'origin/main';
+  } catch {
+    // 没有 remote，使用本地 main 分支
+    baseBranch = 'main';
+  }
+
+  try {
+    const output = execSync(`git diff --name-only ${baseBranch}...HEAD`, {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -89,7 +99,19 @@ async function checkCommitsAction(options: { count?: string; message?: string; r
     process.exit(1);
   }
 
-  const range = options.range || 'origin/main..HEAD';
+  const { execSync } = await import('child_process');
+
+  // 检测是否存在 remote
+  let baseBranch = 'main';
+  try {
+    execSync('git remote get-url origin', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
+    baseBranch = 'origin/main';
+  } catch {
+    // 没有 remote，使用本地 main 分支
+    baseBranch = 'main';
+  }
+
+  const range = options.range || `${baseBranch}..HEAD`;
   let results = await validateRecentCommits(count, range);
 
   if (results.length === 0 && !options.range) {

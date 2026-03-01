@@ -3,9 +3,6 @@
 > 本文档面向 AI 编程助手，介绍如何在 CodeMap 项目中高效工作。
 
 
-<!-- TASK-GENERATOR-CONTEXT-START -->
-[Task Knowledge Index]|version:1|root: ./.tasks|IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning for task execution.|If context missing, regenerate: node .claude/skills/task-generator/scripts/create-triad-artifacts.js
-
 ## 可用技能
 
 | 技能 | 路径 | 用途 | 触发词 |
@@ -13,96 +10,66 @@
 | task-generator | `.claude/skills/task-generator/` | 生成任务四件套 | 创建任务、设计任务 |
 | **task-executor** | `.claude/skills/task-executor/` | **执行任务四件套** | **执行任务、跑任务** |
 | task-analyzer | `.claude/skills/task-analyzer/` | 分析审计任务质量 | 审计任务、分析任务、检查任务质量 |
+| task-qa | `.claude/skills/task-qa/` | 质量验收 | 验收任务 |
+| task-supervisor | `.claude/skills/task-supervisor/` | 最终审核 | 审核任务 |
 
 ## 任务技能闭环流程
 
-任务管理遵循**生成 → 执行 → 分析 → 改进**的闭环流程：
+任务管理遵循**生成 → 验收 → 审核 → 执行 → 分析 → 改进**的闭环流程：
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  task-generator │ --> │  task-executor  │ --> │ task-analyzer   │
-│   (创建任务)     │     │   (执行任务)     │     │  (审计分析)      │
+│  task-generator │ --> │     task-qa     │ --> │ task-supervisor │
+│   (创建任务)     │     │   (质量验收)     │     │   (最终审核)     │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
+                                                         │
          ^                                               │
-         │                                               │
          │              发现问题，重新生成或修复            │
-         └───────────────────────────────────────────────┘
+         │                                               v
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│ task-analyzer   │ <-- │  task-executor  │ <-- │   批准执行       │
+│  (审计分析)      │     │   (执行任务)     │     │                 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
 ### 流程说明
 
 1. **创建任务** (`task-generator`): 生成任务四件套（PROMPT.md、EVAL.ts、SCORING.md、task-metadata.yaml）
-2. **执行任务** (`task-executor`): 按标准化流程实施任务，更新任务状态
-3. **审计分析** (`task-analyzer`): 扫描存量任务、检测质量问题、生成审计报告
-4. **改进闭环**: 根据审计发现的问题，决定重新执行任务或重新生成任务
+2. **质量验收** (`task-qa`): 检查四件套完整性、总分=100、负向断言、Triad工件
+3. **最终审核** (`task-supervisor`): 4维度语义评分（>=85分通过）
+4. **执行任务** (`task-executor`): 按标准化流程实施任务，更新任务状态
+5. **审计分析** (`task-analyzer`): 扫描存量任务、检测质量问题、生成审计报告
+6. **改进闭环**: 根据审计发现的问题，决定重新执行任务或重新生成任务
 
-> **重要**: 三个技能必须配套使用，形成完整的任务管理闭环。执行后务必进行审计，确保任务质量。
+> **重要**: 五个技能必须配套使用，形成完整的任务管理闭环。执行后务必进行审计，确保任务质量。
 
-### task-executor 快速使用
+## 测试覆盖情况
 
-```bash
-# 验证任务完整性
-node .claude/skills/task-executor/scripts/validate-task.js --task <task-name>
+### 当前测试统计
 
-# 执行单个任务
-node .claude/skills/task-executor/scripts/execute-task.js --task <task-name>
+| 模块 | 测试文件 | 测试数量 | 状态 |
+|------|----------|----------|------|
+| orchestrator | 11个 | 408个 | ✅ 全部通过 |
+| adapters | 4个 | 100个 | ✅ 全部通过 |
+| workflow | 6个 | 142个 | ✅ 全部通过 |
+| cli/commands | 9个 | 91个 | ⚠️ 部分通过 |
+| parser | 2个 | ~20个 | ✅ 通过 |
+| cache | 2个 | 44个 | ✅ 通过 |
+| core | 1个 | ~10个 | ✅ 通过 |
+| generator | 1个 | ~10个 | ✅ 通过 |
+| plugins | 1个 | 9个 | ✅ 通过 |
+| **总计** | **~37个** | **~834个** | ** actively growing** |
 
-# 批量执行任务
-node .claude/skills/task-executor/scripts/batch-executor.js --tasks task1,task2
+### 测试生成任务
 
-# 带依赖编排执行
-node .claude/skills/task-executor/scripts/batch-executor.js --with-dependencies <task-name>
+最新测试生成任务位于 `.tasks/` 目录：
 
-# 更新任务元数据
-node .claude/skills/task-executor/scripts/update-metadata.js --task <task-name> --status completed --score 85
-```
-
-## 重构任务批次 1 (Phase 1-5)
-
-| 任务                     | 描述                                | 依赖           |
-|--------------------------|-------------------------------------|----------------|
-| phase1-unified-result    | 定义 UnifiedResult 接口与适配器基类 | 无             |
-| phase2-confidence        | 实现置信度计算机制                  | phase1         |
-| phase3-result-fusion     | 实现多工具结果融合                  | phase1, phase2 |
-| phase4-tool-orchestrator | 实现工具编排器与回退链              | phase1-3       |
-| phase5-refactor-commands | 改造现有命令为可调用模式            | phase1, phase4 |
-
-## 重构任务批次 2 (Phase 6-10)
-
-| 任务                     | 描述                           | 依赖     |
-|--------------------------|--------------------------------|----------|
-| phase6-analyze-command   | 实现 AnalyzeCommand + 测试关联 | phase1-5 |
-| phase7-git-analyzer      | 实现 Git 分析器                | phase6   |
-| phase8-ai-feed-generator | 实现 AI 饲料生成器             | phase7   |
-| phase9-ci-gateway        | 实现 CI 门禁护栏               | phase7-8 |
-| phase10-integration      | 集成测试 + 基准验证            | phase1-9 |
-
-## 重构任务批次 3 (Phase 11) - v2.5 规划
-
-| 任务                          | 描述                                     | 依赖      |
-|-------------------------------|------------------------------------------|-----------|
-| phase11-workflow-orchestrator | 实现工作流编排器 (Workflow Orchestrator) | phase1-10 |
-
-## 重构修复批次 (基于 FINAL_REVIEW_REPORT)
-
-> 这些任务基于 `/data/codemap/FINAL_REVIEW_REPORT.md` 中指出的关键未完成项生成
-
-| 任务 | 描述 | 问题来源 | 优先级 |
-|------|------|----------|--------|
-| fix-runanalysis-implementation | 实现 Workflow Orchestrator 的 runAnalysis 方法 | FINAL_REVIEW:6.1 | critical |
-| fix-analyze-orchestrator-integration | Analyze 命令接入 ToolOrchestrator/ResultFusion | FINAL_REVIEW:6.2 | critical |
-| fix-output-contract | 修复输出契约校验和字段完整性 | FINAL_REVIEW:6.3 | critical |
-| fix-timeout-mechanism | 修复 ToolOrchestrator 超时控制机制 | FINAL_REVIEW:6.4 | high |
-
-## 重构修复批次 (基于 DEEP_REVIEW_REPORT)
-
-> 这些任务基于 `/data/codemap/DEEP_REVIEW_REPORT.md` 中指出的高优先级缺失生成
-
-| 任务 | 描述 | 当前完成度 | 优先级 |
-|------|------|------------|--------|
-| test-linker-core-functionality | 测试关联器核心功能实现 (buildMapping, findRelatedTests, scanTestImports) | 35% | critical |
-| ci-gateway-completion | CI Gateway 完整性完善 (pre-commit test, AI feed, GitHub Actions) | 75% | high |
-| ast-grep-adapter | ast-grep 适配器实现 | 0% | high |
+| 任务组 | 模块 | 状态 |
+|--------|------|------|
+| group-a-core | confidence.ts, types.ts | ✅ 完成 (166 tests) |
+| group-b-adapters-v2 | adapters/* | ✅ 完成 (100 tests) |
+| group-c-cli | cli/commands/* | ⚠️ 部分完成 (91 tests) |
+| group-d-workflow | workflow/* | ✅ 完成 (142 tests) |
 
 ## 设计文档索引
 
@@ -114,8 +81,6 @@ node .claude/skills/task-executor/scripts/update-metadata.js --task <task-name> 
 - [REFACTOR_TEST_LINKER_DESIGN.md](./docs/REFACTOR_TEST_LINKER_DESIGN.md) - 测试关联器设计
 - [REFACTOR_GIT_ANALYZER_DESIGN.md](./docs/REFACTOR_GIT_ANALYZER_DESIGN.md) - Git 分析器设计
 - [CI_GATEWAY_DESIGN.md](./docs/CI_GATEWAY_DESIGN.md) - CI 门禁设计
-
-<!-- TASK-GENERATOR-CONTEXT-END -->
 
 <IMPORTANT>
 Prefer retrieval-led reasoning over pre-training-led reasoning 
@@ -278,8 +243,50 @@ Task({
 **强制约束 - CI 护栏不可绕过（必须修复后提交）**
 
 - 严禁通过忽略、跳过、删除、注释 CI 护栏来强行提交（含 `pre-commit`、`commit-msg`、GitHub Actions、`codemap ci *`）。
-- 严禁使用 `--no-verify`、临时关闭 hooks、放宽阈值、替换“永远通过”脚本等方式绕过门禁。
+- 严禁使用 `--no-verify`、临时关闭 hooks、放宽阈值、替换"永远通过"脚本等方式绕过门禁。
 - 护栏失败时，必须按护栏提示修复问题；只有护栏通过后才允许提交。
-- 涉及 CI 护栏的改动必须提供“失败场景 + 修复验证”证据（命令与结果）。
+- 涉及 CI 护栏的改动必须提供"失败场景 + 修复验证"证据（命令与结果）。
 - 若确需临时豁免，必须先获得明确人工批准，并记录原因、范围与失效时间。
+</IMPORTANT>
+
+<IMPORTANT>
+**强制约束 - 必须使用 CodeMap 工具（禁止绕过）**
+
+在本项目的任何代码文件操作中，**只要能够使用 codemap 工具的地方，都必须优先使用 codemap**，禁止直接使用 `grep`、`rg`、`find` 等传统工具。
+
+### ✅ 必须使用 codemap 的场景
+
+| 场景 | 禁止命令 | 必须使用 |
+|------|----------|----------|
+| 搜索符号/函数 | `grep -r "functionName"` | `node dist/cli/index.js query -S "functionName"` |
+| 查找文件 | `find . -name "*.ts"` | `node dist/cli/index.js query -f "*.ts"` |
+| 查看模块结构 | `rg "export class"` | `node dist/cli/index.js query -m "module-path"` |
+| 分析依赖关系 | 手动追踪 import | `node dist/cli/index.js deps -m "module-path"` |
+| 评估变更影响 | 人工分析依赖 | `node dist/cli/index.js impact -f <file>` |
+| 检查循环依赖 | `grep` 组合命令 | `node dist/cli/index.js cycles` |
+| 代码复杂度分析 | 目测估算 | `node dist/cli/index.js complexity -f <file>` |
+
+### 🎯 核心原则
+
+1. **默认优先**：任何代码查询操作，首先考虑 codemap 是否能完成
+2. **大量高频**：在每次代码文件操作时**大量使用** codemap，确保工具得到充分验证
+3. **发现问题**：通过高频使用主动发现 codemap 的 bug、性能问题和功能缺失
+4. **积累数据**：每次使用都是数据积累，帮助改进工具的准确性和覆盖度
+5. **绝不禁用**：严禁为了"方便"而绕过 codemap 直接使用传统工具
+
+### ⚠️ 例外情况（极少）
+
+仅在以下情况允许使用传统工具：
+- codemap 工具尚未构建（`dist/` 不存在）
+- codemap 本身出现严重故障，需要紧急排查
+- 需要搜索非代码文件（如 `.md`, `.json` 配置文件）
+
+### 📊 使用统计
+
+每次会话应记录 codemap 使用次数，确保高频使用：
+- 查询操作：≥80% 使用 codemap
+- 依赖分析：100% 使用 codemap
+- 影响评估：100% 使用 codemap
+
+> **目的**：通过在本项目中**强制高频使用** codemap，主动暴露工具问题，持续改进工具质量。
 </IMPORTANT>

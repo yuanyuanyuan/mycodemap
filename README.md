@@ -270,6 +270,12 @@ src/
   ├── cli/              # CLI 命令入口
   │   ├── index.ts      # Commander 命令注册
   │   └── commands/     # 各子命令实现
+  │       ├── analyze.ts    # 统一分析入口（支持多意图路由）
+  │       ├── impact.ts     # 影响范围分析
+  │       ├── deps.ts       # 依赖分析
+  │       ├── complexity.ts # 复杂度分析
+  │       ├── workflow.ts   # 工作流编排命令
+  │       └── ci.ts        # CI 门禁命令
   ├── core/             # 核心分析引擎
   │   └── analyzer.ts   # 主分析器
   ├── parser/           # 解析器层
@@ -277,6 +283,27 @@ src/
   │   └── implementations/
   │       ├── fast-parser.ts   # 快速正则解析器
   │       └── smart-parser.ts  # TypeScript AST 解析器
+  ├── orchestrator/     # 编排层（v2.5 新增）
+  │   ├── index.ts              # 统一导出
+  │   ├── types.ts              # UnifiedResult 类型定义
+  │   ├── confidence.ts         # 置信度计算
+  │   ├── result-fusion.ts      # 结果融合
+  │   ├── tool-orchestrator.ts  # 工具编排器
+  │   ├── intent-router.ts     # 意图路由
+  │   ├── test-linker.ts       # 测试关联器
+  │   ├── git-analyzer.ts      # Git 分析器
+  │   ├── ai-feed-generator.ts # AI 饲料生成器
+  │   ├── file-header-scanner.ts   # 文件头扫描器
+  │   ├── commit-validator.ts      # 提交验证器
+  │   ├── adapters/                 # 工具适配器
+  │   │   ├── base-adapter.ts      # 适配器基类
+  │   │   ├── codemap-adapter.ts  # CodeMap 适配器
+  │   │   └── ast-grep-adapter.ts # AstGrep 适配器
+  │   └── workflow/               # 工作流模块
+  │       ├── workflow-orchestrator.ts  # 工作流编排器
+  │       ├── workflow-persistence.ts    # 工作流持久化
+  │       ├── phase-checkpoint.ts       # 阶段检查点
+  │       └── config.ts                 # 工作流配置
   ├── generator/        # 输出生成器
   │   ├── index.ts      # AI_MAP / JSON / Mermaid 生成
   │   └── context.ts    # CONTEXT.md 生成
@@ -301,6 +328,44 @@ src/
   │   └── codex.ts      # Codex 适配器
   └── types/            # 类型定义
       └── index.ts      # 核心类型
+```
+
+## 新增 CLI 命令
+
+### `codemap analyze`
+
+统一分析入口，支持多意图路由：
+
+```bash
+codemap analyze "分析 tool-orchestrator 的影响范围"
+codemap analyze --intent impact --file src/cli/index.ts
+codemap analyze --intent dependency --file src/cli/index.ts
+codemap analyze --intent search "UnifiedResult"
+```
+
+### `codemap workflow`
+
+工作流编排命令：
+
+```bash
+codemap workflow start              # 启动工作流
+codemap workflow status             # 查看状态
+codemap workflow proceed           # 推进下一阶段
+codemap workflow resume            # 恢复工作流
+codemap workflow checkpoint        # 创建检查点
+codemap workflow list              # 列出所有工作流
+codemap workflow delete            # 删除工作流
+```
+
+### `codemap ci`
+
+CI 门禁命令：
+
+```bash
+codemap ci check-commits           # 检查提交格式
+codemap ci check-headers           # 检查文件头注释
+codemap ci assess-risk             # 评估变更风险
+codemap ci check-output-contract   # 检查输出契约
 ```
 
 ## 贡献指南

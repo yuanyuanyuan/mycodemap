@@ -1,0 +1,149 @@
+# Triad Workflow Roles Configuration
+# 任务ID: group-c-cli-001
+
+triad_roles:
+  # ============================================
+  # Role 1: Generator (任务生成器)
+  # ============================================
+  generator:
+    name: generator
+    description: 任务套件生成器，负责创建完整的任务四件套
+    responsibilities:
+      - 分析源文件结构和依赖关系
+      - 生成PROMPT.md详细需求文档
+      - 生成EVAL.ts分层评估标准
+      - 生成SCORING.md评分规则
+      - 生成task-metadata.yaml任务元数据
+      - 生成TRIAD_ROLES.yaml角色定义
+      - 生成TRIAD_WORKFLOW.md工作流说明
+      - 生成TRIAD_ACCEPTANCE.md验收标准
+    inputs:
+      - 源文件列表
+      - 设计文档
+      - 现有测试参考
+    outputs:
+      - PROMPT.md
+      - EVAL.ts
+      - SCORING.md
+      - task-metadata.yaml
+      - TRIAD_ROLES.yaml
+      - TRIAD_WORKFLOW.md
+      - TRIAD_ACCEPTANCE.md
+    constraints:
+      - 不得跳过Phase 4
+      - 必须包含测试代码
+      - 分值总和必须等于100
+      - 必须包含retrieval-led指令
+    
+  # ============================================
+  # Role 2: QA Reviewer (质量审核员)
+  # ============================================
+  qa_reviewer:
+    name: qa-reviewer
+    description: 任务套件质量审核员，负责验证生成物的完整性和正确性
+    responsibilities:
+      - 验证PROMPT.md完整性
+      - 验证EVAL.ts可执行性
+      - 验证SCORING.md分值计算
+      - 验证约束条件明确性
+      - 识别潜在风险和遗漏
+      - 提出改进建议
+    inputs:
+      - PROMPT.md
+      - EVAL.ts
+      - SCORING.md
+      - task-metadata.yaml
+    outputs:
+      - qa_review_report.md
+    review_checklist:
+      - 所有必需字段存在且非空
+      - 背景说明清晰完整
+      - 初始状态定义明确
+      - 约束条件具体可验证
+      - 验收标准可测量
+      - 评分规则公平合理
+      - 总分等于100
+      - 包含反例场景
+    approval_criteria:
+      - 无阻塞性问题
+      - 高风险项已记录
+      - 建议项已分类
+
+  # ============================================
+  # Role 3: Supervisor (任务监理)
+  # ============================================
+  supervisor:
+    name: supervisor
+    description: 任务监理，负责最终审批和流程控制
+    responsibilities:
+      - 审核QA评审报告
+      - 决定是否需要返工
+      - 批准任务进入执行阶段
+      - 监控任务执行过程
+      - 执行最终验收
+    inputs:
+      - 生成物全套文档
+      - QA评审报告
+    outputs:
+      - approval_decision
+      - acceptance_report
+    decision_matrix:
+      approve:
+        condition: QA评审通过，无阻塞问题
+        action: 批准进入执行阶段
+      conditional:
+        condition: 存在低风险建议项
+        action: 批准进入执行阶段，记录改进项
+      reject:
+        condition: 存在阻塞性问题
+        action: 退回generator返工
+
+# 角色交互流程
+role_interactions:
+  - step: 1
+    from: generator
+    to: qa-reviewer
+    artifact: 完整任务套件
+    action: 提交评审
+  
+  - step: 2
+    from: qa-reviewer
+    to: supervisor
+    artifact: QA评审报告
+    action: 提交审批
+  
+  - step: 3
+    from: supervisor
+    to: generator
+    artifact: 返工意见
+    action: 如需返工
+  
+  - step: 4
+    from: supervisor
+    to: executor
+    artifact: 批准通知
+    action: 批准执行
+
+# 角色权限
+role_permissions:
+  generator:
+    - 创建任务套件
+    - 修改任务套件
+    - 提交评审
+  qa_reviewer:
+    - 评审任务套件
+    - 提出改进建议
+    - 标记阻塞问题
+    - 提交审批
+  supervisor:
+    - 批准/拒绝任务
+    - 要求返工
+    - 最终验收
+    - 关闭任务
+
+# 禁止事项
+restrictions:
+  - 同一agent不得同时担任多个角色
+  - generator不得评审自己的输出
+  - qa-reviewer不得修改生成物
+  - supervisor未审批前不得进入执行

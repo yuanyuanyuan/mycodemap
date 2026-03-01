@@ -1,0 +1,72 @@
+triad:
+  version: "1.0.0"
+  description: 适配器测试套件生成三角色配置
+  
+  roles:
+    generator:
+      name: test-generator
+      description: 测试用例生成器
+      responsibilities:
+        - 分析源代码结构
+        - 设计测试用例
+        - 编写测试代码
+        - 确保边界条件覆盖
+      deliverables:
+        - 完整的测试文件
+        - 测试数据构造
+        - Mock配置
+      constraints:
+        - 必须使用Vitest
+        - 必须使用vi.mock
+        - 必须100%覆盖率设计
+        
+    qa:
+      name: test-qa-reviewer
+      description: 测试质量审查员
+      responsibilities:
+        - 审查测试覆盖率
+        - 验证边界条件
+        - 检查Mock合理性
+        - 评估测试有效性
+      deliverables:
+        - 覆盖率分析报告
+        - 边界条件检查清单
+        - 改进建议
+      constraints:
+        - 客观评估
+        - 提供具体改进点
+        - 验证100%覆盖率目标
+        
+    supervisor:
+      name: test-supervisor
+      description: 测试验收主管
+      responsibilities:
+        - 最终验收决策
+        - 质量门禁控制
+        - 交付确认
+        - 风险评估
+      deliverables:
+        - 验收报告
+        - 通过/拒绝决策
+        - 质量评级
+      constraints:
+        - 严格按标准验收
+        - 不可逆的质量妥协
+        
+  handoff_rules:
+    generator_to_qa:
+      - 代码必须通过类型检查
+      - 测试必须可运行
+      - 必须附带覆盖率报告
+      
+    qa_to_supervisor:
+      - 必须通过所有检查点
+      - 必须达到100%覆盖率
+      - 必须无重大缺陷
+      
+  escalation:
+    enabled: true
+    conditions:
+      - 覆盖率不达标
+      - 边界条件缺失
+      - 架构设计问题

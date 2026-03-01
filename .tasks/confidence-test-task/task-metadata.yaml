@@ -1,0 +1,105 @@
+task_id: confidence-test-task-001
+task_name: confidence.ts 模块测试用例生成
+created_at: 2025-01-20
+version: 1.0.0
+owner: generator
+
+# 任务描述
+description: |
+  为 src/orchestrator/confidence.ts 模块生成完整的 Vitest 测试用例，
+  确保测试覆盖率达到100%，包含所有边界条件、所有8种intent类型、
+  高/中/低置信度场景的测试。
+
+# 输入输出
+target_file: src/orchestrator/__tests__/confidence.test.ts
+source_file: src/orchestrator/confidence.ts
+
+# 依赖关系
+dependencies:
+  - src/orchestrator/confidence.ts
+  - src/orchestrator/types.ts
+  - vitest (已安装)
+
+# 质量门禁
+quality_gates:
+  - name: test_count
+    description: 至少90个测试用例
+    min_value: 90
+  
+  - name: coverage_statements
+    description: 语句覆盖率100%
+    min_value: 100
+  
+  - name: coverage_branches
+    description: 分支覆盖率100%
+    min_value: 100
+  
+  - name: coverage_functions
+    description: 函数覆盖率100%
+    min_value: 100
+  
+  - name: coverage_lines
+    description: 行覆盖率100%
+    min_value: 100
+
+# 三角色工作流
+workflow:
+  phase_1_generator:
+    role: generator
+    actions:
+      - 分析源代码结构
+      - 生成测试文件
+      - 运行测试验证
+      - 生成任务四件套
+    outputs:
+      - PROMPT.md
+      - EVAL.ts
+      - SCORING.md
+      - task-metadata.yaml
+      - TRIAD_ROLES.yaml
+      - TRIAD_WORKFLOW.md
+      - TRIAD_ACCEPTANCE.md
+  
+  phase_2_qa:
+    role: qa
+    actions:
+      - 审查测试质量
+      - 检查边界条件覆盖
+      - 验证intent类型覆盖
+      - 评估代码可读性
+    outputs:
+      - QA_REPORT.md
+  
+  phase_3_supervisor:
+    role: supervisor
+    actions:
+      - 运行质量门禁
+      - 检查覆盖率达标
+      - 批准/驳回任务
+    outputs:
+      - SUPERVISOR_APPROVAL.md
+
+# 验收标准
+acceptance_criteria:
+  - 所有98个测试通过
+  - 代码覆盖率100%
+  - 包含所有边界条件测试
+  - 包含所有8种intent类型测试
+  - 包含高/中/低置信度场景测试
+  - 文件包含 retrieval-led 注释
+
+# 标签
+tags:
+  - testing
+  - vitest
+  - coverage-100
+  - orchestrator
+  - confidence
+
+# 复杂度
+complexity: medium
+estimated_effort: 4h
+
+# 状态
+status: completed
+completed_at: 2025-01-20

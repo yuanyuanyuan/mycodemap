@@ -1,5 +1,6 @@
 /**
- * ResultFusion - 多工具结果融合模块
+ * [META] ResultFusion - 多工具结果融合模块
+ * [WHY] 将多个工具的输出统一格式转换、加权合并、去重、排序
  *
  * 负责将多个工具（CodeMap 核心、ast-grep、AI 饲料等）的输出进行统一格式转换、
  * 加权合并、去重、排序和截断。
@@ -15,6 +16,8 @@
  */
 
 import type { UnifiedResult } from './types';
+import type { HeatScore } from './types';
+import type { AIFeed } from './git-analyzer';
 
 /**
  * 融合选项配置
@@ -295,4 +298,104 @@ export function truncateByToken(content: string, maxTokens: number): string {
   }
 
   return content;
+}
+
+// ==================== AI 饲料结果融合函数 (v2.4 新增) ====================
+
+/**
+ * 标签风险权重映射
+ * 基于 REFACTOR_REQUIREMENTS.md 第 8.6 节
+ */
+const TAG_WEIGHTS: Record<string, number> = {
+  'BUGFIX': 0.9,     // 修复过的代码 = 曾经有问题
+  'REFACTOR': 0.8,   // 重构过的代码 = 复杂度较高
+  'FEATURE': 0.7,    // 新功能 = 可能不稳定
+  'CONFIG': 0.5,     // 配置变更 = 中等风险
+  'DOCS': 0.2,       // 文档 = 低风险
+  'DELETE': 0.1,     // 删除代码 = 极低风险
+  'UNKNOWN': 0.5,    // 未知 = 默认中等风险
+  'NEW': 0.5         // 新文件 = 默认中等风险
+};
+
+/**
+ * 将 AI 饲料转换为 UnifiedResult
+ * @param feed - AI 饲料数组
+ * @returns UnifiedResult 数组
+ */
+export function convertAIFeedToResults(feed: AIFeed[]): UnifiedResult[] {
+  return feed.map(f => ({
+    id: `ai-feed-${f.file}`,
+    source: 'ai-feed',
+    toolScore: f.gravity / 20,  // 归一化
+    type: 'risk-assessment' as const,
+    file: f.file,
+    content: formatAIFeedContent(f),
+    relevance: calculateAIFeedRelevance(f),
+    keywords: [f.heat.lastType, f.meta.why || ''].filter(Boolean),
+    metadata: {
+      gravity: f.gravity,
+      heatScore: f.heat,
+      impactCount: f.dependents.length,
+      stability: f.meta.stable,
+      riskLevel: calculateRiskLevel(f)
+    }
+  }));
+}
+
+/**
+ * 格式化 AI 饲料内容
+ * 使用纯文本标记代替 emoji，确保机器可读性
+ * @param f - AI 饲料项
+ * @returns 格式化后的内容字符串
+ */
+export function formatAIFeedContent(f: AIFeed): string {
+  const riskFlag = f.meta.stable ? '[STABLE]' : f.heat.freq30d > 5 ? '[HIGH RISK]' : '[MEDIUM RISK]';
+  return `${riskFlag} ${f.file}\n` +
+         `   GRAVITY: ${f.gravity} | HEAT: ${f.heat.freq30d}/${f.heat.lastType}\n` +
+         `   WHY: ${f.meta.why || 'N/A'}\n` +
+         `   IMPACT: ${f.dependents.length} files depend on this`;
+}
+
+/**
+ * 计算 AI 饲料的相关度
+ * @param f - AI 饲料项
+ * @returns 相关度分数 (0-1)
+ */
+function calculateAIFeedRelevance(f: AIFeed): number {
+  // 基于 gravity 和 heat 计算基础分数
+  const gravityScore = Math.min(f.gravity / 20, 1) * 0.4;
+  const heatScore = Math.min(f.heat.freq30d / 10, 1) * 0.3;
+  const impactScore = Math.min(f.dependents.length / 50, 1) * 0.3;
+
+  return Math.min(1, gravityScore + heatScore + impactScore);
+}
+
+/**
+ * 计算风险等级
+ * 风险评分公式以 REFACTOR_REQUIREMENTS.md 为单一真源
+ * @param f - AI 饲料项
+ * @returns 风险等级: 'high' | 'medium' | 'low'
+ */
+export function calculateRiskLevel(f: AIFeed): 'high' | 'medium' | 'low' {
+  const gravityNorm = Math.min(f.gravity / 20, 1);
+  const freqNorm = Math.min(f.heat.freq30d / 10, 1);
+  const tagWeight = TAG_WEIGHTS[f.heat.lastType] ?? TAG_WEIGHTS['UNKNOWN'];
+  const stableBoost = f.meta.stable ? 0 : 0.15;
+  const impactNorm = Math.min(f.dependents.length / 50, 1);
+
+  const score = Math.min(
+    Math.max(
+      gravityNorm * 0.30 +
+      freqNorm * 0.15 +
+      tagWeight * 0.10 +
+      stableBoost +
+      impactNorm * 0.10,
+      0
+    ),
+    1
+  );
+
+  if (score > 0.7) return 'high';
+  if (score > 0.4) return 'medium';
+  return 'low';
 }

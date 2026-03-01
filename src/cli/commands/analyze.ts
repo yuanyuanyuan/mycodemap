@@ -12,6 +12,8 @@ import type { AnalyzeArgs, IntentType, CodemapOutput, UnifiedResult, Confidence 
 import { resolveTestFile } from '../../orchestrator/test-linker.js';
 import { ToolOrchestrator } from '../../orchestrator/tool-orchestrator.js';
 import { ResultFusion } from '../../orchestrator/result-fusion.js';
+import { CodemapAdapter } from '../../orchestrator/adapters/codemap-adapter.js';
+import { AstGrepAdapter } from '../../orchestrator/adapters/ast-grep-adapter.js';
 
 /**
  * 错误码定义
@@ -138,6 +140,13 @@ export class AnalyzeCommand {
    */
   private async executeWithOrchestrator(intent: string, scope: string, topK: number): Promise<CodemapOutput> {
     const orchestrator = new ToolOrchestrator();
+
+    // 注册适配器
+    const codemapAdapter = new CodemapAdapter({ codemapPath: '.codemap' });
+    const astGrepAdapter = new AstGrepAdapter();
+    orchestrator.registerAdapter(codemapAdapter);
+    orchestrator.registerAdapter(astGrepAdapter);
+
     const fusion = new ResultFusion();
 
     // 构建意图对象

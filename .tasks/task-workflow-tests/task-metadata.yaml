@@ -1,0 +1,112 @@
+task_id: TASK-WORKFLOW-TESTS-001
+task_name: 工作流编排器模块测试生成
+description: 为工作流编排器5个模块生成完整的Vitest测试套件
+
+workflow:
+  phases:
+    - phase: 1
+      name: requirements
+      description: 需求分析与范围确认
+      deliverables:
+        - 源代码分析完成
+        - 测试范围确认
+
+    - phase: 2
+      name: generate
+      description: 生成任务四件套和测试代码
+      deliverables:
+        - PROMPT.md
+        - EVAL.ts
+        - SCORING.md
+        - TRIAD_ROLES.yaml
+        - TRIAD_WORKFLOW.md
+        - TRIAD_ACCEPTANCE.md
+
+    - phase: 3
+      name: qa_review
+      description: QA审查测试质量
+      deliverables:
+        - 覆盖率验证报告
+        - 边界条件检查
+
+    - phase: 4
+      name: supervisor_approval
+      description: Supervisor最终验收
+      deliverables:
+        - 质量门禁通过
+        - 合并批准
+
+modules:
+  - name: workflow-orchestrator.ts
+    class: WorkflowOrchestrator
+    methods:
+      - start(task: string): Promise<WorkflowContext>
+      - executeCurrentPhase(analyzeArgs: AnalyzeArgs): Promise<PhaseResult>
+      - proceedToNextPhase(force?: boolean): Promise<WorkflowPhase>
+      - getStatus(): Promise<WorkflowStatus>
+      - resume(id: string): Promise<WorkflowContext | null>
+      - checkpoint(): Promise<void>
+      - listWorkflows(): Promise<unknown[]>
+      - deleteWorkflow(id: string): Promise<void>
+    state_machine: pending → running → completed → verified
+
+  - name: workflow-context.ts
+    classes:
+      - WorkflowContextFactory
+      - WorkflowContextValidator
+    focus:
+      - 创建与验证
+      - Map/Set序列化
+      - 状态转换验证
+
+  - name: workflow-persistence.ts
+    class: WorkflowPersistence
+    methods:
+      - save(context: WorkflowContext): Promise<void>
+      - load(id: string): Promise<WorkflowContext | null>
+      - loadActive(): Promise<WorkflowContext | null>
+      - list(): Promise<WorkflowSummary[]>
+      - delete(id: string): Promise<void>
+    mock_target: node:fs
+
+  - name: phase-checkpoint.ts
+    class: PhaseCheckpoint
+    methods:
+      - validate(phase, artifacts, definition): Promise<CheckpointResult>
+      - validateAll(phases, definitions): Promise<array>
+      - getSummary(results): object
+    focus: 交付物验证
+
+  - name: config.ts
+    type: constants
+    exports:
+      - PHASE_CI_CONFIG
+      - PHASE_GIT_CONFIG
+      - PHASE_TEST_STRATEGY
+      - CONFIDENCE_REQUIREMENTS
+      - WORKFLOW_CONFIG
+
+test_requirements:
+  framework: vitest
+  coverage_target: 100%
+  mock_strategy:
+    fs: vi.mock('node:fs')
+    dependencies: vi.mock for classes
+  boundary_conditions:
+    - null/undefined参数
+    - 空Map/Set
+    - 文件不存在
+    - 无效状态转换
+
+generated_files:
+  - src/orchestrator/workflow/__tests__/workflow-orchestrator.test.ts
+  - src/orchestrator/workflow/__tests__/workflow-context.test.ts
+  - src/orchestrator/workflow/__tests__/workflow-persistence.test.ts
+  - src/orchestrator/workflow/__tests__/phase-checkpoint.test.ts
+  - src/orchestrator/workflow/__tests__/config.test.ts
+
+triad_config:
+  generator: task-generator
+  qa: test-qa
+  supervisor: workflow-supervisor
+  current_phase: generate

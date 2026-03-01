@@ -1,0 +1,140 @@
+# TRIAD_ROLES.yaml - 三角色配置
+# 
+# 规则：
+# 1. 三角色必须是3个独立agents，禁止同名复用
+# 2. 每个角色有明确的职责边界
+# 3. 角色之间通过artifacts传递信息
+
+roles:
+  # ============================================================================
+  # Role 1: Generator (生成器)
+  # ============================================================================
+  generator:
+    name: task-generator
+    description: |
+      负责生成任务四件套和三角色工件。
+      基于源代码分析和设计文档，创建完整的测试用例。
+    
+    responsibilities:
+      - 分析源代码结构和导出接口
+      - 设计测试用例覆盖所有分支
+      - 生成任务四件套 (PROMPT.md, EVAL.ts, SCORING.md, task-metadata.yaml)
+      - 生成三角色工件 (TRIAD_*.yaml/md)
+      - 运行测试验证基本功能
+    
+    inputs:
+      - src/orchestrator/confidence.ts
+      - src/orchestrator/types.ts
+      - REFACTOR_CONFIDENCE_DESIGN.md (设计文档)
+    
+    outputs:
+      - src/orchestrator/__tests__/confidence.test.ts
+      - PROMPT.md
+      - EVAL.ts
+      - SCORING.md
+      - task-metadata.yaml
+      - TRIAD_ROLES.yaml
+      - TRIAD_WORKFLOW.md
+      - TRIAD_ACCEPTANCE.md
+    
+    constraints:
+      - 单次生成任务数不得超过5个
+      - 不得跳过模板字段
+      - 必须保留 retrieval-led 指令
+      - 禁止自由发挥核心结构
+
+  # ============================================================================
+  # Role 2: QA (质量保证)
+  # ============================================================================
+  qa:
+    name: task-qa
+    description: |
+      负责审查生成的测试用例质量。
+      确保测试覆盖所有边界条件，代码符合最佳实践。
+    
+    responsibilities:
+      - 审查测试代码质量
+      - 验证边界条件覆盖完整性
+      - 验证所有intent类型覆盖
+      - 检查代码可读性和维护性
+      - 识别潜在遗漏场景
+      - 生成QA报告
+    
+    inputs:
+      - src/orchestrator/__tests__/confidence.test.ts
+      - PROMPT.md
+      - EVAL.ts
+      - SCORING.md
+    
+    outputs:
+      - QA_REPORT.md
+    
+    review_checklist:
+      - [ ] 所有导出函数都有测试
+      - [ ] 所有边界条件都有测试
+      - [ ] 所有8种intent类型都有测试
+      - [ ] 测试命名清晰、描述准确
+      - [ ] 断言具体、不宽松
+      - [ ] 代码风格一致
+      - [ ] 无重复测试
+
+  # ============================================================================
+  # Role 3: Supervisor (监督者)
+  # ============================================================================
+  supervisor:
+    name: task-supervisor
+    description: |
+      负责最终验收和质量门禁。
+      运行自动化检查，决定是否批准任务完成。
+    
+    responsibilities:
+      - 运行质量门禁检查
+      - 验证测试覆盖率达标
+      - 确认所有检查点通过
+      - 批准或驳回任务
+      - 生成最终审批报告
+    
+    inputs:
+      - src/orchestrator/__tests__/confidence.test.ts
+      - QA_REPORT.md
+      - EVAL.ts (检查点定义)
+    
+    outputs:
+      - SUPERVISOR_APPROVAL.md
+    
+    quality_gates:
+      - name: test_execution
+        command: npm test -- src/orchestrator/__tests__/confidence.test.ts
+        expected: "Tests: .* passed"
+      
+      - name: coverage_check
+        command: npm test -- --coverage
+        expected: 
+          - "Statements.*100%"
+          - "Branches.*100%"
+          - "Functions.*100%"
+          - "Lines.*100%"
+      
+      - name: eval_check
+        command: npx tsx EVAL.ts
+        expected: "Score: (9[0-9]|100)"
+    
+    approval_rules:
+      - 所有质量门禁必须通过
+      - 测试覆盖率必须达到100%
+      - QA报告无严重问题
+      - EVAL评分 >= 90分
+
+# 角色流转规则
+workflow_rules:
+  - generator 完成后，自动触发 qa
+  - qa 发现问题，退回 generator 修复
+  - qa 通过后，自动触发 supervisor
+  - supervisor 驳回，退回 generator 修复
+  - supervisor 批准后，任务完成
+
+# 禁止事项
+prohibitions:
+  - 禁止同一个agent同时担任多个角色
+  - 禁止跳过phase 4（边界条件检查）
+  - 禁止生成覆盖率不达标的测试

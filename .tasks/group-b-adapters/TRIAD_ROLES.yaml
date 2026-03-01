@@ -1,0 +1,149 @@
+# Triad 三角色配置
+# 任务ID: group-b-adapters-001
+
+triad:
+  version: "1.0"
+  task_id: group-b-adapters-001
+  
+  # ============================================================
+  # 角色1: Generator (任务生成器)
+  # ============================================================
+  generator:
+    name: task-generator
+    responsibilities:
+      - 生成任务四件套 (PROMPT.md, EVAL.ts, SCORING.md, task-metadata.yaml)
+      - 读取源代码，分析接口定义
+      - 设计测试策略和 Mock 方案
+      - 定义验收标准和评分规则
+      
+    inputs:
+      - 源文件路径
+      - 设计文档
+      - 现有任务（如有）
+      
+    outputs:
+      - PROMPT.md - 详细需求
+      - EVAL.ts - 评估检查点
+      - SCORING.md - 评分规则
+      - task-metadata.yaml - 任务元数据
+      - TRIAD_ROLES.yaml - 角色定义
+      - TRIAD_WORKFLOW.md - 工作流说明
+      - TRIAD_ACCEPTANCE.md - 验收标准
+      
+    constraints:
+      - 不得跳过 Phase 4
+      - SCORING.md 分值总和必须等于 100
+      - PROMPT.md 必须包含 retrieval-led 指令
+      
+    current_status: completed
+    
+  # ============================================================
+  # 角色2: QA (质量审查员)
+  # ============================================================
+  qa:
+    name: task-qa-reviewer
+    responsibilities:
+      - 审查生成的任务四件套
+      - 验证检查点是否可执行
+      - 确认评分规则合理性
+      - 识别遗漏的测试场景
+      - 验证 Mock 策略可行性
+      
+    inputs:
+      - 任务四件套文档
+      - 源代码
+      - 设计文档
+      
+    outputs:
+      - QA 审查报告
+      - 问题列表（如有）
+      - 改进建议（如有）
+      
+    review_checklist:
+      - [ ] PROMPT.md 内容完整，接口定义准确
+      - [ ] EVAL.ts 检查点可执行，覆盖所有关键路径
+      - [ ] SCORING.md 总分等于 100，等级定义清晰
+      - [ ] task-metadata.yaml 结构正确，依赖完整
+      - [ ] Mock 策略可行，考虑了所有外部依赖
+      - [ ] 边界条件覆盖完整
+      - [ ] 验收标准可验证
+      
+    approval_criteria:
+      - 所有检查项通过，或问题已记录并认可
+      - 无重大遗漏
+      
+    current_status: pending
+    
+  # ============================================================
+  # 角色3: Supervisor (任务监督员)
+  # ============================================================
+  supervisor:
+    name: task-supervisor
+    responsibilities:
+      - 批准任务发布
+      - 监控任务执行
+      - 最终验收判定
+      - 冲突仲裁
+      
+    inputs:
+      - Generator 生成的任务套件
+      - QA 审查报告
+      - 执行结果
+      
+    outputs:
+      - 批准/驳回决定
+      - 验收报告
+      - 发布指令
+      
+    decision_points:
+      - 任务套件发布审批
+      - 执行结果验收
+      
+    approval_criteria:
+      - QA 审查通过
+      - 所有约束条件满足
+      - 风险可控
+      
+    current_status: pending
+
+# ============================================================
+# 角色交互规则
+# ============================================================
+interaction_rules:
+  - 三角色必须是独立 agents，禁止同名复用
+  
+  - generator → qa:
+      trigger: 任务套件生成完成
+      deliverable: 任务四件套
+      
+  - qa → supervisor:
+      trigger: QA 审查完成
+      deliverable: 审查报告 + 任务套件
+      
+  - supervisor → generator:
+      trigger: 审批驳回
+      deliverable: 驳回原因 + 修改建议
+      
+  - supervisor → task-executor:
+      trigger: 审批通过
+      deliverable: 发布指令 + 任务套件
+
+# ============================================================
+# 通知配置
+# ============================================================
+notifications:
+  generator_complete:
+    recipients: [qa]
+    message: "任务套件已生成，请进行 QA 审查"
+    
+  qa_complete:
+    recipients: [supervisor]
+    message: "QA 审查完成，请进行最终审批"
+    
+  supervisor_approved:
+    recipients: [generator, qa, task-executor]
+    message: "任务已批准发布"
+    
+  supervisor_rejected:
+    recipients: [generator]
+    message: "任务被驳回，请根据反馈修改"

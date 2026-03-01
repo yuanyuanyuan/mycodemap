@@ -1,0 +1,140 @@
+task:
+  id: group-b-adapters-001
+  name: 适配器模块测试套件生成 (Group B)
+  description: 为编排器适配器模块（AstGrepAdapter、CodemapAdapter）生成完整的 Vitest 测试用例，覆盖 100% 代码和边界条件
+  type: test-generation
+  status: pending
+  priority: high
+  
+  modules:
+    - name: ast-grep-adapter
+      file: src/orchestrator/adapters/__tests__/ast-grep-adapter.test.ts
+      source: src/orchestrator/adapters/ast-grep-adapter.ts
+      description: AstGrepAdapter 完整功能测试（含 spawn 模拟）
+      priority: high
+      test_focus:
+        - isAvailable() - 工具可用性检测
+        - execute() - 多关键词搜索执行
+        - search() - AST 模式搜索
+        - 错误边界 - spawn 失败、无效 JSON、空输入
+      
+    - name: codemap-adapter
+      file: src/orchestrator/adapters/__tests__/codemap-adapter.test.ts
+      source: src/orchestrator/adapters/codemap-adapter.ts
+      description: CodemapAdapter 完整功能测试（含三种 intent）
+      priority: high
+      test_focus:
+        - isAvailable() - 配置文件存在性检测
+        - execute() - 意图路由（impact/dependency/complexity）
+        - executeImpact() - 影响分析
+        - executeDeps() - 依赖分析
+        - executeComplexity() - 复杂度分析
+        - 错误边界 - 文件不存在、命令失败、空目标
+      
+    - name: index
+      file: src/orchestrator/adapters/__tests__/index.test.ts
+      source: src/orchestrator/adapters/index.ts
+      description: 适配器导出和工厂函数测试
+      priority: medium
+      test_focus:
+        - 导出类型验证
+        - createAstGrepAdapter() 工厂函数
+        - createCodemapAdapter() 工厂函数
+
+  dependencies:
+    - src/orchestrator/adapters/base-adapter.ts
+    - src/orchestrator/adapters/ast-grep-adapter.ts
+    - src/orchestrator/adapters/codemap-adapter.ts
+    - src/orchestrator/adapters/index.ts
+    - src/orchestrator/types.ts
+    - src/cli/commands/impact.ts
+    - src/cli/commands/deps.ts
+    - src/cli/commands/complexity.ts
+
+  workflow:
+    phases:
+      - name: Phase 1 - 需求解析
+        status: completed
+        deliverables:
+          - PROMPT.md
+          - EVAL.ts
+          - SCORING.md
+          
+      - name: Phase 2 - 测试设计
+        status: in_progress
+        deliverables:
+          - 测试策略文档
+          - Mock 设计文档
+          
+      - name: Phase 3 - 代码生成
+        status: pending
+        deliverables:
+          - ast-grep-adapter.test.ts
+          - codemap-adapter.test.ts
+          - index.test.ts
+          
+      - name: Phase 4 - 质量验证
+        status: pending
+        deliverables:
+          - 覆盖率报告
+          - 检查点评估报告
+        exit_criteria:
+          - 所有检查点通过
+          - 覆盖率 100%
+          - 无 TypeScript 错误
+
+  constraints:
+    hard:
+      - 使用 Vitest 测试框架
+      - 使用 vi.mock 进行模块模拟（禁止使用 vi.fn() 直接修改模块）
+      - 覆盖率必须达到 100%（语句、分支、函数、行）
+      - 必须模拟 spawn 的所有事件（stdout.data, stderr.data, close, error）
+      - 必须测试所有 Promise 的 resolve 和 reject 场景
+      - 错误场景必须返回空数组，不抛出异常
+      
+    soft:
+      - 优先使用 beforeEach 重置 mock 状态
+      - 测试名称应遵循 "should [expected] when [condition]" 模式
+      - 单文件测试数建议 20-40 个
+      - 使用 describe 按方法分组
+      - 复杂 mock 设置应有注释说明
+
+  acceptance_criteria:
+    functional:
+      - 所有测试可执行并通过（npx vitest run）
+      - 覆盖率报告 100%（npx vitest run --coverage）
+      - 无 TypeScript 编译错误
+      - 无 ESLint 警告
+      
+    quality:
+      - 边界条件全覆盖（空输入、无效输入、极端值）
+      - 错误场景全覆盖（文件不存在、命令失败、超时）
+      - Mock 策略合理，不测试实现细节
+      - 代码重复率 < 10%
+      
+    documentation:
+      - 测试意图清晰（测试名称自解释）
+      - 复杂 mock 设置有注释
+      - 边界条件测试有说明注释
+
+  metadata:
+    created_at: "2025-03-02T00:00:00Z"
+    updated_at: "2025-03-02T00:00:00Z"
+    version: "1.0.0"
+    framework: vitest
+    language: typescript
+    test_pattern: AAA (Arrange-Act-Assert)
+    related_tasks:
+      - adapter-test-suite-001  # 已有任务，本任务作为补充/升级
+    
+  notes: |
+    本任务与 adapter-test-suite-001 的关系：
+    - adapter-test-suite-001 是早期设计阶段任务，部分接口定义与实际代码有差异
+    - group-b-adapters-001 基于实际源代码生成，接口定义更准确
+    - 两个任务可并行执行，或选择 group-b-adapters-001 作为最终版本
+    
+    关键实现挑战：
+    1. spawn 事件模拟需要正确处理 stdout/stderr 的 data 事件和 close/error 事件
+    2. globby 的 mock 需要返回模拟的文件列表
+    3. CLI 命令类的 mock 需要模拟 runEnhanced() 方法
+    4. 所有错误场景都应返回空数组而不是抛出异常

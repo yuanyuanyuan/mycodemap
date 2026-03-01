@@ -1,0 +1,84 @@
+# Triad 角色定义
+# 工作流编排器测试任务
+
+triad:
+  generator:
+    id: task-generator
+    name: 任务生成器
+    responsibilities:
+      - 分析源代码和需求
+      - 生成任务四件套 (PROMPT.md, EVAL.ts, SCORING.md, task-metadata.yaml)
+      - 生成完整测试代码
+      - 确保符合模板要求
+      - 处理QA反馈
+    artifacts:
+      - PROMPT.md
+      - EVAL.ts
+      - SCORING.md
+      - task-metadata.yaml
+      - *.test.ts 文件
+    constraints:
+      - 必须遵循固定模板
+      - 必须包含retrieval-led reasoning指令
+      - 必须测试所有公共方法
+      - 必须使用vi.mock
+
+  qa:
+    id: test-qa
+    name: 测试质量保障
+    responsibilities:
+      - 审查测试覆盖率
+      - 验证边界条件覆盖
+      - 检查Mock使用正确性
+      - 确保TypeScript类型安全
+      - 运行测试验证
+    artifacts:
+      - 覆盖率报告
+      - 边界条件检查表
+      - QA审查报告
+    checks:
+      - 语句覆盖率100%
+      - 分支覆盖率100%
+      - 函数覆盖率100%
+      - 无any类型
+      - Mock正确隔离
+      - 所有测试通过
+
+  supervisor:
+    id: workflow-supervisor
+    name: 工作流监督者
+    responsibilities:
+      - 最终验收决策
+      - 运行质量门禁
+      - 批准合并
+      - 记录任务完成
+    artifacts:
+      - 验收报告
+      - 质量门禁结果
+      - 合并批准记录
+    gate_criteria:
+      - QA审查通过
+      - 所有检查点通过
+      - 评分等级A或B
+      - 无阻塞问题
+
+# 角色协作规则
+collaboration:
+  generator_to_qa:
+    - 完成代码生成后提交QA审查
+    - 提供必要的上下文说明
+    - 响应QA反馈
+
+  qa_to_generator:
+    - 发现问题时提供详细反馈
+    - 指出具体行号和改进建议
+    - 验证修复结果
+
+  qa_to_supervisor:
+    - QA审查通过后提交Supervisor
+    - 提供覆盖率报告和检查清单
+
+  supervisor_to_all:
+    - 最终决策
+    - 记录完成状态
+    - 触发合并流程

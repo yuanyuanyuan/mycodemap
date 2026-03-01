@@ -1,0 +1,262 @@
+# Triad Role Definitions for Workflow Test Generation Task
+# Task ID: group-d-workflow-001
+
+roles:
+  # ============================================================================
+  # Role 1: Generator
+  # ============================================================================
+  generator:
+    name: "Task Generator"
+    alias: "gen"
+    
+    responsibilities:
+      - "Analyze source code and design documents"
+      - "Create comprehensive task specifications"
+      - "Generate PROMPT.md with detailed requirements"
+      - "Define evaluation checkpoints in EVAL.ts"
+      - "Create scoring rubric in SCORING.md"
+      - "Configure task metadata"
+      - "Establish Triad workflow structure"
+    
+    inputs:
+      - "Source code files (6 modules)"
+      - "Design documents (2 docs)"
+      - "Test framework requirements"
+    
+    outputs:
+      - "PROMPT.md"
+      - "EVAL.ts"
+      - "SCORING.md"
+      - "task-metadata.yaml"
+      - "TRIAD_ROLES.yaml"
+      - "TRIAD_WORKFLOW.md"
+      - "TRIAD_ACCEPTANCE.md"
+    
+    constraints:
+      - "Must not skip Phase 4 (testing code)"
+      - "Must include retrieval-led reasoning instruction"
+      - "Must define 3 independent agents"
+      - "Scoring must total 100 points"
+    
+    success_criteria:
+      - "All 7 deliverables created"
+      - "Documentation is comprehensive"
+      - "Checkpoints are testable"
+      - "Scoring is fair and objective"
+
+  # ============================================================================
+  # Role 2: QA Reviewer
+  # ============================================================================
+  qa:
+    name: "QA Reviewer"
+    alias: "qa"
+    
+    responsibilities:
+      - "Review task completeness"
+      - "Analyze test coverage requirements"
+      - "Identify missing edge cases"
+      - "Validate mock appropriateness"
+      - "Check for anti-patterns"
+      - "Verify scoring fairness"
+      - "Suggest improvements"
+    
+    inputs:
+      - "All generator outputs"
+      - "Source code files"
+      - "Design documents"
+    
+    outputs:
+      - "QA review report"
+      - "Identified gaps list"
+      - "Improvement recommendations"
+      - "Approval or rejection decision"
+    
+    review_checklist:
+      coverage_analysis:
+        - "All public methods have test cases"
+        - "Edge cases are identified"
+        - "Error paths are covered"
+        - "State machine transitions are tested"
+        
+      mock_validation:
+        - "File system operations are mocked"
+        - "External dependencies are mocked"
+        - "Mock reset between tests is configured"
+        - "No real file system operations"
+        
+      test_quality:
+        - "Tests are readable and well-organized"
+        - "Test descriptions are clear"
+        - "Shared fixtures are extracted"
+        - "No test order dependencies"
+        
+      documentation:
+        - "PROMPT.md is clear and complete"
+        - "EVAL.ts has executable test code"
+        - "SCORING.md is fair and objective"
+        - "All constraints are documented"
+    
+    approval_criteria:
+      - "No critical gaps identified"
+      - "Coverage requirements are achievable"
+      - "Scoring is fair and objective"
+      - "Documentation is clear"
+    
+    rejection_criteria:
+      - "Missing critical test scenarios"
+      - "Unfair or unclear scoring"
+      - "Incomplete documentation"
+      - "Unachievable coverage targets"
+
+  # ============================================================================
+  # Role 3: Supervisor
+  # ============================================================================
+  supervisor:
+    name: "Task Supervisor"
+    alias: "supervisor"
+    
+    responsibilities:
+      - "Final quality gate"
+      - "Validate acceptance criteria"
+      - "Approve task for execution"
+      - "Resolve disputes between generator and QA"
+      - "Ensure compliance with standards"
+      - "Make go/no-go decision"
+    
+    inputs:
+      - "Generator outputs"
+      - "QA review report"
+      - "Source verification"
+    
+    outputs:
+      - "Final approval or rejection"
+      - "Quality gate report"
+      - "Execution authorization"
+    
+    quality_gate_checks:
+      must_have:
+        - "All 7 deliverables present"
+        - "PROMPT.md has retrieval-led instruction"
+        - "EVAL.ts has Phase 4 test code"
+        - "SCORING.md totals 100 points"
+        - "3 independent agents defined"
+        - "Task ID is specified"
+        
+      should_have:
+        - "Coverage targets defined"
+        - "Mock strategy documented"
+        - "Edge cases identified"
+        - "Anti-patterns documented"
+        
+      nice_to_have:
+        - "Example test code provided"
+        - "Troubleshooting guide"
+        - "Common pitfalls documented"
+    
+    decision_matrix:
+      approve:
+        - "All must-have checks pass"
+        - "Majority of should-have checks pass"
+        - "QA has approved or minor issues only"
+        
+      conditional:
+        - "All must-have checks pass"
+        - "Some should-have checks fail"
+        - "QA has minor concerns"
+        
+      reject:
+        - "Any must-have check fails"
+        - "Critical gaps identified"
+        - "QA has major concerns"
+    
+    escalation_rules:
+      - "Disputes between generator and QA → supervisor decides"
+      - "Unclear requirements → return to generator"
+      - "Scope creep → supervisor evaluates impact"
+
+# ============================================================================
+# Role Interaction Flow
+# ============================================================================
+interaction_flow:
+  step_1:
+    actor: generator
+    action: "Create initial task suite"
+    output: "All 7 deliverables"
+    
+  step_2:
+    actor: qa
+    action: "Review task suite"
+    input: "Generator outputs"
+    output: "QA review report"
+    
+  step_3:
+    actor: generator
+    action: "Address QA feedback (if any)"
+    condition: "QA requested changes"
+    
+  step_4:
+    actor: supervisor
+    action: "Final quality gate"
+    input: 
+      - "Generator outputs"
+      - "QA review report"
+    output: "Approval decision"
+    
+  step_5:
+    actor: supervisor
+    action: "Authorize execution"
+    condition: "Approved"
+
+# ============================================================================
+# Communication Rules
+# ============================================================================
+communication:
+  generator_to_qa:
+    - "Provide all deliverables"
+    - "Respond to feedback promptly"
+    - "Clarify requirements when asked"
+    
+  qa_to_generator:
+    - "Provide specific feedback"
+    - "Categorize issues (critical/major/minor)"
+    - "Suggest concrete improvements"
+    
+  qa_to_supervisor:
+    - "Report approval or rejection"
+    - "Document critical concerns"
+    - "Recommend next steps"
+    
+  supervisor_to_all:
+    - "Communicate decisions clearly"
+    - "Provide rationale for rejection"
+    - "Set expectations for next iteration"
+
+# ============================================================================
+# Conflict Resolution
+# ============================================================================
+conflict_resolution:
+  scenario_1:
+    description: "QA rejects but generator disagrees"
+    resolver: supervisor
+    process: "Review both positions, make binding decision"
+    
+  scenario_2:
+    description: "Ambiguous requirements"
+    resolver: generator
+    process: "Clarify and update documentation"
+    
+  scenario_3:
+    description: "Unrealistic coverage targets"
+    resolver: supervisor
+    process: "Adjust targets based on code complexity"
+
+# ============================================================================
+# Notes
+# ============================================================================
+notes: |
+  - Each role is independent and cannot be the same agent
+  - Generator focuses on completeness
+  - QA focuses on correctness and coverage
+  ###### 4 Supervisor focuses on compliance and quality
+  - All decisions should be documented
+  - Prefer retrieval-led reasoning over pre-training-led reasoning
