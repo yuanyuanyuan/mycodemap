@@ -70,5 +70,72 @@ For complex tasks (3+ steps, research, projects):
 
 
 <IMPORTANT>
+**强制约束 - 多 Agent 环境适配（Codex CLI 优先）**
+
+本项目需要支持多 Agent 协作。执行前必须先检测环境，并按环境的原生方式执行，不得混用语义。
+
+### 步骤1：检测环境（优先级从高到低）
+
+1. **Codex CLI 环境**（满足任一）：
+   - 可用原生多-agent编排能力（`spawn_agent` / `send_input` / `wait` / `close_agent`）
+   - 当前任务明确要求使用 Codex CLI 多-agent方式
+
+2. **kimi-cli 环境**（满足任一）：
+   - 系统提示词中存在 `${KIMI_WORK_DIR}` 或 `${KIMI_SKILLS}`
+   - 可用工具路径包含 `kimi_cli.tools.` 命名空间
+   - 用户使用 `--agent` 或 `--agent-file` 启动参数
+
+3. **Claude Code 环境**（满足任一）：
+   - 工具体系存在 `Task` / `TeamCreate` / `SendMessage` 语义
+   - 存在 `Skill(skill="name")` 调用机制
+
+### 步骤2：根据环境选择执行方式
+
+| 环境 | 多 Agent 启动方式 | 约束 |
+|------|------------------|------|
+| **Codex CLI** | 原生多-agent生命周期：`spawn_agent -> send_input -> wait -> close_agent` | 主协调器必须做最终汇总与验收 |
+| **kimi-cli** | YAML 配置 + `Task(subagent_name="xxx")` | 子 Agent 禁止嵌套调用 `Task` |
+| **Claude Code** | Skill: `agent-teams-playbook` | 按 skill 定义流程执行 |
+
+### Codex CLI 环境执行详情（强制）
+
+1. **必须使用原生生命周期**：
+   - 启动：`spawn_agent`
+   - 派发：`send_input`
+   - 收敛：`wait`
+   - 关闭：`close_agent`
+
+2. **任务隔离与并行规范**：
+   - 并行改代码前，必须先使用 `using-git-worktrees` skill 创建隔离工作区
+   - 每个子 Agent 必须单一职责，并声明明确文件所有权，避免交叉编辑
+   - 长耗时任务（测试、监控、显式等待）必须使用 `awaiter` agent
+
+3. **质量闸门**：
+   - 至少保留 1 个 reviewer 角色（可并行）
+   - 未通过验收的结果不得直接交付
+   - 失败必须回报：失败 Agent、失败原因、重试策略、风险提示
+
+### 禁止项（MUST NOT）
+
+1. 在 Codex CLI 环境中将 `Task(...)`、`TeamCreate(...)`、`SendMessage(...)`、`Skill(...)` 当作可执行工具调用
+2. 在同一任务中混用多套编排语义
+3. 跳过生命周期任一关键步骤（尤其是 `wait` 和 `close_agent`）
+
+### 术语映射（Claude -> Codex CLI）
+
+- `Task` -> `spawn_agent` + `send_input`
+- `TeamCreate` -> 多个 `spawn_agent` + 协调器编排
+- `SendMessage` -> `send_input`
+- 阶段并发 -> 一次性启动多个 agent，统一 `wait` 收敛
+
+### 关键约束
+
+1. **Codex CLI 优先**：检测到 Codex CLI 时，必须走 Codex CLI 原生方式
+2. **禁止混用**：确定环境后，全程使用该环境原生方式
+3. **不修改 Skill**：`.claude/skills/agent-teams-playbook/SKILL.md` 保持原样，仅在项目 `AGENTS.md` 做适配约束
+4. **子 Agent 隔离**：子 Agent 运行在独立上下文，结果由主协调器汇总
+</IMPORTANT>
+
+<IMPORTANT>
 每次任务完成后都要检查docs目录和AGENTS.md 和CLAUDE.md 和README.md 文件，确认是否需要同步更新。
 </IMPORTANT>
