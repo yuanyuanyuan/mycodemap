@@ -1,0 +1,92 @@
+# 任务元数据
+# 用于任务追溯和复用
+
+metadata:
+  task_id: "phase11-workflow-orchestrator"
+  task_name: "workflow-orchestrator"
+  version: "1.0.0"
+  created_at: "2026-03-01T17:30:00+08:00"
+  updated_at: "2026-03-01T17:35:00+08:00"
+
+# 任务属性
+task:
+  type: "code_generation"
+  difficulty: "hard"
+  estimated_minutes: 180
+
+# 能力维度
+capabilities:
+  tested:
+    - "TypeScript 类型定义"
+    - "状态机设计"
+    - "Map/Set 序列化"
+    - "CLI 命令实现"
+    - "文件系统操作"
+  required_knowledge:
+    - "CodeMap 项目架构"
+    - "REFACTOR_ORCHESTRATOR_DESIGN.md 第 8 章"
+    - "Commander.js CLI 框架"
+    - "TypeScript 严格模式"
+
+# 陷阱设计
+traps:
+  - name: "WorkflowPhase 类型定义"
+    description: "容易将字面量联合类型定义为普通 string 类型"
+    severity: "high"
+  - name: "Map/Set 序列化"
+    description: "直接使用 JSON.stringify 会导致数据丢失"
+    severity: "critical"
+  - name: "状态机边界"
+    description: "缺少 nextPhase 存在性检查会导致未定义行为"
+    severity: "high"
+  - name: "阶段定义硬编码"
+    description: "阶段定义散落在各处而非集中管理"
+    severity: "medium"
+  - name: "CLI 命令参数"
+    description: "workflow 子命令的参数和选项容易遗漏"
+    severity: "medium"
+
+# 反例场景
+counter_examples:
+  - user_type: "单次查询用户"
+    scenario: "只需要使用 `codemap analyze --intent search` 查找函数定义"
+    reason: "工作流编排器适用于多阶段开发任务，简单查询直接使用 analyze 命令更高效"
+  - user_type: "纯 CI/CD 自动化"
+    scenario: "在 GitHub Actions 中自动运行 codemap"
+    reason: "workflow resume/checkpoint 命令需要人工介入确认，不适合完全自动化环境"
+
+# 三角色工作流（硬约束）
+workflow:
+  batch:
+    requested_count: 1
+    max_allowed: 5
+  triad:
+    generator:
+      agent: "task-generator"
+      agent_definition: ".agents/task-generator.agent.md"
+      status: "completed"
+      evidence: "任务四件套已生成：PROMPT.md, EVAL.ts, SCORING.md, task-metadata.yaml；Triad 工件已生成：TRIAD_ROLES.yaml, TRIAD_WORKFLOW.md, TRIAD_ACCEPTANCE.md"
+    qa:
+      agent: "task-qa"
+      agent_definition: ".agents/task-qa.agent.md"
+      status: "completed"
+      evidence: "质量门禁检查通过：四件套齐全，总分=100，包含负向断言"
+    supervisor:
+      agent: "task-supervisor"
+      agent_definition: ".agents/task-supervisor.agent.md"
+      status: "completed"
+      evidence: "语义评审通过：score=99, threshold=85, critical_failures=0"
+      semantic_review:
+        prompt_template: ".agents/task-supervisor.semantic.prompt.md"
+        report_file: "SUPERVISOR_SEMANTIC_REVIEW.md"
+        score: 99
+        threshold: 85
+        critical_failures: 0
+        status: "completed"
+  approved: true
+
+# 版本历史
+version_history:
+  - version: "1.0.0"
+    date: "2026-03-01"
+    changes: "初始版本，基于 REFACTOR_ORCHESTRATOR_DESIGN.md 第 8 章设计"

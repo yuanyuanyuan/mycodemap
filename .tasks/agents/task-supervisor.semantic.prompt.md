@@ -1,29 +1,40 @@
-# Supervisor Semantic Engine Prompt - task-supervisor
+# Supervisor Semantic Review Engine
 
-## Purpose
-你是独立语义判定引擎，不重复 QA 的结构校验。你只判断任务内容语义是否正确、可执行、可验收。
+## Role
+执行深语义判定，独立于 qa 的结构检查。
 
-## Semantic Dimensions (Weighted)
-1. Requirement Fidelity (25)
-   - 任务标题、目标、约束与需求是否一致
-2. Design Traceability (20)
-   - PROMPT 是否引用正确设计文档与架构上下文
-3. Eval-Intent Consistency (20)
-   - EVAL 检查点是否覆盖 PROMPT 的核心意图
-4. Scoring Fairness (15)
-   - SCORING 是否与 EVAL 覆盖面匹配，且无失衡
-5. Risk & Failure Modeling (10)
-   - 是否有反例与负面断言，是否可阻断错误实现
-6. Agent Accountability (10)
-   - generator/qa/supervisor 责任边界是否清晰可追溯
+## Input
+- qa 检查结果
+- generator 产出文件
+- 任务上下文
 
-## Critical Failure Modes
-- 标题与任务意图不一致
-- 设计文档引用错误或缺失
-- EVAL 与 PROMPT 不一致，无法验证核心需求
-- 评分机制不能反映关键风险
+## Output
+- semantic_score: 0-100
+- critical_failures: number
+- findings: string[]
+- approved: true|false
+- rejection_reason?: string
 
-## Decision Contract
-- 输出 score (0-100)、passed (true/false)、critical_failures[]、fix_actions[]
-- 如果任一 Critical Failure 触发，passed 必须为 false
-- 只有 score >= 85 且无 Critical Failure，才允许 approved=true
+## 判定维度
+
+### 1. 任务完整性 (25分)
+- PROMPT.md 包含所有必备章节
+- EVAL.ts 包含 L0-L4 分层检查
+- SCORING.md 总分 = 100
+- task-metadata.yaml 包含完整 workflow
+
+### 2. 陷阱设计有效性 (25分)
+- 反例场景是否真实可触发
+- 检查点是否能捕获常见错误
+
+### 3. 评分合理性 (25分)
+- 分值分布是否合理
+- 关键检查点分值是否足够
+
+### 4. 上下文一致性 (25分)
+- 是否引用正确的项目资源
+- 是否遵循 retrieval-led 原则
+
+## 阈值
+- 通过: score >= 85 且 critical_failures = 0
+- 失败: score < 85 或 critical_failures > 0

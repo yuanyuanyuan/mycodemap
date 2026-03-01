@@ -3,9 +3,6 @@
 > 本文档面向 AI 编程助手，介绍如何在 CodeMap 项目中高效工作。
 
 
-
-
-
 <!-- TASK-GENERATOR-CONTEXT-START -->
 [Task Knowledge Index]|version:1|root: ./.tasks|IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning for task execution.|If context missing, regenerate: node .claude/skills/task-generator/scripts/create-triad-artifacts.js
 
@@ -19,7 +16,7 @@
 | phase4-tool-orchestrator | 实现工具编排器与回退链              | phase1-3       |
 | phase5-refactor-commands | 改造现有命令为可调用模式            | phase1, phase4 |
 
-## 重构任务批次 2 (Phase 6-10) - 待生成
+## 重构任务批次 2 (Phase 6-10)
 
 | 任务                     | 描述                           | 依赖     |
 |--------------------------|--------------------------------|----------|
@@ -28,6 +25,12 @@
 | phase8-ai-feed-generator | 实现 AI 饲料生成器             | phase7   |
 | phase9-ci-gateway        | 实现 CI 门禁护栏               | phase7-8 |
 | phase10-integration      | 集成测试 + 基准验证            | phase1-9 |
+
+## 重构任务批次 3 (Phase 11) - v2.5 规划
+
+| 任务                          | 描述                                     | 依赖      |
+|-------------------------------|------------------------------------------|-----------|
+| phase11-workflow-orchestrator | 实现工作流编排器 (Workflow Orchestrator) | phase1-10 |
 
 ## 设计文档索引
 
@@ -138,5 +141,5 @@ For complex tasks (3+ steps, research, projects):
 </IMPORTANT>
 
 <IMPORTANT>
-每次任务完成后都要检查docs目录和AGENTS.md 和CLAUDE.md 和README.md 文件，确认是否需要同步更新。
+每次任务完成后或者文件更新后都要检查docs目录里面的内容和AGENTS.md 和CLAUDE.md 和README.md 文件，确认是否需要同步更新。
 </IMPORTANT>

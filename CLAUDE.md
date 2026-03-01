@@ -70,6 +70,12 @@ src/
 | phase9-ci-gateway        | 实现 CI 门禁护栏               | phase7-8 |
 | phase10-integration      | 集成测试 + 基准验证            | phase1-9 |
 
+## 重构任务批次 3 (Phase 11) - v2.5 规划
+
+| 任务                     | 描述                           | 依赖     |
+|--------------------------|--------------------------------|----------|
+| phase11-workflow-orchestrator | 实现工作流编排器 (Workflow Orchestrator) | phase1-10 |
+
 ## 设计文档索引
 
 - [REFACTOR_ARCHITECTURE_OVERVIEW.md](./docs/REFACTOR_ARCHITECTURE_OVERVIEW.md) - 架构概览
