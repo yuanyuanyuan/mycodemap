@@ -32,6 +32,17 @@
 |-------------------------------|------------------------------------------|-----------|
 | phase11-workflow-orchestrator | 实现工作流编排器 (Workflow Orchestrator) | phase1-10 |
 
+## 重构修复批次 (基于 FINAL_REVIEW_REPORT)
+
+> 这些任务基于 `/data/codemap/FINAL_REVIEW_REPORT.md` 中指出的关键未完成项生成
+
+| 任务 | 描述 | 问题来源 | 优先级 |
+|------|------|----------|--------|
+| fix-runanalysis-implementation | 实现 Workflow Orchestrator 的 runAnalysis 方法 | FINAL_REVIEW:6.1 | critical |
+| fix-analyze-orchestrator-integration | Analyze 命令接入 ToolOrchestrator/ResultFusion | FINAL_REVIEW:6.2 | critical |
+| fix-output-contract | 修复输出契约校验和字段完整性 | FINAL_REVIEW:6.3 | critical |
+| fix-timeout-mechanism | 修复 ToolOrchestrator 超时控制机制 | FINAL_REVIEW:6.4 | high |
+
 ## 设计文档索引
 
 - [REFACTOR_ARCHITECTURE_OVERVIEW.md](./docs/REFACTOR_ARCHITECTURE_OVERVIEW.md) - 架构概览

@@ -1,0 +1,91 @@
+# 任务元数据
+# 用于任务追溯和复用
+
+metadata:
+  task_id: "fix-output-contract"
+  task_name: "fix-output-contract"
+  version: "1.0.0"
+  created_at: "2026-03-01"
+  updated_at: "2026-03-01"
+
+# 任务属性
+task:
+  type: "refactoring"
+  difficulty: "medium"
+  estimated_minutes: 60
+
+# 能力维度
+capabilities:
+  tested:
+    - "TypeScript 接口设计"
+    - "CLI 命令实现"
+    - "JSON Schema 契约定义"
+    - "类型守卫函数"
+  required_knowledge:
+    - "CodeMap 架构设计"
+    - "CI 门禁设计规范"
+    - "输出契约模式"
+    - "Commander.js CLI 框架"
+
+# 陷阱设计
+traps:
+  - name: "破坏 human 输出"
+    description: "错误地修改所有输出模式，导致人类可读输出也变成 JSON"
+    severity: "critical"
+  - name: "仅检查 package.json"
+    description: "没有真正运行 analyze 命令，只是检查 package.json 字段"
+    severity: "critical"
+  - name: "引入新依赖"
+    description: "使用 zod/ajv 等 JSON Schema 验证库，而项目未使用这些库"
+    severity: "high"
+  - name: "忽略错误码体系"
+    description: "没有添加 E0010 错误码，或错误处理不符合项目规范"
+    severity: "medium"
+  - name: "类型定义不完整"
+    description: "CodemapOutput 接口缺少必需字段，或没有类型守卫"
+    severity: "medium"
+
+# 反例场景
+counter_examples:
+  - user_type: "仅使用 human 模式"
+    scenario: "用户只使用人类可读输出，不关心 machine/json 输出"
+    reason: "此修复仅影响 machine 模式，对 human 模式无影响"
+  - user_type: "依赖旧格式解析"
+    scenario: "用户使用自定义脚本解析旧的 analyze 输出"
+    reason: "新字段添加可能破坏旧解析逻辑，需要适配"
+
+# 三角色工作流（硬约束）
+workflow:
+  batch:
+    requested_count: 1
+    max_allowed: 5
+  triad:
+    generator:
+      agent: "task-generator"
+      agent_definition: ".agents/task-generator.agent.md"
+      status: "completed"
+      evidence: "四件套与 triad 文档已生成"
+    qa:
+      agent: "qa-checker"
+      agent_definition: ".agents/task-qa.agent.md"
+      status: "completed"
+      evidence: ""
+    supervisor:
+      agent: "task-supervisor"
+      agent_definition: ".agents/task-supervisor.agent.md"
+      status: "completed"
+      evidence: "语义评审通过：score=100, critical_failures=0, approved=true"
+      semantic_review:
+        prompt_template: ".agents/task-supervisor.semantic.prompt.md"
+        report_file: "SUPERVISOR_SEMANTIC_REVIEW.md"
+        score: 100
+        threshold: 85
+        critical_failures: 0
+        status: "completed"
+  approved: true
+
+# 版本历史
+version_history:
+  - version: "1.0.0"
+    date: "2026-03-01"
+    changes: "初始版本 - 修复输出契约校验和字段完整性"

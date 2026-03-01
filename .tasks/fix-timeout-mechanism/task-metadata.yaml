@@ -1,0 +1,88 @@
+# 任务元数据
+# 用于任务追溯和复用
+
+metadata:
+  task_id: "fix-timeout-mechanism"
+  task_name: "修复 ToolOrchestrator 超时控制机制"
+  version: "1.0.0"
+  created_at: "2026-03-01T18:05:00+08:00"
+  updated_at: "2026-03-01T18:05:00+08:00"
+
+# 任务属性
+task:
+  type: "refactoring"
+  difficulty: "medium"
+  estimated_minutes: 45
+
+# 能力维度
+capabilities:
+  tested:
+    - "TypeScript 接口设计"
+    - "AbortController 和 AbortSignal 使用"
+    - "Promise.race 超时模式"
+    - "向后兼容的 API 设计"
+  required_knowledge:
+    - "Node.js AbortController API"
+    - "TypeScript 可选参数"
+    - "Promise.race 模式"
+    - "错误处理和回退机制"
+
+# 陷阱设计
+traps:
+  - name: "signal 参数未传递"
+    description: "更新了接口但未在实际调用中传递 signal"
+    severity: "critical"
+  - name: "破坏向后兼容"
+    description: "将 signal 设为必填参数，导致现有适配器编译失败"
+    severity: "high"
+  - name: "未使用 Promise.race"
+    description: "仍然依赖原生的 AbortController 自动行为，没有硬超时保证"
+    severity: "high"
+  - name: "超时未触发回退"
+    description: "超时后没有正确返回空数组，导致回退机制未触发"
+    severity: "medium"
+
+# 反例场景
+counter_examples:
+  - user_type: "现有 ToolAdapter 实现者"
+    scenario: "不更新适配器以处理 signal"
+    reason: "虽然接口兼容，但超时机制对该适配器仍不生效"
+  - user_type: "期望异常行为的调用者"
+    scenario: "期望超时抛出异常而非返回空数组"
+    reason: "当前设计统一返回空数组触发回退，不区分超时和错误"
+
+# 三角色工作流（硬约束）
+workflow:
+  batch:
+    requested_count: 1
+    max_allowed: 5
+  triad:
+    generator:
+      agent: "task-generator"
+      agent_definition: ".agents/task-generator.agent.md"
+      status: "completed"
+      evidence: ""
+    qa:
+      agent: "qa-agent"
+      agent_definition: ".agents/task-qa.agent.md"
+      status: "completed"
+      evidence: ""
+    supervisor:
+      agent: "task-supervisor"
+      agent_definition: ".agents/task-supervisor.agent.md"
+      status: "completed"
+      evidence: "语义评审通过：score=99, critical_failures=0, approved=true"
+      semantic_review:
+        prompt_template: ".agents/task-supervisor.semantic.prompt.md"
+        report_file: "SUPERVISOR_SEMANTIC_REVIEW.md"
+        score: 99
+        threshold: 85
+        critical_failures: 0
+        status: "completed"
+  approved: true
+
+# 版本历史
+version_history:
+  - version: "1.0.0"
+    date: "2026-03-01"
+    changes: "初始版本 - 修复 ToolOrchestrator 超时控制机制"

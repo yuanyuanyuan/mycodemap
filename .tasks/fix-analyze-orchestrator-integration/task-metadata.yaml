@@ -1,0 +1,89 @@
+# 任务元数据
+# 用于任务追溯和复用
+
+metadata:
+  task_id: "fix-analyze-orchestrator-integration"
+  task_name: "fix-analyze-orchestrator-integration"
+  version: "1.0.0"
+  created_at: "2026-03-01"
+  updated_at: "2026-03-01"
+
+# 任务属性
+task:
+  type: "refactoring"
+  difficulty: "hard"
+  estimated_minutes: 90
+
+# 能力维度
+capabilities:
+  tested:
+    - "ToolOrchestrator 集成"
+    - "ResultFusion 结果融合"
+    - "多 intent 路由"
+    - "向后兼容设计"
+  required_knowledge:
+    - "TypeScript 类设计"
+    - "CodeMap 编排层架构"
+    - "ToolOrchestrator API"
+    - "ResultFusion API"
+    - "UnifiedResult 数据流"
+
+# 陷阱设计
+traps:
+  - name: "重新实现而非复用"
+    description: "AI 可能重新实现 ToolOrchestrator/ResultFusion 逻辑，而非复用现有类"
+    severity: "critical"
+  - name: "破坏向后兼容"
+    description: "修改 CLI 参数或 JSON 输出格式，导致下游工具失效"
+    severity: "high"
+  - name: "硬编码 switch 残留"
+    description: "未完全移除或重构原有的硬编码 switch 路由逻辑"
+    severity: "medium"
+  - name: "类型安全丢失"
+    description: "未正确使用 TypeScript 类型注解，导致类型检查失败"
+    severity: "medium"
+
+# 反例场景
+counter_examples:
+  - user_type: "依赖旧版 JSON 输出的自动化工具"
+    scenario: "JSON 输出结构发生破坏性变更"
+    reason: "会破坏下游工具集成，应保持输出格式一致"
+  - user_type: "低性能环境用户"
+    scenario: "强制并行执行大量工具导致内存溢出"
+    reason: "未考虑资源限制，应提供串行执行选项"
+
+# 三角色工作流（硬约束）
+workflow:
+  batch:
+    requested_count: 1
+    max_allowed: 5
+  triad:
+    generator:
+      agent: "task-executor"
+      agent_definition: ".agents/task-executor.agent.md"
+      status: "completed"
+      evidence: ""
+    qa:
+      agent: "qa-validator"
+      agent_definition: ".agents/qa-validator.agent.md"
+      status: "completed"
+      evidence: ""
+    supervisor:
+      agent: "task-supervisor"
+      agent_definition: ".agents/task-supervisor.agent.md"
+      status: "completed"
+      evidence: "语义评审通过：score=99, critical_failures=0, approved=true"
+      semantic_review:
+        prompt_template: ".agents/task-supervisor.semantic.prompt.md"
+        report_file: "SUPERVISOR_SEMANTIC_REVIEW.md"
+        score: 99
+        threshold: 85
+        critical_failures: 0
+        status: "completed"
+  approved: true
+
+# 版本历史
+version_history:
+  - version: "1.0.0"
+    date: "2026-03-01"
+    changes: "初始版本 - Analyze 命令接入 ToolOrchestrator 和 ResultFusion"
