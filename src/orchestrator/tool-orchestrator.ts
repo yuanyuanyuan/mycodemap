@@ -1,8 +1,6 @@
 /**
- * ToolOrchestrator - 工具编排器
- *
- * 负责执行工具、超时控制、错误隔离、回退级联。
- * 是连接 IntentRouter、适配器和结果融合的"胶水"组件。
+ * [META] ToolOrchestrator - 工具编排器
+ * [WHY] 负责执行工具、超时控制、错误隔离、回退级联，是连接 IntentRouter、适配器和结果融合的"胶水"组件。
  */
 
 import type { UnifiedResult, CodemapIntent, IntentType } from './types.js';
@@ -75,9 +73,10 @@ export class ToolOrchestrator {
 
   /**
    * 注册工具适配器
+   * @param adapter 工具适配器实例
    */
-  registerAdapter(adapter: ToolAdapter): void {
-    this.adapters.set(adapter.name, adapter);
+  registerAdapter(adapter: { name: string; weight: number; isAvailable(): Promise<boolean>; execute(...args: unknown[]): Promise<UnifiedResult[]> }): void {
+    this.adapters.set(adapter.name, adapter as ToolAdapter);
   }
 
   /**

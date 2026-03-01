@@ -1,6 +1,6 @@
 /**
- * 工作流编排器
- * 串联所有模块的"粘合剂"，解决阶段割裂问题
+ * [META] 工作流编排器
+ * [WHY] 串联所有模块的"粘合剂"，解决阶段割裂问题
  */
 
 import { exec } from 'node:child_process';
@@ -11,6 +11,7 @@ import { ToolOrchestrator } from '../tool-orchestrator.js';
 import { IntentRouter } from '../intent-router.js';
 import { ResultFusion } from '../result-fusion.js';
 import { createCodemapAdapter } from '../adapters/codemap-adapter.js';
+import { createAstGrepAdapter } from '../adapters/ast-grep-adapter.js';
 import { WorkflowPersistence } from './workflow-persistence.js';
 import { PhaseCheckpoint } from './phase-checkpoint.js';
 import {
@@ -57,6 +58,8 @@ export class WorkflowOrchestrator {
   private registerAdapters(): void {
     // 注册 CodeMap 适配器
     this.toolOrchestrator.registerAdapter(createCodemapAdapter());
+    // 注册 ast-grep 适配器（权重 1.0）
+    this.toolOrchestrator.registerAdapter(createAstGrepAdapter());
   }
 
   /**
