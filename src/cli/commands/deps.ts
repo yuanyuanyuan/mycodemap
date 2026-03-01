@@ -2,10 +2,31 @@ import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
 import type { CodeMap, ModuleInfo } from '../../types/index.js';
+import type { UnifiedResult, HeatScore } from '../../orchestrator/types.js';
 
 interface DepsOptions {
   module?: string;
   json?: boolean;
+}
+
+interface DepsArgs {
+  targets: string[];
+}
+
+interface DepsModuleInfo {
+  path: string;
+  relativePath: string;
+  dependencies: string[];
+  dependents: string[];
+}
+
+interface DepsResult {
+  modules: DepsModuleInfo[];
+  allDependencies?: Array<{
+    path: string;
+    count: number;
+    type: string;
+  }>;
 }
 
 /**
@@ -49,6 +70,56 @@ function getModuleDependencies(codeMap: CodeMap, modulePath: string): {
     module,
     dependencies: module.dependencies,
     dependents: module.dependents
+  };
+}
+
+/**
+ * 分析依赖关系 - 纯逻辑函数
+ * @param codeMap 代码地图数据
+ * @param modulePaths 目标模块路径列表（可选，为空则分析所有模块）
+ * @returns 依赖分析结果
+ */
+function analyzeDeps(codeMap: CodeMap, modulePaths?: string[]): DepsResult {
+  const modules: DepsModuleInfo[] = [];
+  const allDependencies: Array<{ path: string; count: number; type: string }> = [];
+
+  if (modulePaths && modulePaths.length > 0) {
+    // 分析指定模块
+    for (const modulePath of modulePaths) {
+      const result = getModuleDependencies(codeMap, modulePath);
+      if (result.module) {
+        modules.push({
+          path: result.module.absolutePath,
+          relativePath: path.relative(codeMap.project.rootDir, result.module.absolutePath),
+          dependencies: result.dependencies,
+          dependents: result.dependents
+        });
+      }
+    }
+  } else {
+    // 分析所有模块
+    for (const module of codeMap.modules) {
+      modules.push({
+        path: module.absolutePath,
+        relativePath: path.relative(codeMap.project.rootDir, module.absolutePath),
+        dependencies: module.dependencies,
+        dependents: module.dependents
+      });
+
+      allDependencies.push({
+        path: module.absolutePath,
+        count: module.dependencies.length,
+        type: module.type
+      });
+    }
+
+    // 按依赖数量排序
+    allDependencies.sort((a, b) => b.count - a.count);
+  }
+
+  return {
+    modules,
+    allDependencies: allDependencies.length > 0 ? allDependencies : undefined
   };
 }
 
@@ -148,7 +219,7 @@ function formatDependencies(
 }
 
 /**
- * Deps 命令实现
+ * Deps 命令实现 - 保持向后兼容
  */
 export async function depsCommand(options: DepsOptions) {
   const rootDir = process.cwd();
@@ -179,3 +250,121 @@ export async function depsCommand(options: DepsOptions) {
   // 输出结果
   formatDependencies(codeMap, targetModule, allDependencies, options);
 }
+
+/**
+ * DepsCommand 类 - 供 ToolOrchestrator 调用
+ */
+export class DepsCommand {
+  private codeMap: CodeMap | null = null;
+
+  /**
+   * 加载代码地图
+   */
+  private loadCodeMap(rootDir: string): CodeMap | null {
+    const codemapPath = path.join(rootDir, '.codemap', 'codemap.json');
+
+    if (!fs.existsSync(codemapPath)) {
+      return null;
+    }
+
+    try {
+      const data = fs.readFileSync(codemapPath, 'utf-8');
+      return JSON.parse(data) as CodeMap;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * 执行依赖分析
+   * @param args 分析参数
+   * @returns 依赖分析结果
+   */
+  async run(args: DepsArgs): Promise<DepsResult> {
+    const rootDir = process.cwd();
+
+    // 加载代码地图
+    if (!this.codeMap) {
+      this.codeMap = this.loadCodeMap(rootDir);
+    }
+
+    if (!this.codeMap) {
+      throw new Error('代码地图不存在，请先运行 codemap generate');
+    }
+
+    // 执行分析
+    return analyzeDeps(this.codeMap, args.targets.length > 0 ? args.targets : undefined);
+  }
+
+  /**
+   * 执行增强依赖分析，返回 UnifiedResult 格式
+   * @param args 分析参数
+   * @returns UnifiedResult 数组
+   */
+  async runEnhanced(args: DepsArgs): Promise<UnifiedResult[]> {
+    const result = await this.run(args);
+    return this.toUnifiedResults(result);
+  }
+
+  /**
+   * 将 DepsResult 转换为 UnifiedResult 数组
+   * @param result 依赖分析结果
+   * @returns UnifiedResult 数组
+   */
+  private toUnifiedResults(result: DepsResult): UnifiedResult[] {
+    const unifiedResults: UnifiedResult[] = [];
+
+    for (const module of result.modules) {
+      // 生成唯一ID
+      const fileName = path.basename(module.path);
+      const id = `codemap-${fileName}-0`;
+
+      // 构建人类可读内容
+      const depCount = module.dependencies.length;
+      const dependentCount = module.dependents.length;
+      const content = `依赖 ${depCount} 个模块，被 ${dependentCount} 个模块依赖`;
+
+      // 计算依赖复杂度评分 (gravity)
+      // 基于依赖数量和被依赖数量的加权计算
+      const gravity = Math.min(1.0, (depCount + dependentCount * 2) / 20);
+
+      // 构建热度评分对象
+      const heatScore: HeatScore = {
+        freq30d: 0, // 依赖分析不涉及提交历史
+        lastType: 'dependency',
+        lastDate: new Date().toISOString().split('T')[0]
+      };
+
+      // 构建元数据
+      const metadata: UnifiedResult['metadata'] = {
+        symbolType: 'class',
+        dependencies: module.dependencies,
+        testFile: '',
+        commitCount: 0,
+        gravity,
+        heatScore,
+        impactCount: dependentCount,
+        stability: dependentCount === 0 || dependentCount > 5, // 无依赖或多依赖视为稳定
+        riskLevel: gravity > 0.7 ? 'high' : gravity > 0.4 ? 'medium' : 'low'
+      };
+
+      unifiedResults.push({
+        id,
+        source: 'codemap',
+        toolScore: 0.9,
+        type: 'file',
+        file: module.path,
+        line: 0,
+        content,
+        relevance: 0.8,
+        keywords: [],
+        metadata
+      });
+    }
+
+    return unifiedResults;
+  }
+}
+
+// 导出类型
+export type { DepsArgs, DepsResult, DepsModuleInfo };
