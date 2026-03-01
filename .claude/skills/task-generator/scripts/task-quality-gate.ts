@@ -37,7 +37,16 @@ interface ContextReport {
   errors: string[];
 }
 
-const REQUIRED_FILES = ["PROMPT.md", "EVAL.ts", "SCORING.md", "task-metadata.yaml"];
+const REQUIRED_FILES = [
+  "PROMPT.md",
+  "EVAL.ts",
+  "SCORING.md",
+  "task-metadata.yaml",
+  "TRIAD_ROLES.yaml",
+  "TRIAD_WORKFLOW.md",
+  "TRIAD_ACCEPTANCE.md",
+  "SUPERVISOR_SEMANTIC_REVIEW.md",
+];
 const PROMPT_SECTIONS = [
   "## 背景",
   "## 要求",
@@ -53,6 +62,7 @@ const METADATA_KEYS = [
   "capabilities",
   "traps",
   "counter_examples",
+  "workflow",
   "version_history",
 ];
 const CONTEXT_START_MARKER = "<!-- TASK-GENERATOR-CONTEXT-START -->";
@@ -191,6 +201,209 @@ function checkMetadataTemplate(metadataContent: string): string[] {
     const keyPattern = new RegExp(`^${key}:\\s*$`, "m");
     if (!keyPattern.test(metadataContent)) {
       errors.push(`task-metadata.yaml missing top-level key: ${key}`);
+    }
+  }
+
+  return errors;
+}
+
+function checkTriadWorkflow(metadataContent: string): string[] {
+  const errors: string[] = [];
+
+  const requestedCountMatch = metadataContent.match(
+    /^\s*requested_count:\s*(\d+)\s*$/m,
+  );
+  if (!requestedCountMatch) {
+    errors.push("task-metadata.yaml missing workflow.batch.requested_count");
+  } else {
+    const requestedCount = Number(requestedCountMatch[1]);
+    if (!Number.isFinite(requestedCount) || requestedCount <= 0) {
+      errors.push("workflow.batch.requested_count must be a positive integer");
+    } else if (requestedCount > 5) {
+      errors.push(
+        `workflow.batch.requested_count exceeds limit 5 (actual: ${requestedCount})`,
+      );
+    }
+  }
+
+  if (!/^\s*max_allowed:\s*5\s*$/m.test(metadataContent)) {
+    errors.push("workflow.batch.max_allowed must be 5");
+  }
+
+  for (const role of ["generator", "qa", "supervisor"]) {
+    const rolePattern = new RegExp(`^\\s*${role}:\\s*$`, "m");
+    if (!rolePattern.test(metadataContent)) {
+      errors.push(`task-metadata.yaml missing workflow.triad.${role} block`);
+      continue;
+    }
+
+    const statusPattern = new RegExp(
+      `\\n\\s*${role}:\\s*\\n(?:\\s+.*\\n)*?\\s+status:\\s*(?:["']?completed["']?)\\b`,
+      "m",
+    );
+    if (!statusPattern.test(metadataContent)) {
+      errors.push(`workflow.triad.${role}.status must be completed`);
+    }
+
+    const evidencePattern = new RegExp(
+      `\\n\\s*${role}:\\s*\\n(?:\\s+.*\\n)*?\\s+evidence:\\s*["']?.+`,
+      "m",
+    );
+    if (!evidencePattern.test(metadataContent)) {
+      errors.push(`workflow.triad.${role}.evidence must be non-empty`);
+    }
+
+    const agentDefinitionPattern = new RegExp(
+      `\\n\\s*${role}:\\s*\\n(?:\\s+.*\\n)*?\\s+agent_definition:\\s*["']?.+`,
+      "m",
+    );
+    if (!agentDefinitionPattern.test(metadataContent)) {
+      errors.push(`workflow.triad.${role}.agent_definition must be non-empty`);
+    }
+  }
+
+  const semanticScoreMatch = metadataContent.match(
+    /\n\s*semantic_review:\s*\n(?:\s+.*\n)*?\s+score:\s*(\d+)\s*$/m,
+  );
+  const semanticThresholdMatch = metadataContent.match(
+    /\n\s*semantic_review:\s*\n(?:\s+.*\n)*?\s+threshold:\s*(\d+)\s*$/m,
+  );
+  const semanticStatusMatch = metadataContent.match(
+    /\n\s*semantic_review:\s*\n(?:\s+.*\n)*?\s+status:\s*["']?(completed|failed|pending)["']?\s*$/m,
+  );
+  if (!semanticScoreMatch || !semanticThresholdMatch || !semanticStatusMatch) {
+    errors.push("workflow.triad.supervisor.semantic_review block must include score/threshold/status");
+  } else {
+    const score = Number(semanticScoreMatch[1]);
+    const threshold = Number(semanticThresholdMatch[1]);
+    if (!Number.isFinite(score) || !Number.isFinite(threshold) || score < threshold) {
+      errors.push(
+        `workflow.triad.supervisor.semantic_review score must meet threshold (score=${score}, threshold=${threshold})`,
+      );
+    }
+  }
+
+  if (!/^\s*approved:\s*true\s*$/m.test(metadataContent)) {
+    errors.push("workflow.approved must be true");
+  }
+
+  return errors;
+}
+
+function checkTriadArtifacts(taskPath: string): string[] {
+  const errors: string[] = [];
+  const rolesPath = path.join(taskPath, "TRIAD_ROLES.yaml");
+  const workflowPath = path.join(taskPath, "TRIAD_WORKFLOW.md");
+  const acceptancePath = path.join(taskPath, "TRIAD_ACCEPTANCE.md");
+
+  if (!existsSync(rolesPath) || !existsSync(workflowPath) || !existsSync(acceptancePath)) {
+    return errors;
+  }
+
+  const rolesContent = readFileSync(rolesPath, "utf-8");
+  const workflowContent = readFileSync(workflowPath, "utf-8");
+  const acceptanceContent = readFileSync(acceptancePath, "utf-8");
+
+  for (const marker of ["generator:", "qa:", "supervisor:"]) {
+    if (!rolesContent.includes(marker)) {
+      errors.push(`TRIAD_ROLES.yaml missing role definition: ${marker}`);
+    }
+  }
+
+  for (const marker of ["## generator", "## qa", "## supervisor"]) {
+    if (!workflowContent.includes(marker)) {
+      errors.push(`TRIAD_WORKFLOW.md missing section: ${marker}`);
+    }
+  }
+
+  for (const marker of [
+    "## Hard Constraints",
+    "## Artifact Checklist",
+    "## Automated Validation",
+  ]) {
+    if (!acceptanceContent.includes(marker)) {
+      errors.push(`TRIAD_ACCEPTANCE.md missing section: ${marker}`);
+    }
+  }
+
+  return errors;
+}
+
+function parseRoleAgent(metadataContent: string, role: string): string | null {
+  const pattern = new RegExp(
+    `\\n\\s*${role}:\\s*\\n(?:\\s+.*\\n)*?\\s+agent:\\s*["']?([^"\\n']+)`,
+    "m",
+  );
+  const matched = metadataContent.match(pattern);
+  return matched ? matched[1].trim() : null;
+}
+
+function checkAgentDefinitions(taskPath: string, metadataContent: string): string[] {
+  const errors: string[] = [];
+  const projectRoot = path.resolve(taskPath, "..", "..");
+  const agentsDir = path.join(projectRoot, ".agents");
+  if (!existsSync(agentsDir)) {
+    errors.push(`missing .agents directory: ${agentsDir}`);
+    return errors;
+  }
+
+  for (const role of ["generator", "qa", "supervisor"]) {
+    const agentName = parseRoleAgent(metadataContent, role);
+    if (!agentName) {
+      errors.push(`missing workflow.triad.${role}.agent`);
+      continue;
+    }
+    const agentPath = path.join(agentsDir, `${agentName}.agent.md`);
+    if (!existsSync(agentPath)) {
+      errors.push(`missing ${role} agent definition: ${agentPath}`);
+    }
+  }
+
+  const supervisorName = parseRoleAgent(metadataContent, "supervisor");
+  if (supervisorName) {
+    const semanticPromptPath = path.join(
+      agentsDir,
+      `${supervisorName}.semantic.prompt.md`,
+    );
+    if (!existsSync(semanticPromptPath)) {
+      errors.push(`missing supervisor semantic prompt: ${semanticPromptPath}`);
+    }
+  }
+
+  return errors;
+}
+
+function checkSupervisorSemanticReport(taskPath: string): string[] {
+  const errors: string[] = [];
+  const reportPath = path.join(taskPath, "SUPERVISOR_SEMANTIC_REVIEW.md");
+  if (!existsSync(reportPath)) {
+    errors.push("missing SUPERVISOR_SEMANTIC_REVIEW.md");
+    return errors;
+  }
+
+  const content = readFileSync(reportPath, "utf-8");
+  for (const marker of ["## Semantic Dimensions", "## Critical Failure Modes", "## Decision"]) {
+    if (!content.includes(marker)) {
+      errors.push(`SUPERVISOR_SEMANTIC_REVIEW.md missing section: ${marker}`);
+    }
+  }
+
+  const scoreMatch = content.match(/^- score:\s*(\d+)\s*$/m);
+  const thresholdMatch = content.match(/^- threshold:\s*(\d+)\s*$/m);
+  const passedMatch = content.match(/^- passed:\s*(true|false)\s*$/m);
+  if (!scoreMatch || !thresholdMatch || !passedMatch) {
+    errors.push("SUPERVISOR_SEMANTIC_REVIEW.md missing score/threshold/passed");
+  } else {
+    const score = Number(scoreMatch[1]);
+    const threshold = Number(thresholdMatch[1]);
+    const passed = passedMatch[1] === "true";
+    if (!Number.isFinite(score) || !Number.isFinite(threshold) || score < threshold) {
+      errors.push(
+        `SUPERVISOR_SEMANTIC_REVIEW score below threshold (score=${score}, threshold=${threshold})`,
+      );
+    }
+    if (!passed) {
+      errors.push("SUPERVISOR_SEMANTIC_REVIEW passed=false");
     }
   }
 
@@ -363,6 +576,10 @@ function checkTask(taskPath: string, options: CliOptions): TaskReport {
   }
 
   report.errors.push(...checkMetadataTemplate(metadataContent));
+  report.errors.push(...checkTriadWorkflow(metadataContent));
+  report.errors.push(...checkTriadArtifacts(taskPath));
+  report.errors.push(...checkAgentDefinitions(taskPath, metadataContent));
+  report.errors.push(...checkSupervisorSemanticReport(taskPath));
 
   return report;
 }

@@ -1,0 +1,29 @@
+# Triad Roles - phase9-ci-gateway
+
+triad_roles:
+  generator:
+    role: "task-generator"
+    objective: "使用固定模板生成任务四件套与 triad 文档"
+    status: "completed"
+    evidence: "PROMPT.md, EVAL.ts, SCORING.md, task-metadata.yaml generated"
+
+  qa:
+    role: "task-qa"
+    objective: "验证生成内容是否达到交付标准"
+    status: "pending"
+    evidence: ""
+
+  supervisor:
+    role: "task-supervisor"
+    objective: "监督 generator 与 qa 的执行质量，做最终放行"
+    status: "pending"
+    evidence: ""
+    semantic_review:
+      status: "pending"
+      score: 0
+      threshold: 85
+
+workflow:
+  approved: false
+  batch_requested: 1
+  created_at: "2026-03-01T06:14:43.249Z"

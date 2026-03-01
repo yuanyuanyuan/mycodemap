@@ -33,6 +33,36 @@ counter_examples:
     scenario: ""         # 不适用场景
     reason: ""           # 原因
 
+# 三角色工作流（硬约束）
+workflow:
+  batch:
+    requested_count: 0   # 本次请求任务数，必须 <= 5
+    max_allowed: 5
+  triad:
+    generator:
+      agent: ""          # 生成角色/agent 名称
+      agent_definition: "" # .agents/{agent}.agent.md
+      status: "pending"  # pending/completed/failed
+      evidence: ""       # 证据（命令、报告或日志）
+    qa:
+      agent: ""          # 质量验收角色/agent 名称
+      agent_definition: "" # .agents/{agent}.agent.md
+      status: "pending"  # pending/completed/failed
+      evidence: ""       # 证据（门禁或检查输出）
+    supervisor:
+      agent: ""          # 审核监督角色/agent 名称
+      agent_definition: "" # .agents/{agent}.agent.md
+      status: "pending"  # pending/completed/failed
+      evidence: ""       # 证据（review 记录）
+      semantic_review:
+        prompt_template: "" # .agents/{supervisor}.semantic.prompt.md
+        report_file: "SUPERVISOR_SEMANTIC_REVIEW.md"
+        score: 0
+        threshold: 85
+        critical_failures: 0
+        status: "pending"  # pending/completed/failed
+  approved: false        # supervisor 最终审批结果
+
 # 版本历史
 version_history:
   - version: "1.0.0"

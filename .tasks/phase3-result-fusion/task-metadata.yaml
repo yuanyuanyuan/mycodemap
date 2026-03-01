@@ -1,0 +1,143 @@
+# 任务元数据
+# 用于任务追溯和复用
+
+metadata:
+  task_id: "codemap-phase-003"
+  task_name: "phase3-result-fusion"
+  version: "1.0.0"
+  created_at: "2026-03-01T14:04:21+08:00"
+  updated_at: "2026-03-01T14:04:21+08:00"
+
+# 任务属性
+task:
+  type: "code_generation"
+  difficulty: "hard"
+  estimated_minutes: 120
+
+# 能力维度
+capabilities:
+  tested:
+    - "TypeScript 类设计"
+    - "算法实现（加权、去重、排序）"
+    - "Map 数据处理"
+    - "边界条件处理"
+  required_knowledge:
+    - "TypeScript 泛型"
+    - "数组方法（map, filter, sort, reduce）"
+    - "Map 数据结构"
+    - "结果融合策略"
+
+# 陷阱设计
+traps:
+  - name: "去重逻辑错误"
+    description: "保留先遇到的结果而非高分结果"
+    severity: "critical"
+  - name: "relevance 越界"
+    description: "加权后 relevance 超出 [0, 1] 范围"
+    severity: "high"
+  - name: "工具权重缺失"
+    description: "未按设计文档配置工具权重"
+    severity: "medium"
+  - name: "token 估算错误"
+    description: "使用字符数而非 token 数截断"
+    severity: "medium"
+  - name: "metadata 空值处理"
+    description: "未处理 metadata 为 undefined 的情况"
+    severity: "medium"
+
+# 反例场景
+counter_examples:
+  - user_type: "实现者"
+    scenario: "去重时保留先遇到的结果"
+    reason: "应该比较 relevance 保留高分结果，低质量结果不应覆盖高质量结果"
+  - user_type: "实现者"
+    scenario: "忽略工具权重，统一处理所有工具结果"
+    reason: "不同工具精度不同，ast-grep(1.0) 和 rg-internal(0.7) 应有不同权重"
+  - user_type: "实现者"
+    scenario: "按字符数而非 token 数截断内容"
+    reason: "AI 消费时按 token 计费，字符数估算不准确会导致超限"
+  - user_type: "实现者"
+    scenario: "risk 加权后 relevance 可能为负数或超过 1"
+    reason: "下游组件期望 relevance 在 [0, 1] 范围内，必须进行 clamp"
+
+# 三角色工作流（硬约束）
+workflow:
+  batch:
+    requested_count: 1
+    max_allowed: 5
+  triad:
+    generator:
+      agent: "task-generator"
+      agent_definition: ".agents/task-generator.agent.md"
+      status: "completed"
+      evidence: "四件套文件已生成"
+    qa:
+      agent: "task-qa"
+      agent_definition: ".agents/task-qa.agent.md"
+      status: "completed"
+      evidence: "QA验收通过：四件套完整性、章节完整性、EVAL分层、SCORING总分、metadata字段全部通过"
+    supervisor:
+      agent: "task-supervisor"
+      agent_definition: ".agents/task-supervisor.agent.md"
+      status: "completed"
+      evidence: "语义判定完成：score=97, threshold=85, 无critical failures"
+      semantic_review:
+        prompt_template: ".agents/task-supervisor.semantic.prompt.md"
+        report_file: "SUPERVISOR_SEMANTIC_REVIEW.md"
+        score: 97
+        threshold: 85
+        critical_failures: 0
+        status: "completed"
+  approved: true
+
+# 依赖关系
+dependencies:
+  required:
+    - "phase1-unified-result"
+    - "phase2-confidence"
+  optional: []
+  blocks:
+    - "phase4-tool-orchestrator"
+    - "phase5-refactor-commands"
+
+# 参考文档
+references:
+  design_docs:
+    - "REFACTOR_RESULT_FUSION_DESIGN.md"
+    - "REFACTOR_ARCHITECTURE_OVERVIEW.md"
+    - "REFACTOR_REQUIREMENTS.md"
+  code_references:
+    - "src/orchestrator/types.ts"
+
+# 输出文件
+outputs:
+  - path: "src/orchestrator/result-fusion.ts"
+    description: "ResultFusion 类实现"
+    type: "code"
+
+# 验收检查点
+acceptance_criteria:
+  - id: "AC-1"
+    description: "ResultFusion 类实现完整"
+    verification: "代码审查 + 单元测试"
+  - id: "AC-2"
+    description: "工具权重配置正确"
+    verification: "正则检查"
+  - id: "AC-3"
+    description: "去重逻辑正确"
+    verification: "单元测试"
+  - id: "AC-4"
+    description: "风险加权正确"
+    verification: "单元测试"
+  - id: "AC-5"
+    description: "Token 截断正确"
+    verification: "单元测试"
+  - id: "AC-6"
+    description: "排序策略正确"
+    verification: "单元测试"
+
+# 版本历史
+version_history:
+  - version: "1.0.0"
+    date: "2026-03-01T14:04:21+08:00"
+    changes: "初始版本，基于 REFACTOR_RESULT_FUSION_DESIGN.md v2.5"

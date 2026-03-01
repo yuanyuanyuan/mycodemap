@@ -1,0 +1,85 @@
+# 任务元数据
+# 用于任务追溯和复用
+
+metadata:
+  task_id: "phase10-integration"
+  task_name: "集成测试 + 基准验证"
+  version: "1.0.0"
+  created_at: "2026-03-01T12:00:00Z"
+  updated_at: "2026-03-01T12:00:00Z"
+
+# 任务属性
+task:
+  type: "code_generation"
+  difficulty: "high"
+  estimated_minutes: 90
+
+# 能力维度
+capabilities:
+  tested:
+    - 集成测试覆盖
+    - 多工具回退测试
+    - 基准验证
+    - Hit@8 指标计算
+  required_knowledge:
+    - TypeScript 严格模式
+    - Vitest 测试框架
+    - 基准测试方法
+    - Token 统计
+
+# 陷阱设计
+traps:
+  - name: "使用自定义查询"
+    description: "基准测试使用自定义查询而非项目定义的 30 条"
+    severity: "critical"
+  - name: "Hit@8 不达标强行通过"
+    description: "未达标但标记为通过"
+    severity: "critical"
+  - name: "Token 统计不准确"
+    description: "使用简单字符计数而非编码统计"
+    severity: "high"
+
+# 反例场景
+counter_examples:
+  - user_type: "AI Agent"
+    scenario: "基准测试使用自定义查询"
+    reason: "必须使用项目定义的 30 条 benchmark.ts 查询"
+  - user_type: "开发者"
+    scenario: "Hit@8 = 85% 但标记为通过"
+    reason: "必须 >= 90% 才算通过"
+
+# 三角色工作流（硬约束）
+workflow:
+  batch:
+    requested_count: 5
+    max_allowed: 5
+  triad:
+    generator:
+      agent: "task-generator"
+      agent_definition: ".agents/task-generator.agent.md"
+      status: "completed"
+      evidence: "PROMPT.md generated"
+    qa:
+      agent: "task-qa"
+      agent_definition: ".agents/task-qa.agent.md"
+      status: "completed"
+      evidence: "四件套验证通过，SCORING总分=100"
+    supervisor:
+      agent: "task-supervisor"
+      agent_definition: ".agents/task-supervisor.agent.md"
+      status: "completed"
+      evidence: "语义判定通过，semantic_score=91"
+      semantic_review:
+        prompt_template: ".agents/task-supervisor.semantic.prompt.md"
+        report_file: "SUPERVISOR_SEMANTIC_REVIEW.md"
+        score: 91
+        threshold: 85
+        critical_failures: 0
+        status: "completed"
+  approved: true
+
+# 版本历史
+version_history:
+  - version: "1.0.0"
+    date: "2026-03-01"
+    changes: "初始版本"

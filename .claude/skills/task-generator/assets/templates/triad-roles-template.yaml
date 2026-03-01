@@ -1,0 +1,60 @@
+# 三角色定义模板（固定产物，禁止自由发挥）
+triad_roles:
+  generator:
+    role: "{{GENERATOR_AGENT}}"
+    objective: "根据固定模板生成任务四件套与 triad 文档"
+    inputs:
+      - "任务基础信息（task_id, task_name, module, difficulty）"
+      - "固定模板（PROMPT/EVAL/SCORING/metadata/triad）"
+    outputs:
+      - "PROMPT.md"
+      - "EVAL.ts"
+      - "SCORING.md"
+      - "task-metadata.yaml"
+      - "TRIAD_WORKFLOW.md"
+      - "TRIAD_ACCEPTANCE.md"
+    acceptance_method: "文件存在性 + 结构关键词校验"
+    acceptance_criteria:
+      - "四件套齐全"
+      - "triad 文档齐全"
+      - "三角色 agent 定义文件存在于 .agents"
+      - "SCORING 总分为 100"
+
+  qa:
+    role: "{{QA_AGENT}}"
+    objective: "验证生成内容是否达到交付标准"
+    inputs:
+      - "generator 输出文件"
+      - "质量门禁脚本输出"
+    outputs:
+      - "qa.result = pass/fail"
+      - "qa.findings 列表"
+    acceptance_method: "脚本门禁 + 抽样人工复核"
+    acceptance_criteria:
+      - "requested_count <= 5"
+      - "workflow.triad 三角色状态可追溯"
+      - "负向断言存在"
+      - "SUPERVISOR_SEMANTIC_REVIEW.md 存在且通过"
+
+  supervisor:
+    role: "{{SUPERVISOR_AGENT}}"
+    objective: "监督 generator 与 qa 的执行质量，做最终放行"
+    inputs:
+      - "qa 检查结果"
+      - "workflow-report.json"
+      - ".agents/{{SUPERVISOR_AGENT}}.semantic.prompt.md"
+    outputs:
+      - "supervisor.approved = true/false"
+      - "SUPERVISOR_SEMANTIC_REVIEW.md"
+      - "拒绝原因（若失败）"
+    acceptance_method: "复核关键约束 + 独立语义判定引擎评分"
+    acceptance_criteria:
+      - "单次批量 <= 5"
+      - "generator/qa/supervisor 状态均 completed"
+      - "语义评分 >= 85 且无 critical failure"
+      - "workflow.approved = true"
+
+batch_policy:
+  requested_count: {{REQUESTED_COUNT}}
+  max_allowed: 5
+  blocked_when_exceeded: true

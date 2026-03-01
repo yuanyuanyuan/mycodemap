@@ -1,0 +1,14 @@
+{
+  "runtime": {
+    "runtime": "auto",
+    "reason": "skipped by --skip-runtime-init"
+  },
+  "summary": {
+    "scannedTasks": 0,
+    "passedTasks": 0,
+    "failedTasks": 0,
+    "blockingCount": 0,
+    "warningCount": 0
+  },
+  "results": []
+}

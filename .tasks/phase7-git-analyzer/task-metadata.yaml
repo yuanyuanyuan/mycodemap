@@ -1,0 +1,63 @@
+# 任务元数据
+metadata:
+  task_id: "phase7-git-analyzer"
+  task_name: "实现 Git 分析器"
+  version: "1.0.0"
+  created_at: "2026-03-01T12:00:00Z"
+  updated_at: "2026-03-01T12:00:00Z"
+
+task:
+  type: "code_generation"
+  difficulty: "medium"
+  estimated_minutes: 60
+
+capabilities:
+  tested:
+    - Git 历史分析
+    - 风险评分计算
+    - 修改频率统计
+  required_knowledge:
+    - TypeScript 严格模式
+    - simple-git 库使用
+
+traps:
+  - name: "外部 Git CLI 调用"
+    description: "直接使用 exec/spawn 调用 git 命令"
+    severity: "high"
+  - name: "未处理非 Git 仓库"
+    description: "未检查 .git 目录存在性"
+    severity: "critical"
+
+workflow:
+  batch:
+    requested_count: 5
+    max_allowed: 5
+  triad:
+    generator:
+      agent: "task-generator"
+      agent_definition: ".agents/task-generator.agent.md"
+      status: "completed"
+      evidence: "PROMPT.md generated"
+    qa:
+      agent: "task-qa"
+      agent_definition: ".agents/task-qa.agent.md"
+      status: "completed"
+      evidence: "四件套验证通过，SCORING总分=100"
+    supervisor:
+      agent: "task-supervisor"
+      agent_definition: ".agents/task-supervisor.agent.md"
+      status: "completed"
+      evidence: "语义判定通过，semantic_score=85"
+      semantic_review:
+        prompt_template: ".agents/task-supervisor.semantic.prompt.md"
+        report_file: "SUPERVISOR_SEMANTIC_REVIEW.md"
+        score: 85
+        threshold: 85
+        critical_failures: 0
+        status: "completed"
+  approved: true
+
+version_history:
+  - version: "1.0.0"
+    date: "2026-03-01"
+    changes: "初始版本"

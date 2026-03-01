@@ -1,0 +1,90 @@
+metadata:
+  task_id: "codemap-phase-002"
+  task_name: "实现置信度计算机制"
+  version: "1.0.0"
+  created_at: "2026-03-01T14:04:21Z"
+  updated_at: "2026-03-01T14:04:21Z"
+
+task:
+  type: "code_generation"
+  difficulty: "medium"
+  estimated_minutes: 90
+
+capabilities:
+  tested:
+    - "置信度算法设计"
+    - "多维度评分机制"
+    - "场景化阈值配置"
+    - "TypeScript 函数式编程"
+  required_knowledge:
+    - "加权评分算法"
+    - "TypeScript 联合类型"
+    - "防御性编程"
+    - "算法边界处理"
+
+dependencies:
+  required:
+    - "phase1-unified-result"
+  optional: []
+
+traps:
+  - name: "score_range_trap"
+    description: "置信度分数超出 [0, 1] 范围，未使用 clamp 限制"
+    severity: "critical"
+  - name: "hardcoded_threshold_trap"
+    description: "使用硬编码魔法数字而非配置的阈值"
+    severity: "high"
+  - name: "empty_reasons_trap"
+    description: "reasons 数组为空，用户无法理解决策依据"
+    severity: "medium"
+  - name: "uniform_threshold_trap"
+    description: "所有 intent 使用相同阈值，未考虑场景差异"
+    severity: "medium"
+  - name: "relevance_compat_trap"
+    description: "getRelevance 未兼容多种结果格式"
+    severity: "low"
+
+counter_examples:
+  - user_type: "快速实现者"
+    scenario: "硬编码所有阈值，如 if (score > 0.6)"
+    reason: "难以维护和调整，违反可配置性原则"
+  - user_type: "算法简化者"
+    scenario: "忽略场景匹配维度，仅用结果数量计算置信度"
+    reason: "丢失场景特异性，影响特定 intent 的准确度"
+  - user_type: "边界忽视者"
+    scenario: "不处理空结果或超大结果集"
+    reason: "可能导致除以零错误或分数溢出"
+
+workflow:
+  batch:
+    requested_count: 1
+    max_allowed: 5
+  triad:
+    generator:
+      agent: "task-generator"
+      agent_definition: ".agents/task-generator.agent.md"
+      status: "completed"
+      evidence: "Generated PROMPT.md, EVAL.ts, SCORING.md, task-metadata.yaml"
+    qa:
+      agent: "task-qa"
+      agent_definition: ".agents/task-qa.agent.md"
+      status: "completed"
+      evidence: "QA验收通过：四件套完整性、章节完整性、EVAL分层、SCORING总分、metadata字段全部通过"
+    supervisor:
+      agent: "task-supervisor"
+      agent_definition: ".agents/task-supervisor.agent.md"
+      status: "completed"
+      evidence: "语义判定完成：score=96, threshold=85, 无critical failures"
+      semantic_review:
+        prompt_template: ".agents/task-supervisor.semantic.prompt.md"
+        report_file: "SUPERVISOR_SEMANTIC_REVIEW.md"
+        score: 96
+        threshold: 85
+        critical_failures: 0
+        status: "completed"
+  approved: true
+
+version_history:
+  - version: "1.0.0"
+    date: "2026-03-01"
+    changes: "初始版本，实现置信度计算机制和阈值配置"

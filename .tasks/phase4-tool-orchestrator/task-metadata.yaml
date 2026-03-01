@@ -1,0 +1,153 @@
+# 任务元数据
+# 用于任务追溯和复用
+
+metadata:
+  task_id: "codemap-phase-004"
+  task_name: "phase4-tool-orchestrator"
+  version: "1.0.0"
+  created_at: "2026-03-01T14:00:00+08:00"
+  updated_at: "2026-03-01T14:00:00+08:00"
+
+# 任务属性
+task:
+  type: "code_generation"
+  difficulty: "hard"
+  estimated_minutes: 120
+
+# 能力维度
+capabilities:
+  tested:
+    - "TypeScript 异步编程 (async/await)"
+    - "AbortController 超时控制"
+    - "错误隔离与容错设计"
+    - "回退链 (Fallback Chain) 模式"
+    - "意图路由设计"
+    - "并行执行控制"
+  required_knowledge:
+    - "Node.js AbortController API"
+    - "TypeScript 严格模式"
+    - "软件容错设计模式"
+    - "CodeMap 项目架构"
+    - "Vitest 测试框架"
+
+# 陷阱设计
+traps:
+  - name: "setTimeout 抛错模式"
+    description: "使用 setTimeout 抛出异常来实现超时，而非 AbortController"
+    severity: "critical"
+  - name: "回退链循环依赖"
+    description: "回退链配置形成 A->B->A 循环，导致栈溢出"
+    severity: "critical"
+  - name: "错误传播中断"
+    description: "工具执行错误时抛出异常，中断整个分析流程"
+    severity: "high"
+  - name: "硬编码魔法数字"
+    description: "超时时间等常量直接硬编码，不使用命名常量"
+    severity: "medium"
+  - name: "遗漏类型标注"
+    description: "异步方法缺少 Promise 返回类型标注"
+    severity: "medium"
+  - name: "any 类型滥用"
+    description: "过度使用 any 类型，破坏类型安全"
+    severity: "low"
+
+# 反例场景
+counter_examples:
+  - user_type: "资源受限环境用户"
+    scenario: "希望完全禁用回退机制以节省资源"
+    reason: "当前实现回退链默认启用，无配置开关"
+  - user_type: "大型代码库用户"
+    scenario: "分析大型项目需要超过 30 秒超时"
+    reason: "默认 30 秒超时可能不足，但可通过参数自定义"
+  - user_type: "多语言项目用户"
+    scenario: "需要支持 Python/Go/Rust 项目分析"
+    reason: "v1.0 仅支持 TypeScript/JavaScript"
+
+# 三角色工作流（硬约束）
+workflow:
+  batch:
+    requested_count: 1
+    max_allowed: 5
+  triad:
+    generator:
+      agent: "task-generator"
+      agent_definition: ".agents/task-generator.agent.md"
+      status: "completed"
+      evidence: "Generated task artifacts: PROMPT.md, EVAL.ts, SCORING.md, task-metadata.yaml"
+    qa:
+      agent: "task-qa"
+      agent_definition: ".agents/task-qa.agent.md"
+      status: "completed"
+      evidence: "QA验收通过：四件套完整性、章节完整性、EVAL分层、SCORING总分、metadata字段全部通过"
+    supervisor:
+      agent: "task-supervisor"
+      agent_definition: ".agents/task-supervisor.agent.md"
+      status: "completed"
+      evidence: "语义判定完成：score=99, threshold=85, 无critical failures"
+      semantic_review:
+        prompt_template: ".agents/task-supervisor.semantic.prompt.md"
+        report_file: "SUPERVISOR_SEMANTIC_REVIEW.md"
+        score: 99
+        threshold: 85
+        critical_failures: 0
+        status: "completed"
+  approved: true
+
+# 依赖关系
+dependencies:
+  required:
+    - task_id: "codemap-phase-001"
+      task_name: "phase1-unified-result"
+      description: "UnifiedResult 接口与适配器基类"
+    - task_id: "codemap-phase-002"
+      task_name: "phase2-confidence"
+      description: "置信度计算机制"
+    - task_id: "codemap-phase-003"
+      task_name: "phase3-result-fusion"
+      description: "多工具结果融合"
+  optional: []
+
+# 设计文档引用
+design_docs:
+  - "REFACTOR_ORCHESTRATOR_DESIGN.md"
+  - "REFACTOR_ARCHITECTURE_OVERVIEW.md"
+  - "REFACTOR_CONFIDENCE_DESIGN.md"
+  - "REFACTOR_RESULT_FUSION_DESIGN.md"
+
+# 实现要求
+implementation:
+  files_to_create:
+    - path: "src/orchestrator/tool-orchestrator.ts"
+      description: "工具编排器核心类"
+    - path: "src/orchestrator/intent-router.ts"
+      description: "意图路由类"
+    - path: "src/orchestrator/index.ts"
+      description: "模块入口文件"
+  files_to_modify: []
+  test_files:
+    - path: "src/orchestrator/__tests__/tool-orchestrator.test.ts"
+      description: "工具编排器单元测试（可选）"
+
+# 验收标准
+checkpoints:
+  - id: "CP-001"
+    description: "ToolOrchestrator 类包含所有必需方法"
+    criteria: "实现 runToolWithTimeout, runToolSafely, executeWithFallback, executeParallel"
+  - id: "CP-002"
+    description: "使用 AbortController 实现超时控制"
+    criteria: "不得使用 setTimeout 抛错模式"
+  - id: "CP-003"
+    description: "回退链正确触发与执行"
+    criteria: "置信度 < medium 阈值时触发，防止循环"
+  - id: "CP-004"
+    description: "错误隔离有效"
+    criteria: "工具失败返回空结果，不中断流程"
+  - id: "CP-005"
+    description: "意图路由白名单验证"
+    criteria: "无效 intent 抛出明确错误"
+
+# 版本历史
+version_history:
+  - version: "1.0.0"
+    date: "2026-03-01"
+    changes: "初始版本，包含完整的四件套定义"

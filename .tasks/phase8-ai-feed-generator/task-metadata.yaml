@@ -1,0 +1,63 @@
+# 任务元数据
+metadata:
+  task_id: "phase8-ai-feed-generator"
+  task_name: "实现 AI 饲料生成器"
+  version: "1.0.0"
+  created_at: "2026-03-01T12:00:00Z"
+  updated_at: "2026-03-01T12:00:00Z"
+
+task:
+  type: "code_generation"
+  difficulty: "medium"
+  estimated_minutes: 60
+
+capabilities:
+  tested:
+    - 文件头解析
+    - 三维评分计算
+    - 结构化输出
+  required_knowledge:
+    - TypeScript 严格模式
+    - Git 分析器集成
+
+traps:
+  - name: "硬编码风险公式"
+    description: "风险评分公式应引用 REQUIREMENTS 定义"
+    severity: "critical"
+  - name: "输出格式不标准"
+    description: "AI 无法解析非结构化输出"
+    severity: "high"
+
+workflow:
+  batch:
+    requested_count: 5
+    max_allowed: 5
+  triad:
+    generator:
+      agent: "task-generator"
+      agent_definition: ".agents/task-generator.agent.md"
+      status: "completed"
+      evidence: "PROMPT.md generated"
+    qa:
+      agent: "task-qa"
+      agent_definition: ".agents/task-qa.agent.md"
+      status: "completed"
+      evidence: "四件套验证通过，SCORING总分=100"
+    supervisor:
+      agent: "task-supervisor"
+      agent_definition: ".agents/task-supervisor.agent.md"
+      status: "completed"
+      evidence: "语义判定通过，semantic_score=89"
+      semantic_review:
+        prompt_template: ".agents/task-supervisor.semantic.prompt.md"
+        report_file: "SUPERVISOR_SEMANTIC_REVIEW.md"
+        score: 89
+        threshold: 85
+        critical_failures: 0
+        status: "completed"
+  approved: true
+
+version_history:
+  - version: "1.0.0"
+    date: "2026-03-01"
+    changes: "初始版本"

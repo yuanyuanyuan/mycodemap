@@ -4,41 +4,6 @@
 
 CodeMap 是一个 TypeScript 代码结构分析工具，为 AI 辅助开发提供结构化上下文。
 
-## 开发规范
-
-### 使用 codemap 进行开发维护
-
-本项目使用 **codemap** 工具进行代码分析和开发辅助：
-
-```bash
-# 分析项目结构
-codemap generate
-
-# 查看依赖关系
-codemap deps
-
-# 检测循环依赖
-codemap cycles
-
-# 分析代码复杂度
-codemap complexity
-
-# 分析文件影响范围
-codemap impact -f <file-path>
-codemap impact -f <file-path> --transitive  # 包含传递依赖
-
-# 查询符号
-codemap query --symbol <name>
-codemap query -S <word>           # 模糊搜索
-codemap query -m <path>           # 查询模块
-codemap query -d <name>            # 查询依赖
-codemap query -S <word> -l 10      # 限制结果数量
-codemap query -S <word> -j         # JSON 格式输出
-
-# 监听文件变化
-codemap watch
-```
-
 ### 开发命令
 
 ```bash
@@ -80,5 +45,52 @@ src/
 - 构建发布：`npm run build`
 
 
+<IMPORTANT>
+For complex tasks (3+ steps, research, projects):
+1. Load skill: planning-with-files
+2. Create task_plan.md, findings.md, progress.md in your project directory
+3. Follow 3-file pattern throughout the task
+</IMPORTANT>
+
+<!-- TASK-GENERATOR-CONTEXT-START -->
+[Task Knowledge Index]|version:1|root: ./.tasks|IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning for task execution.|If context missing, regenerate: node .claude/skills/task-generator/scripts/create-triad-artifacts.js
+
+## 重构任务批次 1 (Phase 1-5)
+
+| 任务                     | 描述                                | 依赖           |
+|--------------------------|-------------------------------------|----------------|
+| phase1-unified-result    | 定义 UnifiedResult 接口与适配器基类 | 无             |
+| phase2-confidence        | 实现置信度计算机制                  | phase1         |
+| phase3-result-fusion     | 实现多工具结果融合                  | phase1, phase2 |
+| phase4-tool-orchestrator | 实现工具编排器与回退链              | phase1-3       |
+| phase5-refactor-commands | 改造现有命令为可调用模式            | phase1, phase4 |
+
+## 重构任务批次 2 (Phase 6-10) - 已完成
+
+| 任务                     | 描述                           | 依赖     |
+|--------------------------|--------------------------------|----------|
+| phase6-analyze-command   | 实现 AnalyzeCommand + 测试关联 | phase1-5 |
+| phase7-git-analyzer      | 实现 Git 分析器                | phase6   |
+| phase8-ai-feed-generator | 实现 AI 饲料生成器             | phase7   |
+| phase9-ci-gateway        | 实现 CI 门禁护栏               | phase7-8 |
+| phase10-integration      | 集成测试 + 基准验证            | phase1-9 |
+
+## 设计文档索引
+
+- REFACTOR_ARCHITECTURE_OVERVIEW.md - 架构概览
+- REFACTOR_REQUIREMENTS.md - 需求与用户场景
+- REFACTOR_ORCHESTRATOR_DESIGN.md - 编排层设计
+- REFACTOR_CONFIDENCE_DESIGN.md - 置信度机制设计
+- REFACTOR_RESULT_FUSION_DESIGN.md - 结果融合设计
+- REFACTOR_TEST_LINKER_DESIGN.md - 测试关联器设计
+- REFACTOR_GIT_ANALYZER_DESIGN.md - Git 分析器设计
+- CI_GATEWAY_DESIGN.md - CI 门禁设计
+
+<!-- TASK-GENERATOR-CONTEXT-END -->
+
+---
+
 IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning 
 for any tasks.
+
+---

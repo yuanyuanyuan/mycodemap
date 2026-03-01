@@ -1,0 +1,122 @@
+# 任务元数据
+# 用于任务追溯和复用
+
+metadata:
+  task_id: "codemap-phase-005"
+  task_name: "phase5-refactor-commands"
+  version: "1.0.0"
+  created_at: "2026-03-01T14:04:21+08:00"
+  updated_at: "2026-03-01T14:04:21+08:00"
+
+# 任务属性
+task:
+  type: "refactoring"
+  difficulty: "medium"
+  estimated_minutes: 120
+
+# 能力维度
+capabilities:
+  tested:
+    - "TypeScript 类设计"
+    - "向后兼容设计"
+    - "接口实现"
+    - "代码重构"
+  required_knowledge:
+    - "CodeMap 项目架构"
+    - "UnifiedResult 格式"
+    - "ToolAdapter 接口"
+    - "CLI 命令模式"
+
+# 陷阱设计
+traps:
+  - name: "向后兼容破坏"
+    description: "修改原有命令函数签名或输出格式，破坏现有 CLI 调用方"
+    severity: "critical"
+  - name: "UnifiedResult 字段缺失"
+    description: "转换时遗漏必需字段（id, source, toolScore 等）"
+    severity: "high"
+  - name: "id 格式错误"
+    description: "未使用规范格式 {source}-{file}-{line}"
+    severity: "medium"
+  - name: "source 值错误"
+    description: "source 字段不为 'codemap'，导致结果融合权重错误"
+    severity: "medium"
+  - name: "weight 值错误"
+    description: "CodemapAdapter weight 不为 0.9"
+    severity: "low"
+
+# 反例场景
+counter_examples:
+  - user_type: "现有 CLI 用户"
+    scenario: "运行 codemap impact --file src/index.ts 时期望原有输出格式"
+    reason: "若改造破坏了原有函数，用户的脚本和工作流将失效"
+  - user_type: "ToolOrchestrator 调用方"
+    scenario: "调用 runEnhanced() 后与其他工具结果融合"
+    reason: "若 UnifiedResult 格式不正确，结果融合时会出现错误"
+  - user_type: "下游 AI Agent"
+    scenario: "通过 ToolAdapter 接口统一调用各种工具"
+    reason: "若 CodemapAdapter 未正确实现接口，无法被编排器调用"
+
+# 三角色工作流（硬约束）
+workflow:
+  batch:
+    requested_count: 1
+    max_allowed: 5
+  triad:
+    generator:
+      agent: "task-generator"
+      agent_definition: ".agents/task-generator.agent.md"
+      status: "completed"
+      evidence: "Generated PROMPT.md, EVAL.ts, SCORING.md, task-metadata.yaml"
+    qa:
+      agent: "task-qa"
+      agent_definition: ".agents/task-qa.agent.md"
+      status: "completed"
+      evidence: "QA验收通过：四件套完整性、章节完整性、EVAL分层、SCORING总分、metadata字段全部通过"
+    supervisor:
+      agent: "task-supervisor"
+      agent_definition: ".agents/task-supervisor.agent.md"
+      status: "completed"
+      evidence: "语义判定完成：score=93, threshold=85, 无critical failures"
+      semantic_review:
+        prompt_template: ".agents/task-supervisor.semantic.prompt.md"
+        report_file: "SUPERVISOR_SEMANTIC_REVIEW.md"
+        score: 93
+        threshold: 85
+        critical_failures: 0
+        status: "completed"
+  approved: true
+
+# 依赖关系
+dependencies:
+  required:
+    - "phase1-unified-result"
+    - "phase4-tool-orchestrator"
+  optional: []
+  conflicts: []
+
+# 设计文档引用
+design_docs:
+  - "REFACTOR_ARCHITECTURE_OVERVIEW.md"
+  - "REFACTOR_ORCHESTRATOR_DESIGN.md"
+  - "REFACTOR_RESULT_FUSION_DESIGN.md"
+
+# 代码位置
+code_locations:
+  existing:
+    - "src/cli/commands/impact.ts"
+    - "src/cli/commands/deps.ts"
+    - "src/cli/commands/complexity.ts"
+  new:
+    - "src/cli/commands/impact.ts"  # 新增 ImpactCommand 类
+    - "src/cli/commands/deps.ts"    # 新增 DepsCommand 类
+    - "src/cli/commands/complexity.ts"  # 新增 ComplexityCommand 类
+    - "src/orchestrator/types.ts"
+    - "src/orchestrator/adapters/codemap-adapter.ts"
+    - "src/orchestrator/adapters/index.ts"
+
+# 版本历史
+version_history:
+  - version: "1.0.0"
+    date: "2026-03-01"
+    changes: "初始版本 - Phase 5 命令改造任务"

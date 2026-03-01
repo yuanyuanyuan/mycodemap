@@ -1,0 +1,1 @@
+../../../.tasks/skills-adapters/claude/task-generator/SKILL.md

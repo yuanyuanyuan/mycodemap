@@ -10,14 +10,21 @@
 6. **先检索后记忆**：任务中显式要求优先使用项目内检索信息。
 7. **先持久后依赖**：关键约束写入 `AGENTS.md` 或 `CLAUDE.md` 的 marker 块。
 8. **先压缩后注入**：上下文块写索引，不写全文，控制体积。
+9. **先模板后生成**：优先使用固定脚本与模板创建任务与 triad 工件。
+10. **先 agent 后执行**：先确认 `.agents` 里存在三角色定义，再进入生成流水线。
+11. **监督先语义后放行**：supervisor 必须先完成独立语义判定引擎，再决定是否批准。
 
 ## 5 条防错规则（硬约束）
 
 1. **不得跳过 Phase 4（检查点与测试）**：每个检查点都要有测试代码。
 2. **总分必须为 100**：`SCORING.md` 的分值行总和必须等于 100。
-3. **必须通过质量门禁**：运行 `scripts/task-quality-gate.ts`。
+3. **必须通过质量门禁**：运行 `.tasks/scripts/task-quality-gate.ts`。
 4. **不得缺失检索优先指令**：`PROMPT.md` 和上下文块都要包含 retrieval-led 语句。
 5. **上下文注入必须带 marker**：使用 `TASK-GENERATOR-CONTEXT-START/END`，并幂等替换。
+6. **单次生成数量必须 <=5**：任何 `>5` 的请求都必须被阻断。
+7. **必须完成三角色闭环**：`generator`、`qa`、`supervisor` 三角色状态都必须是 completed。
+8. **必须存在三角色 agent 资产**：`.agents/{generator|qa|supervisor}.agent.md` 必须存在。
+9. **supervisor 必须有独立语义引擎模板**：`.agents/{supervisor}.semantic.prompt.md` 必须存在并参与判定。
 
 ## 推荐门禁命令
 

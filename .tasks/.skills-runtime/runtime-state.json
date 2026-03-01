@@ -1,0 +1,36 @@
+{
+  "runtime": "codex",
+  "reason": "explicit --runtime",
+  "initializedAt": "2026-03-01T05:28:10.561Z",
+  "projectRoot": "/data/codemap",
+  "adapterRoot": "/data/codemap/.tasks/skills-adapters/codex",
+  "skillTargetRoot": "/data/codemap/.agents/skills",
+  "agentsDir": "/data/codemap/.agents",
+  "agentsStoreDir": "/data/codemap/.tasks/agents",
+  "roles": {
+    "generator": "task-generator",
+    "qa": "task-qa",
+    "supervisor": "task-supervisor"
+  },
+  "options": {
+    "skipSkillSync": false,
+    "skipAgentBootstrap": false,
+    "dryRun": false,
+    "agentsStoreDir": ".tasks/agents"
+  },
+  "syncedSkills": [
+    {
+      "skill": "task-analyzer",
+      "source": "/data/codemap/.tasks/skills-adapters/codex/task-analyzer/SKILL.md",
+      "target": "/data/codemap/.agents/skills/task-analyzer/SKILL.md",
+      "mode": "symlink"
+    },
+    {
+      "skill": "task-generator",
+      "source": "/data/codemap/.tasks/skills-adapters/codex/task-generator/SKILL.md",
+      "target": "/data/codemap/.agents/skills/task-generator/SKILL.md",
+      "mode": "symlink"
+    }
+  ],
+  "migratedAgents": []
+}

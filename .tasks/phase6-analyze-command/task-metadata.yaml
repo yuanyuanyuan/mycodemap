@@ -1,0 +1,84 @@
+# 任务元数据
+# 用于任务追溯和复用
+
+metadata:
+  task_id: "phase6-analyze-command"
+  task_name: "实现 AnalyzeCommand 统一入口 + 测试关联"
+  version: "1.0.0"
+  created_at: "2026-03-01T12:00:00Z"
+  updated_at: "2026-03-01T12:00:00Z"
+
+# 任务属性
+task:
+  type: "code_generation"
+  difficulty: "medium"
+  estimated_minutes: 60
+
+# 能力维度
+capabilities:
+  tested:
+    - CLI 参数解析
+    - Intent 路由
+    - 测试关联
+    - 错误处理
+  required_knowledge:
+    - TypeScript 严格模式
+    - Commander.js CLI 框架
+    - Jest/Vitest 配置解析
+
+# 陷阱设计
+traps:
+  - name: "使用 any 类型"
+    description: "使用 any 类型绕过类型检查"
+    severity: "high"
+  - name: "忽略测试关联"
+    description: "影响分析结果中不包含测试文件"
+    severity: "high"
+  - name: "machine 模式多余输出"
+    description: "JSON 输出模式有额外日志"
+    severity: "critical"
+
+# 反例场景
+counter_examples:
+  - user_type: "AI Agent"
+    scenario: "调用 analyze 命令时使用无效 intent"
+    reason: "应返回 E0001 错误并提示有效 intent 列表"
+  - user_type: "开发者"
+    scenario: "需要查找影响分析的测试文件"
+    reason: "测试关联器应自动在结果中包含测试文件路径"
+
+# 三角色工作流（硬约束）
+workflow:
+  batch:
+    requested_count: 5
+    max_allowed: 5
+  triad:
+    generator:
+      agent: "task-generator"
+      agent_definition: ".agents/task-generator.agent.md"
+      status: "completed"
+      evidence: "PROMPT.md generated"
+    qa:
+      agent: "task-qa"
+      agent_definition: ".agents/task-qa.agent.md"
+      status: "completed"
+      evidence: "四件套验证通过，SCORING总分=100"
+    supervisor:
+      agent: "task-supervisor"
+      agent_definition: ".agents/task-supervisor.agent.md"
+      status: "completed"
+      evidence: "语义判定通过，semantic_score=90"
+      semantic_review:
+        prompt_template: ".agents/task-supervisor.semantic.prompt.md"
+        report_file: "SUPERVISOR_SEMANTIC_REVIEW.md"
+        score: 90
+        threshold: 85
+        critical_failures: 0
+        status: "completed"
+  approved: true
+
+# 版本历史
+version_history:
+  - version: "1.0.0"
+    date: "2026-03-01"
+    changes: "初始版本"
