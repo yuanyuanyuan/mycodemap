@@ -29,7 +29,7 @@ export interface ToolAdapter {
   name: string;
   weight: number;
   isAvailable(): Promise<boolean>;
-  execute(intent: CodemapIntent): Promise<UnifiedResult[]>;
+  execute(intent: CodemapIntent, signal?: AbortSignal): Promise<UnifiedResult[]>;
 }
 
 /**
@@ -83,7 +83,7 @@ export class ToolOrchestrator {
   /**
    * 带超时控制的工具执行
    *
-   * 使用 AbortController 实现超时控制
+   * 使用 AbortController + Promise.race 实现真正的超时控制
    *
    * @param tool 工具名称
    * @param intent 意图对象
@@ -97,25 +97,36 @@ export class ToolOrchestrator {
   ): Promise<UnifiedResult[]> {
     console.debug(`执行工具: ${tool}, 超时: ${timeout}ms`);
 
+    const adapter = this.adapters.get(tool);
+    if (!adapter) {
+      console.warn(`工具 ${tool} 未注册，返回空结果`);
+      return [];
+    }
+
+    // 检查工具是否可用
+    if (!(await adapter.isAvailable())) {
+      console.warn(`工具 ${tool} 不可用，返回空结果`);
+      return [];
+    }
+
+    // 创建 AbortController 用于超时控制
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
       controller.abort();
     }, timeout);
 
+    // 使用 Promise.race 实现硬超时
+    const executionPromise = adapter.execute(intent, controller.signal);
+
     try {
-      const adapter = this.adapters.get(tool);
-      if (!adapter) {
-        console.warn(`工具 ${tool} 未注册，返回空结果`);
-        return [];
-      }
-
-      // 检查工具是否可用
-      if (!(await adapter.isAvailable())) {
-        console.warn(`工具 ${tool} 不可用，返回空结果`);
-        return [];
-      }
-
-      const results = await adapter.execute(intent);
+      const results = await Promise.race([
+        executionPromise,
+        new Promise<never>((_, reject) => {
+          controller.signal.addEventListener('abort', () => {
+            reject(new DOMException('工具执行超时', 'AbortError'));
+          });
+        })
+      ]);
       console.debug(`工具 ${tool} 执行成功，返回 ${results.length} 条结果`);
       return results;
     } catch (error) {
