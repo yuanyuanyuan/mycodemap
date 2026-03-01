@@ -18,4 +18,4 @@
 - [x] 6.2 定义 CLI 参数契约
 - [x] 6.3 实现测试关联器集成 (test-linker.ts)
 - [x] 6.4 实现错误码系统 (E0001-E0006)
-- [ ] 6.5 编写单元测试 (可后续补充)
+- [x] 6.5 编写单元测试 (analyze.test.ts, test-linker.test.ts)
