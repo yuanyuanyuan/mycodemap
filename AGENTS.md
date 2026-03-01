@@ -56,5 +56,5 @@ For complex tasks (3+ steps, research, projects):
 
 
 <IMPORTANT>
-每次任务完成后都要检查docs目录和AGENTS.md 和CLAUDE.md 和README.md 文件
+每次任务完成后都要检查docs目录和AGENTS.md 和CLAUDE.md 和README.md 文件，确认是否需要同步更新。
 </IMPORTANT>
