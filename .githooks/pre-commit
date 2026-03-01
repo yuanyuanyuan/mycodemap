@@ -1,5 +1,6 @@
 #!/bin/sh
 # Pre-commit hook: 验证文件头注释
+# 只检查本次修改（staged）的文件，而非全量扫描
 
 echo "🔍 Checking file headers..."
 
@@ -12,29 +13,32 @@ if [ ! -f "$NODE_PATH/.bin/tsc" ]; then
     exit 0
 fi
 
-# 扫描源代码目录
-SRC_DIR="src"
+# 获取 staged 的 .ts/.js 文件
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|js|jsx|mjs|cjs)$' | grep -v node_modules | grep -v dist | grep -v __tests__ | grep -v "\.test\." | grep -v "\.spec\.")
 
-# 定义需要检查的文件扩展名
-EXTENSIONS="ts tsx js jsx mjs cjs"
+# 如果没有 staged 的源文件，跳过检查
+if [ -z "$STAGED_FILES" ]; then
+    echo "✅ No source files staged, skipping header check"
+    exit 0
+fi
 
 # 统计变量
 TOTAL=0
 INVALID=0
 
-for ext in $EXTENSIONS; do
-    # 查找所有匹配的文件，排除 node_modules, dist, test 等目录
-    FILES=$(find "$SRC_DIR" -type f -name "*.$ext" 2>/dev/null | grep -v node_modules | grep -v dist | grep -v __tests__ | grep -v "\.test\." | grep -v "\.spec\.")
+for file in $STAGED_FILES; do
+    # 跳过不存在的文件（如删除的文件）
+    if [ ! -f "$file" ]; then
+        continue
+    fi
 
-    for file in $FILES; do
-        TOTAL=$((TOTAL + 1))
+    TOTAL=$((TOTAL + 1))
 
-        # 检查文件头是否包含 [META] 或 [WHY]
-        if ! head -n 20 "$file" | grep -qi '\[META\]\|\[WHY\]'; then
-            echo "❌ E0008: $file - Missing [META] or [WHY] comment"
-            INVALID=$((INVALID + 1))
-        fi
-    done
+    # 检查文件头是否包含 [META] 或 [WHY]
+    if ! head -n 20 "$file" | grep -qi '\[META\]\|\[WHY\]'; then
+        echo "❌ E0008: $file - Missing [META] or [WHY] comment"
+        INVALID=$((INVALID + 1))
+    fi
 done
 
 echo ""
