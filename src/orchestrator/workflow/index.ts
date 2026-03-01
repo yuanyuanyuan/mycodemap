@@ -7,3 +7,4 @@ export * from './workflow-context.js';
 export * from './workflow-orchestrator.js';
 export * from './workflow-persistence.js';
 export * from './phase-checkpoint.js';
+export * from './config.js';
