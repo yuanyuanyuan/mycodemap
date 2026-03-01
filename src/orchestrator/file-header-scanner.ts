@@ -1,6 +1,6 @@
 /**
- * 文件头注释扫描器
- * 检查 TypeScript/JavaScript 文件头是否包含 [META] 或 [WHY] 注释
+ * [META] 文件头注释扫描器
+ * [WHY] 为 pre-commit 与 CI 提供统一的 [META]/[WHY] 校验逻辑
  */
 
 import { readFileSync, readdirSync, statSync } from 'fs';
@@ -19,8 +19,6 @@ export interface FileHeaderResult {
 
 export interface ScanOptions {
   directory: string;
-  includeHighRisk?: boolean;
-  highRiskPatterns?: RegExp[];
 }
 
 const DEFAULT_HIGH_RISK_PATTERNS = [
@@ -33,13 +31,10 @@ const DEFAULT_HIGH_RISK_PATTERNS = [
 /**
  * 扫描文件头注释
  * @param filePath - 文件路径
- * @param checkHighRisk - 是否检查高风险文件需要的 [WHY] 注释
  * @returns 扫描结果
  */
 export function scanFileHeader(
-  filePath: string,
-  checkHighRisk: boolean = false,
-  highRiskPatterns: RegExp[] = DEFAULT_HIGH_RISK_PATTERNS
+  filePath: string
 ): FileHeaderResult {
   const content = readFileSync(filePath, 'utf-8');
   const lines = content.split('\n').slice(0, 20); // 只检查前 20 行
@@ -47,27 +42,25 @@ export function scanFileHeader(
   const hasMeta = /\[META\]/i.test(lines.join('\n'));
   const hasWhy = /\[WHY\]/i.test(lines.join('\n'));
 
-  const isHighRisk = highRiskPatterns.some((pattern) => pattern.test(filePath));
-
-  // 通用检查：必须有 [META] 或 [WHY]
-  if (!hasMeta && !hasWhy) {
+  // 通用检查：必须有 [META]
+  if (!hasMeta) {
     return {
       filePath,
       valid: false,
       errorCode: 'E0008',
-      errorMessage: `File header missing [META] or [WHY] comment. Add a comment explaining the purpose of this file.`,
+      errorMessage: 'File header missing [META] comment. Add [META] metadata in the first 20 lines.',
       hasMeta: false,
-      hasWhy: false,
+      hasWhy,
     };
   }
 
-  // 高风险文件检查：必须有 [WHY]
-  if (checkHighRisk && isHighRisk && !hasWhy) {
+  // 通用检查：必须有 [WHY]
+  if (!hasWhy) {
     return {
       filePath,
       valid: false,
       errorCode: 'E0009',
-      errorMessage: `High-risk file "${filePath}" requires [WHY] comment explaining why this change is necessary.`,
+      errorMessage: 'File header missing [WHY] comment. Explain why this file exists in the first 20 lines.',
       hasMeta,
       hasWhy: false,
     };
@@ -87,7 +80,7 @@ export function scanFileHeader(
  * @returns 扫描结果数组
  */
 export function scanDirectory(options: ScanOptions): FileHeaderResult[] {
-  const { directory, includeHighRisk = true, highRiskPatterns = DEFAULT_HIGH_RISK_PATTERNS } = options;
+  const { directory } = options;
   const results: FileHeaderResult[] = [];
 
   function walkDir(dir: string): void {
@@ -108,7 +101,7 @@ export function scanDirectory(options: ScanOptions): FileHeaderResult[] {
       } else if (stat.isFile()) {
         const ext = extname(fullPath);
         if (SUPPORTED_EXTENSIONS.includes(ext)) {
-          const result = scanFileHeader(fullPath, includeHighRisk, highRiskPatterns);
+          const result = scanFileHeader(fullPath);
           results.push(result);
         }
       }
@@ -128,9 +121,9 @@ export function scanAndPrint(directory: string): void {
 
   for (const result of results) {
     if (result.valid) {
-      console.log(`✅ ${result.filePath}: OK [META: ${result.hasMeta}, WHY: ${result.hasWhy}]`);
+      console.log(`PASS ${result.filePath}: OK [META: ${result.hasMeta}, WHY: ${result.hasWhy}]`);
     } else {
-      console.error(`❌ ${result.errorCode}: ${result.filePath}`);
+      console.error(`ERROR ${result.errorCode}: ${result.filePath}`);
       console.error(`   ${result.errorMessage}`);
       hasErrors = true;
     }

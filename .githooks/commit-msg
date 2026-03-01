@@ -1,46 +1,22 @@
 #!/bin/sh
 # Commit-msg hook: 验证 Commit 消息格式
 
-# 获取 commit message 文件路径
-COMMIT_MSG_FILE=$1
-COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+MSG_FILE=$1
+MSG=$(head -1 "$MSG_FILE")
 
-# 定义有效的大写 TAG（支持 [TAG] scope: message 格式）
 VALID_TAGS="BUGFIX FEATURE REFACTOR CONFIG DOCS DELETE"
 
-# 检查是否以 [TAG] 格式开头（大写）
-if ! echo "$COMMIT_MSG" | grep -qE '^\[[A-Z]+\]'; then
+if ! echo "$MSG" | grep -qE '^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]'; then
     echo "ERROR: Commit message must start with an uppercase tag."
-    echo ""
     echo "Format: [TAG] scope: message"
-    echo ""
-    echo "Valid tags:"
-    echo "  [BUGFIX]   - Bug fixes"
-    echo "  [FEATURE]  - New features"
-    echo "  [REFACTOR] - Code refactoring"
-    echo "  [CONFIG]   - Configuration changes"
-    echo "  [DOCS]     - Documentation"
-    echo "  [DELETE]   - Code deletion"
-    echo ""
-    echo "Example:"
-    echo "  [FEATURE] cli: add analyze command"
+    echo "Valid tags: $VALID_TAGS"
     exit 1
 fi
 
-# 提取 TAG 并验证
-TAG=$(echo "$COMMIT_MSG" | sed -E 's/^\[([A-Z]+)\].*/\1/')
-
-if ! echo "$VALID_TAGS" | grep -qw "$TAG"; then
-    echo "ERROR: Invalid tag: [$TAG]"
-    echo "   Valid tags: $VALID_TAGS"
-    exit 1
-fi
-
-# 检查 scope 是否存在（格式: [TAG] scope: message）
-if ! echo "$COMMIT_MSG" | grep -qE '^\[[A-Z]+\]\s+[^:]+:'; then
-    echo "ERROR: scope cannot be empty"
+if ! echo "$MSG" | grep -qE '^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]\s+[^:]+:\s+.+'; then
+    echo "ERROR: scope and message are required."
     echo "Format: [TAG] scope: message"
-    echo "Example: [FEATURE] cli: add new feature"
+    echo "Example: [FEATURE] cli: add new command"
     exit 1
 fi
 

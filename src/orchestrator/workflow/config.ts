@@ -15,6 +15,7 @@ export const PHASE_CI_CONFIG = {
   checks: [
     'check-commits',
     'check-headers',
+    'assess-risk',
     'check-output-contract'
   ] as const
 };

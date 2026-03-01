@@ -215,3 +215,13 @@ For complex tasks (3+ steps, research, projects):
 <IMPORTANT>
 每次任务完成后或者文件更新后都要检查docs目录里面的内容和AGENTS.md 和CLAUDE.md 和README.md 文件，确认是否需要同步更新。
 </IMPORTANT>
+
+<IMPORTANT>
+**强制约束 - CI 护栏不可绕过（必须修复后提交）**
+
+- 严禁通过忽略、跳过、删除、注释 CI 护栏来强行提交（含 `pre-commit`、`commit-msg`、GitHub Actions、`codemap ci *`）。
+- 严禁使用 `--no-verify`、临时关闭 hooks、放宽阈值、替换“永远通过”脚本等方式绕过门禁。
+- 护栏失败时，必须按护栏提示修复问题；只有护栏通过后才允许提交。
+- 涉及 CI 护栏的改动必须提供“失败场景 + 修复验证”证据（命令与结果）。
+- 若确需临时豁免，必须先获得明确人工批准，并记录原因、范围与失效时间。
+</IMPORTANT>

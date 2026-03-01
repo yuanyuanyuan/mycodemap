@@ -2,144 +2,46 @@ name: CI Gateway
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
-  commit-format:
-    name: Commit Format Check
+  ci-gateway:
+    name: CI Gateway Checks
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Validate commit messages
-        run: |
-          # 获取所有 commits
-          COMMITS=$(git log --format=%s origin/main..HEAD)
-
-          VALID_TAGS="BUGFIX FEATURE REFACTOR CONFIG DOCS DELETE"
-
-          for commit in $COMMITS; do
-            # 检查是否以 [TAG] 格式开头（大写）
-            if ! echo "$commit" | grep -qE '^\[[A-Z]+\]'; then
-              echo "ERROR: Invalid commit format: $commit"
-              echo "   Expected format: [TAG] scope: message"
-              echo "   Valid tags: $VALID_TAGS"
-              exit 1
-            fi
-
-            # 提取并验证 TAG（大写）
-            TAG=$(echo "$commit" | sed -E 's/^\[([A-Z]+)\].*/\1/')
-            if ! echo "$VALID_TAGS" | grep -qw "$TAG"; then
-              echo "ERROR: Invalid tag: [$TAG]"
-              echo "   Valid tags: $VALID_TAGS"
-              exit 1
-            fi
-
-            # 检查 scope 是否存在
-            if ! echo "$commit" | grep -qE '^\[[A-Z]+\]\s+[^:]+:'; then
-              echo "ERROR: Missing scope in commit: $commit"
-              echo "   Format: [TAG] scope: message"
-              exit 1
-            fi
-
-            echo "Valid: $commit"
-          done
-
-  file-headers:
-    name: File Header Check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Check file headers
-        run: |
-          # 检查 src 目录下的所有 TypeScript/JavaScript 文件
-          echo "Checking file headers..."
-
-          TOTAL=0
-          INVALID=0
-
-          for file in $(find src -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" \) 2>/dev/null); do
-            TOTAL=$((TOTAL + 1))
-
-            if ! head -n 20 "$file" | grep -qi '\[META\]\|\[WHY\]'; then
-              echo "❌ E0008: $file - Missing [META] or [WHY] comment"
-              INVALID=$((INVALID + 1))
-            fi
-          done
-
-          echo ""
-          echo "Total files checked: $TOTAL"
-          echo "Invalid files: $INVALID"
-
-          if [ $INVALID -gt 0 ]; then
-            echo ""
-            echo "❌ File header check failed."
-            exit 1
-          fi
-
-          echo "✅ All file headers are valid"
-
-  unit-tests:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build project
-        run: npm run build
-
-      - name: Run unit tests
+      - name: Run tests
         run: npm test
 
-      - name: Generate AI feed
+      - name: Check commit format
+        run: npx codemap ci check-commits --range origin/main..HEAD
+
+      - name: Check file headers
+        run: npx codemap ci check-headers
+
+      - name: Generate AI feed and verify sync
         run: |
           npx codemap generate
-          git diff --exit-code .codemap/ || (echo "AI feed is out of sync. Run 'codemap generate' and commit the changes." && exit 1)
+          git diff --exit-code .codemap/ai-feed.txt || (echo "ERROR: AI feed is out of sync. Run 'codemap generate' and commit changes." && exit 1)
 
       - name: Assess risk
         run: npx codemap ci assess-risk --threshold=0.7
 
       - name: Check output contract
         run: npx codemap ci check-output-contract --schema-version v1.0.0 --top-k 8 --max-tokens 160
-
-  typecheck:
-    name: TypeScript Type Check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run TypeScript type check
-        run: npx tsc --noEmit

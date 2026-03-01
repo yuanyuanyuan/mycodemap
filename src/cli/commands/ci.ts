@@ -4,12 +4,11 @@
  */
 
 import { Command } from 'commander';
-import chalk from 'chalk';
-import { validateCommitMessage, validateRecentCommits } from '../../orchestrator/commit-validator.js';
-import { scanDirectory, assessRisk, type FileHeaderResult } from '../../orchestrator/file-header-scanner.js';
+import { validateCommitMessage, validateRecentCommits, VALID_TAGS } from '../../orchestrator/commit-validator.js';
+import { scanDirectory, scanFileHeader, type FileHeaderResult } from '../../orchestrator/file-header-scanner.js';
+import { GitAnalyzer } from '../../orchestrator/git-analyzer.js';
+import { AIFeedGenerator } from '../../orchestrator/ai-feed-generator.js';
 import { isCodemapOutput } from '../../orchestrator/types.js';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 
 /**
  * CI 命令错误码
@@ -26,78 +25,160 @@ export enum CIErrorCode {
  */
 export const CI_ERROR_MESSAGES: Record<CIErrorCode, string> = {
   [CIErrorCode.E0007_INVALID_COMMIT_FORMAT]: 'Commit 格式不符合规范',
-  [CIErrorCode.E0008_MISSING_HEADER]: '文件头缺少 [META] 或 [WHY] 注释',
-  [CIErrorCode.E0009_MISSING_WHY]: '高风险文件缺少 [WHY] 注释',
+  [CIErrorCode.E0008_MISSING_HEADER]: '文件头缺少 [META] 注释',
+  [CIErrorCode.E0009_MISSING_WHY]: '文件头缺少 [WHY] 注释',
   [CIErrorCode.E0010_OUTPUT_CONTRACT_VIOLATION]: '输出契约校验失败',
 };
+
+function parseGitDiffFiles(command: string): string[] {
+  return command
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+async function getChangedFiles(options: { files?: string }): Promise<string[]> {
+  if (options.files) {
+    return options.files
+      .split(',')
+      .map((f) => f.trim())
+      .filter(Boolean);
+  }
+
+  const { execSync } = await import('child_process');
+
+  try {
+    const output = execSync('git diff --name-only origin/main...HEAD', {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const files = parseGitDiffFiles(output);
+    if (files.length > 0) {
+      return files;
+    }
+  } catch {
+    // fallback 到 HEAD 差异
+  }
+
+  try {
+    const output = execSync('git diff --name-only HEAD', {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return parseGitDiffFiles(output);
+  } catch {
+    console.error('ERROR: Failed to detect changed files from git diff');
+    process.exit(1);
+  }
+}
 
 /**
  * check-commits 子命令 - 验证 Commit 格式
  */
-async function checkCommitsAction(options: { count?: number; message?: string }): Promise<void> {
-  const count = options.count ?? 10;
+async function checkCommitsAction(options: { count?: string; message?: string; range?: string }): Promise<void> {
+  const count = parseInt(options.count ?? '10', 10);
 
   if (options.message) {
-    // 验证单个 commit message
     const result = validateCommitMessage(options.message);
     if (result.valid) {
-      console.log(chalk.green(`✅ Valid commit: [${result.tag}] ${result.commitMessage}`));
-    } else {
-      console.error(chalk.red(`❌ ${result.errorCode}: ${result.errorMessage}`));
-      process.exit(1);
-    }
-  } else {
-    // 验证最近的 commits
-    const results = await validateRecentCommits(count);
-    let hasErrors = false;
-
-    for (const result of results) {
-      if (result.valid) {
-        console.log(chalk.green(`✅ [${result.tag}] ${result.commitMessage}`));
-      } else {
-        console.error(chalk.red(`❌ ${result.errorCode}: ${result.errorMessage}`));
-        hasErrors = true;
-      }
+      console.log(`Commit message valid: [${result.tag}] ${result.commitMessage}`);
+      return;
     }
 
-    if (hasErrors) {
-      console.error(chalk.red('\n❌ Some commits do not conform to the format specification.'));
-      console.error(chalk.yellow('Expected format: [TAG] message'));
-      console.error(chalk.yellow('Valid tags: feat, fix, refactor, docs, chore, test, style, perf, ci, build, revert'));
-      process.exit(1);
-    }
-
-    console.log(chalk.green(`\n✅ All ${results.length} commits are valid.`));
+    console.error(`ERROR: ${result.errorCode}: ${result.errorMessage}`);
+    process.exit(1);
   }
+
+  const range = options.range || 'origin/main..HEAD';
+  let results = await validateRecentCommits(count, range);
+
+  if (results.length === 0 && !options.range) {
+    // 本地分支不存在 origin/main 时，退回最近 N 次提交
+    results = await validateRecentCommits(count);
+  }
+
+  if (results.length === 0) {
+    console.log('No commits found for validation.');
+    return;
+  }
+
+  let hasErrors = false;
+  for (const result of results) {
+    if (result.valid) {
+      console.log(`PASS: [${result.tag}] ${result.commitMessage}`);
+    } else {
+      console.error(`ERROR: ${result.errorCode}: ${result.errorMessage}`);
+      hasErrors = true;
+    }
+  }
+
+  if (hasErrors) {
+    console.error('ERROR: Some commits do not conform to the specification.');
+    console.error('Expected format: [TAG] scope: message');
+    console.error(`Valid tags: ${VALID_TAGS.join(', ')}`);
+    process.exit(1);
+  }
+
+  console.log(`All ${results.length} commits are valid.`);
 }
 
 /**
  * check-headers 子命令 - 验证文件头注释
  */
-function checkHeadersAction(options: { directory?: string; 'no-high-risk'?: boolean }): void {
-  const directory = options.directory ?? process.cwd();
-  const includeHighRisk = !options['no-high-risk'];
+function getHeaderCheckCandidates(files: string[]): string[] {
+  return files.filter(
+    (file) =>
+      /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(file) &&
+      !/\.d\.ts$/.test(file) &&
+      !/\.test\.|\.spec\./.test(file)
+  );
+}
 
-  console.log(chalk.blue(`Scanning directory: ${directory}`));
-  console.log(chalk.blue(`Include high-risk check: ${includeHighRisk}\n`));
+function runHeaderValidation(files: string[]): FileHeaderResult[] {
+  const candidates = getHeaderCheckCandidates(files);
+  return candidates.map((file) => scanFileHeader(file));
+}
 
-  const results = scanDirectory({ directory, includeHighRisk });
+async function checkHeadersAction(options: { directory?: string; files?: string }): Promise<void> {
+  let results: FileHeaderResult[] = [];
+
+  if (options.files) {
+    const files = options.files
+      .split(',')
+      .map((f) => f.trim())
+      .filter(Boolean);
+    console.log(`Scanning explicit files: ${files.length}`);
+    results = runHeaderValidation(files);
+  } else if (options.directory) {
+    const directory = options.directory;
+    console.log(`Scanning directory: ${directory}`);
+    results = scanDirectory({ directory });
+  } else {
+    const changedFiles = await getChangedFiles({});
+    const candidates = getHeaderCheckCandidates(changedFiles);
+    console.log(`Scanning changed files: ${candidates.length}`);
+    if (candidates.length === 0) {
+      console.log('No changed source files detected for header validation.');
+      return;
+    }
+    results = runHeaderValidation(candidates);
+  }
+
   let hasErrors = false;
 
   for (const result of results) {
     if (result.valid) {
-      console.log(chalk.green(`✅ ${result.filePath}`));
+      console.log(`PASS: ${result.filePath}`);
     } else {
-      console.error(chalk.red(`❌ ${result.errorCode}: ${result.filePath}`));
-      console.error(chalk.gray(`   ${result.errorMessage}`));
+      console.error(`ERROR: ${result.errorCode}: ${result.filePath}`);
+      console.error(`  ${result.errorMessage}`);
       hasErrors = true;
     }
   }
 
   const total = results.length;
   const valid = results.filter((r: FileHeaderResult) => r.valid).length;
-
-  console.log(chalk.blue(`\nTotal: ${total}, Valid: ${valid}, Invalid: ${total - valid}`));
+  console.log(`Summary: total=${total}, valid=${valid}, invalid=${total - valid}`);
 
   if (hasErrors) {
     process.exit(1);
@@ -108,47 +189,49 @@ function checkHeadersAction(options: { directory?: string; 'no-high-risk'?: bool
  * assess-risk 子命令 - 评估危险置信度
  */
 async function assessRiskAction(options: { files?: string; threshold?: string }): Promise<void> {
-  let changedFiles: string[] = [];
   const threshold = parseFloat(options.threshold ?? '0.7');
+  const changedFiles = await getChangedFiles(options);
 
-  if (options.files) {
-    changedFiles = options.files.split(',').map((f) => f.trim());
-  } else {
-    // 获取 git 变更的文件
-    const { execSync } = await import('child_process');
-    try {
-      const output = execSync('git diff --name-only HEAD', { encoding: 'utf-8' });
-      changedFiles = output.split('\n').filter(Boolean);
-    } catch {
-      console.error(chalk.red('Failed to get git changed files'));
-      process.exit(1);
-    }
-  }
+  const targetFiles = changedFiles.filter(
+    (file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && !file.endsWith('.d.ts')
+  );
 
-  if (changedFiles.length === 0) {
-    console.log(chalk.yellow('No changed files detected.'));
+  if (targetFiles.length === 0) {
+    console.log('No changed TypeScript source files detected.');
     return;
   }
 
-  const assessment = assessRisk(changedFiles);
+  const projectRoot = process.cwd();
+  const gitAnalyzer = new GitAnalyzer();
+  const generator = new AIFeedGenerator(gitAnalyzer);
+  const feed = await generator.generate(projectRoot);
 
-  console.log(chalk.blue('\n=== Risk Assessment ===\n'));
-  console.log(chalk.bold(`Risk Level: ${chalk.cyan(assessment.level.toUpperCase())}`));
-  console.log(chalk.bold(`Confidence: ${(assessment.confidence * 100).toFixed(0)}%`));
-  console.log(chalk.bold(`Threshold: ${(threshold * 100).toFixed(0)}%`));
+  const commits = await gitAnalyzer.findRelatedCommits([], targetFiles, {
+    maxCommits: 100,
+    projectRoot,
+  });
 
-  if (assessment.factors.length > 0) {
-    console.log(chalk.bold('\nRisk Factors:'));
-    for (const factor of assessment.factors) {
-      console.log(`  - ${factor}`);
+  const risk = gitAnalyzer.calculateRiskScore(targetFiles, commits, feed);
+
+  console.log('Risk assessment summary');
+  console.log(`score=${risk.score.toFixed(2)}`);
+  console.log(`level=${risk.level}`);
+  console.log(`threshold=${threshold.toFixed(2)}`);
+
+  if (risk.riskFactors.length > 0) {
+    console.log('riskFactors:');
+    for (const factor of risk.riskFactors) {
+      console.log(`- ${factor}`);
     }
   }
 
-  // 使用阈值判断是否阻断
-  if (assessment.confidence >= threshold) {
-    console.log(chalk.red(`\nRisk confidence ${(assessment.confidence * 100).toFixed(0)}% exceeds threshold ${(threshold * 100).toFixed(0)}%`));
+  if (risk.score > threshold) {
+    console.error(`ERROR: Risk score ${risk.score.toFixed(2)} exceeds threshold ${threshold.toFixed(2)}`);
+    console.error('Risk mitigation notes required. Add explanation to commit body.');
     process.exit(1);
   }
+
+  console.log('Risk assessment passed.');
 }
 
 /**
@@ -163,24 +246,22 @@ async function checkOutputContractAction(options: {
   const topK = parseInt(options.topK || '8', 10);
   const maxTokens = parseInt(options.maxTokens || '160', 10);
 
-  console.log(chalk.blue('=== Output Contract Check ===\n'));
-  console.log(chalk.bold('Schema Version:'), schemaVersion);
-  console.log(chalk.bold('Top-K Limit:'), topK);
-  console.log(chalk.bold('Max Tokens:'), maxTokens);
-  console.log();
+  console.log('Output contract check');
+  console.log(`schemaVersion=${schemaVersion}`);
+  console.log(`topK=${topK}`);
+  console.log(`maxTokens=${maxTokens}`);
 
-  // 运行 analyze 命令获取 machine 模式输出
   const { execSync } = await import('child_process');
   let output: string;
 
   try {
-    output = execSync('node dist/cli/index.js analyze -i impact -t src/index.ts --output-mode machine', {
+    output = execSync('node dist/cli/index.js analyze -i impact -t src/index.ts --output-mode machine --json', {
       encoding: 'utf-8',
       timeout: 30000,
       cwd: process.cwd(),
     });
-  } catch (error) {
-    console.error(chalk.red(`❌ [${CIErrorCode.E0010_OUTPUT_CONTRACT_VIOLATION}] Failed to run analyze command`));
+  } catch {
+    console.error(`ERROR: [${CIErrorCode.E0010_OUTPUT_CONTRACT_VIOLATION}] Failed to run analyze command`);
     process.exit(1);
   }
 
@@ -188,76 +269,66 @@ async function checkOutputContractAction(options: {
   try {
     parsed = JSON.parse(output);
   } catch {
-    console.error(chalk.red(`❌ [${CIErrorCode.E0010_OUTPUT_CONTRACT_VIOLATION}] Invalid JSON output`));
+    console.error(`ERROR: [${CIErrorCode.E0010_OUTPUT_CONTRACT_VIOLATION}] Invalid JSON output`);
     process.exit(1);
   }
 
   let errors = 0;
 
-  // 1. 校验 schemaVersion
   if (!isCodemapOutput(parsed)) {
-    console.error(chalk.red(`❌ [${CIErrorCode.E0010_OUTPUT_CONTRACT_VIOLATION}] Missing required fields in output`));
+    console.error(`ERROR: [${CIErrorCode.E0010_OUTPUT_CONTRACT_VIOLATION}] Missing required fields in output`);
     errors++;
   } else {
-    const output_1 = parsed;
-
-    if (!output_1.schemaVersion) {
-      console.error(chalk.red('❌ Missing schemaVersion in output'));
+    if (!parsed.schemaVersion) {
+      console.error('ERROR: Missing schemaVersion in output');
       errors++;
-    } else if (output_1.schemaVersion !== schemaVersion) {
-      console.error(chalk.red(`❌ schemaVersion mismatch: expected ${schemaVersion}, got ${output_1.schemaVersion}`));
+    } else if (parsed.schemaVersion !== schemaVersion) {
+      console.error(`ERROR: schemaVersion mismatch: expected ${schemaVersion}, got ${parsed.schemaVersion}`);
       errors++;
     }
 
-    // 2. 校验 confidence 字段完整性
-    if (!output_1.confidence) {
-      console.error(chalk.red('❌ Missing confidence in output'));
+    if (!parsed.confidence) {
+      console.error('ERROR: Missing confidence in output');
       errors++;
     } else {
-      if (typeof output_1.confidence.score !== 'number') {
-        console.error(chalk.red('❌ Missing confidence.score in output'));
+      if (typeof parsed.confidence.score !== 'number') {
+        console.error('ERROR: Missing confidence.score in output');
         errors++;
       }
-      if (!['high', 'medium', 'low'].includes(output_1.confidence.level)) {
-        console.error(chalk.red('❌ Invalid confidence.level in output'));
+      if (!['high', 'medium', 'low'].includes(parsed.confidence.level)) {
+        console.error('ERROR: Invalid confidence.level in output');
         errors++;
       }
     }
 
-    // 3. 校验 tool 字段
-    if (!output_1.tool) {
-      console.error(chalk.red('❌ Missing tool in output'));
+    if (!parsed.tool) {
+      console.error('ERROR: Missing tool in output');
       errors++;
     }
 
-    // 4. 校验 Top-K
-    const resultCount = output_1.results?.length || 0;
+    const resultCount = parsed.results?.length || 0;
     if (resultCount > topK) {
-      console.error(chalk.red(`❌ Result count ${resultCount} exceeds Top-K limit ${topK}`));
+      console.error(`ERROR: Result count ${resultCount} exceeds Top-K limit ${topK}`);
       errors++;
     }
 
-    // 5. 校验 token 限制 (简单估算)
-    if (output_1.results) {
-      for (const result of output_1.results) {
-        const content = (result as { content?: string }).content || '';
-        // 简单估算 token 数：按空格和中文分词
-        const tokenEstimate = content.split(/[\s\u4e00-\u9fa5]/).filter(Boolean).length;
-        if (tokenEstimate > maxTokens) {
-          console.error(chalk.red(`❌ Result token count ${tokenEstimate} exceeds limit ${maxTokens}`));
-          errors++;
-          break; // 只报告一次
-        }
+    for (const result of parsed.results ?? []) {
+      const content = (result as { content?: string }).content || '';
+      const tokenEstimate = content.split(/[\s\u4e00-\u9fa5]/).filter(Boolean).length;
+      if (tokenEstimate > maxTokens) {
+        console.error(`ERROR: Result token count ${tokenEstimate} exceeds limit ${maxTokens}`);
+        errors++;
+        break;
       }
     }
   }
 
   if (errors > 0) {
-    console.error(chalk.red(`\n❌ ${errors} output contract violation(s) detected`));
+    console.error(`ERROR: ${errors} output contract violation(s) detected`);
     process.exit(1);
   }
 
-  console.log(chalk.green(`✅ Output contract validated (schema: ${schemaVersion}, topK: ≤${topK}, tokens: ≤${maxTokens})`));
+  console.log(`Output contract validated (schema=${schemaVersion}, topK<=${topK}, tokens<=${maxTokens})`);
 }
 
 /**
@@ -267,23 +338,21 @@ export function createCICommand(): Command {
   const ci = new Command('ci');
   ci.description('CI Gateway - 代码质量门禁工具');
 
-  // check-commits 子命令
   ci
     .command('check-commits')
-    .description('验证 Commit 格式是否符合规范')
+    .description('验证 Commit 格式是否符合 [TAG] scope: message')
     .option('-c, --count <number>', '检查最近的 N 个提交', '10')
+    .option('-r, --range <range>', '检查指定 git log 范围，例如 origin/main..HEAD')
     .option('-m, --message <text>', '验证单个 commit message')
     .action(checkCommitsAction);
 
-  // check-headers 子命令
   ci
     .command('check-headers')
-    .description('验证文件头注释是否包含 [META] 或 [WHY]')
-    .option('-d, --directory <path>', '要扫描的目录', process.cwd())
-    .option('--no-high-risk', '跳过高风险文件检查')
+    .description('验证文件头注释是否包含 [META] 和 [WHY]（默认检查 git 变更文件）')
+    .option('-d, --directory <path>', '扫描指定目录（全量）')
+    .option('-f, --files <files>', '逗号分隔的文件列表（精确模式）')
     .action(checkHeadersAction);
 
-  // assess-risk 子命令
   ci
     .command('assess-risk')
     .description('评估代码变更的危险置信度')
@@ -291,7 +360,6 @@ export function createCICommand(): Command {
     .option('-t, --threshold <number>', '风险阈值 (0-1)', '0.7')
     .action(assessRiskAction);
 
-  // check-output-contract 子命令
   ci
     .command('check-output-contract')
     .description('验证 analyze 命令的输出契约')
@@ -303,5 +371,4 @@ export function createCICommand(): Command {
   return ci;
 }
 
-// 导出命令作为默认导出
 export const ciCommand = createCICommand();

@@ -1,6 +1,6 @@
 /**
- * AnalyzeCommand - 统一分析入口
- * 提供统一的 CLI 接口，支持多种分析意图
+ * [META] AnalyzeCommand - 统一分析入口
+ * [WHY] 为 CI 与人工调用提供统一分析输出，支持 machine/json 契约
  */
 
 import { parseArgs } from 'node:util';
@@ -438,7 +438,11 @@ export async function analyzeCommand(argv: string[]): Promise<void> {
 
   try {
     const command = new AnalyzeCommand(args);
-    await command.execute();
+    const output = await command.execute();
+
+    if (args.outputMode === 'machine' || args.json) {
+      console.log(JSON.stringify(output, null, 2));
+    }
   } catch (error) {
     if (error instanceof Error && 'code' in error) {
       const analyzeError = error as Error & { code: AnalyzeErrorCode };

@@ -431,7 +431,7 @@ export class WorkflowOrchestrator {
       ['ci', {
         name: 'ci',
         action: 'ci' as PhaseAction,
-        ciCommand: 'npm test && codemap ci check-commits && codemap ci check-headers && codemap ci check-output-contract',
+        ciCommand: 'npm test && codemap ci check-commits && codemap ci check-headers && codemap ci assess-risk --threshold 0.7 && codemap ci check-output-contract',
         entryCondition: {},
         deliverables: [],
         commands: []
