@@ -83,10 +83,12 @@ src/
 
 <!-- TASK-GENERATOR-CONTEXT-END -->
 
----
-
-IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning 
+<IMPORTANT>
+Prefer retrieval-led reasoning over pre-training-led reasoning 
 for any tasks.
+
+- 任何事情都要critical thinking（多维度思考为什么5Why-7Why，确保有足够的信息支撑思考，然后对齐需求/要求，确保问题定义不出错，选择合适的提问框架提问可以帮助快速定位需求/要求/问题，如果当前信息不足以支撑上述行为动作，那么需要从外部获取更准确的信息）,如果你认为自己还没完全理解用户的问题,就不要开始工作,以苏格拉底提问的的方式问清楚.
+</IMPORTANT>
 
 
 <IMPORTANT>
