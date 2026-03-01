@@ -1,3 +1,6 @@
+// [META] since:2026-03-02 | owner:orchestrator-team | stable:true
+// [WHY] Core type definitions with optional fields for flexible unified results
+
 /**
  * UnifiedResult 统一结果接口
  * 用于规范化不同工具的输出格式
@@ -13,34 +16,34 @@ export interface UnifiedResult {
   type: 'file' | 'symbol' | 'code' | 'documentation' | 'risk-assessment';
   /** 文件路径 */
   file: string;
-  /** 行号 */
-  line: number;
+  /** 行号（可选） */
+  line?: number;
   /** 截断后的内容 */
   content: string;
   /** 归一化相关度（0-1） */
   relevance: number;
   /** 匹配的关键词 */
   keywords: string[];
-  /** 元数据 */
-  metadata: {
+  /** 元数据（可选） */
+  metadata?: {
     /** 符号类型 */
-    symbolType: 'class' | 'function' | 'interface' | 'variable';
+    symbolType?: 'class' | 'function' | 'interface' | 'variable';
     /** 依赖文件列表 */
-    dependencies: string[];
+    dependencies?: string[];
     /** 关联的测试文件 */
-    testFile: string;
+    testFile?: string;
     /** 提交次数 */
-    commitCount: number;
+    commitCount?: number;
     /** 依赖复杂度评分 */
-    gravity: number;
+    gravity?: number;
     /** 热度评分对象 */
-    heatScore: HeatScore;
+    heatScore?: HeatScore;
     /** 影响文件数 */
-    impactCount: number;
+    impactCount?: number;
     /** 是否稳定 */
-    stability: boolean;
+    stability?: boolean;
     /** 风险等级 */
-    riskLevel: 'high' | 'medium' | 'low';
+    riskLevel?: 'high' | 'medium' | 'low';
   };
 }
 
@@ -52,8 +55,8 @@ export interface HeatScore {
   freq30d: number;
   /** 最后提交标签 */
   lastType: string;
-  /** 最后修改日期 */
-  lastDate: Date | null;
+  /** 最后修改日期（ISO 字符串格式） */
+  lastDate: string | null;
   /** 是否稳定 (沉积岩 vs 火山灰) */
   stability: boolean;
 }

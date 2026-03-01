@@ -3,8 +3,9 @@
  * [WHY] 负责执行工具、超时控制、错误隔离、回退级联，是连接 IntentRouter、适配器和结果融合的"胶水"组件。
  */
 
-import type { UnifiedResult, CodemapIntent, IntentType } from './types.js';
+import type { UnifiedResult, CodemapIntent, IntentType, ToolOptions } from './types.js';
 import { calculateConfidence, type ConfidenceResult } from './confidence.js';
+import type { ToolAdapter } from './adapters/base-adapter.js';
 
 /**
  * 默认超时时间（毫秒）
@@ -19,16 +20,6 @@ const FALLBACK_CHAINS: Record<string, string[]> = {
   'ast-grep': ['rg-internal'],   // AST搜索 → 文本搜索（内部）
   'codemap': ['rg-internal'],    // 结构分析 → 文本搜索（内部）
 };
-
-/**
- * 工具适配器接口
- */
-export interface ToolAdapter {
-  name: string;
-  weight: number;
-  isAvailable(): Promise<boolean>;
-  execute(intent: CodemapIntent, signal?: AbortSignal): Promise<UnifiedResult[]>;
-}
 
 /**
  * 执行结果
@@ -75,8 +66,24 @@ export class ToolOrchestrator {
    * 注册工具适配器
    * @param adapter 工具适配器实例
    */
-  registerAdapter(adapter: { name: string; weight: number; isAvailable(): Promise<boolean>; execute(...args: unknown[]): Promise<UnifiedResult[]> }): void {
-    this.adapters.set(adapter.name, adapter as ToolAdapter);
+  registerAdapter(adapter: ToolAdapter): void {
+    this.adapters.set(adapter.name, adapter);
+  }
+
+  /**
+   * 将 CodemapIntent 转换为适配器调用参数
+   * @param intent 意图对象
+   * @returns [keywords, options] 元组
+   */
+  private convertIntentToAdapterArgs(intent: CodemapIntent): [string[], ToolOptions] {
+    const keywords = intent.keywords || [];
+    const options: ToolOptions = {
+      intent: intent.intent,
+      targets: intent.targets,
+      scope: intent.scope,
+      timeout: DEFAULT_TIMEOUT,
+    };
+    return [keywords, options];
   }
 
   /**
@@ -108,14 +115,24 @@ export class ToolOrchestrator {
       return [];
     }
 
+    // 将 intent 转换为适配器调用参数
+    const [keywords, options] = this.convertIntentToAdapterArgs(intent);
+
     // 创建 AbortController 用于超时控制
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
       controller.abort();
     }, timeout);
 
+    // 将 signal 添加到 options
+    const optionsWithSignal = {
+      ...options,
+      signal: controller.signal,
+      timeout,
+    };
+
     // 使用 Promise.race 实现硬超时
-    const executionPromise = adapter.execute(intent, controller.signal);
+    const executionPromise = adapter.execute(keywords, optionsWithSignal);
 
     try {
       const results = await Promise.race([
@@ -307,3 +324,6 @@ export class ToolOrchestrator {
     return thresholds[intent] ?? 0.3;
   }
 }
+
+// 重新导出 ToolAdapter 类型，保持向后兼容
+export type { ToolAdapter } from './adapters/base-adapter.js';

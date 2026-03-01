@@ -42,7 +42,7 @@ describe('ToolOrchestrator', () => {
       expect(results).toHaveLength(1);
       expect(results[0].file).toBe('src/a.ts');
       // 验证 execute 被调用时传递了 intent 和 AbortSignal
-      expect(mockAdapter.execute).toHaveBeenCalledWith(intent, expect.any(AbortSignal));
+      expect(mockAdapter.execute).toHaveBeenCalledWith(["test"], expect.objectContaining({ intent: "search", signal: expect.any(AbortSignal) }));
     });
 
     it('工具不存在时返回空数组', async () => {

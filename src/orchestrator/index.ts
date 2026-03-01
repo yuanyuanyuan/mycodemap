@@ -13,9 +13,12 @@ export type {
   AnalyzeArgs
 } from './types';
 
+// ToolAdapter 从 base-adapter 导出
+export type { ToolAdapter } from './adapters/base-adapter.js';
+
 // 类导出
 export { ToolOrchestrator } from './tool-orchestrator.js';
-export type { ToolAdapter, ExecutionResult, SafeExecutionResult } from './tool-orchestrator.js';
+export type { ExecutionResult, SafeExecutionResult } from './tool-orchestrator.js';
 
 export { IntentRouter } from './intent-router.js';
 

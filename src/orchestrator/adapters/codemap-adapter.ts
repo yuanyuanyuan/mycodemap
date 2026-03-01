@@ -1,3 +1,6 @@
+// [META] since:2026-03-02 | owner:orchestrator-team | stable:true
+// [WHY] Adapter implementing ToolAdapter interface for CodeMap tool integration with unified result format
+
 /**
  * CodemapAdapter - CodeMap 工具适配器
  * 实现 ToolAdapter 接口，供编排器调用
@@ -5,8 +8,8 @@
 
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { UnifiedResult, ToolOptions, CodemapIntent } from '../types.js';
-import type { ToolAdapter } from '../tool-orchestrator.js';
+import type { UnifiedResult, ToolOptions } from '../types.js';
+import type { ToolAdapter } from './base-adapter.js';
 import { ImpactCommand } from '../../cli/commands/impact.js';
 import { DepsCommand } from '../../cli/commands/deps.js';
 import { ComplexityCommand } from '../../cli/commands/complexity.js';
@@ -17,6 +20,10 @@ import { ComplexityCommand } from '../../cli/commands/complexity.js';
 export interface CodemapAdapterOptions {
   /** Codemap 数据目录路径 */
   codemapPath?: string;
+  /** 默认意图类型 */
+  defaultIntent?: 'impact' | 'dependency' | 'complexity';
+  /** 默认分析范围 */
+  defaultScope?: 'direct' | 'transitive';
 }
 
 /**
@@ -31,9 +38,13 @@ export class CodemapAdapter implements ToolAdapter {
   weight = 0.9;
 
   private codemapPath: string;
+  private defaultIntent: 'impact' | 'dependency' | 'complexity';
+  private defaultScope: 'direct' | 'transitive';
 
   constructor(options: CodemapAdapterOptions = {}) {
     this.codemapPath = options.codemapPath || '.codemap';
+    this.defaultIntent = options.defaultIntent || 'impact';
+    this.defaultScope = options.defaultScope || 'direct';
   }
 
   /**
@@ -52,16 +63,24 @@ export class CodemapAdapter implements ToolAdapter {
 
   /**
    * 执行 CodeMap 分析
-   * 根据 CodemapIntent 调用对应的命令
+   * 根据 keywords 和 options 调用对应的命令
+   * @param keywords - 搜索关键词列表（第一个关键词可能包含意图信息）
+   * @param options - 工具选项，可包含 intent、scope、targets 等
    */
-  async execute(intent: CodemapIntent): Promise<UnifiedResult[]> {
-    const targets = intent.targets || [];
-    const scope = intent.scope || 'direct';
-    const keywords = intent.keywords || [];
-    const topK = 8;
+  async execute(keywords: string[], options: ToolOptions): Promise<UnifiedResult[]> {
+    // 从 options 中提取意图和配置
+    const intent = (options.intent as 'impact' | 'dependency' | 'complexity') || this.defaultIntent;
+    const scope = (options.scope as 'direct' | 'transitive') || this.defaultScope;
+    const targets = (options.targets as string[]) || keywords;
+    const topK = options.topK ?? 8;
+
+    // 如果没有目标，返回空结果
+    if (targets.length === 0) {
+      return [];
+    }
 
     // 根据 intent 路由到对应命令
-    switch (intent.intent) {
+    switch (intent) {
       case 'impact':
         return this.executeImpact(targets, scope, topK, keywords);
       case 'dependency':
@@ -83,12 +102,23 @@ export class CodemapAdapter implements ToolAdapter {
     topK: number,
     keywords: string[]
   ): Promise<UnifiedResult[]> {
-    const command = new ImpactCommand();
-    const args = { targets, scope };
-    const results = await command.runEnhanced(args);
+    try {
+      const command = new ImpactCommand();
+      const args = { targets, scope };
+      const results = await command.runEnhanced(args);
 
-    // 限制返回结果数量
-    return results.slice(0, topK);
+      // 添加关键词信息到结果
+      const resultsWithKeywords = results.map(result => ({
+        ...result,
+        keywords: [...new Set([...result.keywords, ...keywords])]
+      }));
+
+      // 限制返回结果数量
+      return resultsWithKeywords.slice(0, topK);
+    } catch (error) {
+      console.warn(`Impact 分析失败: ${error instanceof Error ? error.message : String(error)}`);
+      return [];
+    }
   }
 
   /**
@@ -99,12 +129,23 @@ export class CodemapAdapter implements ToolAdapter {
     topK: number,
     keywords: string[]
   ): Promise<UnifiedResult[]> {
-    const command = new DepsCommand();
-    const args = { targets };
-    const results = await command.runEnhanced(args);
+    try {
+      const command = new DepsCommand();
+      const args = { targets };
+      const results = await command.runEnhanced(args);
 
-    // 限制返回结果数量
-    return results.slice(0, topK);
+      // 添加关键词信息到结果
+      const resultsWithKeywords = results.map(result => ({
+        ...result,
+        keywords: [...new Set([...result.keywords, ...keywords])]
+      }));
+
+      // 限制返回结果数量
+      return resultsWithKeywords.slice(0, topK);
+    } catch (error) {
+      console.warn(`Dependency 分析失败: ${error instanceof Error ? error.message : String(error)}`);
+      return [];
+    }
   }
 
   /**
@@ -115,12 +156,23 @@ export class CodemapAdapter implements ToolAdapter {
     topK: number,
     keywords: string[]
   ): Promise<UnifiedResult[]> {
-    const command = new ComplexityCommand();
-    const args = { targets };
-    const results = await command.runEnhanced(args);
+    try {
+      const command = new ComplexityCommand();
+      const args = { targets };
+      const results = await command.runEnhanced(args);
 
-    // 限制返回结果数量
-    return results.slice(0, topK);
+      // 添加关键词信息到结果
+      const resultsWithKeywords = results.map(result => ({
+        ...result,
+        keywords: [...new Set([...result.keywords, ...keywords])]
+      }));
+
+      // 限制返回结果数量
+      return resultsWithKeywords.slice(0, topK);
+    } catch (error) {
+      console.warn(`Complexity 分析失败: ${error instanceof Error ? error.message : String(error)}`);
+      return [];
+    }
   }
 }
 

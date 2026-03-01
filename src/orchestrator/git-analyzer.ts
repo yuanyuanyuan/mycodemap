@@ -1,3 +1,6 @@
+// [META] since:2026-03-02 | owner:orchestrator-team | stable:true
+// [WHY] Git analyzer with unified date string format for consistent serialization
+
 /**
  * Git 分析器
  * 分析文件的 Git 提交历史，评估修改风险
@@ -160,15 +163,15 @@ export class GitAnalyzer {
       const lastType = tag?.type ?? 'UNKNOWN';
 
       // 获取最后一次提交的日期
-      let lastDate: Date | null = null;
+      let lastDateStr: string | null = null;
       try {
         const dateOutput = execSync(
           `git log -1 --pretty=format:"%ci" -- "${filePath}"`,
           { cwd: projectRoot, encoding: 'utf-8' }
         ) as string;
-        lastDate = dateOutput ? new Date(dateOutput.split(' ')[0]) : null;
+        lastDateStr = dateOutput ? dateOutput.split(' ')[0] : null;
       } catch {
-        lastDate = null;
+        lastDateStr = null;
       }
 
       // 稳定性：30天内少于3次视为稳定
@@ -177,7 +180,7 @@ export class GitAnalyzer {
       return {
         freq30d: commits.length,
         lastType,
-        lastDate,
+        lastDate: lastDateStr,
         stability
       };
     } catch {

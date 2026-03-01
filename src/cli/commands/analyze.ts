@@ -157,7 +157,7 @@ export class AnalyzeCommand {
     if (result.tool && result.results) {
       resultsByTool.set(result.tool, result.results);
     }
-    const fusedResults = fusion.fuse(resultsByTool, { topK, keywordWeights: {}, maxTokens: 160 });
+    const fusedResults = await fusion.fuse(resultsByTool, { topK, keywordWeights: {}, maxTokens: 160 });
 
     return {
       schemaVersion: 'v1.0.0',

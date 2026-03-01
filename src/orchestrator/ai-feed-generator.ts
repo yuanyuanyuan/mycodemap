@@ -1,3 +1,6 @@
+// [META] since:2026-03-02 | owner:orchestrator-team | stable:true
+// [WHY] AI feed generator with date format alignment for JSON serialization
+
 /**
  * AI Feed Generator
  * Generates structured data for AI consumption (ai-feed.txt)
@@ -254,11 +257,7 @@ export class AIFeedGenerator {
     ];
 
     for (const f of feed) {
-      const lastDateStr = f.heat.lastDate
-        ? (f.heat.lastDate instanceof Date
-          ? f.heat.lastDate.toISOString().split('T')[0]
-          : String(f.heat.lastDate).split(' ')[0])
-        : 'never';
+      const lastDateStr = f.heat.lastDate ?? 'never';
 
       lines.push(`FILE: ${f.file}`);
       lines.push(`GRAVITY: ${f.gravity} | HEAT: ${f.heat.freq30d}/${f.heat.lastType}/${lastDateStr}`);
@@ -475,26 +474,13 @@ export class AIFeedGenerator {
    * @param outputPath - Output file path
    */
   writeFeedFileJson(feed: AIFeed[], outputPath: string): void {
-    // Convert Date objects before serialization
-    const serializableFeed = feed.map(f => ({
-      ...f,
-      heat: {
-        ...f.heat,
-        lastDate: f.heat.lastDate
-          ? (f.heat.lastDate instanceof Date
-            ? f.heat.lastDate.toISOString()
-            : f.heat.lastDate)
-          : null
-      }
-    }));
-
     // Ensure directory exists
     const outputDir = path.dirname(outputPath);
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
-    fs.writeFileSync(outputPath, JSON.stringify(serializableFeed, null, 2), 'utf-8');
+    fs.writeFileSync(outputPath, JSON.stringify(feed, null, 2), 'utf-8');
   }
 }
 

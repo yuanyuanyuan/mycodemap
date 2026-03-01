@@ -176,7 +176,7 @@ export class WorkflowOrchestrator {
       const resultsByTool = await this.toolOrchestrator.executeParallel(codemapIntent, tools);
 
       // 3. 使用 ResultFusion 融合结果
-      const fusedResults = this.resultFusion.fuse(resultsByTool, {
+      const fusedResults = await this.resultFusion.fuse(resultsByTool, {
         topK: analyzeArgs.topK ?? 8,
         intent: intent,
         keywordWeights: this.buildKeywordWeights(codemapIntent.keywords)
