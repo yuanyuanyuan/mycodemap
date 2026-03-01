@@ -144,6 +144,13 @@ workflow.command('checkpoint')
   .action(async () => {
     const orchestrator = new WorkflowOrchestrator();
 
+    // 先加载活动工作流
+    const status = await orchestrator.getStatus();
+    if (!status.active) {
+      console.log('No active workflow. Run "codemap workflow start <task>" first.');
+      return;
+    }
+
     try {
       await orchestrator.checkpoint();
       console.log('Checkpoint created successfully.');
