@@ -47,6 +47,7 @@ Prefer retrieval-led reasoning over pre-training-led reasoning
 for any tasks.
 
 - 任何事情都要critical thinking（多维度思考为什么5Why-7Why，确保有足够的信息支撑思考，然后对齐需求/要求，确保问题定义不出错，选择合适的提问框架提问可以帮助快速定位需求/要求/问题，如果当前信息不足以支撑上述行为动作，那么需要从外部获取更准确的信息）,如果你认为自己还没完全理解用户的问题,就不要开始工作,以苏格拉底提问的的方式问清楚.
+- critical thinking 可以使用MCP 工具sequentialthinking来完成。
 </IMPORTANT>
 
 <IMPORTANT>
@@ -91,11 +92,11 @@ For complex tasks (3+ steps, research, projects):
 
 ### 步骤2：根据环境选择执行方式
 
-| 环境 | 多 Agent 启动方式 | 约束 |
-|------|------------------|------|
-| **Codex CLI** | 原生多-agent生命周期：`spawn_agent -> send_input -> wait -> close_agent` | 主协调器必须做最终汇总与验收 |
-| **kimi-cli** | YAML 配置 + `Task(subagent_name="xxx")` | 子 Agent 禁止嵌套调用 `Task` |
-| **Claude Code** | Skill: `agent-teams-playbook` | 按 skill 定义流程执行 |
+| 环境            | 多 Agent 启动方式                                                       | 约束                         |
+|-----------------|-------------------------------------------------------------------------|------------------------------|
+| **Codex CLI**   | 原生多-agent生命周期：`spawn_agent -> send_input -> wait -> close_agent` | 主协调器必须做最终汇总与验收 |
+| **kimi-cli**    | YAML 配置 + `Task(subagent_name="xxx")`                                 | 子 Agent 禁止嵌套调用 `Task` |
+| **Claude Code** | Skill: `agent-teams-playbook`                                           | 按 skill 定义流程执行        |
 
 ### Codex CLI 环境执行详情（强制）
 
