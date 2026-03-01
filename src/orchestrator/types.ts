@@ -70,3 +70,42 @@ export interface ToolOptions {
   /** 其他扩展选项 */
   [key: string]: unknown;
 }
+
+/**
+ * IntentType 意图类型
+ */
+export type IntentType =
+  | 'impact'
+  | 'dependency'
+  | 'search'
+  | 'documentation'
+  | 'complexity'
+  | 'overview'
+  | 'refactor'
+  | 'reference';
+
+/**
+ * CodemapIntent Codemap 意图对象
+ */
+export interface CodemapIntent {
+  intent: IntentType;
+  targets: string[];
+  keywords: string[];
+  scope: 'direct' | 'transitive';
+  tool: string;
+}
+
+/**
+ * AnalyzeArgs 分析命令参数
+ */
+export interface AnalyzeArgs {
+  intent?: string;
+  targets?: string[];
+  keywords?: string[];
+  scope?: 'direct' | 'transitive';
+  topK?: number;
+  includeTests?: boolean;
+  includeGitHistory?: boolean;
+  json?: boolean;
+  outputMode?: 'machine' | 'human';
+}
