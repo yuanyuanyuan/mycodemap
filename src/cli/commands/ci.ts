@@ -1,6 +1,6 @@
 /**
- * CI Gateway CLI 命令
- * 提供 CI 门禁相关的子命令
+ * [META] CI Gateway CLI 命令
+ * [WHY] 提供 CI 门禁相关的子命令
  */
 
 import { Command } from 'commander';
@@ -107,8 +107,9 @@ function checkHeadersAction(options: { directory?: string; 'no-high-risk'?: bool
 /**
  * assess-risk 子命令 - 评估危险置信度
  */
-async function assessRiskAction(options: { files?: string }): Promise<void> {
+async function assessRiskAction(options: { files?: string; threshold?: string }): Promise<void> {
   let changedFiles: string[] = [];
+  const threshold = parseFloat(options.threshold ?? '0.7');
 
   if (options.files) {
     changedFiles = options.files.split(',').map((f) => f.trim());
@@ -119,7 +120,7 @@ async function assessRiskAction(options: { files?: string }): Promise<void> {
       const output = execSync('git diff --name-only HEAD', { encoding: 'utf-8' });
       changedFiles = output.split('\n').filter(Boolean);
     } catch {
-      console.error(chalk.red('❌ Failed to get git changed files'));
+      console.error(chalk.red('Failed to get git changed files'));
       process.exit(1);
     }
   }
@@ -134,6 +135,7 @@ async function assessRiskAction(options: { files?: string }): Promise<void> {
   console.log(chalk.blue('\n=== Risk Assessment ===\n'));
   console.log(chalk.bold(`Risk Level: ${chalk.cyan(assessment.level.toUpperCase())}`));
   console.log(chalk.bold(`Confidence: ${(assessment.confidence * 100).toFixed(0)}%`));
+  console.log(chalk.bold(`Threshold: ${(threshold * 100).toFixed(0)}%`));
 
   if (assessment.factors.length > 0) {
     console.log(chalk.bold('\nRisk Factors:'));
@@ -142,7 +144,9 @@ async function assessRiskAction(options: { files?: string }): Promise<void> {
     }
   }
 
-  if (assessment.level === 'critical' || assessment.level === 'high') {
+  // 使用阈值判断是否阻断
+  if (assessment.confidence >= threshold) {
+    console.log(chalk.red(`\nRisk confidence ${(assessment.confidence * 100).toFixed(0)}% exceeds threshold ${(threshold * 100).toFixed(0)}%`));
     process.exit(1);
   }
 }
@@ -284,6 +288,7 @@ export function createCICommand(): Command {
     .command('assess-risk')
     .description('评估代码变更的危险置信度')
     .option('-f, --files <files>', '逗号分隔的变更文件列表')
+    .option('-t, --threshold <number>', '风险阈值 (0-1)', '0.7')
     .action(assessRiskAction);
 
   // check-output-contract 子命令

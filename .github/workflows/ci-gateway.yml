@@ -21,26 +21,33 @@ jobs:
           # 获取所有 commits
           COMMITS=$(git log --format=%s origin/main..HEAD)
 
-          VALID_TAGS="feat fix refactor docs chore test style perf ci build revert"
+          VALID_TAGS="BUGFIX FEATURE REFACTOR CONFIG DOCS DELETE"
 
           for commit in $COMMITS; do
-            # 检查是否以 [TAG] 格式开头
-            if ! echo "$commit" | grep -qE '^\[[a-z]+\]'; then
-              echo "❌ Invalid commit format: $commit"
-              echo "   Expected format: [TAG] message"
+            # 检查是否以 [TAG] 格式开头（大写）
+            if ! echo "$commit" | grep -qE '^\[[A-Z]+\]'; then
+              echo "ERROR: Invalid commit format: $commit"
+              echo "   Expected format: [TAG] scope: message"
               echo "   Valid tags: $VALID_TAGS"
               exit 1
             fi
 
-            # 提取并验证 TAG
-            TAG=$(echo "$commit" | sed -E 's/^\[([a-z]+)\].*/\1/')
+            # 提取并验证 TAG（大写）
+            TAG=$(echo "$commit" | sed -E 's/^\[([A-Z]+)\].*/\1/')
             if ! echo "$VALID_TAGS" | grep -qw "$TAG"; then
-              echo "❌ Invalid tag: [$TAG]"
+              echo "ERROR: Invalid tag: [$TAG]"
               echo "   Valid tags: $VALID_TAGS"
               exit 1
             fi
 
-            echo "✅ Valid: $commit"
+            # 检查 scope 是否存在
+            if ! echo "$commit" | grep -qE '^\[[A-Z]+\]\s+[^:]+:'; then
+              echo "ERROR: Missing scope in commit: $commit"
+              echo "   Format: [TAG] scope: message"
+              exit 1
+            fi
+
+            echo "Valid: $commit"
           done
 
   file-headers:
@@ -107,6 +114,17 @@ jobs:
 
       - name: Run unit tests
         run: npm test
+
+      - name: Generate AI feed
+        run: |
+          npx codemap generate
+          git diff --exit-code .codemap/ || (echo "AI feed is out of sync. Run 'codemap generate' and commit the changes." && exit 1)
+
+      - name: Assess risk
+        run: npx codemap ci assess-risk --threshold=0.7
+
+      - name: Check output contract
+        run: npx codemap ci check-output-contract --schema-version v1.0.0 --top-k 8 --max-tokens 160
 
   typecheck:
     name: TypeScript Type Check
