@@ -10,8 +10,8 @@ import { UnifiedResult } from './types';
 type IntentType = 'impact' | 'dependency' | 'search' | 'documentation' | 
                   'complexity' | 'overview' | 'refactor' | 'reference';
 
-// SearchResult 类型（兼容 UnifiedResult）
-type SearchResult = UnifiedResult;
+// SearchResult 接口（兼容 UnifiedResult）
+interface SearchResult extends UnifiedResult {}
 
 // ConfidenceResult 接口
 interface ConfidenceResult {

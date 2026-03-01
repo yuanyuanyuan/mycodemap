@@ -24,23 +24,23 @@ export interface UnifiedResult {
   /** 元数据 */
   metadata: {
     /** 符号类型 */
-    symbolType?: 'class' | 'function' | 'interface' | 'variable';
+    symbolType: 'class' | 'function' | 'interface' | 'variable';
     /** 依赖文件列表 */
-    dependencies?: string[];
+    dependencies: string[];
     /** 关联的测试文件 */
-    testFile?: string;
+    testFile: string;
     /** 提交次数 */
-    commitCount?: number;
+    commitCount: number;
     /** 依赖复杂度评分 */
-    gravity?: number;
+    gravity: number;
     /** 热度评分对象 */
-    heatScore?: HeatScore;
+    heatScore: HeatScore;
     /** 影响文件数 */
-    impactCount?: number;
+    impactCount: number;
     /** 是否稳定 */
-    stability?: boolean;
+    stability: boolean;
     /** 风险等级 */
-    riskLevel?: 'high' | 'medium' | 'low';
+    riskLevel: 'high' | 'medium' | 'low';
   };
 }
 
