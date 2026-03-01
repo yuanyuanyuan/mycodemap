@@ -92,6 +92,18 @@ for any tasks.
 
 
 <IMPORTANT>
+**强制约束 - Git Worktrees：**
+
+当需要创建隔离的工作空间时（如同时开发多个功能、实验性工作、subagent 独立环境），必须使用 `git-worktrees` skill：
+
+```
+使用方式：Invoke the git-worktrees skill
+```
+
+请声明："I'm using the using-git-worktrees skill to set up an isolated workspace."
+</IMPORTANT>
+
+<IMPORTANT>
 For complex tasks (3+ steps, research, projects):
 1. Load skill: planning-with-files
 2. Create task_plan.md, findings.md, progress.md in your project directory

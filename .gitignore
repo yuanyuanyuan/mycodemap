@@ -136,3 +136,4 @@ codemap-output/
 
 # TypeScript incremental builds
 *.tsbuildinfo
+.worktrees/
