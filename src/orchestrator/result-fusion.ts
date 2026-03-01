@@ -247,6 +247,11 @@ export class ResultFusion {
  * @returns 截断后的内容
  */
 export function truncateByToken(content: string, maxTokens: number): string {
+  // 处理空字符串或 undefined
+  if (!content) {
+    return '';
+  }
+
   // 简单估算：按空格分割的词 + 中文字符数
   const words = content.split(/\s+/);
   let tokenCount = 0;
