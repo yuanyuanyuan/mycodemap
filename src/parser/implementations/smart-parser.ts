@@ -33,7 +33,7 @@ export class SmartParser implements IParser {
     const exports = this.extractExports(sourceFile);
     const imports = this.extractImports(sourceFile);
     const symbols = this.extractSymbols(sourceFile);
-    const dependencies = this.extractDependencies(imports);
+    const dependencies = this.extractDependencies(imports, exports);
     const typeInfo = this.extractTypeInfo(sourceFile);
     const callGraph = this.extractCallGraph(sourceFile);
     const complexity = this.calculateComplexity(sourceFile);
@@ -1080,12 +1080,21 @@ export class SmartParser implements IParser {
   /**
    * 提取依赖列表
    */
-  private extractDependencies(imports: ImportInfo[]): string[] {
+  private extractDependencies(imports: ImportInfo[], exports?: ExportInfo[]): string[] {
     const deps = new Set<string>();
 
+    // 收集所有 import 依赖
     for (const imp of imports) {
-      // 收集所有依赖：相对路径、绝对路径、node_modules
       deps.add(imp.source);
+    }
+
+    // 处理 re-export 依赖 (export { foo } from './module')
+    if (exports) {
+      for (const exp of exports) {
+        if (exp.origin) {
+          deps.add(exp.origin);
+        }
+      }
     }
 
     return Array.from(deps);

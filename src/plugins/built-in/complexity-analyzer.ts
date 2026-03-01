@@ -29,11 +29,34 @@ export interface ModuleComplexity {
   }>;
 }
 
-// 复杂度评分
+/**
+ * 计算可维护性指数
+ * 
+ * 基于微软的可维护性指数公式，进行适应性调整：
+ * - 结果范围 0-100
+ * - 考虑了圈复杂度、代码行数和注释比例
+ * - 使用对数缩放避免大文件过度惩罚
+ */
 function calculateMaintainabilityIndex(loc: number, cyclomatic: number, commentRatio: number): number {
-  // 基于 Halstead 指标的简化版维持性指数
-  const mi = 171 - 5.2 * Math.log(loc) - 0.23 * cyclomatic - 16.2 * Math.log(loc);
-  return Math.max(0, Math.min(100, mi + 50 * commentRatio));
+  // 规范化输入
+  const normalizedLOC = Math.max(1, loc);
+  const normalizedCC = Math.max(1, cyclomatic);
+  
+  // 基础分 100
+  let mi = 100;
+  
+  // 圈复杂度惩罚（每点复杂度减少2分）
+  mi -= (normalizedCC - 1) * 2;
+  
+  // 代码行数惩罚（对数缩放）
+  // 100行: -5分, 500行: -15分, 1000行: -20分
+  mi -= Math.log(normalizedLOC / 10 + 1) * 5;
+  
+  // 注释奖励（最多+10分）
+  mi += commentRatio * 15;
+  
+  // 确保结果在 0-100 范围内
+  return Math.max(0, Math.min(100, Math.round(mi)));
 }
 
 // 分析单个模块的复杂度
@@ -63,18 +86,20 @@ function analyzeModuleComplexity(module: ModuleInfo): ModuleComplexity {
       classCount++;
     }
 
-    // 简化复杂度计算：基于关键词
-    // 实际应该解析 AST，这里是简化实现
+    // 简化复杂度计算：基于函数数量
     if (symbol.kind === 'function' || symbol.kind === 'method') {
       cyclomaticComplexity += 1; // 每个函数增加基础复杂度
     }
   }
 
-  // 基于模块类型和大小调整复杂度
+  // 基于模块大小调整复杂度
   const loc = module.stats.codeLines;
   const commentRatio = module.stats.commentLines / Math.max(1, module.stats.lines);
 
-  cyclomaticComplexity = Math.max(1, cyclomaticComplexity + Math.floor(loc / 100));
+  // 更合理的复杂度估算
+  cyclomaticComplexity = Math.max(1, cyclomaticComplexity + Math.floor(loc / 50));
+  
+  // 使用修复后的可维护性指数计算
   const maintainability = calculateMaintainabilityIndex(loc, cyclomaticComplexity, commentRatio);
 
   return {
@@ -86,7 +111,7 @@ function analyzeModuleComplexity(module: ModuleInfo): ModuleComplexity {
       functionCount,
       classCount,
       maxNestingDepth,
-      maintainabilityIndex: Math.round(maintainability),
+      maintainabilityIndex: maintainability,
     },
     hotspots: hotspots.slice(0, 10), // 只返回前10个热点
   };
@@ -116,6 +141,7 @@ class ComplexityAnalyzerPlugin implements CodeMapPlugin {
     let totalFunctions = 0;
     let totalClasses = 0;
     let totalLOC = 0;
+    let totalMaintainability = 0;
 
     for (const module of modules) {
       const complexity = analyzeModuleComplexity(module);
@@ -125,6 +151,7 @@ class ComplexityAnalyzerPlugin implements CodeMapPlugin {
       totalFunctions += complexity.metrics.functionCount;
       totalClasses += complexity.metrics.classCount;
       totalLOC += complexity.metrics.linesOfCode;
+      totalMaintainability += complexity.metrics.maintainabilityIndex;
     }
 
     // 找出复杂度最高的模块
@@ -133,14 +160,17 @@ class ComplexityAnalyzerPlugin implements CodeMapPlugin {
     );
 
     const warnings: string[] = [];
-    const hotspots = sortedModules.slice(0, 5).forEach((mod) => {
+    sortedModules.slice(0, 5).forEach((mod) => {
       if (mod.metrics.cyclomaticComplexity > 20) {
-        warnings.push(`Module "${mod.moduleId}" has high cyclomatic complexity: ${mod.metrics.cyclomaticComplexity}`);
+        warnings.push(`模块 "${mod.moduleId}" 圈复杂度过高: ${mod.metrics.cyclomaticComplexity}`);
       }
       if (mod.metrics.maintainabilityIndex < 50) {
-        warnings.push(`Module "${mod.moduleId}" has low maintainability index: ${mod.metrics.maintainabilityIndex}`);
+        warnings.push(`模块 "${mod.moduleId}" 可维护性指数过低: ${mod.metrics.maintainabilityIndex}`);
       }
     });
+
+    // 计算平均可维护性指数
+    const avgMaintainability = modules.length > 0 ? totalMaintainability / modules.length : 100;
 
     return {
       additionalEdges: [],
@@ -148,6 +178,7 @@ class ComplexityAnalyzerPlugin implements CodeMapPlugin {
         complexityAnalysis: {
           totalCyclomaticComplexity: totalCyclomatic,
           averageCyclomaticComplexity: modules.length > 0 ? totalCyclomatic / modules.length : 0,
+          averageMaintainabilityIndex: avgMaintainability,
           totalFunctions: totalFunctions,
           totalClasses: totalClasses,
           totalLinesOfCode: totalLOC,

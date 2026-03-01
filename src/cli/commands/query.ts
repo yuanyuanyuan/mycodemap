@@ -26,11 +26,22 @@ interface QueryResultItem {
   details?: string;
 }
 
+// ===== 性能优化：添加缓存机制 =====
+let codeMapCache: { data: CodeMap | null; timestamp: number; path: string } | null = null;
+const CACHE_TTL = 5000; // 5秒缓存
+
 /**
- * 加载代码地图数据
+ * 加载代码地图数据（带缓存）
  */
 function loadCodeMap(rootDir: string): CodeMap | null {
   const codemapPath = path.join(rootDir, '.codemap', 'codemap.json');
+
+  // 检查缓存
+  if (codeMapCache && 
+      codeMapCache.path === codemapPath && 
+      Date.now() - codeMapCache.timestamp < CACHE_TTL) {
+    return codeMapCache.data;
+  }
 
   if (!fs.existsSync(codemapPath)) {
     console.log(chalk.red('❌ 代码地图不存在，请先运行 codemap generate'));
@@ -39,7 +50,16 @@ function loadCodeMap(rootDir: string): CodeMap | null {
 
   try {
     const data = fs.readFileSync(codemapPath, 'utf-8');
-    return JSON.parse(data) as CodeMap;
+    const parsed = JSON.parse(data) as CodeMap;
+    
+    // 更新缓存
+    codeMapCache = {
+      data: parsed,
+      timestamp: Date.now(),
+      path: codemapPath
+    };
+    
+    return parsed;
   } catch (error) {
     console.log(chalk.red('❌ 读取代码地图失败:', error instanceof Error ? error.message : String(error)));
     return null;
@@ -47,15 +67,16 @@ function loadCodeMap(rootDir: string): CodeMap | null {
 }
 
 /**
- * 查询符号
+ * 查询符号（支持子串匹配）
  */
 function querySymbol(codeMap: CodeMap, symbolName: string, limit: number): QueryResultItem[] {
   const results: QueryResultItem[] = [];
+  const searchLower = symbolName.toLowerCase();
 
   for (const module of codeMap.modules) {
-    // 搜索导出
+    // 搜索导出（子串匹配）
     for (const exp of module.exports) {
-      if (exp.name.toLowerCase() === symbolName.toLowerCase()) {
+      if (exp.name.toLowerCase().includes(searchLower)) {
         results.push({
           name: exp.name,
           path: module.absolutePath,
@@ -65,9 +86,9 @@ function querySymbol(codeMap: CodeMap, symbolName: string, limit: number): Query
       }
     }
 
-    // 搜索符号
+    // 搜索符号（子串匹配）
     for (const sym of module.symbols) {
-      if (sym.name.toLowerCase() === symbolName.toLowerCase()) {
+      if (sym.name.toLowerCase().includes(searchLower)) {
         results.push({
           name: sym.name,
           path: module.absolutePath,
@@ -237,7 +258,7 @@ export async function queryCommand(options: QueryOptions) {
   const rootDir = process.cwd();
   const limit = options.limit || 20;
 
-  // 加载代码地图
+  // 加载代码地图（带缓存）
   const codeMap = loadCodeMap(rootDir);
   if (!codeMap) {
     process.exit(1);
