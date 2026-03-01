@@ -29,8 +29,8 @@ test('[L2] AstGrepAdapter 应继承 ToolAdapter', () => {
   // 检查导入基类
   expect(content).toMatch(/import.*ToolAdapter.*from.*base-adapter/);
 
-  // 检查继承
-  expect(content).toMatch(/extends\s+ToolAdapter/);
+  // 检查实现接口
+  expect(content).toMatch(/implements\s+ToolAdapter/);
 });
 
 // Level 3: search 方法实现
