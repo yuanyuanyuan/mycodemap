@@ -45,12 +45,7 @@ src/
 - 构建发布：`npm run build`
 
 
-<IMPORTANT>
-For complex tasks (3+ steps, research, projects):
-1. Load skill: planning-with-files
-2. Create task_plan.md, findings.md, progress.md in your project directory
-3. Follow 3-file pattern throughout the task
-</IMPORTANT>
+
 
 <!-- TASK-GENERATOR-CONTEXT-START -->
 [Task Knowledge Index]|version:1|root: ./.tasks|IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning for task execution.|If context missing, regenerate: node .claude/skills/task-generator/scripts/create-triad-artifacts.js
@@ -93,4 +88,15 @@ For complex tasks (3+ steps, research, projects):
 IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning 
 for any tasks.
 
----
+
+<IMPORTANT>
+For complex tasks (3+ steps, research, projects):
+1. Load skill: planning-with-files
+2. Create task_plan.md, findings.md, progress.md in your project directory
+3. Follow 3-file pattern throughout the task
+</IMPORTANT>
+
+
+<IMPORTANT>
+每次任务完成后都要检查docs目录和AGENTS.md 和CLAUDE.md 和README.md 文件，确认是否需要同步更新。
+</IMPORTANT>
