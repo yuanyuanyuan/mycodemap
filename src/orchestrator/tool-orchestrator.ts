@@ -101,17 +101,17 @@ export class ToolOrchestrator {
     intent: CodemapIntent,
     timeout: number = this.DEFAULT_TIMEOUT
   ): Promise<UnifiedResult[]> {
-    console.debug(`执行工具: ${tool}, 超时: ${timeout}ms`);
+    // console.debug(`执行工具: ${tool}, 超时: ${timeout}ms`);
 
     const adapter = this.adapters.get(tool);
     if (!adapter) {
-      console.warn(`工具 ${tool} 未注册，返回空结果`);
+      // console.warn(`工具 ${tool} 未注册，返回空结果`);
       return [];
     }
 
     // 检查工具是否可用
     if (!(await adapter.isAvailable())) {
-      console.warn(`工具 ${tool} 不可用，返回空结果`);
+      // console.warn(`工具 ${tool} 不可用，返回空结果`);
       return [];
     }
 
@@ -143,13 +143,13 @@ export class ToolOrchestrator {
           });
         })
       ]);
-      console.debug(`工具 ${tool} 执行成功，返回 ${results.length} 条结果`);
+      // console.debug(`工具 ${tool} 执行成功，返回 ${results.length} 条结果`);
       return results;
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        console.warn(`工具 ${tool} 执行超时 (${timeout}ms)`);
+        // console.warn(`工具 ${tool} 执行超时 (${timeout}ms)`);
       } else {
-        console.error(`工具 ${tool} 执行失败: ${error}`);
+        // console.error(`工具 ${tool} 执行失败: ${error}`);
       }
       // 超时或错误时返回空结果，触发回退
       return [];
@@ -173,7 +173,7 @@ export class ToolOrchestrator {
       const results = await this.runToolWithTimeout(tool, intent);
       return { results };
     } catch (error) {
-      console.error(`工具 ${tool} 执行异常:`, error);
+      // console.error(`工具 ${tool} 执行异常:`, error);
       return { results: [], error: error as Error };
     }
   }
@@ -201,7 +201,7 @@ export class ToolOrchestrator {
     let results = await this.runToolWithTimeout(primaryTool, intent);
     let confidence = calculateConfidence(results, intent.intent);
 
-    console.debug(`主工具 ${primaryTool} 置信度: ${confidence.score.toFixed(2)} (${confidence.level})`);
+    // console.debug(`主工具 ${primaryTool} 置信度: ${confidence.score.toFixed(2)} (${confidence.level})`);
 
     // 2. 检查是否需要回退（低于当前 intent 的中等阈值）
     const threshold = this.getMediumThreshold(intent.intent);
@@ -212,12 +212,12 @@ export class ToolOrchestrator {
       for (const fallbackTool of fallbackTools) {
         // 防止循环执行同一工具
         if (this.executedTools.has(fallbackTool)) {
-          console.warn(`跳过已执行的工具: ${fallbackTool}`);
+          // console.warn(`跳过已执行的工具: ${fallbackTool}`);
           continue;
         }
 
         this.executedTools.add(fallbackTool);
-        console.warn(`[LOW CONFIDENCE] ${primaryTool} confidence: ${confidence.score.toFixed(2)}, trying ${fallbackTool}...`);
+        // console.warn(`[LOW CONFIDENCE] ${primaryTool} confidence: ${confidence.score.toFixed(2)}, trying ${fallbackTool}...`);
 
         const fallbackResults = await this.runToolWithTimeout(fallbackTool, intent);
         const fallbackConfidence = calculateConfidence(fallbackResults, intent.intent);
@@ -232,7 +232,7 @@ export class ToolOrchestrator {
           reasons: [...confidence.reasons, ...fallbackConfidence.reasons]
         };
 
-        console.debug(`回退工具 ${fallbackTool} 置信度: ${fallbackConfidence.score.toFixed(2)}, 合并后: ${confidence.score.toFixed(2)}`);
+        // console.debug(`回退工具 ${fallbackTool} 置信度: ${fallbackConfidence.score.toFixed(2)}, 合并后: ${confidence.score.toFixed(2)}`);
 
         // 4. 达到阈值则停止回退
         if (confidence.score >= threshold) {

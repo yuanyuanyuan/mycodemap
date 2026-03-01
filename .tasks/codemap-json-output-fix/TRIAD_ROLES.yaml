@@ -1,0 +1,183 @@
+# Triad Role Definitions for CodeMap CLI JSON Output Fix Task
+
+triad:
+  name: CodeMap JSON Output Fix Triad
+  version: 1.0.0
+  
+  # ============================================================
+  # Role 1: Generator (任务生成器)
+  # ============================================================
+  generator:
+    name: generator
+    description: 任务生成器 - 负责创建任务四件套和 Triad 工件
+    
+    responsibilities:
+      - 分析任务需求并创建完整的任务定义
+      - 生成 PROMPT.md 任务提示词
+      - 生成 EVAL.ts 评估检查点
+      - 生成 SCORING.md 评分标准
+      - 生成 task-metadata.yaml 元数据
+      - 生成 TRIAD_ROLES.yaml 角色定义
+      - 生成 TRIAD_WORKFLOW.md 工作流文档
+      - 生成 TRIAD_ACCEPTANCE.md 验收标准
+    
+    constraints:
+      - 单次生成任务数不得超过5个
+      - 不得跳过模板字段
+      - SCORING.md 分值总和必须等于100
+      - PROMPT.md 必须包含 retrieval-led 指令
+      - 每个检查点必须有测试代码
+    
+    outputs:
+      - PROMPT.md
+      - EVAL.ts
+      - SCORING.md
+      - task-metadata.yaml
+      - TRIAD_ROLES.yaml
+      - TRIAD_WORKFLOW.md
+      - TRIAD_ACCEPTANCE.md
+    
+    handoff_to: qa
+  
+  # ============================================================
+  # Role 2: QA (质量保证)
+  # ============================================================
+  qa:
+    name: qa
+    description: 质量保证 - 负责审查任务质量和完整性
+    
+    responsibilities:
+      - 审查 PROMPT.md 的完整性和清晰度
+      - 验证 EVAL.ts 的测试覆盖率和正确性
+      - 验证 SCORING.md 总分是否为100
+      - 检查 task-metadata.yaml 的有效性
+      - 验证 Triad 工件是否完整
+      - 确保所有验收标准可测试
+      - 检查是否遵循 retrieval-led 原则
+    
+    review_checklist:
+      prompt_review:
+        - background_clear: 背景描述是否清晰
+        - requirements_specific: 需求是否具体明确
+        - constraints_defined: 约束条件是否定义完整
+        - acceptance_criteria_testable: 验收标准是否可测试
+        - user_value_explained: 用户价值是否说明清楚
+        - anti_patterns_documented: 反模式是否已文档化
+        - retrieval_led_instruction_present: 是否包含 retrieval-led 指令
+      
+      eval_review:
+        - phase1_tests_exist: Phase 1 测试代码存在
+        - phase2_tests_exist: Phase 2 测试代码存在
+        - phase3_tests_exist: Phase 3 测试代码存在
+        - phase4_tests_exist: Phase 4 测试代码存在
+        - tests_are_executable: 测试可执行
+        - error_handling_covered: 错误处理被覆盖
+      
+      scoring_review:
+        - total_is_100: 总分等于100
+        - criteria_clear: 评分标准清晰
+        - grades_defined: 等级定义明确
+        - deductions_documented: 扣分项已文档化
+      
+      metadata_review:
+        - workflow_defined: 工作流已定义
+        - artifacts_listed: 所有工件已列出
+        - validation_commands_specified: 验证命令已指定
+      
+      triad_review:
+        - roles_distinct: 三个角色是独立的
+        - no_name_reuse: 没有同名复用
+        - workflow_complete: 工作流完整
+        - handoffs_defined: 交接点已定义
+    
+    approval_criteria:
+      - all_checklist_items_passed: 所有检查项通过
+      - no_critical_issues: 无严重问题
+      - minor_issues_documented: 轻微问题已记录
+    
+    handoff_to: supervisor
+  
+  # ============================================================
+  # Role 3: Supervisor (监督者)
+  # ============================================================
+  supervisor:
+    name: supervisor
+    description: 监督者 - 负责任务的最终审批和验收
+    
+    responsibilities:
+      - 最终审批任务是否可发布
+      - 验证所有 Triad 工件齐全
+      - 确认任务可被执行
+      - 授权任务进入执行阶段
+      - 处理升级和例外情况
+    
+    approval_gates:
+      gate_1_artifacts_complete:
+        description: 所有必需工件已生成
+        check:
+          - PROMPT.md exists and valid
+          - EVAL.ts exists and valid
+          - SCORING.md exists and valid
+          - task-metadata.yaml exists and valid
+          - TRIAD_ROLES.yaml exists and valid
+          - TRIAD_WORKFLOW.md exists and valid
+          - TRIAD_ACCEPTANCE.md exists and valid
+      
+      gate_2_qa_passed:
+        description: QA 审查已通过
+        check:
+          - qa review completed
+          - no blocking issues
+          - approval documented
+      
+      gate_3_acceptance_clear:
+        description: 验收标准清晰可执行
+        check:
+          - acceptance criteria are specific
+          - validation commands are provided
+          - success criteria are measurable
+      
+      gate_4_constraints_met:
+        description: 所有约束条件已满足
+        check:
+          - retrieval_led instruction present
+          - scoring total equals 100
+          - max tasks <= 5
+          - all phases have tests
+    
+    decision_options:
+      - approve: 批准任务进入执行阶段
+      - reject: 拒绝任务，返回 Generator 重新修改
+      - escalate: 升级处理，需要人工干预
+    
+    handoff_to: task-executor
+  
+  # ============================================================
+  # 角色关系图
+  # ============================================================
+  workflow_sequence:
+    - step: 1
+      role: generator
+      action: generate
+      output: task artifacts
+      
+    - step: 2
+      role: qa
+      action: review
+      input: task artifacts
+      output: review report
+      
+    - step: 3
+      role: supervisor
+      action: approve
+      input: task artifacts + review report
+      output: approved task
+      
+    - step: 4
+      role: task-executor
+      action: execute
+      input: approved task
+      output: execution results
+
+# 重要: 三角色必须是3个独立agents，禁止同名复用
+# generator → qa → supervisor 必须按顺序执行

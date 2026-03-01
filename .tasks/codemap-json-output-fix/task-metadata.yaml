@@ -1,0 +1,127 @@
+task:
+  id: codemap-json-output-fix-001
+  name: Fix CodeMap CLI JSON Output Pollution
+  description: Remove console log statements from tool-orchestrator.ts to ensure clean JSON output in --json mode
+  
+  version: 1.0.0
+  priority: high
+  
+  created_at: "2025-01-20T00:00:00Z"
+  updated_at: "2025-03-02T00:00:00Z"
+  
+  # 工作流定义
+  workflow:
+    type: triad
+    phases:
+      - name: generation
+        role: generator
+        description: Generate task artifacts (this phase)
+        status: completed
+        
+      - name: qa_review
+        role: qa
+        description: Review task quality and completeness
+        status: completed
+        gates:
+          - check_prompt_completeness
+          - check_eval_coverage
+          - check_scoring_totals
+          - check_metadata_validity
+          
+      - name: supervisor_approval
+        role: supervisor
+        description: Final approval and acceptance
+        status: completed
+        gates:
+          - verify_all_artifacts_exist
+          - verify_triad_workflow_defined
+          - verify_acceptance_criteria_clear
+          - approve_task_for_execution
+      
+      - name: execution
+        role: executor
+        description: Execute the task and verify results
+        status: completed
+        executed_at: "2025-03-02T10:00:00Z"
+        executed_by: "task-executor"
+        final_score: 100
+        evidence: 
+          - "All 11 console calls commented in tool-orchestrator.ts"
+          - "Build successful with npm run build"
+          - "JSON output verified clean across 3 consecutive runs"
+        artifacts:
+          report: "EXECUTION_REPORT.md"
+          changes: "src/orchestrator/tool-orchestrator.ts"
+  
+  # 文件清单
+  artifacts:
+    required:
+      - path: .tasks/codemap-json-output-fix/PROMPT.md
+        description: Task prompt with background, requirements, constraints
+        generated: true
+        
+      - path: .tasks/codemap-json-output-fix/EVAL.ts
+        description: Evaluation checkpoints and test code
+        generated: true
+        
+      - path: .tasks/codemap-json-output-fix/SCORING.md
+        description: Scoring criteria (total must be 100)
+        generated: true
+        
+      - path: .tasks/codemap-json-output-fix/task-metadata.yaml
+        description: This file - task metadata and workflow
+        generated: true
+        
+      - path: .tasks/codemap-json-output-fix/TRIAD_ROLES.yaml
+        description: Triad role definitions
+        generated: true
+        
+      - path: .tasks/codemap-json-output-fix/TRIAD_WORKFLOW.md
+        description: Triad workflow documentation
+        generated: true
+        
+      - path: .tasks/codemap-json-output-fix/TRIAD_ACCEPTANCE.md
+        description: Triad acceptance criteria
+        generated: true
+  
+  # 目标文件
+  target:
+    file: src/orchestrator/tool-orchestrator.ts
+    language: typescript
+    
+  # 修改范围
+  scope:
+    type: single_file
+    operations:
+      - comment_or_remove_console_logs
+    restrictions:
+      - do_not_modify_other_files
+      - do_not_change_business_logic
+  
+  # 验证命令
+  validation:
+    build:
+      command: npm run build
+      cwd: /data/codemap
+      
+    test:
+      command: node dist/cli/index.js analyze -i impact -t src/index.ts --output-mode machine --json
+      cwd: /data/codemap
+      expected:
+        format: json
+        clean: true  # No log pollution
+  
+  # 约束条件
+  constraints:
+    - retrieval_led_reasoning_required
+    - max_tasks_per_request: 5
+    - scoring_total_must_equal_100
+    - all_phases_must_have_tests
+  
+  # 标签
+  tags:
+    - bugfix
+    - json
+    - cli
+    - logging
+    - codemap
