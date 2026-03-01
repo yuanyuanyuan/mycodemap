@@ -25,3 +25,29 @@ export type { FusionOptions } from './result-fusion.js';
 
 export { calculateConfidence } from './confidence.js';
 export type { ConfidenceResult } from './confidence.js';
+
+// AI 饲料生成器导出
+export {
+  AIFeedGenerator,
+  FileHeaderScanner
+} from './ai-feed-generator.js';
+export type {
+  AIFeed,
+  FileMeta,
+  FileHeader,
+  FileHeaderMeta
+} from './ai-feed-generator.js';
+
+// Git 分析器导出
+export {
+  GitAnalyzer,
+  TAG_WEIGHTS,
+  COMMIT_TAG_REGEX
+} from './git-analyzer.js';
+export type {
+  CommitInfo,
+  CommitTag,
+  CommitTagType,
+  RiskLevel,
+  RiskScore
+} from './git-analyzer.js';
