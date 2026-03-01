@@ -332,7 +332,8 @@ export class DepsCommand {
       const heatScore: HeatScore = {
         freq30d: 0, // 依赖分析不涉及提交历史
         lastType: 'dependency',
-        lastDate: new Date().toISOString().split('T')[0]
+        lastDate: null,
+        stability: true
       };
 
       // 构建元数据
