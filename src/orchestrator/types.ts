@@ -53,7 +53,9 @@ export interface HeatScore {
   /** 最后提交标签 */
   lastType: string;
   /** 最后修改日期 */
-  lastDate: string;
+  lastDate: Date | null;
+  /** 是否稳定 (沉积岩 vs 火山灰) */
+  stability: boolean;
 }
 
 /**

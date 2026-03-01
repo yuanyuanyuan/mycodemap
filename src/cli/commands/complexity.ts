@@ -244,7 +244,8 @@ export class ComplexityCommand {
           heatScore: {
             freq30d: 0,
             lastType: '',
-            lastDate: ''
+            lastDate: null,
+            stability: true
           },
           impactCount: 0,
           stability: true,

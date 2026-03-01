@@ -275,7 +275,8 @@ export class ImpactCommand {
       const heatScore: HeatScore = {
         freq30d: 0,
         lastType: 'unknown',
-        lastDate: new Date().toISOString()
+        lastDate: null,
+        stability: true
       };
 
       // 构建 metadata
