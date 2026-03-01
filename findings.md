@@ -84,8 +84,8 @@ M1 (UnifiedResult)
 
 ## 参考资源
 
-- [REFACTOR_REQUIREMENTS.md](./REFACTOR_REQUIREMENTS.md) - 需求场景
-- [REFACTOR_ARCHITECTURE_OVERVIEW.md](./REFACTOR_ARCHITECTURE_OVERVIEW.md) - 架构概览
+- [REFACTOR_REQUIREMENTS.md](./docs/REFACTOR_REQUIREMENTS.md) - 需求场景
+- [REFACTOR_ARCHITECTURE_OVERVIEW.md](./docs/REFACTOR_ARCHITECTURE_OVERVIEW.md) - 架构概览
 - [task-generator skill](./.claude/skills/task-generator/SKILL.md) - 任务生成规范
 
 ---
