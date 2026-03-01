@@ -80,7 +80,6 @@ workflow:
         critical_failures: 0
         status: "completed"
   approved: true
-  approved: false
 
 # 版本历史
 version_history:

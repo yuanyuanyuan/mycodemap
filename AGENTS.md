@@ -170,8 +170,66 @@ For complex tasks (3+ steps, research, projects):
 | 环境            | 多 Agent 启动方式                                                       | 约束                         |
 |-----------------|-------------------------------------------------------------------------|------------------------------|
 | **Codex CLI**   | 原生多-agent生命周期：`spawn_agent -> send_input -> wait -> close_agent` | 主协调器必须做最终汇总与验收 |
-| **kimi-cli**    | YAML 配置 + `Task(subagent_name="xxx")`                                 | 子 Agent 禁止嵌套调用 `Task` |
+| **kimi-cli**    | YAML 配置 + `CreateSubagent` / `Task`                                   | 子 Agent 禁止嵌套调用 `Task` |
 | **Claude Code** | Skill: `agent-teams-playbook`                                           | 按 skill 定义流程执行        |
+
+### kimi-cli 环境执行详情
+
+> ✅ 已验证可用（2026-03-01）：CreateSubagent 和 Task 工具完全可用
+
+**配置方式**：通过 `.kimi/config.yaml` 配置多 Agent：
+
+```yaml
+version: 1
+agent:
+  name: codemap-checker
+  extend: default
+  system_prompt_path: ./system.md
+  tools:
+    - "kimi_cli.tools.multiagent:CreateSubagent"  # 创建动态子 Agent
+    - "kimi_cli.tools.multiagent:Task"            # 调用子 Agent
+  subagents:
+    ci-checker:                                    # 预定义子 Agent
+      path: ./subagents/ci-checker.yaml
+      description: "CI Gateway 设计检查员"
+```
+
+**子 Agent 配置示例** (`.kimi/subagents/ci-checker.yaml`)：
+
+```yaml
+version: 1
+agent:
+  name: ci-checker
+  system_prompt_path: ./prompt.md
+  tools:
+    - "kimi_cli.tools.shell:Shell"
+    - "kimi_cli.tools.file:ReadFile"
+```
+
+**使用方法**：
+
+```bash
+# 方式1: 使用配置文件启动
+kimi --agent-file .kimi/config.yaml
+
+# 方式2: 动态创建子 Agent
+CreateSubagent({
+  name: "my-checker",
+  system_prompt: "你的角色描述..."
+})
+
+# 调用子 Agent 执行任务
+Task({
+  subagent_name: "my-checker",
+  description: "任务描述",
+  prompt: "详细任务指令..."
+})
+```
+
+**约束**：
+1. 子 Agent 配置中**禁止**使用 `extend` 指向包含自身的主配置（会导致循环引用）
+2. 子 Agent **禁止**嵌套调用 `Task`（避免无限递归）
+3. 主协调器必须做最终汇总与验收
 
 ### Codex CLI 环境执行详情（强制）
 

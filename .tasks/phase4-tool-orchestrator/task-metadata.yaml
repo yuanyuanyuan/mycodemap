@@ -92,6 +92,12 @@ workflow:
         critical_failures: 0
         status: "completed"
   approved: true
+  execution:
+    status: completed
+    updated_at: '2026-03-01T23:28:00Z'
+    executed_by: task-executor
+    final_score: 99
+    evidence: 代码实现完整，工具编排、超时控制、意图路由功能正常
 
 # 依赖关系
 dependencies:

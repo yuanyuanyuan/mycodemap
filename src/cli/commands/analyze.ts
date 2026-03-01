@@ -10,6 +10,8 @@ import { DepsCommand } from './deps.js';
 import { ComplexityCommand } from './complexity.js';
 import type { AnalyzeArgs, IntentType, CodemapOutput, UnifiedResult, Confidence } from '../../orchestrator/types.js';
 import { resolveTestFile } from '../../orchestrator/test-linker.js';
+import { ToolOrchestrator } from '../../orchestrator/tool-orchestrator.js';
+import { ResultFusion } from '../../orchestrator/result-fusion.js';
 
 /**
  * 错误码定义
@@ -110,7 +112,15 @@ export class AnalyzeCommand {
     const scope = this.args.scope || 'direct';
     const topK = this.args.topK || 8;
 
-    // 根据 intent 路由
+    // 尝试使用 ToolOrchestrator 和 ResultFusion
+    try {
+      return await this.executeWithOrchestrator(intent, scope, topK);
+    } catch (error) {
+      // 回退到原有实现
+      console.warn('[Analyze] Orchestrator not available, falling back to legacy mode');
+    }
+
+    // 根据 intent 路由 (legacy)
     switch (intent) {
       case 'impact':
         return this.executeImpact(scope, topK);
@@ -121,6 +131,49 @@ export class AnalyzeCommand {
       default:
         return this.executeImpact(scope, topK);
     }
+  }
+
+  /**
+   * 使用编排器执行分析
+   */
+  private async executeWithOrchestrator(intent: string, scope: string, topK: number): Promise<CodemapOutput> {
+    const orchestrator = new ToolOrchestrator();
+    const fusion = new ResultFusion();
+
+    // 构建意图对象
+    const intentObj: import('../../orchestrator/types.js').CodemapIntent = {
+      intent: intent as IntentType,
+      targets: this.args.targets || [],
+      keywords: this.args.keywords || [],
+      scope: scope as 'direct' | 'transitive',
+      tool: 'codemap',
+    };
+
+    // 执行工具（使用回退链）
+    const result = await orchestrator.executeWithFallback(intentObj, 'codemap');
+
+    // 融合结果
+    const resultsByTool = new Map<string, UnifiedResult[]>();
+    if (result.tool && result.results) {
+      resultsByTool.set(result.tool, result.results);
+    }
+    const fusedResults = fusion.fuse(resultsByTool, { topK, keywordWeights: {}, maxTokens: 160 });
+
+    return {
+      schemaVersion: 'v1.0.0',
+      intent: intent as IntentType,
+      tool: 'codemap-orchestrated',
+      confidence: {
+        score: result.confidence?.score || 0,
+        level: result.confidence?.level || 'low',
+      },
+      results: fusedResults,
+      metadata: {
+        total: fusedResults.length,
+        scope,
+        resultCount: fusedResults.length,
+      },
+    };
   }
 
   /**
