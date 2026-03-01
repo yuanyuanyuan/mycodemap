@@ -5,8 +5,12 @@
 
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { AnalyzeArgs, UnifiedResult, ConfidenceResult } from '../types.js';
+import type { AnalyzeArgs, UnifiedResult, ConfidenceResult, CodemapIntent } from '../types.js';
 import { calculateConfidence } from '../confidence.js';
+import { ToolOrchestrator } from '../tool-orchestrator.js';
+import { IntentRouter } from '../intent-router.js';
+import { ResultFusion } from '../result-fusion.js';
+import { createCodemapAdapter } from '../adapters/codemap-adapter.js';
 import { WorkflowPersistence } from './workflow-persistence.js';
 import { PhaseCheckpoint } from './phase-checkpoint.js';
 import {
@@ -31,11 +35,28 @@ export class WorkflowOrchestrator {
   private phaseDefinitions: Map<WorkflowPhase, PhaseDefinition>;
   private persistence: WorkflowPersistence;
   private phaseCheckpoint: PhaseCheckpoint;
+  private toolOrchestrator: ToolOrchestrator;
+  private intentRouter: IntentRouter;
+  private resultFusion: ResultFusion;
 
   constructor() {
     this.phaseDefinitions = this.initializePhaseDefinitions();
     this.persistence = new WorkflowPersistence();
     this.phaseCheckpoint = new PhaseCheckpoint();
+    this.toolOrchestrator = new ToolOrchestrator();
+    this.intentRouter = new IntentRouter();
+    this.resultFusion = new ResultFusion();
+
+    // 注册工具适配器
+    this.registerAdapters();
+  }
+
+  /**
+   * 注册工具适配器
+   */
+  private registerAdapters(): void {
+    // 注册 CodeMap 适配器
+    this.toolOrchestrator.registerAdapter(createCodemapAdapter());
   }
 
   /**
@@ -130,16 +151,78 @@ export class WorkflowOrchestrator {
 
   /**
    * 运行分析
+   *
+   * 集成 ToolOrchestrator 和 ResultFusion 执行真实的分析
    */
   private async runAnalysis(
     intent: string,
     analyzeArgs: AnalyzeArgs
   ): Promise<UnifiedResult[]> {
-    // 这里可以调用现有的分析器
-    // 为了简化，暂时返回空结果
-    // 实际实现中会调用 AnalyzeCommand 或 ToolOrchestrator
-    console.log(`Running analysis with intent: ${intent}`);
-    return [];
+    try {
+      // 1. 使用 IntentRouter 将参数转换为 CodemapIntent
+      const mergedArgs: AnalyzeArgs = {
+        ...analyzeArgs,
+        intent: intent
+      };
+      const codemapIntent = this.intentRouter.route(mergedArgs);
+
+      console.log(`Running analysis with intent: ${intent}, targets: ${codemapIntent.targets.join(', ')}`);
+
+      // 2. 并行执行多个工具
+      const tools = this.selectTools(codemapIntent);
+      const resultsByTool = await this.toolOrchestrator.executeParallel(codemapIntent, tools);
+
+      // 3. 使用 ResultFusion 融合结果
+      const fusedResults = this.resultFusion.fuse(resultsByTool, {
+        topK: analyzeArgs.topK ?? 8,
+        intent: intent,
+        keywordWeights: this.buildKeywordWeights(codemapIntent.keywords)
+      });
+
+      console.log(`Analysis completed: ${fusedResults.length} results`);
+      return fusedResults;
+    } catch (error) {
+      // 错误处理：工具失败时返回空数组而非抛出异常
+      console.error(`Analysis failed for intent ${intent}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * 根据意图选择要执行的工具列表
+   */
+  private selectTools(intent: CodemapIntent): string[] {
+    // 根据意图类型选择工具
+    switch (intent.intent) {
+      case 'search':
+      case 'refactor':
+      case 'reference':
+        // 需要 AST 分析的工具
+        return ['codemap'];
+      case 'impact':
+      case 'dependency':
+      case 'complexity':
+      case 'overview':
+      case 'documentation':
+      default:
+        // 默认使用 codemap
+        return ['codemap'];
+    }
+  }
+
+  /**
+   * 构建关键词权重映射
+   */
+  private buildKeywordWeights(keywords: string[]): Record<string, number> {
+    const weights: Record<string, number> = {};
+    if (keywords.length > 0) {
+      // 为每个关键词分配基础权重
+      const baseWeight = 0.1 / keywords.length;
+      for (const keyword of keywords) {
+        weights[keyword] = baseWeight;
+      }
+    }
+    return weights;
   }
 
   /**

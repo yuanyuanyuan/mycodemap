@@ -5,8 +5,8 @@
 
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { ToolAdapter } from './base-adapter.js';
-import type { UnifiedResult, ToolOptions } from '../types.js';
+import type { UnifiedResult, ToolOptions, CodemapIntent } from '../types.js';
+import type { ToolAdapter } from '../tool-orchestrator.js';
 import { ImpactCommand } from '../../cli/commands/impact.js';
 import { DepsCommand } from '../../cli/commands/deps.js';
 import { ComplexityCommand } from '../../cli/commands/complexity.js';
@@ -52,20 +52,19 @@ export class CodemapAdapter implements ToolAdapter {
 
   /**
    * 执行 CodeMap 分析
-   * 根据 options.intent 调用对应的命令
+   * 根据 CodemapIntent 调用对应的命令
    */
-  async execute(keywords: string[], options: ToolOptions): Promise<UnifiedResult[]> {
-    const intent = (options.intent as string) || 'impact';
-    const targets = (options.targets as string[]) || [];
-    const scope = (options.scope as 'direct' | 'transitive') || 'direct';
-    const topK = options.topK || 8;
+  async execute(intent: CodemapIntent): Promise<UnifiedResult[]> {
+    const targets = intent.targets || [];
+    const scope = intent.scope || 'direct';
+    const keywords = intent.keywords || [];
+    const topK = 8;
 
     // 根据 intent 路由到对应命令
-    switch (intent) {
+    switch (intent.intent) {
       case 'impact':
         return this.executeImpact(targets, scope, topK, keywords);
       case 'dependency':
-      case 'deps':
         return this.executeDeps(targets, topK, keywords);
       case 'complexity':
         return this.executeComplexity(targets, topK, keywords);
