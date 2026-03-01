@@ -1,7 +1,6 @@
 /**
- * Orchestrator 模块入口
- *
- * 导出编排层的所有核心类型和类
+ * [META] Orchestrator 模块入口
+ * [WHY] 导出编排层的所有核心类型和类
  */
 
 // 类型导出
@@ -59,3 +58,12 @@ export type {
   RiskLevel,
   RiskScore
 } from './git-analyzer.js';
+
+// TestLinker 导出
+export { TestLinker, resolveTestFile, resolveTestFiles } from './test-linker.js';
+export type {
+  TestLinkerOptions,
+  TestMapping,
+  TestConfig,
+  CodemapData
+} from './test-linker.js';
