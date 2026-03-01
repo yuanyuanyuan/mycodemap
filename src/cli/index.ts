@@ -96,19 +96,9 @@ program
   .option('--include-git-history', '包含 Git 历史')
   .option('--json', 'JSON 格式输出')
   .option('--output-mode <mode>', '输出模式 (machine|human)')
-  .action(async (options) => {
-    const argv = [
-      ...(options.intent ? [`--intent`, options.intent] : []),
-      ...(options.targets ? options.targets.flatMap((t: string) => [`--targets`, t]) : []),
-      ...(options.keywords ? options.keywords.flatMap((k: string) => [`--keywords`, k]) : []),
-      ...(options.scope ? [`--scope`, options.scope] : []),
-      ...(options.topK ? [`--topK`, options.topK] : []),
-      ...(options.includeTests ? [`--include-tests`] : []),
-      ...(options.includeGitHistory ? [`--include-git-history`] : []),
-      ...(options.json ? [`--json`] : []),
-      ...(options.outputMode ? [`--output-mode`, options.outputMode] : []),
-    ];
-    await analyzeCommand(argv);
+  .action(async () => {
+    // 跳过 program name 和 command name
+    await analyzeCommand(process.argv.slice(2));
   });
 
 // CI Gateway 命令

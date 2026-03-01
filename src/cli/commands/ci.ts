@@ -7,6 +7,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { validateCommitMessage, validateRecentCommits } from '../../orchestrator/commit-validator.js';
 import { scanDirectory, assessRisk, type FileHeaderResult } from '../../orchestrator/file-header-scanner.js';
+import { isCodemapOutput } from '../../orchestrator/types.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -17,6 +18,7 @@ export enum CIErrorCode {
   E0007_INVALID_COMMIT_FORMAT = 'E0007',
   E0008_MISSING_HEADER = 'E0008',
   E0009_MISSING_WHY = 'E0009',
+  E0010_OUTPUT_CONTRACT_VIOLATION = 'E0010',
 }
 
 /**
@@ -26,6 +28,7 @@ export const CI_ERROR_MESSAGES: Record<CIErrorCode, string> = {
   [CIErrorCode.E0007_INVALID_COMMIT_FORMAT]: 'Commit 格式不符合规范',
   [CIErrorCode.E0008_MISSING_HEADER]: '文件头缺少 [META] 或 [WHY] 注释',
   [CIErrorCode.E0009_MISSING_WHY]: '高风险文件缺少 [WHY] 注释',
+  [CIErrorCode.E0010_OUTPUT_CONTRACT_VIOLATION]: '输出契约校验失败',
 };
 
 /**
@@ -147,34 +150,110 @@ async function assessRiskAction(options: { files?: string }): Promise<void> {
 /**
  * check-output-contract 子命令 - 验证输出契约
  */
-function checkOutputContractAction(): void {
-  // 读取 package.json 验证版本
-  const packageJsonPath = join(process.cwd(), 'package.json');
+async function checkOutputContractAction(options: {
+  schemaVersion?: string;
+  topK?: string;
+  maxTokens?: string;
+}): Promise<void> {
+  const schemaVersion = options.schemaVersion || 'v1.0.0';
+  const topK = parseInt(options.topK || '8', 10);
+  const maxTokens = parseInt(options.maxTokens || '160', 10);
+
+  console.log(chalk.blue('=== Output Contract Check ===\n'));
+  console.log(chalk.bold('Schema Version:'), schemaVersion);
+  console.log(chalk.bold('Top-K Limit:'), topK);
+  console.log(chalk.bold('Max Tokens:'), maxTokens);
+  console.log();
+
+  // 运行 analyze 命令获取 machine 模式输出
+  const { execSync } = await import('child_process');
+  let output: string;
 
   try {
-    const content = readFileSync(packageJsonPath, 'utf-8');
-    const pkg = JSON.parse(content);
-
-    console.log(chalk.blue('=== Output Contract Check ===\n'));
-    console.log(chalk.bold('Package:'), pkg.name);
-    console.log(chalk.bold('Version:'), pkg.version);
-    console.log(chalk.bold('Main:'), pkg.main ?? 'N/A');
-    console.log(chalk.bold('Types:'), pkg.types ?? pkg.typing ?? 'N/A');
-
-    // 验证必要字段
-    const required = ['name', 'version', 'main'];
-    const missing = required.filter((f) => !pkg[f]);
-
-    if (missing.length > 0) {
-      console.error(chalk.red(`\n❌ Missing required fields: ${missing.join(', ')}`));
-      process.exit(1);
-    }
-
-    console.log(chalk.green('\n✅ Output contract valid.'));
-  } catch (err) {
-    console.error(chalk.red('❌ Failed to read package.json'));
+    output = execSync('node dist/cli/index.js analyze -i impact -t src/index.ts --output-mode machine', {
+      encoding: 'utf-8',
+      timeout: 30000,
+      cwd: process.cwd(),
+    });
+  } catch (error) {
+    console.error(chalk.red(`❌ [${CIErrorCode.E0010_OUTPUT_CONTRACT_VIOLATION}] Failed to run analyze command`));
     process.exit(1);
   }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(output);
+  } catch {
+    console.error(chalk.red(`❌ [${CIErrorCode.E0010_OUTPUT_CONTRACT_VIOLATION}] Invalid JSON output`));
+    process.exit(1);
+  }
+
+  let errors = 0;
+
+  // 1. 校验 schemaVersion
+  if (!isCodemapOutput(parsed)) {
+    console.error(chalk.red(`❌ [${CIErrorCode.E0010_OUTPUT_CONTRACT_VIOLATION}] Missing required fields in output`));
+    errors++;
+  } else {
+    const output_1 = parsed;
+
+    if (!output_1.schemaVersion) {
+      console.error(chalk.red('❌ Missing schemaVersion in output'));
+      errors++;
+    } else if (output_1.schemaVersion !== schemaVersion) {
+      console.error(chalk.red(`❌ schemaVersion mismatch: expected ${schemaVersion}, got ${output_1.schemaVersion}`));
+      errors++;
+    }
+
+    // 2. 校验 confidence 字段完整性
+    if (!output_1.confidence) {
+      console.error(chalk.red('❌ Missing confidence in output'));
+      errors++;
+    } else {
+      if (typeof output_1.confidence.score !== 'number') {
+        console.error(chalk.red('❌ Missing confidence.score in output'));
+        errors++;
+      }
+      if (!['high', 'medium', 'low'].includes(output_1.confidence.level)) {
+        console.error(chalk.red('❌ Invalid confidence.level in output'));
+        errors++;
+      }
+    }
+
+    // 3. 校验 tool 字段
+    if (!output_1.tool) {
+      console.error(chalk.red('❌ Missing tool in output'));
+      errors++;
+    }
+
+    // 4. 校验 Top-K
+    const resultCount = output_1.results?.length || 0;
+    if (resultCount > topK) {
+      console.error(chalk.red(`❌ Result count ${resultCount} exceeds Top-K limit ${topK}`));
+      errors++;
+    }
+
+    // 5. 校验 token 限制 (简单估算)
+    if (output_1.results) {
+      for (const result of output_1.results) {
+        const content = (result as { content?: string }).content || '';
+        // 简单估算 token 数：按空格和中文分词
+        const tokenEstimate = content.split(/[\s\u4e00-\u9fa5]/).filter(Boolean).length;
+        if (tokenEstimate > maxTokens) {
+          console.error(chalk.red(`❌ Result token count ${tokenEstimate} exceeds limit ${maxTokens}`));
+          errors++;
+          break; // 只报告一次
+        }
+      }
+    }
+  }
+
+  if (errors > 0) {
+    console.error(chalk.red(`\n❌ ${errors} output contract violation(s) detected`));
+    process.exit(1);
+  }
+
+  console.log(chalk.green(`✅ Output contract validated (schema: ${schemaVersion}, topK: ≤${topK}, tokens: ≤${maxTokens})`));
 }
 
 /**
@@ -210,7 +289,10 @@ export function createCICommand(): Command {
   // check-output-contract 子命令
   ci
     .command('check-output-contract')
-    .description('验证输出契约 (package.json)')
+    .description('验证 analyze 命令的输出契约')
+    .option('-s, --schema-version <version>', '期望的 schema 版本', 'v1.0.0')
+    .option('-k, --top-k <number>', '期望的 Top-K 限制', '8')
+    .option('-t, --max-tokens <number>', '每个结果的最大 token 数', '160')
     .action(checkOutputContractAction);
 
   return ci;

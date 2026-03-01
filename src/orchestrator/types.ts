@@ -113,6 +113,16 @@ export interface AnalyzeArgs {
 }
 
 /**
+ * Confidence 置信度对象
+ */
+export interface Confidence {
+  /** 置信度分数 (0-1) */
+  score: number;
+  /** 置信度级别 */
+  level: 'high' | 'medium' | 'low';
+}
+
+/**
  * ConfidenceResult 置信度结果
  */
 export interface ConfidenceResult {
@@ -122,4 +132,66 @@ export interface ConfidenceResult {
   level: 'high' | 'medium' | 'low';
   /** 置信度来源说明 */
   reasons: string[];
+}
+
+/**
+ * CodemapOutput Codemap 统一输出格式
+ * 用于规范 analyze 命令的 machine/json 输出
+ */
+export interface CodemapOutput {
+  /** Schema 版本，格式: "v1.0.0" */
+  schemaVersion: string;
+  /** 执行的 intent 类型 */
+  intent: string;
+  /** 主要工具 */
+  tool: string;
+  /** 置信度信息 */
+  confidence: Confidence;
+  /** 结果列表 */
+  results: UnifiedResult[];
+  /** 可选的元数据 */
+  metadata?: {
+    /** 执行时间（毫秒） */
+    executionTime?: number;
+    /** 结果总数 */
+    resultCount?: number;
+    /** 总数（兼容旧字段） */
+    total?: number;
+    /** 范围 */
+    scope?: string;
+  };
+}
+
+/**
+ * 类型守卫：检查对象是否为 CodemapOutput
+ */
+export function isCodemapOutput(obj: unknown): obj is CodemapOutput {
+  if (typeof obj !== 'object' || obj === null) {
+    return false;
+  }
+
+  const output = obj as Record<string, unknown>;
+
+  // 检查必需字段
+  if (typeof output.schemaVersion !== 'string') return false;
+  if (typeof output.intent !== 'string') return false;
+  if (typeof output.tool !== 'string') return false;
+  if (typeof output.confidence !== 'object' || output.confidence === null) return false;
+
+  const confidence = output.confidence as Record<string, unknown>;
+  if (typeof confidence.score !== 'number') return false;
+  if (!['high', 'medium', 'low'].includes(confidence.level as string)) return false;
+
+  if (!Array.isArray(output.results)) return false;
+
+  return true;
+}
+
+/**
+ * 计算置信度级别
+ */
+export function calculateConfidenceLevel(score: number): 'high' | 'medium' | 'low' {
+  if (score >= 0.7) return 'high';
+  if (score >= 0.4) return 'medium';
+  return 'low';
 }

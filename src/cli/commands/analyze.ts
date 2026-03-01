@@ -8,7 +8,7 @@ import chalk from 'chalk';
 import { ImpactCommand } from './impact.js';
 import { DepsCommand } from './deps.js';
 import { ComplexityCommand } from './complexity.js';
-import type { AnalyzeArgs, IntentType } from '../../orchestrator/types.js';
+import type { AnalyzeArgs, IntentType, CodemapOutput, UnifiedResult, Confidence } from '../../orchestrator/types.js';
 import { resolveTestFile } from '../../orchestrator/test-linker.js';
 
 /**
@@ -126,7 +126,7 @@ export class AnalyzeCommand {
   /**
    * 执行影响分析
    */
-  private async executeImpact(scope: string, topK: number): Promise<unknown> {
+  private async executeImpact(scope: string, topK: number): Promise<CodemapOutput> {
     const command = new ImpactCommand();
     const args = {
       targets: this.args.targets || [],
@@ -138,27 +138,66 @@ export class AnalyzeCommand {
     // 关联测试文件
     const resultsWithTests = await this.attachTestFiles(results);
 
+    // 计算置信度
+    const confidenceScore = this.calculateConfidence(resultsWithTests);
+    const confidence: Confidence = {
+      score: confidenceScore,
+      level: confidenceScore >= 0.7 ? 'high' : confidenceScore >= 0.4 ? 'medium' : 'low',
+    };
+
+    const typedResults = resultsWithTests as UnifiedResult[];
+
     // 输出格式处理
     if (this.args.outputMode === 'machine' || this.args.json) {
       return {
+        schemaVersion: 'v1.0.0',
         intent: 'impact',
-        results: resultsWithTests.slice(0, topK),
+        tool: 'codemap-impact',
+        confidence,
+        results: typedResults.slice(0, topK),
         metadata: {
           total: resultsWithTests.length,
           scope,
+          resultCount: resultsWithTests.length,
         },
       };
     }
 
     // 人类可读输出
     this.printHumanOutput(resultsWithTests, 'impact');
-    return resultsWithTests;
+    return {
+      schemaVersion: 'v1.0.0',
+      intent: 'impact',
+      tool: 'codemap-impact',
+      confidence,
+      results: typedResults,
+      metadata: {
+        total: resultsWithTests.length,
+        scope,
+        resultCount: resultsWithTests.length,
+      },
+    };
+  }
+
+  /**
+   * 计算置信度分数
+   */
+  private calculateConfidence(results: unknown[]): number {
+    if (!results || results.length === 0) {
+      return 0;
+    }
+    // 基于结果数量和质量计算置信度
+    const resultCount = results.length;
+    // 假设至少有结果的情况下，基础置信度为 0.5
+    // 结果越多置信度越高
+    const score = Math.min(0.5 + (resultCount / 10), 1);
+    return Math.round(score * 100) / 100;
   }
 
   /**
    * 执行依赖分析
    */
-  private async executeDeps(topK: number): Promise<unknown> {
+  private async executeDeps(topK: number): Promise<CodemapOutput> {
     const command = new DepsCommand();
     const args = {
       targets: this.args.targets || [],
@@ -169,26 +208,49 @@ export class AnalyzeCommand {
     // 关联测试文件
     const resultsWithTests = await this.attachTestFiles(results);
 
+    // 计算置信度
+    const confidenceScore = this.calculateConfidence(resultsWithTests);
+    const confidence: Confidence = {
+      score: confidenceScore,
+      level: confidenceScore >= 0.7 ? 'high' : confidenceScore >= 0.4 ? 'medium' : 'low',
+    };
+
+    const typedResults = resultsWithTests as UnifiedResult[];
+
     // 输出格式处理
     if (this.args.outputMode === 'machine' || this.args.json) {
       return {
+        schemaVersion: 'v1.0.0',
         intent: 'dependency',
-        results: resultsWithTests.slice(0, topK),
+        tool: 'codemap-deps',
+        confidence,
+        results: typedResults.slice(0, topK),
         metadata: {
           total: resultsWithTests.length,
+          resultCount: resultsWithTests.length,
         },
       };
     }
 
     // 人类可读输出
     this.printHumanOutput(resultsWithTests, 'dependency');
-    return resultsWithTests;
+    return {
+      schemaVersion: 'v1.0.0',
+      intent: 'dependency',
+      tool: 'codemap-deps',
+      confidence,
+      results: typedResults,
+      metadata: {
+        total: resultsWithTests.length,
+        resultCount: resultsWithTests.length,
+      },
+    };
   }
 
   /**
    * 执行复杂度分析
    */
-  private async executeComplexity(topK: number): Promise<unknown> {
+  private async executeComplexity(topK: number): Promise<CodemapOutput> {
     const command = new ComplexityCommand();
     const args = {
       targets: this.args.targets || [],
@@ -199,20 +261,43 @@ export class AnalyzeCommand {
     // 关联测试文件
     const resultsWithTests = await this.attachTestFiles(results);
 
+    // 计算置信度
+    const confidenceScore = this.calculateConfidence(resultsWithTests);
+    const confidence: Confidence = {
+      score: confidenceScore,
+      level: confidenceScore >= 0.7 ? 'high' : confidenceScore >= 0.4 ? 'medium' : 'low',
+    };
+
+    const typedResults = resultsWithTests as UnifiedResult[];
+
     // 输出格式处理
     if (this.args.outputMode === 'machine' || this.args.json) {
       return {
+        schemaVersion: 'v1.0.0',
         intent: 'complexity',
-        results: resultsWithTests.slice(0, topK),
+        tool: 'codemap-complexity',
+        confidence,
+        results: typedResults.slice(0, topK),
         metadata: {
           total: resultsWithTests.length,
+          resultCount: resultsWithTests.length,
         },
       };
     }
 
     // 人类可读输出
     this.printHumanOutput(resultsWithTests, 'complexity');
-    return resultsWithTests;
+    return {
+      schemaVersion: 'v1.0.0',
+      intent: 'complexity',
+      tool: 'codemap-complexity',
+      confidence,
+      results: typedResults,
+      metadata: {
+        total: resultsWithTests.length,
+        resultCount: resultsWithTests.length,
+      },
+    };
   }
 
   /**
@@ -267,8 +352,9 @@ export class AnalyzeCommand {
  */
 export function parseAnalyzeArgs(argv: string[]): AnalyzeArgs {
   try {
-    const { values } = parseArgs({
+    const { values, positionals } = parseArgs({
       argv,
+      allowPositionals: true,
       options: {
         intent: {
           type: 'string',
@@ -315,9 +401,14 @@ export function parseAnalyzeArgs(argv: string[]): AnalyzeArgs {
       },
     });
 
+    // 合并位置参数和 --targets 参数作为 targets
+    const positionalTargets = positionals?.filter(p => !p.startsWith('-')) || [];
+    const explicitTargets = values.targets ? (Array.isArray(values.targets) ? values.targets : [values.targets]) : [];
+    const allTargets = [...explicitTargets, ...positionalTargets];
+
     return {
       intent: values.intent as AnalyzeArgs['intent'],
-      targets: values.targets as AnalyzeArgs['targets'],
+      targets: allTargets.length > 0 ? allTargets : undefined,
       keywords: values.keywords as AnalyzeArgs['keywords'],
       scope: values.scope as AnalyzeArgs['scope'],
       topK: values.topK ? parseInt(values.topK as string, 10) : undefined,
@@ -335,7 +426,9 @@ export function parseAnalyzeArgs(argv: string[]): AnalyzeArgs {
  * CLI 入口函数
  */
 export async function analyzeCommand(argv: string[]): Promise<void> {
-  const args = parseAnalyzeArgs(argv);
+  // 过滤掉 'analyze' 命令名
+  const filteredArgv = argv.filter(arg => arg !== 'analyze');
+  const args = parseAnalyzeArgs(filteredArgv);
 
   // 显示帮助
   if (args.intent === 'help' || !args.intent) {
