@@ -9,6 +9,7 @@ import { depsCommand } from './commands/deps.js';
 import { cyclesCommand } from './commands/cycles.js';
 import { complexityCommand } from './commands/complexity.js';
 import { impactCommand } from './commands/impact.js';
+import { analyzeCommand } from './commands/analyze.js';
 
 const program = new Command();
 
@@ -80,5 +81,32 @@ program
   .option('-t, --transitive', '包含传递依赖')
   .option('-j, --json', 'JSON 格式输出')
   .action(impactCommand);
+
+program
+  .command('analyze')
+  .description('统一分析入口 - 支持多种分析意图')
+  .option('-i, --intent <type>', '分析类型 (impact|dependency|search|documentation|complexity|overview|refactor|reference)')
+  .option('-t, --targets <paths...>', '目标文件/模块路径')
+  .option('-k, --keywords <words...>', '搜索关键词')
+  .option('-s, --scope <scope>', '范围 (direct|transitive)')
+  .option('-n, --topK <number>', '返回结果数量', '8')
+  .option('--include-tests', '包含测试文件')
+  .option('--include-git-history', '包含 Git 历史')
+  .option('--json', 'JSON 格式输出')
+  .option('--output-mode <mode>', '输出模式 (machine|human)')
+  .action(async (options) => {
+    const argv = [
+      ...(options.intent ? [`--intent`, options.intent] : []),
+      ...(options.targets ? options.targets.flatMap((t: string) => [`--targets`, t]) : []),
+      ...(options.keywords ? options.keywords.flatMap((k: string) => [`--keywords`, k]) : []),
+      ...(options.scope ? [`--scope`, options.scope] : []),
+      ...(options.topK ? [`--topK`, options.topK] : []),
+      ...(options.includeTests ? [`--include-tests`] : []),
+      ...(options.includeGitHistory ? [`--include-git-history`] : []),
+      ...(options.json ? [`--json`] : []),
+      ...(options.outputMode ? [`--output-mode`, options.outputMode] : []),
+    ];
+    await analyzeCommand(argv);
+  });
 
 program.parse();

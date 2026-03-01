@@ -2,11 +2,43 @@ import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
 import type { CodeMap, ModuleInfo } from '../../types/index.js';
+import type { UnifiedResult } from '../../orchestrator/types.js';
 
 interface ComplexityOptions {
   file?: string;
   json?: boolean;
 }
+
+// ===== 新增类型定义（供 ToolOrchestrator 使用） =====
+
+export interface ComplexityArgs {
+  targets?: string[];
+}
+
+export interface ComplexityInfo {
+  cyclomatic: number;
+  cognitive: number;
+  maintainability: number;
+  functions: number;
+  classes: number;
+  lines: number;
+}
+
+export interface ComplexityResult {
+  files: Array<{
+    path: string;
+    relativePath: string;
+    complexity: ComplexityInfo;
+  }>;
+  summary?: {
+    totalModules: number;
+    averageCyclomatic: number;
+    averageCognitive: number;
+    averageMaintainability: number;
+  };
+}
+
+// ===== 纯逻辑函数（从原有函数提取） =====
 
 /**
  * 加载代码地图数据
@@ -15,15 +47,13 @@ function loadCodeMap(rootDir: string): CodeMap | null {
   const codemapPath = path.join(rootDir, '.codemap', 'codemap.json');
 
   if (!fs.existsSync(codemapPath)) {
-    console.log(chalk.red('❌ 代码地图不存在，请先运行 codemap generate'));
     return null;
   }
 
   try {
     const data = fs.readFileSync(codemapPath, 'utf-8');
     return JSON.parse(data) as CodeMap;
-  } catch (error) {
-    console.log(chalk.red('❌ 读取代码地图失败:', error instanceof Error ? error.message : String(error)));
+  } catch {
     return null;
   }
 }
@@ -31,14 +61,7 @@ function loadCodeMap(rootDir: string): CodeMap | null {
 /**
  * 获取模块复杂度信息
  */
-function getModuleComplexity(module: ModuleInfo): {
-  cyclomatic: number;
-  cognitive: number;
-  maintainability: number;
-  functions: number;
-  classes: number;
-  lines: number;
-} {
+function getModuleComplexity(module: ModuleInfo): ComplexityInfo {
   // 如果模块已经有复杂度数据
   if (module.complexity) {
     return {
@@ -70,7 +93,48 @@ function getModuleComplexity(module: ModuleInfo): {
 }
 
 /**
- * 获取复杂度评级
+ * 分析复杂度（纯逻辑函数）
+ */
+function analyzeComplexity(codeMap: CodeMap, filePaths?: string[]): ComplexityResult {
+  const result: ComplexityResult = {
+    files: []
+  };
+
+  // 筛选目标模块
+  let modulesToAnalyze = codeMap.modules;
+  if (filePaths && filePaths.length > 0) {
+    modulesToAnalyze = codeMap.modules.filter(m =>
+      filePaths.some(fp =>
+        m.absolutePath.includes(fp) ||
+        path.relative(codeMap.project.rootDir, m.absolutePath).includes(fp)
+      )
+    );
+  }
+
+  // 计算每个模块的复杂度
+  for (const module of modulesToAnalyze) {
+    result.files.push({
+      path: module.absolutePath,
+      relativePath: path.relative(codeMap.project.rootDir, module.absolutePath),
+      complexity: getModuleComplexity(module)
+    });
+  }
+
+  // 计算汇总统计
+  if (result.files.length > 0) {
+    result.summary = {
+      totalModules: codeMap.modules.length,
+      averageCyclomatic: result.files.reduce((sum, f) => sum + f.complexity.cyclomatic, 0) / result.files.length,
+      averageCognitive: result.files.reduce((sum, f) => sum + f.complexity.cognitive, 0) / result.files.length,
+      averageMaintainability: result.files.reduce((sum, f) => sum + f.complexity.maintainability, 0) / result.files.length
+    };
+  }
+
+  return result;
+}
+
+/**
+ * 获取复杂度评级（内部使用）
  */
 function getComplexityRating(value: number, type: 'cyclomatic' | 'maintainability'): string {
   if (type === 'cyclomatic') {
@@ -87,12 +151,128 @@ function getComplexityRating(value: number, type: 'cyclomatic' | 'maintainabilit
 }
 
 /**
+ * 获取风险等级（内部使用）
+ */
+function getRiskLevel(complexity: ComplexityInfo): 'high' | 'medium' | 'low' {
+  if (complexity.cyclomatic > 20 || complexity.cognitive > 30 || complexity.maintainability < 40) {
+    return 'high';
+  }
+  if (complexity.cyclomatic > 10 || complexity.cognitive > 15 || complexity.maintainability < 60) {
+    return 'medium';
+  }
+  return 'low';
+}
+
+// ===== ComplexityCommand 类（供 ToolOrchestrator 调用） =====
+
+export class ComplexityCommand {
+  private codeMap: CodeMap | null = null;
+  private rootDir: string;
+
+  constructor(rootDir?: string) {
+    this.rootDir = rootDir || process.cwd();
+  }
+
+  /**
+   * 加载代码地图
+   */
+  private loadCodeMap(): CodeMap | null {
+    if (this.codeMap) {
+      return this.codeMap;
+    }
+    this.codeMap = loadCodeMap(this.rootDir);
+    return this.codeMap;
+  }
+
+  /**
+   * 运行复杂度分析，返回结构化结果
+   */
+  async run(args: ComplexityArgs): Promise<ComplexityResult> {
+    const codeMap = this.loadCodeMap();
+    if (!codeMap) {
+      throw new Error('代码地图不存在，请先运行 codemap generate');
+    }
+
+    return analyzeComplexity(codeMap, args.targets);
+  }
+
+  /**
+   * 增强模式，返回 UnifiedResult[]
+   */
+  async runEnhanced(args: ComplexityArgs): Promise<UnifiedResult[]> {
+    const result = await this.run(args);
+    return this.toUnifiedResults(result);
+  }
+
+  /**
+   * 将 ComplexityResult 转换为 UnifiedResult[]
+   */
+  private toUnifiedResults(result: ComplexityResult): UnifiedResult[] {
+    return result.files.map(file => {
+      const complexity = file.complexity;
+      const riskLevel = getRiskLevel(complexity);
+
+      // 基于复杂度计算相关性（复杂度越高相关性越高）
+      const relevance = Math.min(1, Math.max(0.3,
+        (complexity.cyclomatic / 50) * 0.4 +
+        (complexity.cognitive / 75) * 0.3 +
+        (1 - complexity.maintainability / 100) * 0.3
+      ));
+
+      // 确定类型：复杂度高则标记为 risk-assessment
+      const type: UnifiedResult['type'] = riskLevel === 'high' ? 'risk-assessment' : 'file';
+
+      // 生成人类可读的描述
+      const content = `圈复杂度: ${complexity.cyclomatic}, 认知复杂度: ${complexity.cognitive}, 可维护性: ${complexity.maintainability}`;
+
+      return {
+        id: `codemap-${file.path}-0`,
+        source: 'codemap',
+        toolScore: 0.9,
+        type,
+        file: file.path,
+        line: 0,
+        content,
+        relevance,
+        keywords: [],
+        metadata: {
+          symbolType: 'class',
+          dependencies: [],
+          testFile: '',
+          commitCount: 0,
+          gravity: 0,
+          heatScore: {
+            freq30d: 0,
+            lastType: '',
+            lastDate: ''
+          },
+          impactCount: 0,
+          stability: true,
+          riskLevel,
+          // 额外添加复杂度详细指标
+          complexityMetrics: {
+            cyclomatic: complexity.cyclomatic,
+            cognitive: complexity.cognitive,
+            maintainability: complexity.maintainability,
+            functions: complexity.functions,
+            classes: complexity.classes,
+            lines: complexity.lines
+          }
+        }
+      };
+    });
+  }
+}
+
+// ===== 原有 CLI 命令（保持兼容，使用控制台输出） =====
+
+/**
  * 格式化复杂度输出
  */
 function formatComplexity(
   codeMap: CodeMap,
   targetModule: ModuleInfo | undefined,
-  allComplexities: Array<{ module: ModuleInfo; complexity: ReturnType<typeof getModuleComplexity> }>,
+  allComplexities: Array<{ module: ModuleInfo; complexity: ComplexityInfo }>,
   options: ComplexityOptions
 ): void {
   if (options.json) {
@@ -183,20 +363,40 @@ function formatComplexity(
 }
 
 /**
- * Complexity 命令实现
+ * 加载代码地图数据（兼容旧函数，带控制台输出）
+ */
+function loadCodeMapWithOutput(rootDir: string): CodeMap | null {
+  const codemapPath = path.join(rootDir, '.codemap', 'codemap.json');
+
+  if (!fs.existsSync(codemapPath)) {
+    console.log(chalk.red('❌ 代码地图不存在，请先运行 codemap generate'));
+    return null;
+  }
+
+  try {
+    const data = fs.readFileSync(codemapPath, 'utf-8');
+    return JSON.parse(data) as CodeMap;
+  } catch (error) {
+    console.log(chalk.red('❌ 读取代码地图失败:', error instanceof Error ? error.message : String(error)));
+    return null;
+  }
+}
+
+/**
+ * Complexity 命令实现（原有函数，保持兼容）
  */
 export async function complexityCommand(options: ComplexityOptions) {
   const rootDir = process.cwd();
 
   // 加载代码地图
-  const codeMap = loadCodeMap(rootDir);
+  const codeMap = loadCodeMapWithOutput(rootDir);
   if (!codeMap) {
     process.exit(1);
   }
 
   // 获取目标模块
   let targetModule: ModuleInfo | undefined;
-  const allComplexities: Array<{ module: ModuleInfo; complexity: ReturnType<typeof getModuleComplexity> }> = [];
+  const allComplexities: Array<{ module: ModuleInfo; complexity: ComplexityInfo }> = [];
 
   if (options.file) {
     targetModule = codeMap.modules.find(m =>
