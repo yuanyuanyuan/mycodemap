@@ -105,6 +105,9 @@ $RECYCLE.BIN/
 coverage/
 .nyc_output/
 *.lcov
+test-*.md
+test_report*.md
+test-reports/
 
 # ============================================
 # Temporary Files
