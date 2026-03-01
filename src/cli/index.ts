@@ -11,6 +11,7 @@ import { complexityCommand } from './commands/complexity.js';
 import { impactCommand } from './commands/impact.js';
 import { analyzeCommand } from './commands/analyze.js';
 import { ciCommand } from './commands/ci.js';
+import { workflowCommand } from './commands/workflow.js';
 
 const program = new Command();
 
@@ -112,5 +113,8 @@ program
 
 // CI Gateway 命令
 program.addCommand(ciCommand);
+
+// Workflow 命令
+program.addCommand(workflowCommand);
 
 program.parse();

@@ -111,3 +111,15 @@ export interface AnalyzeArgs {
   json?: boolean;
   outputMode?: 'machine' | 'human';
 }
+
+/**
+ * ConfidenceResult 置信度结果
+ */
+export interface ConfidenceResult {
+  /** 置信度分数 (0-1) */
+  score: number;
+  /** 置信度级别 */
+  level: 'high' | 'medium' | 'low';
+  /** 置信度来源说明 */
+  reasons: string[];
+}
