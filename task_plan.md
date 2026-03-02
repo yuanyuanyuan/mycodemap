@@ -83,24 +83,24 @@ Phase 5
 - Dependencies: `src/orchestrator/types.ts`, `src/orchestrator/intent-router.ts`, `src/cli/commands/analyze.ts`, `src/orchestrator/__tests__`, `docs/REFACTOR_REQUIREMENTS.md`。
 
 ## Current Phase
-Phase 1
+Completed
 
 ## Phases
 ### Phase 1: 差异确认与方案冻结
-- [ ] 锁定文档-实现偏差点
-- [ ] 定义最小改动面
-- **Status:** in_progress
+- [x] 锁定文档-实现偏差点
+- [x] 定义最小改动面
+- **Status:** complete
 
 ### Phase 2: 代码修复
-- [ ] 类型与路由补齐 secondary
-- [ ] analyze 执行策略改为“有 secondary 并行，否则回退”
-- **Status:** pending
+- [x] 类型与路由补齐 secondary
+- [x] analyze 执行策略改为“有 secondary 并行，否则回退”
+- **Status:** complete
 
 ### Phase 3: 测试与收尾
-- [ ] 更新/新增测试并执行
-- [ ] 失败模式模拟
-- [ ] 检查 docs/AGENTS.md/CLAUDE.md/README.md 是否需同步
-- **Status:** pending
+- [x] 更新/新增测试并执行
+- [x] 失败模式模拟
+- [x] 检查 docs/AGENTS.md/CLAUDE.md/README.md 是否需同步
+- **Status:** complete
 
 ## Decisions Made
 | Decision | Rationale |
@@ -112,3 +112,14 @@ Phase 1
 | Error | Attempt | Resolution |
 |-------|---------|------------|
 | 暂无 | - | - |
+
+## Execution Update (2026-03-02)
+- Phase 1: complete
+- Phase 2: complete
+- Phase 3: complete
+
+## Acceptance Check
+- [x] `IntentRouter.route()` 在 impact 场景返回 secondary=`ast-grep`（`src/orchestrator/intent-router.ts:69`、`src/orchestrator/intent-router.ts:77`）。
+- [x] `AnalyzeCommand` 有 secondary 时走并行 `executeParallel`（`src/cli/commands/analyze.ts:164`、`src/cli/commands/analyze.ts:166`）。
+- [x] 无 secondary 时走 `executeWithFallback`（`src/cli/commands/analyze.ts:179`）。
+- [x] 测试通过（见 progress.md Test Results）。

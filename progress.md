@@ -79,7 +79,7 @@
 ## Session: 2026-03-02 (analyze 路由/执行策略修复)
 
 ### Phase 1: 差异确认与方案冻结
-- **Status:** in_progress
+- **Status:** complete
 - Actions taken:
   - 读取并对照需求文档与现有实现。
   - 确认两处偏差：secondary 缺失、并行执行缺失。
@@ -88,3 +88,28 @@
   - `task_plan.md` (updated)
   - `findings.md` (updated)
   - `progress.md` (updated)
+
+### Phase 2: 代码修复
+- **Status:** complete
+- Actions taken:
+  - 扩展 `CodemapIntent` 增加可选 `secondary` 字段。
+  - `impact` 路由返回 `secondary=ast-grep`。
+  - `analyze` 执行链按是否存在 secondary 在并行与回退模式间切换。
+  - 更新 `intent-router` 单测覆盖 secondary 断言。
+- Files created/modified:
+  - `src/orchestrator/types.ts` (updated)
+  - `src/orchestrator/intent-router.ts` (updated)
+  - `src/cli/commands/analyze.ts` (updated)
+  - `src/orchestrator/__tests__/intent-router.test.ts` (updated)
+
+### Phase 3: 验证与收尾
+- **Status:** complete
+- Actions taken:
+  - 使用 awaiter 运行 targeted vitest 验证。
+  - 完成失败模式模拟并记录风险与缓解路径。
+  - 检查 `docs/`, `AGENTS.md`, `CLAUDE.md`, `README.md` 是否需同步更新（本次无需改动）。
+
+## Test Results (2026-03-02)
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| intent-router + tool-orchestrator | `pnpm vitest run src/orchestrator/__tests__/intent-router.test.ts src/orchestrator/__tests__/tool-orchestrator.test.ts` | 目标测试通过 | 2 files, 14 tests passed, exit=0, ~558ms | ✓ |

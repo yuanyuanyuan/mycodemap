@@ -35,77 +35,6 @@ npx vitest run --coverage
 node dist/cli/index.js <command>
 ```
 
-## Codemap 自我维护规范
-
-> 每次任务完成后都要执行以下维护命令，确保代码健康度
-
-### 开发前：更新代码地图
-```bash
-# 构建项目后生成代码地图
-npm run build && node dist/cli/index.js generate
-```
-
-### 开发中：监听变更
-```bash
-# 启动后台守护进程，自动增量更新
-node dist/cli/index.js watch -d
-
-# 查看守护进程状态
-node dist/cli/index.js watch -t
-```
-
-### 修改文件前：评估影响范围
-```bash
-# 评估变更影响（包含传递依赖）
-node dist/cli/index.js impact -f <file-path> --transitive
-
-# 检测循环依赖
-node dist/cli/index.js cycles
-
-# 查看模块依赖树
-node dist/cli/index.js deps -m <module-path>
-```
-
-### 提交前：CI 门禁检查（强制）
-```bash
-# 1. 检查 commit 格式
-node dist/cli/index.js ci check-commits
-
-# 2. 检查文件头注释
-node dist/cli/index.js ci check-headers
-
-# 3. 评估变更风险
-node dist/cli/index.js ci assess-risk
-```
-
-### 日常查询
-```bash
-# 模糊搜索符号
-node dist/cli/index.js query -S "<keyword>"
-
-# 精确查询模块
-node dist/cli/index.js query -m "<module-path>"
-
-# 分析代码复杂度
-node dist/cli/index.js complexity -f <file-path>
-
-# 统一分析入口（支持自然语言）
-node dist/cli/index.js analyze "分析 confidence.ts 的影响范围"
-```
-
-### 工作流编排
-```bash
-# 启动工作流
-node dist/cli/index.js workflow start
-
-# 查看状态
-node dist/cli/index.js workflow status
-
-# 创建检查点
-node dist/cli/index.js workflow checkpoint
-```
-
-> **注意**：由于是项目自身，使用 `node dist/cli/index.js <command>` 而非全局的 `codemap <command>`
 
 ## 项目结构
 
@@ -150,62 +79,9 @@ src/
 └── types/            # 类型定义
 ```
 
-## 测试覆盖
 
-### 当前测试统计
+|
 
-| 模块         | 测试文件数 | 测试数量 | 状态                 |
-|--------------|------------|----------|----------------------|
-| orchestrator | 11         | 408      | ✅ 通过               |
-| adapters     | 4          | 100      | ✅ 通过               |
-| workflow     | 6          | 142      | ✅ 通过               |
-| cli/commands | 9          | 91       | ⚠️ 部分              |
-| parser       | 2          | 20       | ✅ 通过               |
-| cache        | 2          | 44       | ✅ 通过               |
-| core         | 1          | 10       | ✅ 通过               |
-| generator    | 1          | 10       | ✅ 通过               |
-| plugins      | 1          | 9        | ✅ 通过               |
-| **总计**     | **~37**    | **~834** | **actively growing** |
-
-### 最新测试生成任务
-
-位于 `.tasks/` 目录：
-
-| 任务组              | 目标模块                | 生成测试数 | 状态    |
-|---------------------|-------------------------|------------|---------|
-| group-a-core        | confidence.ts, types.ts | 166        | ✅ 完成  |
-| group-b-adapters-v2 | adapters/*              | 100        | ✅ 完成  |
-| group-c-cli         | cli/commands/*          | 91         | ⚠️ 部分 |
-| group-d-workflow    | workflow/*              | 142        | ✅ 完成  |
-
-## 任务技能闭环流程
-
-完整工作流：**生成 → 验收 → 审核 → 执行 → 分析 → 改进**
-
-| 阶段 | 技能              | 用途                 | 触发词   |
-|------|-------------------|----------------------|----------|
-| 生成 | `task-generator`  | 生成任务四件套       | 创建任务 |
-| 验收 | `task-qa`         | 质量验收             | 验收任务 |
-| 审核 | `task-supervisor` | 4维度语义审核        | 审核任务 |
-| 执行 | `task-executor`   | 执行任务四件套       | 执行任务 |
-| 分析 | `task-analyzer`   | 分析审计任务质量     | 审计任务 |
-| 改进 | -                 | 根据审计结果重新生成 | -        |
-
-```
-┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│   生成任务    │ -> │   质量验收    │ -> │   最终审核    │
-│task-generator│    │   task-qa    │    │task-supervisor│
-└──────────────┘    └──────────────┘    └──────────────┘
-                                               │
-┌──────────────┐    ┌──────────────┐          │
-│   审计分析    │ <- │   执行任务    │ <-  批准执行
-│task-analyzer │    │task-executor │
-└──────────────┘    └──────────────┘
-       │
-       └──────────────── 发现问题，改进优化
-```
-
-> **重要**: 五个技能必须配套使用，形成完整的任务管理闭环。
 
 ## 设计文档索引
 
@@ -261,60 +137,4 @@ For complex tasks (3+ steps, research, projects):
 - 若确需临时豁免，必须先获得明确人工批准，并记录原因、范围与失效时间。
 </IMPORTANT>
 
-<IMPORTANT>
-**强制约束 - 工具选择规范（根据综合推荐表）**
 
-基于 comprehensive_test_report.md 的工具推荐，选择最适合的工具：
-
-| 需求         | 推荐工具             | 原因                                  |
-|--------------|----------------------|---------------------------------------|
-| 快速文本搜索 | **rg/grep**          | 速度快60-300倍，无需索引               |
-| 符号定义查找 | **CodeMap**          | 结构化输出，带类型信息（需修复搜索算法） |
-| 依赖分析     | **CodeMap**          | 双向分析、循环检测、传递依赖            |
-| 影响范围评估 | **CodeMap**          | 独有传递依赖分析，风险评估             |
-| 复杂度监控   | **ESLint/SonarQube** | CodeMap指标计算不准确                 |
-| CI/CD集成    | **CodeMap**          | JSON输出便于自动化（需修复格式问题）    |
-| IDE插件开发  | **CodeMap**          | 语义化查询，结构化输出                 |
-
-### ✅ 场景化工具选择
-
-| 场景           | 禁止命令                 | 必须使用                                         |
-|----------------|--------------------------|--------------------------------------------------|
-| 搜索符号/函数  | `grep -r "functionName"` | `node dist/cli/index.js query -S "functionName"` |
-| 查找文件       | `find . -name "*.ts"`    | `node dist/cli/index.js query -f "*.ts"`         |
-| 查看模块结构   | `rg "export class"`      | `node dist/cli/index.js query -m "module-path"`  |
-| 分析依赖关系   | 手动追踪 import          | `node dist/cli/index.js deps -m "module-path"`   |
-| 评估变更影响   | 人工分析依赖             | `node dist/cli/index.js impact -f <file>`        |
-| 检查循环依赖   | `grep` 组合命令          | `node dist/cli/index.js cycles`                  |
-| 代码复杂度分析 | codemap complexity       | **ESLint/SonarQube**                             |
-| 快速文本搜索   | codemap query            | **rg/grep**                                      |
-
-### 🎯 核心原则
-
-1. **按需选择**：根据具体需求选择最适合的工具，不是非 codemap 不可
-2. **高频验证**：对 codemap 优势场景（依赖分析、影响评估）高频使用，发现 bug
-3. **发现问题**：通过高频使用主动发现 codemap 的问题（搜索算法、格式问题、复杂度计算）
-4. **积累数据**：每次使用都是数据积累，帮助改进工具的准确性和覆盖度
-
-### ⚠️ 正确使用场景（codemap 优势场景）
-
-- 符号定义查找（带类型信息）
-- 依赖分析（双向、循环检测、传递依赖）
-- 影响范围评估（传递依赖分析）
-- CI/CD 集成（JSON 输出）
-- IDE 插件开发（语义化查询）
-
-### ⚠️ 正确使用例外（应使用其他工具）
-
-- **快速文本搜索**：使用 `rg` 或 `grep`，codemap 速度较慢
-- **复杂度监控**：使用 ESLint/SonarQube，codemap 指标计算不准确
-
-仅在以下情况允许使用传统工具：
-- codemap 工具尚未构建（`dist/` 不存在）
-- codemap 本身出现严重故障，需要紧急排查
-- 需要搜索非代码文件（如 `.md`, `.json` 配置文件）
-
-
-
-> **目的**：按需选择工具，在 codemap 优势场景高频使用以发现问题，同时不回避其不足之处。
-</IMPORTANT>

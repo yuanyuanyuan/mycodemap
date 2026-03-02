@@ -50,3 +50,15 @@
 
 ### 初步结论
 - 当前实现与设计文档在“路由表达能力”和“执行策略”两点存在偏差。
+
+### 实施结果
+- `CodemapIntent` 新增可选 `secondary` 字段（`src/orchestrator/types.ts:101`）。
+- `IntentRouter` 在 `impact` 路由时返回 `secondary = "ast-grep"`（`src/orchestrator/intent-router.ts:69`、`src/orchestrator/intent-router.ts:77`）。
+- `AnalyzeCommand.executeWithOrchestrator()` 改为：有 `secondary` 时使用 `executeParallel` + `ResultFusion.fuse`，否则使用 `executeWithFallback`（`src/cli/commands/analyze.ts:164`、`src/cli/commands/analyze.ts:166`、`src/cli/commands/analyze.ts:179`）。
+- 新增路由测试断言 secondary 行为（`src/orchestrator/__tests__/intent-router.test.ts:28`、`src/orchestrator/__tests__/intent-router.test.ts:41`）。
+
+### 失败模式模拟（强制）
+- 触发：Workflow 路径仍未使用 `secondary`，`selectTools()` 当前固定返回 `[codemap]`。
+- 证据：`runAnalysis()` 虽调用了 `route()`，但后续 `selectTools()` 只按 intent 返回 codemap（`src/orchestrator/workflow/workflow-orchestrator.ts:170`、`src/orchestrator/workflow/workflow-orchestrator.ts:197`、`src/orchestrator/workflow/workflow-orchestrator.ts:204`）。
+- 风险：CLI 与 Workflow 在多工具策略上出现行为分叉。
+- 缓解：后续将 Workflow 的 `selectTools()` 对齐到 `tool + secondary` 策略，并补回归测试。
