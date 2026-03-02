@@ -98,6 +98,7 @@ export interface CodemapIntent {
   keywords: string[];
   scope: 'direct' | 'transitive';
   tool: string;
+  secondary?: string;
 }
 
 /**

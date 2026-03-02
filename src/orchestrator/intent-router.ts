@@ -1,3 +1,6 @@
+// [META] since:2026-03-02 | owner:orchestrator-team | stable:true
+// [WHY] Route analyze intents to primary/secondary tools with whitelist validation
+
 /**
  * IntentRouter - 意图路由
  *
@@ -66,13 +69,15 @@ export class IntentRouter {
 
     // 确定工具
     const tool = args.intent ? INTENT_DEFAULT_TOOL[intent] : 'codemap';
+    const secondary = intent === 'impact' ? 'ast-grep' : undefined;
 
     return {
       intent,
       targets,
       keywords,
       scope,
-      tool
+      tool,
+      secondary
     };
   }
 

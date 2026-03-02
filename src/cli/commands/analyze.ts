@@ -14,6 +14,7 @@ import { ToolOrchestrator } from '../../orchestrator/tool-orchestrator.js';
 import { ResultFusion } from '../../orchestrator/result-fusion.js';
 import { CodemapAdapter } from '../../orchestrator/adapters/codemap-adapter.js';
 import { AstGrepAdapter } from '../../orchestrator/adapters/ast-grep-adapter.js';
+import { IntentRouter } from '../../orchestrator/intent-router.js';
 
 /**
  * 错误码定义
@@ -148,39 +149,51 @@ export class AnalyzeCommand {
     orchestrator.registerAdapter(astGrepAdapter);
 
     const fusion = new ResultFusion();
+    const intentRouter = new IntentRouter();
 
     // 构建意图对象
-    const intentObj: import('../../orchestrator/types.js').CodemapIntent = {
-      intent: intent as IntentType,
-      targets: this.args.targets || [],
-      keywords: this.args.keywords || [],
-      scope: scope as 'direct' | 'transitive',
-      tool: 'codemap',
-    };
+    const intentObj = intentRouter.route({
+      ...this.args,
+      intent: intent as AnalyzeArgs['intent'],
+      scope: scope as AnalyzeArgs['scope'],
+    });
 
-    // 执行工具（使用回退链）
-    const result = await orchestrator.executeWithFallback(intentObj, 'codemap');
+    let orchestratedResults: UnifiedResult[] = [];
+    let confidence: Confidence;
 
-    // 融合结果
-    const resultsByTool = new Map<string, UnifiedResult[]>();
-    if (result.tool && result.results) {
-      resultsByTool.set(result.tool, result.results);
+    if (intentObj.secondary) {
+      const tools = Array.from(new Set([intentObj.tool, intentObj.secondary]));
+      const resultsByTool = await orchestrator.executeParallel(intentObj, tools);
+      orchestratedResults = fusion.fuse(resultsByTool, {
+        topK,
+        intent: intentObj.intent,
+        keywordWeights: {},
+        maxTokens: 160,
+      });
+      const confidenceScore = this.calculateConfidence(orchestratedResults);
+      confidence = {
+        score: confidenceScore,
+        level: confidenceScore >= 0.7 ? 'high' : confidenceScore >= 0.4 ? 'medium' : 'low',
+      };
+    } else {
+      const result = await orchestrator.executeWithFallback(intentObj, intentObj.tool);
+      orchestratedResults = result.results.slice(0, topK);
+      confidence = {
+        score: result.confidence?.score || 0,
+        level: result.confidence?.level || 'low',
+      };
     }
-    const fusedResults = await fusion.fuse(resultsByTool, { topK, keywordWeights: {}, maxTokens: 160 });
 
     return {
       schemaVersion: 'v1.0.0',
       intent: intent as IntentType,
       tool: 'codemap-orchestrated',
-      confidence: {
-        score: result.confidence?.score || 0,
-        level: result.confidence?.level || 'low',
-      },
-      results: fusedResults,
+      confidence,
+      results: orchestratedResults,
       metadata: {
-        total: fusedResults.length,
+        total: orchestratedResults.length,
         scope,
-        resultCount: fusedResults.length,
+        resultCount: orchestratedResults.length,
       },
     };
   }
@@ -504,6 +517,20 @@ export async function analyzeCommand(argv: string[]): Promise<void> {
 
     if (args.outputMode === 'machine' || args.json) {
       console.log(JSON.stringify(output, null, 2));
+    } else {
+      // human 模式：打印格式化输出
+      const typedOutput = output as CodemapOutput;
+      console.log(chalk.bold(`\n📊 ${typedOutput.intent?.toUpperCase() || 'ANALYSIS'} 分析结果\n`));
+      for (const result of typedOutput.results || []) {
+        console.log(chalk.cyan(`📁 ${result.file}${result.line ? `:${result.line}` : ''}`));
+        console.log(`   ${result.content}`);
+        console.log(chalk.gray(`   相关度: ${(result.relevance * 100).toFixed(1)}%`));
+        if (result.metadata?.testFile) {
+          console.log(chalk.green(`   🧪 测试: ${result.metadata.testFile}`));
+        }
+        console.log();
+      }
+      console.log(chalk.gray(`Tools: ${typedOutput.tool}, Confidence: ${typedOutput.confidence.level} (${typedOutput.confidence.score})`));
     }
   } catch (error) {
     if (error instanceof Error && 'code' in error) {

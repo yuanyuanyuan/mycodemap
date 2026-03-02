@@ -25,6 +25,7 @@ describe('IntentRouter', () => {
       expect(result.keywords).toEqual(['test']);
       expect(result.scope).toBe('direct');
       expect(result.tool).toBe('ast-grep');
+      expect(result.secondary).toBeUndefined();
     });
 
     it('应该正确路由 impact intent', () => {
@@ -37,6 +38,7 @@ describe('IntentRouter', () => {
 
       expect(result.intent).toBe('impact');
       expect(result.tool).toBe('codemap');
+      expect(result.secondary).toBe('ast-grep');
     });
 
     it('无 intent 参数时应使用默认 search', () => {
