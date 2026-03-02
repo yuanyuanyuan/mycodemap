@@ -280,9 +280,27 @@ describe('AIFeedGenerator', () => {
       vi.mocked(fs.readFileSync).mockReturnValue('export const x = 1;');
       vi.mocked(fs.existsSync).mockReturnValue(true);
 
-      await generator.generate('/project');
+      await generator.generate('/project', { includeGitHistory: true });
 
       expect(gitAnalyzer.analyzeFileHeat).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not call GitAnalyzer by default (includeGitHistory defaults to false)', async () => {
+      const mockFiles = ['src/a.ts', 'src/b.ts'];
+      vi.mocked(globby).mockResolvedValue(mockFiles);
+      vi.mocked(fs.readFileSync).mockReturnValue('export const x = 1;');
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      // Call without includeGitHistory option (should default to false)
+      await generator.generate('/project');
+
+      // GitAnalyzer should NOT be called
+      expect(gitAnalyzer.analyzeFileHeat).not.toHaveBeenCalled();
+
+      // Heat score should be empty/default
+      const feed = await generator.generate('/project');
+      expect(feed[0].heat.freq30d).toBe(0);
+      expect(feed[0].heat.lastType).toBe('unknown');
     });
 
     it('should handle empty file list', async () => {

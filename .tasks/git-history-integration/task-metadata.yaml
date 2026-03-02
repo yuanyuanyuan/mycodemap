@@ -1,0 +1,54 @@
+name: git-history-integration
+description: 验证 Git 历史分析功能（--include-git-history 参数）的正确集成和工作
+created: 2026-03-02
+version: 1.0.0
+type: integration-test
+module: orchestrator
+status: completed
+
+# 三角色流程状态
+triad:
+  generator: completed
+  qa: completed
+  supervisor: completed
+  semantic_score: 100
+
+# 执行信息
+workflow:
+  execution:
+    status: completed
+    executed_at: 2026-03-02T22:52:00Z
+    executed_by: task-executor
+    final_score: 100
+    evidence: ".tasks/git-history-integration/EXECUTION_REPORT.md"
+
+# 验收状态
+acceptance:
+  workflow_approved: true
+  quality_gate_passed: true
+  semantic_review_passed: true
+
+# 质量指标
+quality:
+  test_count: 8
+  min_score: 70
+  target_score: 90
+  auto_verifiable: true
+
+# 发现的问题
+issues:
+  - severity: warning
+    title: "includeGitHistory 参数未实际生效"
+    description: "虽然参数已定义并传递，但代码中没有检查该参数来决定是否调用 GitAnalyzer"
+    recommendation: "在编排层添加逻辑，根据 includeGitHistory 参数决定是否调用 Git 分析器"
+    status: resolved
+    resolved_at: 2026-03-02T22:52:00Z
+
+# 代码变更
+code_changes:
+  - file: src/orchestrator/ai-feed-generator.ts
+    description: 添加 includeGitHistory 参数支持
+  - file: src/cli/commands/ci.ts
+    description: 启用 Git 历史分析
+  - file: src/orchestrator/__tests__/ai-feed-generator.test.ts
+    description: 修复并新增测试

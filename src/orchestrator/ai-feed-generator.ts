@@ -198,9 +198,12 @@ export class AIFeedGenerator {
    * Integrated into codemap generate command
    *
    * @param projectRoot - Project root directory
+   * @param options - Generation options
+   * @param options.includeGitHistory - Whether to include Git history analysis (default: false)
    * @returns AIFeed[] feed list (sorted by gravity descending)
    */
-  async generate(projectRoot: string): Promise<AIFeed[]> {
+  async generate(projectRoot: string, options?: { includeGitHistory?: boolean }): Promise<AIFeed[]> {
+    const includeGitHistory = options?.includeGitHistory ?? false;
     // 1. Get all TypeScript files
     const files = await globby(['src/**/*.ts'], {
       cwd: projectRoot,
@@ -219,7 +222,10 @@ export class AIFeedGenerator {
       }
 
       const header = this.headerScanner.scan(fullPath);
-      const heat = await this.scanGitHistory(file, projectRoot);
+      // Only scan Git history if explicitly enabled
+      const heat = includeGitHistory
+        ? await this.scanGitHistory(file, projectRoot)
+        : { freq30d: 0, lastType: 'unknown', lastDate: null, stability: true };
 
       feed.push({
         file,

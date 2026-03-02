@@ -226,7 +226,7 @@ async function assessRiskAction(options: { files?: string; threshold?: string })
   const projectRoot = process.cwd();
   const gitAnalyzer = new GitAnalyzer();
   const generator = new AIFeedGenerator(gitAnalyzer);
-  const feed = await generator.generate(projectRoot);
+  const feed = await generator.generate(projectRoot, { includeGitHistory: true });
 
   const commits = await gitAnalyzer.findRelatedCommits([], targetFiles, {
     maxCommits: 100,
