@@ -7,6 +7,12 @@
   "bin": {
     "codemap": "./dist/cli/index.js"
   },
+  "files": [
+    "dist/",
+    "LICENSE",
+    "README.md",
+    "codemap.config.schema.json"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
@@ -15,7 +21,8 @@
     "typecheck": "tsc --noEmit",
     "postinstall": "sh scripts/hooks/install-hooks.sh",
     "benchmark": "bash scripts/run-benchmark.sh",
-    "test:all": "npm run test && npm run benchmark"
+    "test:all": "npm run test && npm run benchmark",
+    "prepublishOnly": "npm run build && npm test"
   },
   "keywords": [
     "typescript",
@@ -48,5 +55,9 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

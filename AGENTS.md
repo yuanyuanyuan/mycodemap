@@ -150,7 +150,7 @@
 │   └── commit-msg                # 提交消息验证
 ├── .github/workflows/            # GitHub Actions
 │   └── ci-gateway.yml            # CI Gateway 工作流
-├── dist/                         # 编译输出
+├── build/                        # 编译输出
 ├── package.json                  # 项目配置
 ├── tsconfig.json                 # TypeScript 配置
 ├── vitest.config.ts              # 测试配置
@@ -171,7 +171,7 @@ npm install
 ### 构建项目
 
 ```bash
-# 编译 TypeScript
+# 编译 TypeScript 到 dist/ 目录
 npm run build
 
 # 开发模式（监听编译）
@@ -298,7 +298,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/**/*.test.ts', 'refer/**/*.test.ts'],
-    exclude: ['node_modules', 'dist'],
+    exclude: ['node_modules', 'build'],
     testTimeout: 30000,
     hookTimeout: 30000
   }
@@ -365,6 +365,111 @@ codemap ci assess-risk --threshold=0.7
 
 # 检查输出契约
 codemap ci check-output-contract --schema-version v1.0.0 --top-k 8 --max-tokens 160
+```
+
+---
+
+## CodeMap 工具使用规范
+
+在进行代码搜索或项目分析时，**必须优先使用 CodeMap CLI 工具**。
+
+### 代码搜索优先级
+
+```
+1. 首选: node dist/cli/index.js <command>
+2. 备选: grep, rg, find 等标准工具
+3. 记录: 将 CodeMap 问题记录到 .codemap/issues/codemap-issues.md
+```
+
+### 常用 CodeMap 命令
+
+```bash
+# 符号查询
+node dist/cli/index.js query -s "symbolName"
+
+# 模块查询  
+node dist/cli/index.js query -m "moduleName"
+
+# 依赖分析
+node dist/cli/index.js deps -m "src/parser"
+
+# 统一分析入口
+node dist/cli/index.js analyze <intent>
+
+# 影响范围分析
+node dist/cli/index.js impact -f <file-path>
+
+# 复杂度分析
+node dist/cli/index.js complexity
+
+# 循环依赖检测
+node dist/cli/index.js cycles
+```
+
+### CodeMap 问题处理流程
+
+当 CodeMap 使用过程中遇到问题或需要功能升级时，按以下流程处理：
+
+#### 1. 检查日志
+
+```bash
+# 查看日志目录
+ls -la .codemap/logs/ 2>/dev/null || echo "No logs directory"
+
+# 详细输出模式
+node dist/cli/index.js <command> --verbose 2>&1 | tee /tmp/codemap-debug-$(date +%s).log
+```
+
+#### 2. 记录问题
+
+**问题跟踪文件**: `.codemap/issues/codemap-issues.md`
+
+```bash
+# 创建问题记录目录
+mkdir -p .codemap/issues
+
+# 添加问题记录
+cat >> .codemap/issues/codemap-issues.md << 'EOF'
+
+### [2026-XX-XX XX:XX] 问题简要描述
+- **命令**: 执行的完整命令
+- **错误信息**: 具体的错误输出
+- **日志位置**: .codemap/logs/xxx.log 或 /tmp/codemap-debug-xxx.log
+- **使用场景**: 当时正在执行的任务描述
+- **临时解决**: 使用的替代方案（如 grep）
+- **优先级**: high / medium / low
+
+EOF
+```
+
+#### 3. 继续任务
+
+记录问题后，使用替代工具（如 `grep`、`rg`）继续完成任务。
+
+#### 4. 批量修复
+
+所有记录在 `.codemap/issues/codemap-issues.md` 的问题将在后续统一修复。
+
+### 问题记录模板
+
+```markdown
+## CodeMap 问题跟踪
+
+### [2026-03-02 14:30] query 命令无法识别复杂符号
+- **命令**: `node dist/cli/index.js query -s "IntentRouter.routeIntent"`
+- **错误信息**: `Symbol not found: IntentRouter.routeIntent`
+- **日志位置**: .codemap/logs/query-20260302.log
+- **使用场景**: 查找 IntentRouter 类的 routeIntent 方法定义
+- **临时解决**: 使用 `grep -r "routeIntent" src/orchestrator/`
+- **优先级**: medium
+
+### [2026-03-02 15:15] deps 命令输出格式不正确
+- **命令**: `node dist/cli/index.js deps -m "src/parser"`
+- **错误信息**: 输出的 JSON 缺少 dependencies 字段
+- **日志位置**: .codemap/logs/deps-20260302.log
+- **使用场景**: 分析 parser 模块的依赖关系
+- **临时解决**: 手动阅读代码分析依赖
+- **优先级**: high
 ```
 
 ---
@@ -484,16 +589,24 @@ Prefer retrieval-led reasoning over pre-training-led reasoning for any tasks.
   "name": "codemap",
   "version": "0.1.0",
   "type": "module",
+  "main": "dist/index.js",
   "bin": {
-    "codemap": "./dist/cli/index.js"
+    "codemap": "./build/cli/index.js"
   },
+  "files": [
+    "dist/",
+    "LICENSE",
+    "README.md",
+    "codemap.config.schema.json"
+  ],
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "build": "tsc --outDir dist",
+    "dev": "tsc --watch --outDir dist",
     "test": "vitest run",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
-    "postinstall": "sh scripts/hooks/install-hooks.sh"
+    "postinstall": "sh scripts/hooks/install-hooks.sh",
+    "prepublishOnly": "npm run build && npm test"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -510,8 +623,8 @@ Prefer retrieval-led reasoning over pre-training-led reasoning for any tasks.
   "include": ["src/**/*.ts"],
   "exclude": [
     "node_modules/**",
-    "dist/**",
     "build/**",
+    "dist/**",
     "*.test.ts",
     "*.spec.ts"
   ],
@@ -525,7 +638,7 @@ Prefer retrieval-led reasoning over pre-training-led reasoning for any tasks.
 - 模块：ESNext
 - 模块解析：bundler
 - 严格模式：启用
-- 输出目录：`./dist`
+- 输出目录：`./build`
 - 源码目录：`./src`
 
 ---
@@ -542,6 +655,8 @@ Prefer retrieval-led reasoning over pre-training-led reasoning for any tasks.
 | `codemap.json` | 完整的结构化 JSON 数据 |
 | `dependency-graph.md` | Mermaid 格式的依赖关系图 |
 | `ai-feed.txt` | AI 饲料文件（v2.4 新增） |
+| `logs/` | CodeMap 执行日志（v0.2+） |
+| `issues/` | 问题跟踪目录（v0.2+） |
 
 ---
 

@@ -41,7 +41,7 @@ CodeMap 是一个专为 TypeScript/JavaScript 项目设计的代码结构分析�
 npm install
 
 # Build
-npm run build           # Compile TypeScript
+npm run build           # Compile TypeScript to dist/
 npm run dev             # Watch mode
 npm run typecheck       # Type check only
 
@@ -250,6 +250,93 @@ After each task or file update, check if these need synchronization:
 
 ---
 
+## CodeMap Tool Usage Rules
+
+When performing code search or project analysis operations, **ALWAYS prioritize using the CodeMap CLI** from this repository over external tools or manual inspection.
+
+### Priority Order for Code Search
+
+1. **Primary**: Use `codemap` CLI commands from this repository
+   ```bash
+   # Query symbols, modules, or dependencies
+   node dist/cli/index.js query -s "symbolName"
+   node dist/cli/index.js query -m "moduleName"
+   node dist/cli/index.js deps -m "src/parser"
+   
+   # Generate comprehensive analysis
+   node dist/cli/index.js analyze <intent>
+   
+   # Impact analysis for changes
+   node dist/cli/index.js impact -f <file-path>
+   ```
+
+2. **Secondary**: If CodeMap fails or returns insufficient results, fall back to `grep`, `ripgrep`, or other standard tools
+
+3. **Documentation**: After using external tools, document the limitation in the task findings
+
+### Handling CodeMap Issues
+
+If CodeMap encounters errors or requires feature enhancements during use:
+
+1. **Check logs immediately**:
+   ```bash
+   # Check for log files in the output directory
+   ls -la .codemap/logs/ 2>/dev/null || echo "No logs directory found"
+   
+   # Check CLI output for error details
+   node dist/cli/index.js <command> --verbose 2>&1 | tee /tmp/codemap-debug.log
+   ```
+
+2. **Record the issue** to the local tracking file:
+   
+   **Issue tracking file**: `.codemap/issues/codemap-issues.md`
+   
+   ```markdown
+   ## Issue Log
+   
+   ### [YYYY-MM-DD HH:MM] Issue Title
+   - **Command**: The command that failed
+   - **Error**: Error message or unexpected behavior
+   - **Log Location**: Path to relevant log file
+   - **Context**: What you were trying to accomplish
+   - **Workaround**: How you worked around it (if applicable)
+   - **Priority**: high/medium/low
+   ```
+
+3. **Continue with task** using alternative tools, then schedule batch fixes
+
+4. **Create issue entry** (if it doesn't exist):
+   ```bash
+   mkdir -p .codemap/issues
+   cat >> .codemap/issues/codemap-issues.md << 'EOF'
+   
+   ### [$(date '+%Y-%m-%d %H:%M')] $(echo "Brief description")
+   - **Command**: 
+   - **Error**: 
+   - **Log Location**: 
+   - **Context**: 
+   - **Workaround**: 
+   - **Priority**: medium
+   
+   EOF
+   ```
+
+### Example Workflow
+
+```bash
+# 1. Try CodeMap first
+node dist/cli/index.js query -s "IntentRouter"
+
+# 2. If it fails, check logs and record
+if [ $? -ne 0 ]; then
+    echo "$(date) - Query failed for IntentRouter" >> .codemap/issues/codemap-issues.md
+    # Fall back to grep
+    grep -r "IntentRouter" src/
+fi
+```
+
+---
+
 ## Design Docs
 
 | Document | Content |
@@ -303,3 +390,5 @@ Running `codemap generate` produces (in `.codemap/`):
 | `codemap.json` | Complete structured JSON data |
 | `dependency-graph.md` | Mermaid dependency diagram |
 | `ai-feed.txt` | AI feed file (v2.4+) |
+| `logs/` | CodeMap execution logs |
+| `issues/` | Issue tracking for CodeMap bugs/enhancements |
