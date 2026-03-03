@@ -1,8 +1,8 @@
 # CI 门禁护栏详细设计
 
-> 版本: 1.1
+> 版本: 1.2
 > 所属模块: CI/CD - Git 工作流门禁
-> 日期: 2026-02-28
+> 日期: 2026-03-03
 
 ---
 
@@ -29,11 +29,11 @@
 | **本地** | 测试通过 | ❌ 阻止提交 | `npm test` |
 | **本地** | Commit 格式 | ❌ 阻止提交 | commit-msg hook |
 | **本地** | 文件头注释 | ❌ 阻止提交 | pre-commit hook |
-| **本地** | 生成 AI 饲料 | ⚠️ 警告 | `codemap generate` |
+| **本地** | 生成代码地图 | ⚠️ 警告 | `codemap generate` |
 | **服务端** | 测试通过 | ❌ 阻止合并 | `npm test` |
 | **服务端** | Commit 格式 | ❌ 阻止合并 | `codemap ci check-commits` |
 | **服务端** | 文件头注释 | ❌ 阻止合并 | `codemap ci check-headers` |
-| **服务端** | AI 饲料同步 | ❌ 阻止合并 | `git diff --exit-code` |
+| **服务端** | 代码地图同步 | ❌ 阻止合并 | `git diff --exit-code` |
 | **服务端** | 危险置信度 | ❌ 阻止合并 | `codemap ci assess-risk` |
 | **服务端** | 输出契约校验 | ❌ 阻止合并 | `codemap ci check-output-contract` |
 
@@ -54,7 +54,7 @@ MSG_FILE=$1
 MSG=$(head -1 "$MSG_FILE")
 
 # 极简正则: 必须以大写标签开头
-if ! echo "$MSG" | grep -qE "^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]"; then
+if ! echo "$MSG" | grep -qE "^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\\]"; then
     echo "ERROR: 提交信息必须以大写标签开头"
     echo ""
     echo "格式: [TAG] scope: message"
@@ -74,7 +74,7 @@ if ! echo "$MSG" | grep -qE "^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]";
 fi
 
 # 检查 scope 是否存在
-if ! echo "$MSG" | grep -qE "^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]\s+[^:]+:"; then
+if ! echo "$MSG" | grep -qE "^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\\]\s+[^:]+:"; then
     echo "ERROR: scope 不能为空"
     echo "格式: [TAG] scope: message"
     echo "示例: [FEATURE] git-analyzer: add new feature"
@@ -144,8 +144,8 @@ fi
 
 echo "✓ File headers valid"
 
-# 3. 生成 AI 饲料（可选，异步执行）
-echo "→ Generating AI feed..."
+# 3. 生成代码地图（可选，异步执行）
+echo "→ Generating code map..."
 npx codemap generate --quiet &
 
 echo "✓ All pre-commit checks passed"
@@ -224,11 +224,11 @@ jobs:
     - name: Check file headers
       run: npx codemap ci check-headers
     
-    # 4. 生成 AI 饲料并检查同步
-    - name: Generate AI feed
+    # 4. 生成代码地图并检查同步
+    - name: Generate code map
       run: |
         npx codemap generate
-        git diff --exit-code .codemap/ai-feed.txt || (echo "AI feed is out of sync. Run 'codemap generate' and commit the changes." && exit 1)
+        git diff --exit-code .codemap/ || (echo "Code map is out of sync. Run 'codemap generate' and commit the changes." && exit 1)
     
     # 5. 评估危险置信度
     - name: Assess risk
@@ -251,7 +251,6 @@ import { Command } from 'commander';
 import { execSync } from 'child_process';
 import { GitAnalyzer } from '../../orchestrator/git-analyzer.js';
 import { FileHeaderScanner } from '../../orchestrator/file-header-scanner.js';
-import { AIFeedGenerator } from '../../orchestrator/ai-feed-generator.js';
 import { globby } from 'globby';
 
 const ci = new Command('ci').description('CI gateway commands');
@@ -306,58 +305,49 @@ ci.command('check-headers')
     console.log(`✓ ${files.length} files validated`);
   });
 
-// 评估危险置信度
+// 评估危险置信度（简化版，不依赖 AI Feed）
 ci.command('assess-risk')
   .description('Assess risk level of changes')
   .option('-t, --threshold <n>', 'Risk threshold (0-1)', '0.7')
   .action(async (options) => {
-    const generator = new AIFeedGenerator();
-    const feed = await generator.generate(process.cwd());
-    
-    // 获取修改的文件
     const changedFiles = execSync('git diff --name-only origin/main...HEAD', { encoding: 'utf-8' })
       .split('\n')
       .filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts'));
     
-    // 计算风险分数
-    const changedFeed = feed.filter(f => changedFiles.includes(f.file));
-    const tagWeights = {
-      BUGFIX: 0.9,
-      FEATURE: 0.7,
-      REFACTOR: 0.8,
-      CONFIG: 0.5,
-      DOCS: 0.2,
-      DELETE: 0.1,
-      UNKNOWN: 0.5
-    };
-    const highRiskFiles = changedFeed.filter(f => {
-      // 风险公式与 REFACTOR_REQUIREMENTS.md 8.6 保持一致
-      const gravityNorm = Math.min(f.gravity / 20, 1);
-      const freqNorm = Math.min(f.heat.freq30d / 10, 1);
-      const tagWeight = tagWeights[f.heat.lastType] ?? tagWeights.UNKNOWN;
-      const stableBoost = f.meta.stable ? 0 : 0.15;
-      const impactNorm = Math.min(f.dependents.length / 50, 1);
-      const score = Math.min(
-        Math.max(
-          gravityNorm * 0.30 +
-            freqNorm * 0.15 +
-            tagWeight * 0.10 +
-            stableBoost +
-            impactNorm * 0.10,
-          0
-        ),
-        1
-      );
-      return score > parseFloat(options.threshold);
-    });
+    if (changedFiles.length === 0) {
+      console.log('✓ No changed TypeScript files');
+      return;
+    }
     
-    if (highRiskFiles.length > 0) {
-      console.log('ERROR: High risk files detected:');
-      for (const f of highRiskFiles) {
-        console.log(`  - ${f.file} (HEAT: ${f.heat.freq30d}/${f.heat.lastType})`);
-      }
-      console.log('\nRisk mitigation notes required. Add explanation to commit body.');
-      // 高风险必须阻断
+    // 简化版风险评估：基于文件数量和变更范围
+    let riskScore = 0.3; // 基础风险
+    
+    // 文件数量风险
+    if (changedFiles.length > 10) {
+      riskScore += 0.2;
+    }
+    if (changedFiles.length > 20) {
+      riskScore += 0.2;
+    }
+    
+    // 核心文件变更风险
+    const coreFiles = changedFiles.filter(f => 
+      f.includes('/core/') || 
+      f.includes('/orchestrator/') ||
+      f.endsWith('/index.ts')
+    );
+    if (coreFiles.length > 0) {
+      riskScore += 0.15;
+    }
+    
+    riskScore = Math.min(1, riskScore);
+    
+    console.log(`Risk assessment: score=${riskScore.toFixed(2)}, threshold=${options.threshold}`);
+    
+    if (riskScore > parseFloat(options.threshold)) {
+      console.log('ERROR: Risk score exceeds threshold');
+      console.log(`Changed files: ${changedFiles.length}`);
+      console.log('Risk mitigation notes required. Add explanation to commit body.');
       process.exit(1);
     } else {
       console.log('✓ Risk assessment passed');
@@ -572,20 +562,19 @@ CI Gateway
     ├── CLI Commands (src/cli/commands/ci.ts)
     │   ├── check-commits
     │   ├── check-headers
-    │   ├── assess-risk
+    │   ├── assess-risk (简化版)
     │   └── check-output-contract (P1-1 新增)
     │
     └── Dependencies
         ├── GitAnalyzer (解析 commit tag)
-        ├── FileHeaderScanner (验证注释)
-        └── AIFeedGenerator (评估风险)
+        └── FileHeaderScanner (验证注释)
 ```
 
 ---
 
-## 11. 工作流集成 (v2.5 规划)
+## 9. 工作流集成 (v2.5 规划)
 
-### 11.1 工作流阶段的 CI 验证
+### 9.1 工作流阶段的 CI 验证
 
 在编排层工作流中，CI 门禁作为最后一个阶段自动执行：
 
@@ -626,7 +615,7 @@ const PHASE_CI_CONFIG: Record<WorkflowPhase, CIConfig> = {
 };
 ```
 
-### 11.2 工作流 CI 执行器
+### 9.2 工作流 CI 执行器
 
 ```typescript
 class WorkflowCIExecutor {
@@ -668,7 +657,7 @@ class WorkflowCIExecutor {
 
 ---
 
-## 9. 检查项汇总
+## 10. 检查项汇总
 
 | 检查项 | 本地 | 服务端 | 工具 |
 |--------|------|--------|------|
@@ -676,13 +665,13 @@ class WorkflowCIExecutor {
 | Commit 格式 `[TAG]` | ✅ | ✅ | `commit-msg hook` / `codemap ci check-commits` |
 | 文件头 `[META]` | ✅ | ✅ | `pre-commit hook` / `codemap ci check-headers` |
 | 文件头 `[WHY]` | ✅ | ✅ | `pre-commit hook` / `codemap ci check-headers` |
-| AI 饲料生成 | ⚠️ | ✅ | `codemap generate` |
+| 代码地图生成 | ⚠️ | ✅ | `codemap generate` |
 | 危险置信度评估 | ❌ | ✅ (P0-2) | `codemap ci assess-risk` |
 | 输出契约校验 | ❌ | ✅ (P1-1) | `codemap ci check-output-contract` |
 
 ---
 
-## 10. 极简实现统计
+## 11. 极简实现统计
 
 | 组件 | 代码量 | 文件 |
 |------|--------|------|
@@ -690,3 +679,13 @@ class WorkflowCIExecutor {
 | pre-commit hook | ~40 行 | `.git/hooks/pre-commit` |
 | CI 子命令 | ~80 行 | `src/cli/commands/ci.ts` |
 | **总计** | **~150 行** | **符合极简原则** |
+
+---
+
+## 附录：版本历史
+
+| 版本 | 日期 | 变更 |
+|------|------|------|
+| 1.0 | 2026-02-28 | 初始版本 |
+| 1.1 | 2026-03-01 | 添加输出契约校验 |
+| 1.2 | 2026-03-03 | 移除 AI 饲料相关功能，简化风险评估 |
