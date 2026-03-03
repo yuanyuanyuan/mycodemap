@@ -1,3 +1,5 @@
+// [META] since:2024-06 | owner:core-team | stable:true
+// [WHY] 定义 CodeMap 项目的核心类型系统，供所有模块共享使用
 // ============================================
 // CodeMap 核心类型定义
 // ============================================
@@ -133,6 +135,7 @@ export interface ImportInfo {
   sourceType: 'relative' | 'absolute' | 'node_module' | 'alias';
   specifiers: ImportSpecifier[];
   isTypeOnly: boolean;
+  isReExport?: boolean;  // 是否为 re-export (export ... from)
 }
 
 export interface ImportSpecifier {

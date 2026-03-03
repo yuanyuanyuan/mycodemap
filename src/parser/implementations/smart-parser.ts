@@ -2,6 +2,8 @@
 // Smart Parser - 基于 TS Compiler API 的深度解析器
 // ============================================
 
+// [META] since:2024-06 | owner:parser-team | stable:true
+// [WHY] 基于 TS Compiler API 的深度解析器，提供完整的类型信息和调用图分析
 import * as ts from 'typescript';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -1456,18 +1458,42 @@ export class SmartParser implements IParser {
     const details: ComplexityMetrics['details']['functions'] = [];
 
     const visit = (node: ts.Node, depth: number) => {
+      let funcName: string | undefined;
+      let funcNode: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | undefined;
+
       if (ts.isFunctionDeclaration(node) && node.name) {
-        const funcCyclomatic = this.calculateFunctionCyclomatic(node);
-        const funcCognitive = this.calculateFunctionCognitive(node);
+        funcName = node.name.text;
+        funcNode = node;
+      } else if (ts.isMethodDeclaration(node) && node.name) {
+        // 获取方法名
+        const methodName = node.name;
+        if (ts.isIdentifier(methodName)) {
+          funcName = methodName.text;
+        } else if (ts.isStringLiteral(methodName)) {
+          funcName = methodName.text;
+        }
+        funcNode = node;
+      } else if (ts.isArrowFunction(node)) {
+        // 箭头函数通常没有名字，跳过详细信息但仍计算复杂度
+        funcName = '(arrow)';
+        funcNode = node;
+      }
+
+      if (funcNode && funcName) {
+        const funcCyclomatic = this.calculateFunctionCyclomatic(funcNode);
+        const funcCognitive = this.calculateFunctionCognitive(funcNode);
         cyclomatic += funcCyclomatic;
         cognitive += funcCognitive;
 
-        details.push({
-          name: node.name.text,
-          cyclomatic: funcCyclomatic,
-          cognitive: funcCognitive,
-          lines: node.getEnd() - node.getStart()
-        });
+        // 只为有名字的函数添加详情
+        if (funcName !== '(arrow)') {
+          details.push({
+            name: funcName,
+            cyclomatic: funcCyclomatic,
+            cognitive: funcCognitive,
+            lines: funcNode.getEnd() - funcNode.getStart()
+          });
+        }
       }
       ts.forEachChild(node, n => visit(n, depth + 1));
     };
@@ -1485,7 +1511,7 @@ export class SmartParser implements IParser {
   /**
    * 计算函数圈复杂度
    */
-  private calculateFunctionCyclomatic(node: ts.FunctionDeclaration): number {
+  private calculateFunctionCyclomatic(node: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression): number {
     let complexity = 1;
 
     const countNodes = (n: ts.Node) => {
@@ -1498,8 +1524,14 @@ export class SmartParser implements IParser {
       ts.forEachChild(n, countNodes);
     };
 
-    if (node.body) {
-      countNodes(node.body);
+    // 获取函数体
+    let body: ts.Block | ts.Expression | undefined;
+    if ('body' in node) {
+      body = (node as any).body;
+    }
+
+    if (body) {
+      countNodes(body);
     }
 
     return complexity;
@@ -1508,7 +1540,7 @@ export class SmartParser implements IParser {
   /**
    * 计算函数认知复杂度
    */
-  private calculateFunctionCognitive(node: ts.FunctionDeclaration): number {
+  private calculateFunctionCognitive(node: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression): number {
     let cognitive = 0;
 
     const countNodes = (n: ts.Node, depth: number) => {
@@ -1524,8 +1556,14 @@ export class SmartParser implements IParser {
       ts.forEachChild(n, child => countNodes(child, depth + 1));
     };
 
-    if (node.body) {
-      countNodes(node.body, 0);
+    // 获取函数体
+    let body: ts.Block | ts.Expression | undefined;
+    if ('body' in node) {
+      body = (node as any).body;
+    }
+
+    if (body) {
+      countNodes(body, 0);
     }
 
     return cognitive;

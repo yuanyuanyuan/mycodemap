@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // [META] since:2026-03-03 | owner:orchestrator-team | stable:true
-// [WHY] CLI 入口点，添加 --verbose 和 --detail 选项
+// [WHY] CLI 入口点，注册命令并初始化运行日志
 
 import { Command } from 'commander';
 import { generateCommand } from './commands/generate.js';
@@ -15,8 +15,11 @@ import { impactCommand } from './commands/impact.js';
 import { analyzeCommand } from './commands/analyze.js';
 import { ciCommand } from './commands/ci.js';
 import { workflowCommand } from './commands/workflow.js';
+import { setupRuntimeLogging } from './runtime-logger.js';
 
 const program = new Command();
+
+setupRuntimeLogging(process.argv.slice(2));
 
 program
   .name('codemap')
@@ -54,9 +57,14 @@ program
   .option('-m, --module <path>', '查询模块')
   .option('-d, --deps <name>', '查询依赖')
   .option('-S, --search <word>', '模糊搜索')
-  .option('-l, --limit <number>', '限制结果数量', '20')
+  .option('-l, --limit <number>', '限制结果数量', '50')
   .option('-j, --json', 'JSON 格式输出')
   .option('-v, --verbose', '显示性能指标')
+  .option('-r, --regex', '使用正则表达式搜索（仅适用于 -S/--search）')
+  .option('-c, --context <lines>', '显示代码上下文行数', '0')
+  .option('--case-sensitive', '大小写敏感搜索（精确搜索默认开启）')
+  .option('--include-references', '包含符号引用位置信息')
+  .option('--deps-format <format>', '依赖查询输出格式 (default|detailed)', 'default')
   .option('--no-cache', '禁用缓存，强制重新加载索引')
   .action(queryCommand);
 

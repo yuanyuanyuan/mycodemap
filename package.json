@@ -13,7 +13,9 @@
     "test": "vitest run",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
-    "postinstall": "sh scripts/hooks/install-hooks.sh"
+    "postinstall": "sh scripts/hooks/install-hooks.sh",
+    "benchmark": "bash scripts/run-benchmark.sh",
+    "test:all": "npm run test && npm run benchmark"
   },
   "keywords": [
     "typescript",

@@ -2,6 +2,8 @@
 // Fast Parser - 基于 Tree-sitter 的快速解析器
 // ============================================
 
+// [META] since:2024-06 | owner:parser-team | stable:true
+// [WHY] 基于 Tree-sitter 的快速解析器，提供高性能的代码结构分析
 import * as path from 'path';
 import * as fs from 'fs';
 import type { IParser, ParseResult, ParserOptions, TextEdit } from '../interfaces/IParser.js';
@@ -112,7 +114,7 @@ export class FastParser implements IParser {
   }
 
   /**
-   * 简化导入提取
+   * 简化导入提取（包括 import 和 re-export）
    */
   private extractImportsSimple(content: string): ImportInfo[] {
     const imports: ImportInfo[] = [];
@@ -141,6 +143,49 @@ export class FastParser implements IParser {
           specifiers: specifiers.map(s => ({ name: s, isTypeOnly: false })) as any,
           isTypeOnly: false
         });
+      }
+    }
+
+    // 处理 re-export: export { ... } from '...'
+    const reExportRegex = /export\s+\{\s*([^}]+)\s*\}\s*from\s+['"]([^'"]+)['"]/g;
+    while ((match = reExportRegex.exec(content)) !== null) {
+      const specifiers = match[1].split(',').map((s: string) => s.trim()).filter(Boolean);
+      if (match[2]) {
+        imports.push({
+          source: match[2],
+          sourceType: match[2].startsWith('.') ? 'relative' : 'alias',
+          specifiers: specifiers.map(s => ({ name: s, isTypeOnly: false })),
+          isTypeOnly: false,
+          isReExport: true  // 标记为 re-export
+        } as ImportInfo);
+      }
+    }
+
+    // 处理 re-export: export * from '...'
+    const reExportAllRegex = /export\s+\*\s*from\s+['"]([^'"]+)['"]/g;
+    while ((match = reExportAllRegex.exec(content)) !== null) {
+      if (match[1]) {
+        imports.push({
+          source: match[1],
+          sourceType: match[1].startsWith('.') ? 'relative' : 'alias',
+          specifiers: [],
+          isTypeOnly: false,
+          isReExport: true
+        } as ImportInfo);
+      }
+    }
+
+    // 处理 re-export: export { default } from '...'
+    const reExportDefaultRegex = /export\s+\{\s*default\s*\}\s*from\s+['"]([^'"]+)['"]/g;
+    while ((match = reExportDefaultRegex.exec(content)) !== null) {
+      if (match[1]) {
+        imports.push({
+          source: match[1],
+          sourceType: match[1].startsWith('.') ? 'relative' : 'alias',
+          specifiers: [{ name: 'default', isTypeOnly: false }],
+          isTypeOnly: false,
+          isReExport: true
+        } as ImportInfo);
       }
     }
 

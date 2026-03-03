@@ -389,7 +389,9 @@ npm run build
 npm run dev
 
 # 运行测试
-npm test
+npm test                  # 功能测试（src/**/*.test.ts）
+npm run benchmark         # 性能基准测试（refer/benchmark-quality.test.ts）
+npm run test:all          # 功能 + 基准（串联执行）
 
 # 类型检查
 npm run typecheck
@@ -419,6 +421,17 @@ chore:    构建/工具变更
 - TypeScript 严格模式
 - 使用 Vitest 作为测试框架
 - 新增功能请同步补充测试和文档
+
+### 运行日志（调试追踪）
+
+- CLI 运行日志默认写入 `.codemap/logs/codemap-YYYY-MM-DD.log`
+- 默认保留 14 天、最多保留 30 个日志文件（自动清理）
+- 可通过环境变量调整：
+  - `CODEMAP_RUNTIME_LOG_ENABLED=false`：关闭运行日志
+  - `CODEMAP_RUNTIME_LOG_DIR=<dir>`：自定义日志目录
+  - `CODEMAP_RUNTIME_LOG_RETENTION_DAYS=<days>`：设置保留天数
+  - `CODEMAP_RUNTIME_LOG_MAX_FILES=<n>`：设置最大保留文件数
+  - `CODEMAP_RUNTIME_LOG_MAX_SIZE_MB=<mb>`：单个日志文件大小上限（超限后自动轮转并 gzip）
 
 ## 许可证
 

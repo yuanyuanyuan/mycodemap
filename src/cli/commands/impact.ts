@@ -1,3 +1,5 @@
+// [META] since:2025-01 | owner:cli-team | stable:true
+// [WHY] 提供变更影响分析命令，支持评估代码变更的风险范围
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
@@ -79,23 +81,66 @@ function findTargetModule(codeMap: CodeMap, filePath: string): ModuleInfo | unde
  */
 function getDirectDependents(codeMap: CodeMap, targetModule: ModuleInfo): ModuleInfo[] {
   const dependents: ModuleInfo[] = [];
+  const targetBasename = path.basename(targetModule.absolutePath, '.ts');
+  const targetPathNormalized = targetModule.absolutePath.replace(/\\/g, '/');
+
+  // 构建模块路径到ID的映射
+  const modulePathToId = new Map<string, string>();
+  for (const mod of codeMap.modules) {
+    const normalizedPath = mod.absolutePath.replace(/\\/g, '/');
+    modulePathToId.set(normalizedPath, mod.id);
+    // 也存储不带扩展名的路径
+    modulePathToId.set(normalizedPath.replace(/\.js$/, ''), mod.id);
+    modulePathToId.set(normalizedPath.replace(/\.ts$/, ''), mod.id);
+  }
 
   for (const module of codeMap.modules) {
-    // 检查是否依赖目标模块
-    if (module.dependencies.some(dep =>
-      dep === targetModule.id ||
-      module.absolutePath.includes(dep) ||
-      path.relative(codeMap.project.rootDir, module.absolutePath).includes(dep)
-    )) {
-      dependents.push(module);
+    // 跳过目标模块自身
+    if (module.id === targetModule.id) continue;
+
+    // 方法1: 检查 module.dependencies 中的路径是否能解析到目标模块
+    const moduleDir = path.dirname(module.absolutePath);
+    for (const dep of module.dependencies) {
+      // 解析相对路径
+      let resolvedPath: string;
+      if (dep.startsWith('./') || dep.startsWith('../')) {
+        resolvedPath = path.resolve(moduleDir, dep).replace(/\\/g, '/');
+      } else {
+        resolvedPath = dep;
+      }
+
+      // 尝试多种扩展名
+      const possiblePaths = [
+        resolvedPath,
+        resolvedPath + '.ts',
+        resolvedPath + '.js',
+        resolvedPath.replace(/\.js$/, '.ts'),
+        resolvedPath.replace(/\.ts$/, '.js')
+      ];
+
+      for (const p of possiblePaths) {
+        if (p === targetPathNormalized || p.includes(targetBasename)) {
+          if (!dependents.includes(module)) {
+            dependents.push(module);
+          }
+          break;
+        }
+      }
     }
 
-    // 也检查 imports
+    // 方法2: 检查 imports（包含 re-export 的 imports）
     for (const imp of module.imports) {
-      if (imp.source.includes(path.basename(targetModule.absolutePath, '.ts'))) {
+      if (imp.source.includes(targetBasename) || imp.source.includes(targetModule.id)) {
         if (!dependents.includes(module)) {
           dependents.push(module);
         }
+      }
+    }
+
+    // 方法3: 直接检查 module.dependents 是否包含目标模块ID（由 analyzer 构建的正确关系）
+    if (module.dependents?.includes(targetModule.id)) {
+      if (!dependents.includes(module)) {
+        dependents.push(module);
       }
     }
   }
@@ -463,10 +508,12 @@ function formatImpact(
 
   if (directDependents.length === 0) {
     console.log(chalk.green('   ✅ 低风险 - 该文件未被其他模块依赖'));
-  } else if (directDependents.length <= 3) {
-    console.log(chalk.yellow('   ⚠️  中风险 - 该文件被少量模块依赖'));
+  } else if (directDependents.length <= 2) {
+    console.log(chalk.green('   🟢 低风险 - 该文件被少量模块依赖'));
   } else if (directDependents.length <= 10) {
-    console.log(chalk.red('   ⚠️  高风险 - 该文件被多个模块依赖，修改需谨慎'));
+    console.log(chalk.yellow('   ⚠️  中风险 - 该文件被多个模块依赖'));
+  } else if (directDependents.length <= 25) {
+    console.log(chalk.red('   🟠 高风险 - 该文件被较多模块依赖，修改需谨慎'));
   } else {
     console.log(chalk.magenta('   🔴 极高风险 - 该文件是核心依赖，修改将影响大量模块'));
   }

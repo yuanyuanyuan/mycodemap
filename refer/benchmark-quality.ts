@@ -9,12 +9,14 @@
  *   npx vitest run refer/benchmark-quality.test.ts
  */
 
-import { execSync } from 'child_process';
-import { existsSync } from 'fs';
-import { join } from 'path';
+import { spawnSync } from 'child_process';
+import { appendFileSync, existsSync, mkdirSync } from 'fs';
+import { join, relative, resolve } from 'path';
+import { fileURLToPath } from 'url';
 
 // 测试项目路径（使用 codemap 自身作为测试目标）
 const PROJECT_ROOT = '/data/codemap';
+const BENCHMARK_ERROR_DIR = join(PROJECT_ROOT, '.codemap', 'logs', 'benchmark-errors');
 
 /**
  * 基准查询定义
@@ -93,6 +95,12 @@ export interface QueryResult {
   outputTokens: number;
   /** 错误信息 */
   error?: string;
+  /** 错误详情（用于写入独立错误日志） */
+  errorDetails?: string;
+  /** 非致命警告（如 ast-grep stderr 输出） */
+  warning?: string;
+  /** 警告详情（用于写入独立错误日志） */
+  warningDetails?: string;
 }
 
 /**
@@ -112,6 +120,74 @@ export interface BenchmarkResult {
   tokenReductionPercent: number;
   /** 每条查询的结果 */
   queryResults: QueryResult[];
+  /** 错误详情日志路径（相对于项目根目录） */
+  errorLogPath?: string;
+}
+
+interface ExecSyncError extends Error {
+  stdout?: string | Buffer;
+  stderr?: string | Buffer;
+}
+
+function bufferToString(value: string | Buffer | undefined): string {
+  if (!value) {
+    return '';
+  }
+  return typeof value === 'string' ? value : value.toString('utf-8');
+}
+
+function summarizeErrorMessage(text: string, maxLength = 160): string {
+  const firstLine = text
+    .split('\n')
+    .map(line => line.trim())
+    .find(Boolean) || '未知错误';
+
+  const compact = firstLine.replace(/\s+/g, ' ');
+  return compact.length > maxLength
+    ? `${compact.slice(0, maxLength)}...`
+    : compact;
+}
+
+function extractExecError(error: unknown): { summary: string; details: string } {
+  if (!(error instanceof Error)) {
+    const details = String(error);
+    return { summary: summarizeErrorMessage(details), details };
+  }
+
+  const execError = error as ExecSyncError;
+  const parts = [
+    error.message,
+    bufferToString(execError.stderr),
+    bufferToString(execError.stdout),
+  ]
+    .map(part => part.trim())
+    .filter(Boolean);
+
+  const details = parts.join('\n\n');
+  return {
+    summary: summarizeErrorMessage(details),
+    details,
+  };
+}
+
+function ensureBenchmarkErrorLogPath(existingPath: string | undefined): string {
+  if (existingPath) {
+    return existingPath;
+  }
+  mkdirSync(BENCHMARK_ERROR_DIR, { recursive: true });
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return join(BENCHMARK_ERROR_DIR, `benchmark-errors-${timestamp}.log`);
+}
+
+function appendBenchmarkError(logPath: string, query: BenchmarkQuery, details: string): void {
+  const header = [
+    `[${new Date().toISOString()}]`,
+    `queryId=${query.id}`,
+    `intent=${query.intent}`,
+    `description=${query.description}`,
+  ].join(' ');
+
+  appendFileSync(logPath, `${header}\n${details}\n${'-'.repeat(80)}\n`, 'utf-8');
 }
 
 /**
@@ -146,13 +222,30 @@ function runQuery(query: BenchmarkQuery): QueryResult {
     // 添加 targets
     args.push('--targets', ...query.targets);
 
-    // 运行命令
-    const cmd = `node ${join(PROJECT_ROOT, 'dist/cli/index.js')} ${args.join(' ')}`;
-    const output = execSync(cmd, {
+    // 运行命令（显式捕获 stdout/stderr，避免 stderr 噪音直接污染控制台）
+    const command = join(PROJECT_ROOT, 'dist/cli/index.js');
+    const execResult = spawnSync('node', [command, ...args], {
       cwd: PROJECT_ROOT,
       encoding: 'utf-8',
-      timeout: 60000,
+      timeout: 5000,
+      maxBuffer: 10 * 1024 * 1024,
     });
+
+    if (execResult.error) {
+      throw execResult.error;
+    }
+
+    const stderrText = (execResult.stderr || '').trim();
+    if (stderrText) {
+      result.warning = summarizeErrorMessage(stderrText);
+      result.warningDetails = stderrText;
+    }
+
+    if (execResult.status !== 0) {
+      throw new Error(stderrText || `命令退出码: ${execResult.status}`);
+    }
+
+    const output = (execResult.stdout || '').trim();
 
     // 解析输出
     let parsed;
@@ -190,7 +283,9 @@ function runQuery(query: BenchmarkQuery): QueryResult {
     }, 0);
 
   } catch (error) {
-    result.error = error instanceof Error ? error.message : String(error);
+    const extracted = extractExecError(error);
+    result.error = extracted.summary;
+    result.errorDetails = extracted.details;
   }
 
   return result;
@@ -207,16 +302,26 @@ function runQuery(query: BenchmarkQuery): QueryResult {
  */
 function runRgBaseline(keywords: string[], targets: string[]): number {
   try {
-    // 使用 rg 搜索并获取匹配内容（-o 选项只输出匹配部分）
-    const targetPath = targets.join(' ');
-
-    // 获取匹配的行内容（包含文件名和行号）
-    const cmd = `rg "${keywords.join(' ')}" ${targetPath} --type ts -n -o | head -50`;
-    const output = execSync(cmd, {
+    // 使用 rg 搜索并获取匹配内容（限制最大 50 条，避免 shell pipe）
+    const rgResult = spawnSync('rg', [
+      keywords.join(' '),
+      ...targets,
+      '--type', 'ts',
+      '-n',
+      '-o',
+      '--max-count', '50',
+    ], {
       cwd: PROJECT_ROOT,
       encoding: 'utf-8',
-      timeout: 30000,
+      timeout: 3000,
+      maxBuffer: 2 * 1024 * 1024,
     });
+
+    if (rgResult.error || rgResult.status !== 0) {
+      return 50;
+    }
+
+    const output = (rgResult.stdout || '').trim();
 
     // 估算 token：按空格分割，每部分约 1-2 个 token
     // rg 输出格式通常是 "filename:line:content"，每个部分都有一些 token
@@ -248,6 +353,8 @@ export async function runBenchmark(): Promise<BenchmarkResult> {
 
   const queryResults: QueryResult[] = [];
   let totalRgTokens = 0;
+  let errorLogPath: string | undefined;
+  let warningCount = 0;
 
   for (const query of BENCHMARK_QUERIES) {
     process.stdout.write(`[${query.id.toString().padStart(2, '0')}/${BENCHMARK_QUERIES.length}] 运行查询: ${query.description} ... `);
@@ -261,7 +368,14 @@ export async function runBenchmark(): Promise<BenchmarkResult> {
     totalRgTokens += rgTokens;
 
     if (result.error) {
-      console.log(`失败: ${result.error}`);
+      errorLogPath = ensureBenchmarkErrorLogPath(errorLogPath);
+      appendBenchmarkError(errorLogPath, query, result.errorDetails || result.error);
+      console.log(`失败: ${result.error} (详情已写入错误日志)`);
+    } else if (result.warningDetails) {
+      warningCount += 1;
+      errorLogPath = ensureBenchmarkErrorLogPath(errorLogPath);
+      appendBenchmarkError(errorLogPath, query, result.warningDetails);
+      console.log(`Hit@8: ${(result.hitAt8 * 100).toFixed(1)}% | Tokens: ${result.outputTokens} | 警告: ${result.warning}`);
     } else {
       console.log(`Hit@8: ${(result.hitAt8 * 100).toFixed(1)}% | Tokens: ${result.outputTokens}`);
     }
@@ -289,6 +403,7 @@ export async function runBenchmark(): Promise<BenchmarkResult> {
     baselineTokens: totalRgTokens,
     tokenReductionPercent,
     queryResults,
+    errorLogPath: errorLogPath ? relative(PROJECT_ROOT, errorLogPath) : undefined,
   };
 
   // 打印汇总
@@ -298,6 +413,7 @@ export async function runBenchmark(): Promise<BenchmarkResult> {
   console.log(`总查询数: ${benchmarkResult.totalQueries}`);
   console.log(`成功: ${benchmarkResult.successfulQueries}`);
   console.log(`失败: ${benchmarkResult.failedQueries}`);
+  console.log(`警告: ${warningCount}`);
   console.log('-'.repeat(60));
   console.log(`Hit@8 分数: ${(benchmarkResult.hitAt8Score * 100).toFixed(1)}%`);
   console.log(`目标: >= 90% ${benchmarkResult.hitAt8Score >= 0.9 ? '✓' : '✗'}`);
@@ -306,6 +422,9 @@ export async function runBenchmark(): Promise<BenchmarkResult> {
   console.log(`Rg 基准: ${benchmarkResult.baselineTokens}`);
   console.log(`Token 降低: ${benchmarkResult.tokenReductionPercent.toFixed(1)}%`);
   console.log(`目标: >= 40% ${benchmarkResult.tokenReductionPercent >= 40 ? '✓' : '✗'}`);
+  if (benchmarkResult.errorLogPath) {
+    console.log(`错误详情日志: ${benchmarkResult.errorLogPath}`);
+  }
   console.log('='.repeat(60));
 
   return benchmarkResult;
@@ -351,4 +470,8 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+const currentFilePath = fileURLToPath(import.meta.url);
+const entryFilePath = process.argv[1] ? resolve(process.argv[1]) : '';
+if (entryFilePath === currentFilePath) {
+  main().catch(console.error);
+}

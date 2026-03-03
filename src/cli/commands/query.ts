@@ -15,6 +15,14 @@ interface QueryOptions {
   json?: boolean;
   verbose?: boolean;
   cache?: boolean;
+  regex?: boolean;  // 新增：正则表达式模式
+  depsFormat?: 'default' | 'detailed';  // 新增：依赖查询输出格式
+  // 新增：大小写敏感
+  caseSensitive?: boolean;
+  // 新增：代码上下文行数
+  context?: number;
+  // 新增：包含引用信息
+  includeReferences?: boolean;
 }
 
 interface QueryResult {
@@ -46,6 +54,21 @@ interface QueryResultItem {
     column?: number;
   };
   isExported?: boolean;
+  // 新增：引用位置
+  references?: ReferenceInfo[];
+  // 新增：代码上下文
+  context?: CodeContext[];
+}
+
+interface ReferenceInfo {
+  file: string;
+  line: number;
+  type: 'import' | 'usage' | 'export';
+}
+
+interface CodeContext {
+  line: number;
+  content: string;
 }
 
 // ===== 性能优化：改进的缓存机制 =====
@@ -70,14 +93,18 @@ const indexCache = new Map<string, IndexCache>();
  * 符号索引 - 用于快速查找
  */
 interface SymbolIndex {
-  // 符号名 -> 符号列表（用于精确/模糊查询）
+  // 符号名 -> 符号列表（用于精确/模糊查询，不区分大小写）
   symbols: Map<string, SymbolEntry[]>;
+  // 符号名 -> 符号列表（用于精确/模糊查询，区分大小写）
+  symbolsExact: Map<string, SymbolEntry[]>;
   // 模块路径 -> 模块索引
   modules: Map<string, ModuleIndex>;
   // 依赖名 -> 依赖列表
   dependencies: Map<string, DependencyEntry[]>;
-  // 前缀索引（用于前缀匹配）
+  // 前缀索引（用于前缀匹配，不区分大小写）
   prefixIndex: Map<string, SymbolEntry[]>;
+  // 前缀索引（用于前缀匹配，区分大小写）
+  prefixIndexExact: Map<string, SymbolEntry[]>;
 }
 
 interface SymbolEntry {
@@ -108,9 +135,11 @@ interface DependencyEntry {
 function buildIndex(codeMap: CodeMap, rootDir: string): SymbolIndex {
   const index: SymbolIndex = {
     symbols: new Map(),
+    symbolsExact: new Map(),
     modules: new Map(),
     dependencies: new Map(),
     prefixIndex: new Map(),
+    prefixIndexExact: new Map(),
   };
 
   for (const module of codeMap.modules) {
@@ -134,20 +163,35 @@ function buildIndex(codeMap: CodeMap, rootDir: string): SymbolIndex {
         isExported: true,
       };
 
-      // 精确索引
+      // 精确索引（不区分大小写）
       const lowerName = exp.name.toLowerCase();
       if (!index.symbols.has(lowerName)) {
         index.symbols.set(lowerName, []);
       }
       index.symbols.get(lowerName)!.push(entry);
 
-      // 前缀索引
+      // 精确索引（区分大小写）
+      if (!index.symbolsExact.has(exp.name)) {
+        index.symbolsExact.set(exp.name, []);
+      }
+      index.symbolsExact.get(exp.name)!.push(entry);
+
+      // 前缀索引（不区分大小写）
       for (let i = 1; i <= exp.name.length; i++) {
         const prefix = exp.name.substring(0, i).toLowerCase();
         if (!index.prefixIndex.has(prefix)) {
           index.prefixIndex.set(prefix, []);
         }
         index.prefixIndex.get(prefix)!.push(entry);
+      }
+
+      // 前缀索引（区分大小写）
+      for (let i = 1; i <= exp.name.length; i++) {
+        const prefix = exp.name.substring(0, i);
+        if (!index.prefixIndexExact.has(prefix)) {
+          index.prefixIndexExact.set(prefix, []);
+        }
+        index.prefixIndexExact.get(prefix)!.push(entry);
       }
     }
 
@@ -168,13 +212,28 @@ function buildIndex(codeMap: CodeMap, rootDir: string): SymbolIndex {
       }
       index.symbols.get(lowerName)!.push(entry);
 
-      // 前缀索引
+      // 精确索引（区分大小写）
+      if (!index.symbolsExact.has(sym.name)) {
+        index.symbolsExact.set(sym.name, []);
+      }
+      index.symbolsExact.get(sym.name)!.push(entry);
+
+      // 前缀索引（不区分大小写）
       for (let i = 1; i <= sym.name.length; i++) {
         const prefix = sym.name.substring(0, i).toLowerCase();
         if (!index.prefixIndex.has(prefix)) {
           index.prefixIndex.set(prefix, []);
         }
         index.prefixIndex.get(prefix)!.push(entry);
+      }
+
+      // 前缀索引（区分大小写）
+      for (let i = 1; i <= sym.name.length; i++) {
+        const prefix = sym.name.substring(0, i);
+        if (!index.prefixIndexExact.has(prefix)) {
+          index.prefixIndexExact.set(prefix, []);
+        }
+        index.prefixIndexExact.get(prefix)!.push(entry);
       }
     }
 
@@ -296,14 +355,123 @@ function clearCache(): void {
 }
 
 /**
+ * 查找符号的引用位置
+ */
+function findReferences(
+  codeMap: CodeMap,
+  symbolName: string,
+  excludeFile: string,
+  caseSensitive: boolean = false
+): ReferenceInfo[] {
+  const references: ReferenceInfo[] = [];
+  const searchName = caseSensitive ? symbolName : symbolName.toLowerCase();
+
+  for (const mod of codeMap.modules) {
+    const relPath = path.relative(codeMap.project.rootDir, mod.absolutePath);
+
+    // 跳过定义位置文件
+    if (relPath === excludeFile) continue;
+
+    // 检查 imports 中是否引用了该符号
+    for (const imp of mod.imports) {
+      // 检查导入源
+      const impSource = caseSensitive ? imp.source : imp.source.toLowerCase();
+      if (impSource.includes(searchName)) {
+        references.push({
+          file: relPath,
+          line: 1,  // 简化处理，显示第一行
+          type: 'import',
+        });
+        continue;
+      }
+
+      // 检查导入的 specifiers
+      for (const spec of imp.specifiers) {
+        const specName = caseSensitive ? spec.name : spec.name.toLowerCase();
+        if (specName === searchName) {
+          references.push({
+            file: relPath,
+            line: 1,
+            type: 'import',
+          });
+          break;
+        }
+      }
+    }
+
+    // 检查 exports 中是否导出该符号
+    for (const exp of mod.exports) {
+      const expName = caseSensitive ? exp.name : exp.name.toLowerCase();
+      if (expName === searchName) {
+        references.push({
+          file: relPath,
+          line: 1,
+          type: 'export',
+        });
+      }
+    }
+  }
+
+  return references.slice(0, 20);  // 限制引用数量
+}
+
+/**
+ * 读取代码上下文
+ */
+function readCodeContext(
+  filePath: string,
+  lineNumber: number,
+  contextLines: number,
+  rootDir: string
+): CodeContext[] {
+  const fullPath = path.join(rootDir, filePath);
+  if (!fs.existsSync(fullPath)) {
+    return [];
+  }
+
+  try {
+    const content = fs.readFileSync(fullPath, 'utf-8');
+    const lines = content.split('\n');
+    const context: CodeContext[] = [];
+
+    const startLine = Math.max(1, lineNumber - contextLines);
+    const endLine = Math.min(lines.length, lineNumber + contextLines);
+
+    for (let i = startLine; i <= endLine; i++) {
+      context.push({
+        line: i,
+        content: lines[i - 1] || '',
+      });
+    }
+
+    return context;
+  } catch {
+    return [];
+  }
+}
+
+/**
  * 查询符号（使用索引）
  */
-function querySymbol(index: SymbolIndex, codeMap: CodeMap, symbolName: string, limit: number): QueryResultItem[] {
+function querySymbol(
+  index: SymbolIndex,
+  codeMap: CodeMap,
+  symbolName: string,
+  limit: number,
+  caseSensitive: boolean = false,
+  includeReferences: boolean = false,
+  contextLines: number = 0
+): QueryResultItem[] {
   const results: QueryResultItem[] = [];
-  const searchLower = symbolName.toLowerCase();
+
+  // 选择正确的索引
+  const symbolsMap = caseSensitive ? index.symbolsExact : index.symbols;
+  const prefixMap = caseSensitive ? index.prefixIndexExact : index.prefixIndex;
+  // 搜索键：不区分大小写时转换为小写
+  const searchKey = caseSensitive ? symbolName : symbolName.toLowerCase();
 
   // 首先尝试精确匹配
-  const exactMatches = index.symbols.get(searchLower);
+  const exactMatches = symbolsMap.get(searchKey);
   if (exactMatches) {
     for (const entry of exactMatches) {
       results.push({
@@ -319,7 +487,7 @@ function querySymbol(index: SymbolIndex, codeMap: CodeMap, symbolName: string, l
 
   // 如果没有精确匹配，尝试前缀匹配
   if (results.length === 0) {
-    const prefixResults = index.prefixIndex.get(searchLower) || [];
+    const prefixResults = prefixMap.get(searchKey) || [];
     for (const entry of prefixResults) {
       // 避免重复
       const key = `${entry.name}:${entry.filePath}`;
@@ -333,6 +501,20 @@ function querySymbol(index: SymbolIndex, codeMap: CodeMap, symbolName: string, l
           isExported: entry.isExported,
         });
       }
+    }
+  }
+
+  // 添加引用信息
+  if (includeReferences) {
+    for (const result of results) {
+      result.references = findReferences(codeMap, symbolName, result.location?.file || '', caseSensitive);
+    }
+  }
+
+  // 添加代码上下文
+  if (contextLines > 0) {
+    for (const result of results) {
+      result.context = readCodeContext(result.location?.file || '', result.location?.line || 0, contextLines, codeMap.project.rootDir);
     }
   }
 
@@ -366,8 +548,13 @@ function queryModule(index: SymbolIndex, codeMap: CodeMap, modulePath: string, l
 
 /**
  * 查询依赖（使用索引）
+ * @param index 符号索引
+ * @param codeMap 代码地图数据
+ * @param depName 依赖名称
+ * @param limit 结果数量限制
+ * @param deduplicate 是否去重（默认true）
  */
-function queryDeps(index: SymbolIndex, codeMap: CodeMap, depName: string, limit: number): QueryResultItem[] {
+function queryDeps(index: SymbolIndex, codeMap: CodeMap, depName: string, limit: number, deduplicate: boolean = true): QueryResultItem[] {
   const results: QueryResultItem[] = [];
   const searchDep = depName.toLowerCase();
 
@@ -386,24 +573,67 @@ function queryDeps(index: SymbolIndex, codeMap: CodeMap, depName: string, limit:
     }
   }
 
+  // 去重：基于 name:sourcePath 组合去重，避免 dependency 和 import 重复
+  if (deduplicate) {
+    const unique = new Map<string, QueryResultItem>();
+    for (const item of results) {
+      const key = `${item.name}:${item.path}`;
+      if (!unique.has(key)) {
+        unique.set(key, item);
+      }
+    }
+    return Array.from(unique.values()).slice(0, limit);
+  }
+
   return results.slice(0, limit);
 }
 
 /**
  * 模糊搜索（使用索引）
+ * @param index 符号索引
+ * @param codeMap 代码地图数据
+ * @param keyword 搜索关键词
+ * @param limit 结果数量限制
+ * @param useRegex 是否使用正则表达式搜索
+ * @param caseSensitive 大小写敏感
+ * @param contextLines 代码上下文行数
  */
-function search(index: SymbolIndex, codeMap: CodeMap, keyword: string, limit: number): QueryResultItem[] {
+function search(
+  index: SymbolIndex,
+  codeMap: CodeMap,
+  keyword: string,
+  limit: number,
+  useRegex: boolean = false,
+  caseSensitive: boolean = false,
+  contextLines: number = 0
+): QueryResultItem[] {
   const results: QueryResultItem[] = [];
-  const searchLower = keyword.toLowerCase();
+
+  // 正则表达式模式
+  let regex: RegExp | null = null;
+  if (useRegex) {
+    try {
+      const flags = caseSensitive ? '' : 'i';
+      regex = new RegExp(keyword, flags);
+    } catch {
+      // 正则表达式无效，回退到普通搜索
+      regex = null;
+    }
+  }
 
   // 1. 搜索模块路径
   for (const [key, moduleIdx] of index.modules.entries()) {
-    if (key.includes(searchLower)) {
+    const searchTarget = caseSensitive ? key : key.toLowerCase();
+    const keywordLower = keyword.toLowerCase();
+    const matches = regex
+      ? regex.test(key) || regex.test(moduleIdx.relativePath)
+      : searchTarget.includes(keywordLower);
+    if (matches) {
       results.push({
         name: moduleIdx.relativePath,
         path: moduleIdx.absolutePath,
         kind: 'module',
-        details: `模块匹配`,
+        details: useRegex ? `正则匹配` : `模块匹配`,
         location: { file: moduleIdx.relativePath },
         isExported: false,
       });
@@ -411,16 +641,42 @@ function search(index: SymbolIndex, codeMap: CodeMap, keyword: string, limit: nu
   }
 
   // 2. 搜索符号和导出（使用前缀索引）
-  const prefixResults = index.prefixIndex.get(searchLower) || [];
-  for (const entry of prefixResults) {
-    results.push({
-      name: entry.name,
-      path: path.join(codeMap.project.rootDir, entry.filePath),
-      kind: entry.isExported ? `export (${entry.kind})` : entry.kind,
-      details: `${entry.isExported ? '导出于' : '定义于'} ${entry.filePath}${entry.line ? ':' + entry.line : ''}`,
-      location: { file: entry.filePath, line: entry.line, column: entry.column },
-      isExported: entry.isExported,
-    });
+  // 选择正确的索引
+  const symbolsMap = caseSensitive ? index.symbolsExact : index.symbols;
+  const prefixMap = caseSensitive ? index.prefixIndexExact : index.prefixIndex;
+
+  if (useRegex && regex) {
+    // 正则模式：遍历所有符号进行匹配
+    for (const [symbolKey, entries] of symbolsMap.entries()) {
+      const matchTarget = caseSensitive ? symbolKey : symbolKey.toLowerCase();
+      if (regex.test(matchTarget) || regex.test(symbolKey)) {
+        for (const entry of entries) {
+          results.push({
+            name: entry.name,
+            path: path.join(codeMap.project.rootDir, entry.filePath),
+            kind: entry.isExported ? `export (${entry.kind})` : entry.kind,
+            details: `正则匹配于 ${entry.filePath}${entry.line ? ':' + entry.line : ''}`,
+            location: { file: entry.filePath, line: entry.line, column: entry.column },
+            isExported: entry.isExported,
+          });
+        }
+      }
+    }
+  } else {
+    // 普通模式：使用前缀索引
+    // 搜索键：不区分大小写时转换为小写
+    const searchKey = caseSensitive ? keyword : keyword.toLowerCase();
+    const prefixResults = prefixMap.get(searchKey) || [];
+    for (const entry of prefixResults) {
+      results.push({
+        name: entry.name,
+        path: path.join(codeMap.project.rootDir, entry.filePath),
+        kind: entry.isExported ? `export (${entry.kind})` : entry.kind,
+        details: `${entry.isExported ? '导出于' : '定义于'} ${entry.filePath}${entry.line ? ':' + entry.line : ''}`,
+        location: { file: entry.filePath, line: entry.line, column: entry.column },
+        isExported: entry.isExported,
+      });
+    }
   }
 
   // 去重（基于 name:path 组合）
@@ -432,7 +688,16 @@ function search(index: SymbolIndex, codeMap: CodeMap, keyword: string, limit: nu
     }
   }
 
-  return Array.from(unique.values()).slice(0, limit);
+  const finalResults = Array.from(unique.values()).slice(0, limit);
+
+  // 添加代码上下文
+  if (contextLines > 0) {
+    for (const result of finalResults) {
+      result.context = readCodeContext(result.location?.file || '', result.location?.line || 0, contextLines, codeMap.project.rootDir);
+    }
+  }
+
+  return finalResults;
 }
 
 /**
@@ -463,6 +728,27 @@ function formatResults(result: QueryResult, isJson: boolean, verbose: boolean): 
     if (item.details) {
       console.log(chalk.gray(`      ${item.details}`));
     }
+
+    // 显示引用信息
+    if (item.references && item.references.length > 0) {
+      console.log(chalk.gray(`      引用:`));
+      for (const ref of item.references.slice(0, 5)) {
+        console.log(chalk.gray(`        - ${ref.type}: ${ref.file}`));
+      }
+      if (item.references.length > 5) {
+        console.log(chalk.gray(`        ... 还有 ${item.references.length - 5} 个引用`));
+      }
+    }
+
+    // 显示代码上下文
+    if (item.context && item.context.length > 0) {
+      console.log(chalk.gray(`      代码上下文:`));
+      for (const ctx of item.context) {
+        const prefix = ctx.line === item.location?.line ? '>' : ' ';
+        console.log(chalk.gray(`        ${prefix}${ctx.line}: ${ctx.content}`));
+      }
+    }
+
     console.log('');
   }
 
@@ -482,9 +768,14 @@ function formatResults(result: QueryResult, isJson: boolean, verbose: boolean): 
  */
 export async function queryCommand(options: QueryOptions) {
   const rootDir = process.cwd();
-  const limit = options.limit || 20;
+  const limit = options.limit || 50;
   const useCache = options.cache !== false;  // 默认启用缓存
   const verbose = options.verbose || false;
+  const useRegex = options.regex || false;
+  const depsFormat = options.depsFormat || 'default';
+  const caseSensitive = options.caseSensitive || false;
+  const contextLines = typeof options.context === 'string' ? parseInt(options.context, 10) : (options.context || 0);
+  const includeReferences = options.includeReferences || false;
 
   // 清除缓存（如果指定 --no-cache）
   if (!useCache) {
@@ -507,7 +798,7 @@ export async function queryCommand(options: QueryOptions) {
 
   // 执行查询
   if (options.symbol) {
-    const items = querySymbol(index, codeMap, options.symbol, limit);
+    const items = querySymbol(index, codeMap, options.symbol, limit, caseSensitive, includeReferences, contextLines);
     result = {
       type: 'symbol',
       query: options.symbol,
@@ -523,7 +814,10 @@ export async function queryCommand(options: QueryOptions) {
       results: items,
     };
   } else if (options.deps) {
-    const items = queryDeps(index, codeMap, options.deps, limit);
+    // 依赖查询：根据 depsFormat 决定是否去重
+    // default 模式下去重，detailed 模式显示完整信息（包含 dependency 和 import）
+    const deduplicate = depsFormat !== 'detailed';
+    const items = queryDeps(index, codeMap, options.deps, limit, deduplicate);
     result = {
       type: 'deps',
       query: options.deps,
@@ -531,7 +825,7 @@ export async function queryCommand(options: QueryOptions) {
       results: items,
     };
   } else if (options.search) {
-    const items = search(index, codeMap, options.search, limit);
+    const items = search(index, codeMap, options.search, limit, useRegex, caseSensitive, contextLines);
     result = {
       type: 'search',
       query: options.search,
@@ -549,6 +843,8 @@ export async function queryCommand(options: QueryOptions) {
     console.log(chalk.gray('   -l, --limit <number>  限制结果数量'));
     console.log(chalk.gray('   -j, --json           JSON 格式输出'));
     console.log(chalk.gray('   -v, --verbose        显示性能指标'));
+    console.log(chalk.gray('   -r, --regex          使用正则表达式搜索'));
+    console.log(chalk.gray('   --deps-format        依赖查询格式 (default|detailed)'));
     console.log(chalk.gray('   --no-cache           禁用缓存'));
     process.exit(1);
   }
