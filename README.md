@@ -514,21 +514,37 @@ npm run lint
 请遵循以下 commit message 格式：
 
 ```
-<type>(<scope>): <subject>
+[TAG] scope: message
 
-feat:     新功能
-fix:      Bug 修复
-docs:     文档变更
-refactor: 代码重构
-test:     测试相关
-chore:    构建/工具变更
+BUGFIX   Bug 修复
+FEATURE  新功能
+REFACTOR 代码重构
+CONFIG   配置/构建变更
+DOCS     文档变更
+DELETE   删除代码/文件
 ```
+
+示例：`[FEATURE] cli: add new command`
+
+### 文件规范
+
+所有 TypeScript 源文件（除测试文件和类型定义外）头部必须包含以下注释：
+
+```typescript
+// [META] since:YYYY-MM | owner:team | stable:false
+// [WHY]  说明该文件存在的原因和业务价值
+```
+
+- `[META]`：元数据注释，包含创建时间、负责团队、稳定性状态
+- `[WHY]`：解释文件存在的业务理由，帮助 AI 理解上下文
 
 ### 开发注意事项
 
 - 项目使用 ESM 模块格式（`"type": "module"`）
 - TypeScript 严格模式
 - 使用 Vitest 作为测试框架
+- **提交前会自动运行与变更相关的测试，失败将阻断提交**
+- **提交前会检查文件头注释规范（[META]/[WHY]）**
 - 新增功能请同步补充测试和文档
 
 ### 运行日志（调试追踪）
