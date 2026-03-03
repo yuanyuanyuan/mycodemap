@@ -10,6 +10,20 @@ import type { IParser, ParseResult, ParserOptions, TextEdit } from '../interface
 import type { ExportInfo, ImportInfo, ModuleSymbol, SymbolKind } from '../../types/index.js';
 
 /**
+ * 将构建路径转换为源代码路径
+ * 例如: ../types/index.js -> ../types/index.ts
+ */
+export function normalizeSourcePath(depPath: string): string {
+  // 已经是 .ts 或 .tsx 的不需要转换
+  if (depPath.endsWith('.ts') || depPath.endsWith('.tsx')) {
+    return depPath;
+  }
+
+  // 替换 .js/.jsx 后缀为 .ts/.tsx
+  return depPath.replace(/\.js$/i, '.ts').replace(/\.jsx$/i, '.tsx');
+}
+
+/**
  * Fast Parser - 使用 Tree-sitter 进行快速解析
  * 注意: 需要安装 tree-sitter 和 tree-sitter-typescript
  */
@@ -138,7 +152,7 @@ export class FastParser implements IParser {
 
       if (match[4]) {
         imports.push({
-          source: match[4],
+          source: normalizeSourcePath(match[4]),
           sourceType: match[4].startsWith('.') ? 'relative' : 'alias',
           specifiers: specifiers.map(s => ({ name: s, isTypeOnly: false })) as any,
           isTypeOnly: false
@@ -152,7 +166,7 @@ export class FastParser implements IParser {
       const specifiers = match[1].split(',').map((s: string) => s.trim()).filter(Boolean);
       if (match[2]) {
         imports.push({
-          source: match[2],
+          source: normalizeSourcePath(match[2]),
           sourceType: match[2].startsWith('.') ? 'relative' : 'alias',
           specifiers: specifiers.map(s => ({ name: s, isTypeOnly: false })),
           isTypeOnly: false,

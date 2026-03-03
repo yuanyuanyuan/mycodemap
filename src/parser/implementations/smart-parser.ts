@@ -11,6 +11,20 @@ import type { IParser, ParseResult, ParserOptions, TypeInfo, CallGraph, Complexi
 import type { ExportInfo, ImportInfo, ModuleSymbol, SymbolKind, DecoratorInfo, FunctionSignature, ParameterInfo, MemberInfo, JSDocComment, CodeSnippet, CodeSnippetType } from '../../types/index.js';
 
 /**
+ * 将构建路径转换为源代码路径
+ * 例如: ../types/index.js -> ../types/index.ts
+ */
+function normalizeSourcePath(depPath: string): string {
+  // 已经是 .ts 或 .tsx 的不需要转换
+  if (depPath.endsWith('.ts') || depPath.endsWith('.tsx')) {
+    return depPath;
+  }
+
+  // 替换 .js/.jsx 后缀为 .ts/.tsx
+  return depPath.replace(/\.js$/i, '.ts').replace(/\.jsx$/i, '.tsx');
+}
+
+/**
  * Smart Parser - 使用 TypeScript Compiler API 进行深度分析
  */
 export class SmartParser implements IParser {
@@ -96,7 +110,7 @@ export class SmartParser implements IParser {
                 kind: 'variable',
                 isDefault: false,
                 isTypeOnly: false,
-                origin: source
+                origin: normalizeSourcePath(source)
               });
             }
           }
@@ -196,7 +210,7 @@ export class SmartParser implements IParser {
         }
 
         imports.push({
-          source,
+          source: normalizeSourcePath(source),
           sourceType: source.startsWith('.') ? 'relative' : 'alias',
           specifiers,
           isTypeOnly: false

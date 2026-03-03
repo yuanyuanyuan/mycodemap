@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs/promises';
-import { FastParser } from '../implementations/fast-parser.js';
+import { FastParser, normalizeSourcePath } from '../implementations/fast-parser.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -186,6 +186,37 @@ export { TestClass, TestInterface };
     it('should dispose without errors', () => {
       expect(() => parser.dispose()).not.toThrow();
     });
+  });
+});
+
+describe('normalizeSourcePath', () => {
+  it('should convert .js to .ts', () => {
+    expect(normalizeSourcePath('../types/index.js')).toBe('../types/index.ts');
+  });
+
+  it('should convert .jsx to .tsx', () => {
+    expect(normalizeSourcePath('./component.jsx')).toBe('./component.tsx');
+  });
+
+  it('should keep .ts unchanged', () => {
+    expect(normalizeSourcePath('../types/index.ts')).toBe('../types/index.ts');
+  });
+
+  it('should keep .tsx unchanged', () => {
+    expect(normalizeSourcePath('./component.tsx')).toBe('./component.tsx');
+  });
+
+  it('should handle nested paths', () => {
+    expect(normalizeSourcePath('./foo/bar.js')).toBe('./foo/bar.ts');
+  });
+
+  it('should handle external modules unchanged', () => {
+    expect(normalizeSourcePath('typescript')).toBe('typescript');
+    expect(normalizeSourcePath('@types/node')).toBe('@types/node');
+  });
+
+  it('should be case insensitive for .JS extension', () => {
+    expect(normalizeSourcePath('../types/index.JS')).toBe('../types/index.ts');
   });
 });
 
