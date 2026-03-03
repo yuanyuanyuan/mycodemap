@@ -1,9 +1,9 @@
 /**
  * [META] Generate CLI Command Test
- * [WHY] Ensure code generation command correctness including AI logic and error handling
+ * [WHY] Ensure code generation command correctness
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Simple mock setup
 vi.mock('ora', () => ({
@@ -31,10 +31,7 @@ const mockAnalyze = vi.fn();
 const mockGenerateAIMap = vi.fn();
 const mockGenerateJSON = vi.fn();
 const mockGenerateContext = vi.fn();
-const mockGenerateContextWithAI = vi.fn();
 const mockGenerateMermaidGraph = vi.fn();
-const mockCreateAIOverviewGenerator = vi.fn();
-const mockCreateSubagentCaller = vi.fn();
 
 vi.mock('../../../core/analyzer.js', () => ({
   analyze: (...args: unknown[]) => mockAnalyze(...args),
@@ -44,16 +41,7 @@ vi.mock('../../../generator/index.js', () => ({
   generateAIMap: (...args: unknown[]) => mockGenerateAIMap(...args),
   generateJSON: (...args: unknown[]) => mockGenerateJSON(...args),
   generateContext: (...args: unknown[]) => mockGenerateContext(...args),
-  generateContextWithAI: (...args: unknown[]) => mockGenerateContextWithAI(...args),
   generateMermaidGraph: (...args: unknown[]) => mockGenerateMermaidGraph(...args),
-}));
-
-vi.mock('../../../generator/ai-overview.js', () => ({
-  createAIOverviewGenerator: (...args: unknown[]) => mockCreateAIOverviewGenerator(...args),
-}));
-
-vi.mock('../../../ai/subagent-caller.js', () => ({
-  createSubagentCaller: (...args: unknown[]) => mockCreateSubagentCaller(...args),
 }));
 
 import { generateCommand } from '../generate.js';
@@ -101,19 +89,7 @@ describe('Generate CLI', () => {
     mockGenerateAIMap.mockResolvedValue(undefined);
     mockGenerateJSON.mockResolvedValue(undefined);
     mockGenerateContext.mockResolvedValue(undefined);
-    mockGenerateContextWithAI.mockResolvedValue(undefined);
     mockGenerateMermaidGraph.mockResolvedValue(undefined);
-    mockCreateAIOverviewGenerator.mockReturnValue({
-      generate: vi.fn().mockResolvedValue('/project/.codemap/AI_OVERVIEW.md'),
-    });
-    mockCreateSubagentCaller.mockReturnValue({
-      isAvailable: vi.fn().mockResolvedValue(true),
-      generateOverview: vi.fn().mockResolvedValue({
-        summary: 'Test overview',
-        keyInsights: [],
-        recommendations: [],
-      }),
-    });
   });
 
   afterEach(() => {
@@ -144,30 +120,6 @@ describe('Generate CLI', () => {
       expect(mockAnalyze).toHaveBeenCalledWith(expect.objectContaining({ output: 'custom-output' }));
     }, 30000);
 
-    it('should generate with AI context enabled', async () => {
-      await generateCommand({ 'ai-context': true });
-      expect(mockGenerateContextWithAI).toHaveBeenCalled();
-    }, 30000);
-
-    it('should skip AI context when disabled', async () => {
-      await generateCommand({ 'ai-context': false });
-      expect(mockGenerateContext).toHaveBeenCalled();
-      expect(mockGenerateContextWithAI).not.toHaveBeenCalled();
-    }, 30000);
-
-    it('should skip AI overview in Claude Code session', async () => {
-      process.env.CLAUDECODE = 'true';
-      await generateCommand({});
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Claude Code'));
-    }, 30000);
-
-    it('should force AI overview with environment variable', async () => {
-      process.env.CLAUDECODE = 'true';
-      process.env.CODEMAP_ENABLE_AI = 'true';
-      await generateCommand({});
-      expect(mockCreateSubagentCaller).toHaveBeenCalled();
-    }, 30000);
-
     it('should handle analysis error', async () => {
       mockAnalyze.mockRejectedValue(new Error('Analysis failed'));
       await expect(generateCommand({})).rejects.toThrow('Process exit');
@@ -183,28 +135,6 @@ describe('Generate CLI', () => {
       mockAnalyze.mockResolvedValue({ ...createMockCodeMap(), actualMode: 'smart' });
       await generateCommand({ mode: 'hybrid' });
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('解析模式'));
-    }, 30000);
-
-    it('should handle AI overview generation failure gracefully', async () => {
-      // 强制启用 AI 以绕过 Claude Code 会话检测
-      process.env.CODEMAP_ENABLE_AI = 'true';
-      mockCreateSubagentCaller.mockReturnValue({
-        isAvailable: vi.fn().mockResolvedValue(true),
-        generateOverview: vi.fn().mockRejectedValue(new Error('AI service unavailable')),
-      });
-      await generateCommand({});
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('AI 概述生成失败'));
-    }, 30000);
-
-    it('should skip AI overview when subagent is not available', async () => {
-      // 强制启用 AI 以绕过 Claude Code 会话检测
-      process.env.CODEMAP_ENABLE_AI = 'true';
-      mockCreateSubagentCaller.mockReturnValue({
-        isAvailable: vi.fn().mockResolvedValue(false),
-        generateOverview: vi.fn(),
-      });
-      await generateCommand({});
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Claude CLI 不可用'));
     }, 30000);
   });
 });

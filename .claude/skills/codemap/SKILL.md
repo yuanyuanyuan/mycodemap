@@ -1,132 +1,185 @@
 ---
 name: codemap
-description: CodeMap 项目专用 CLI 辅助工具。用于查询代码结构、执行 CI 门禁检查、分析依赖关系。当用户需要：(1) 查询符号/模块/依赖信息；(2) 执行 commit 前检查；(3) 分析变更影响范围；(4) 检测循环依赖时使用此 skill。提供半自动交互模式，先执行分析再列出问题供用户确认处理方式。
+description: 项目级代码分析技能，用于 TypeScript/JavaScript 项目的结构化分析。当用户需要：(1) 理解项目结构、查找代码符号、分析模块依赖；(2) 评估文件变更影响范围；(3) 进行 CI 门禁检查（提交格式、文件头）；(4) 启动开发工作流时使用。也适用于用户明确提到 "codemap"、"代码地图"、"分析代码结构"、"查找依赖" 等场景。
 ---
 
-# Codemap 代码分析助手
+# CodeMap 技能
 
-## 概述
+> 注意：此技能使用项目内路径调用 codemap CLI：`/data/codemap/dist/cli/index.js`
 
-这个 skill 为 CodeMap 项目 CLI 提供统一的交互入口。执行分析后列出发现的问题，让用户确认处理方式。
+## 快速开始
 
-**执行方式**：直接运行 `node dist/cli/index.js <command>`（无需切换目录）
-
-## 核心功能
-
-### 1. 快速代码查询
-
-| 用户意图 | CLI 命令 | 说明 |
-|----------|----------|------|
-| 搜索符号 | `query -S <关键词>` | 模糊搜索符号名 |
-| 查询模块 | `query -m <模块路径>` | 查看模块结构 |
-| 查依赖 | `query -d <模块名>` | 查看模块的依赖方 |
-| 精确符号 | `query -s <符号名>` | 精确查找符号 |
-
-**使用示例**：
-```bash
-# 搜索包含 "query" 的符号
-node dist/cli/index.js query -S "query"
-
-# 查看 orchestrator 模块结构
-node dist/cli/index.js query -m "orchestrator"
-```
-
-### 2. CI 门禁检查
-
-| 检查项 | CLI 命令 | 说明 |
-|--------|----------|------|
-| Commit 格式 | `ci check-commits` | 验证 commit 信息格式 |
-| 文件头注释 | `ci check-headers` | 检查文件头 [META][WHY] 注释 |
-| 变更风险 | `ci assess-risk` | 评估变更风险级别 |
-
-**执行流程**：
-1. 运行 `node dist/cli/index.js ci <子命令>`
-2. 分析输出结果
-3. 列出发现的问题
-4. 询问用户如何处理
-
-**使用示例**：
-```bash
-# 完整三件套检查
-node dist/cli/index.js ci check-commits
-node dist/cli/index.js ci check-headers
-node dist/cli/index.js ci assess-risk
-```
-
-### 3. 依赖分析
-
-| 功能 | CLI 命令 | 说明 |
-|------|----------|------|
-| 模块依赖 | `deps -m <模块路径>` | 查看指定模块的依赖树 |
-| 循环依赖 | `cycles` | 检测循环依赖 |
-| 变更影响 | `impact -f <文件> --transitive` | 分析文件影响范围 |
-
-**使用示例**：
-```bash
-# 查看 orchestrator 模块的依赖
-node dist/cli/index.js deps -m "orchestrator"
-
-# 检测循环依赖
-node dist/cli/index.js cycles
-
-# 分析文件影响（包含传递依赖）
-node dist/cli/index.js impact -f "src/orchestrator/confidence.ts" --transitive
-```
-
-### 4. 代码复杂度
+### CLI 调用方式
 
 ```bash
-# 查看文件复杂度
-node dist/cli/index.js complexity -f <文件路径>
+# 项目内调用（当前方式）
+CODEMAP="/data/codemap/dist/cli/index.js"
+
+# 示例：查询符号
+$CODEMAP query -s "IntentRouter"
+
+# 示例：分析影响
+$CODEMAP impact -f src/cli/index.ts
+
+# 示例：生成代码地图
+$CODEMAP generate -m hybrid
 ```
 
-## 工作流程
+### 常用命令速查
 
-### 半自动交互模式
+| 场景 | 命令 | 示例 |
+|------|------|------|
+| 生成代码地图 | `generate` | `$CODEMAP generate -m hybrid` |
+| 查询符号 | `query -s` | `$CODEMAP query -s "IntentRouter"` |
+| 查询模块 | `query -m` | `$CODEMAP query -m "src/parser"` |
+| 模糊搜索 | `query -S` | `$CODEMAP query -S "cache" -l 10` |
+| 依赖分析 | `deps` | `$CODEMAP deps -m "src/cache"` |
+| 循环依赖 | `cycles` | `$CODEMAP cycles` |
+| 复杂度分析 | `complexity` | `$CODEMAP complexity -f src/cli/index.ts` |
+| 影响范围 | `impact` | `$CODEMAP impact -f src/cli/index.ts --transitive` |
+| 文件监听 | `watch` | `$CODEMAP watch -d` |
+| CI 检查 | `ci check-*` | `$CODEMAP ci check-commits` |
 
-1. **接收用户请求**：理解用户想要执行的分析类型
-2. **执行分析**：调用对应的 CodeMap CLI 命令
-3. **解析结果**：分析命令输出，提取关键信息
-4. **列出问题**：以清晰格式展示发现的问题
-5. **请求确认**：询问用户如何处理每个问题
+完整命令参考见 [commands.md](commands.md)
 
-### 常见场景
+## 任务场景
 
-**场景 1：PR 提交前检查**
+### 1. 代码理解
+
+用户需要理解项目结构、查找特定符号或模块时：
+
+```bash
+CODEMAP="/data/codemap/dist/cli/index.js"
+
+# 查找类/函数定义
+$CODEMAP query -s "ClassName"
+
+# 查看模块详情
+$CODEMAP query -m "src/parser"
+
+# 搜索关键词
+$CODEMAP query -S "cache" -l 10
+
+# 查看依赖关系
+$CODEMAP deps -m "src/orchestrator"
 ```
-用户：帮我检查一下这次改动
-→ 执行 ci check-commits, ci check-headers, ci assess-risk
-→ 列出发现的问题
-→ 询问：需要我帮你修复这些问题吗？
+
+### 2. 变更影响评估
+
+用户修改文件前需要了解影响范围时：
+
+```bash
+CODEMAP="/data/codemap/dist/cli/index.js"
+
+# 基本影响分析
+$CODEMAP impact -f "src/cli/index.ts"
+
+# 包含传递依赖
+$CODEMAP impact -f "src/cli/index.ts" -t
+
+# JSON 格式输出
+$CODEMAP impact -f "src/cli/index.ts" -j
 ```
 
-**场景 2：查询代码结构**
+### 3. CI 门禁检查
+
+Commit 前或 CI 流水线中运行：
+
+```bash
+CODEMAP="/data/codemap/dist/cli/index.js"
+
+# 检查提交格式
+$CODEMAP ci check-commits --range origin/main..HEAD
+
+# 检查文件头注释
+$CODEMAP ci check-headers
+
+# 风险评估
+$CODEMAP ci assess-risk -f src/cache/lru-cache.ts
+
+# 输出契约验证
+$CODEMAP ci check-output-contract
 ```
-用户：找到 confidence 相关的代码
-→ 执行 query -S "confidence"
-→ 展示匹配的符号和位置
-→ 询问：需要查看哪个文件的详细信息？
+
+### 4. 工作流编排
+
+启动和管理开发工作流：
+
+```bash
+CODEMAP="/data/codemap/dist/cli/index.js"
+
+# 启动工作流
+$CODEMAP workflow start "实现用户认证模块"
+
+# 启动 bugfix 模板
+$CODEMAP workflow start "修复登录BUG" --template bugfix
+
+# 查看状态
+$CODEMAP workflow status
+
+# 推进阶段
+$CODEMAP workflow proceed
+
+# 可视化
+$CODEMAP workflow visualize
 ```
 
-**场景 3：评估重构影响**
+### 5. 统一分析入口
+
+使用 analyze 命令进行多意图路由：
+
+```bash
+CODEMAP="/data/codemap/dist/cli/index.js"
+
+# 自然语言意图
+$CODEMAP analyze "分析 tool-orchestrator 的影响范围"
+
+# 显式意图
+$CODEMAP analyze --intent impact --file src/cli/index.ts
+$CODEMAP analyze --intent dependency --file src/cli/index.ts
+$CODEMAP analyze --intent search "UnifiedResult"
 ```
-用户：我想重构 orchestrator/types.ts
-→ 执行 impact -f "src/orchestrator/types.ts" --transitive
-→ 展示受影响的文件和模块
-→ 询问：需要我分析这些依赖的具体影响吗？
+
+## 初始化项目
+
+如果目标项目尚未初始化 codemap：
+
+```bash
+CODEMAP="/data/codemap/dist/cli/index.js"
+
+# 初始化配置文件
+$CODEMAP init
+
+# 或使用默认配置
+$CODEMAP init -y
 ```
 
-## 输出格式
+## 输出处理
 
-CLI 输出格式：
-- 默认：人类可读格式
-- JSON：`--json` 或 `-j` 参数
+- 直接返回 CLI 原始输出
+- 若需要 JSON 格式，使用 `-j` / `--json` 参数
+- 复杂输出可重定向到文件：`$CODEMAP query -s "Symbol" > result.txt`
 
-skill 会智能解析输出，转换为更友好的格式展示。
+## 错误处理
 
-## 注意事项
+常见错误：
 
-1. **确保构建**：使用前确认 `npm run build` 已执行
-2. **工作目录**：已在 CodeMap 项目目录，直接执行命令
-3. **JSON 模式**：复杂分析建议使用 `--json` 便于解析
-4. **传递依赖**：影响分析使用 `--transitive` 获得完整视图
+| 错误 | 原因 | 解决方案 |
+|------|------|----------|
+| `command not found` | CLI 路径错误 | 检查 `/data/codemap/dist/cli/index.js` 是否存在 |
+| `codemap.config.json not found` | 未初始化 | 运行 `$CODEMAP init` |
+| `Module not found` | 路径错误 | 检查文件路径是否正确 |
+| `Permission denied` | 权限问题 | 检查文件/目录权限 |
+
+## 配置文件
+
+项目根目录的 `codemap.config.json`：
+
+```json
+{
+  "mode": "fast|smart|hybrid",
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules/**", "dist/**"],
+  "output": ".codemap"
+}
+```

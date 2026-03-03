@@ -36,18 +36,6 @@ export type { CommitValidationResult } from './commit-validator.js';
 export { scanDirectory, assessRisk, SUPPORTED_EXTENSIONS } from './file-header-scanner.js';
 export type { FileHeaderResult, RiskAssessment } from './file-header-scanner.js';
 
-// AI 饲料生成器导出
-export {
-  AIFeedGenerator,
-  FileHeaderScanner
-} from './ai-feed-generator.js';
-export type {
-  AIFeed,
-  FileMeta,
-  FileHeader,
-  FileHeaderMeta
-} from './ai-feed-generator.js';
-
 // Git 分析器导出
 export {
   GitAnalyzer,
@@ -61,12 +49,3 @@ export type {
   RiskLevel,
   RiskScore
 } from './git-analyzer.js';
-
-// TestLinker 导出
-export { TestLinker, resolveTestFile, resolveTestFiles } from './test-linker.js';
-export type {
-  TestLinkerOptions,
-  TestMapping,
-  TestConfig,
-  CodemapData
-} from './test-linker.js';

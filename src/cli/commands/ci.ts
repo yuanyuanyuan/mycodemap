@@ -7,7 +7,6 @@ import { Command } from 'commander';
 import { validateCommitMessage, validateRecentCommits, VALID_TAGS } from '../../orchestrator/commit-validator.js';
 import { scanDirectory, scanFileHeader, type FileHeaderResult } from '../../orchestrator/file-header-scanner.js';
 import { GitAnalyzer } from '../../orchestrator/git-analyzer.js';
-import { AIFeedGenerator } from '../../orchestrator/ai-feed-generator.js';
 import { isCodemapOutput } from '../../orchestrator/types.js';
 
 /**
@@ -225,15 +224,38 @@ async function assessRiskAction(options: { files?: string; threshold?: string })
 
   const projectRoot = process.cwd();
   const gitAnalyzer = new GitAnalyzer();
-  const generator = new AIFeedGenerator(gitAnalyzer);
-  const feed = await generator.generate(projectRoot, { includeGitHistory: true });
 
   const commits = await gitAnalyzer.findRelatedCommits([], targetFiles, {
     maxCommits: 100,
     projectRoot,
   });
 
-  const risk = gitAnalyzer.calculateRiskScore(targetFiles, commits, feed);
+  // 简化版风险评估（移除 AIFeed 依赖）
+  type RiskLevel = 'low' | 'medium' | 'high';
+  
+  const risk: { score: number; level: RiskLevel; riskFactors: string[] } = {
+    score: 0.3, // 默认低风险
+    level: 'low',
+    riskFactors: [],
+  };
+
+  // 根据文件数量和提交历史简单评估
+  if (targetFiles.length > 10) {
+    risk.score += 0.2;
+    risk.riskFactors.push(`变更文件数量较多: ${targetFiles.length} 个文件`);
+  }
+
+  if (commits.length > 20) {
+    risk.score += 0.2;
+    risk.riskFactors.push(`相关提交历史复杂: ${commits.length} 个提交`);
+  }
+
+  // 调整风险等级
+  if (risk.score >= 0.7) {
+    risk.level = 'high';
+  } else if (risk.score >= 0.4) {
+    risk.level = 'medium';
+  }
 
   console.log('Risk assessment summary');
   console.log(`score=${risk.score.toFixed(2)}`);

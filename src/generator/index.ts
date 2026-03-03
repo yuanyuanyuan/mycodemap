@@ -1,3 +1,5 @@
+// [META] since:2024-03 | owner:core-team | stable:true
+// [WHY] 代码地图生成器模块，负责将分析结果转换为各种输出格式
 import fs from 'fs/promises';
 import path from 'path';
 import type { CodeMap, VisualizationConfig, MermaidConfig } from '../types/index.js';
@@ -295,38 +297,4 @@ export async function generateJSON(codeMap: CodeMap, outputDir: string): Promise
 // 生成所有文件的 CONTEXT.md
 export async function generateContext(codeMap: CodeMap, outputDir: string): Promise<void> {
   await generateAllContexts(codeMap.modules, codeMap.project.rootDir, outputDir);
-}
-
-// 生成 AI 文件描述
-export async function generateFileDescriptions(
-  codeMap: CodeMap,
-  config?: FileDescriberConfig,
-  onProgress?: (completed: number, total: number) => void
-): Promise<Map<string, FileDescription>> {
-  const describer = createFileDescriber(config);
-  return await describer.describeFiles(
-    codeMap.modules,
-    codeMap.modules,
-    codeMap.project.rootDir,
-    onProgress
-  );
-}
-
-// 生成带 AI 描述的完整上下文
-export async function generateContextWithAI(
-  codeMap: CodeMap,
-  outputDir: string,
-  describerConfig?: FileDescriberConfig,
-  onProgress?: (stage: string, completed: number, total: number) => void
-): Promise<void> {
-  // 第一步：生成 AI 描述
-  onProgress?.('ai-descriptions', 0, codeMap.modules.length);
-  const descriptions = await generateFileDescriptions(codeMap, describerConfig, (completed, total) => {
-    onProgress?.('ai-descriptions', completed, total);
-  });
-
-  // 第二步：生成上下文文件
-  onProgress?.('context-files', 0, codeMap.modules.length);
-  await generateAllContexts(codeMap.modules, codeMap.project.rootDir, outputDir, descriptions);
-  onProgress?.('context-files', codeMap.modules.length, codeMap.modules.length);
 }

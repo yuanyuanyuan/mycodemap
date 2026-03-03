@@ -31,19 +31,6 @@ vi.mock('../../generator/index.js', () => ({
   generateMermaidGraph: vi.fn().mockResolvedValue(undefined)
 }));
 
-vi.mock('../../generator/ai-overview.js', () => ({
-  createAIOverviewGenerator: vi.fn().mockReturnValue({
-    generate: vi.fn().mockResolvedValue('/path/to/AI_OVERVIEW.md')
-  })
-}));
-
-vi.mock('../../ai/subagent-caller.js', () => ({
-  createSubagentCaller: vi.fn().mockReturnValue({
-    isAvailable: vi.fn().mockResolvedValue(false),
-    generateOverview: vi.fn().mockResolvedValue('AI Overview content')
-  })
-}));
-
 describe('generate command', () => {
   const testDir = path.join(process.cwd(), 'test-output');
   const outputDir = path.join(testDir, '.codemap');
@@ -69,8 +56,7 @@ describe('generate command', () => {
 
     await generateCommand({
       mode: 'fast',
-      output: outputDir,
-      ai: false
+      output: outputDir
     });
 
     expect(analyze).toHaveBeenCalledWith(
@@ -85,8 +71,7 @@ describe('generate command', () => {
     const { generateCommand } = await import('../commands/generate.js');
 
     await generateCommand({
-      output: outputDir,
-      ai: false
+      output: outputDir
     });
 
     expect(analyze).toHaveBeenCalledWith(
@@ -101,8 +86,7 @@ describe('generate command', () => {
 
     await generateCommand({
       mode: 'fast',
-      output: outputDir,
-      ai: false
+      output: outputDir
     });
 
     expect(generateAIMap).toHaveBeenCalled();
