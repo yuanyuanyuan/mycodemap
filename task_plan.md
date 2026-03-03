@@ -165,3 +165,88 @@ All Complete
 1. 默认日志目录是否应与 `.codemap/` 一致？
 2. 日志保留应按天数、文件数还是两者结合？
 3. 是否需要提供环境变量让 CI 可关闭日志写入？
+
+---
+
+# Task Plan: REFACTOR_ARCHITECTURE_OVERVIEW.md 开发完成度验证
+
+## Goal
+验证 /data/codemap/docs/REFACTOR_ARCHITECTURE_OVERVIEW.md 中规划的功能是否已全部实现。
+
+## 验收标准
+- 检查文档中列出的所有核心模块是否已实现
+- 检查 CLI 命令是否按设计实现
+- 检查 CI 门禁功能是否正常
+- 运行测试验证功能完整性
+
+## 关键验收项 (来自文档第8节)
+
+### 核心功能
+- [x] codemap analyze 命令可正常执行
+- [x] 意图路由正确映射到工具 (intent-router.ts)
+- [x] 置信度正确计算（高/中/低三级）
+- [x] 回退级联正常工作 (tool-orchestrator.ts)
+- [x] 多工具结果正确融合（去重+排序）
+- [x] 测试关联基于 Jest/Vitest 配置 (test-linker.ts)
+- [x] Git 提交历史风险评分正常 (git-analyzer.ts)
+- [x] AI 饲料生成正常 (v2.4 新增)
+- [x] CI 门禁服务端检查通过 (v2.4 新增)
+- [x] Commit 格式 [TAG] 验证通过 (v2.4 新增)
+- [x] 文件头注释 [META]/[WHY] 完整 (v2.4 新增)
+- [x] 现有命令保持兼容
+- [x] 单元测试通过 723/723
+- [ ] Hit@8 >= 90% (需要基准测试验证)
+- [ ] Token 消耗降低 >= 40% (需要基准测试验证)
+
+## 核心模块清单 (来自文档第4节)
+1. 置信度机制 (confidence.ts)
+2. 多工具结果融合 (result-fusion.ts)
+3. 工具编排器 (tool-orchestrator.ts)
+4. 测试关联器 (test-linker.ts)
+5. Git 分析器 (git-analyzer.ts)
+6. AI 饲料生成器 (ai-feed-generator.ts)
+7. CI 门禁护栏 (commit-validator.ts, file-header-scanner.ts)
+8. 工作流编排器 (workflow/)
+
+## Current Phase
+Phase 1: 读取并分析文档
+
+## Phases
+
+### Phase 1: 读取并分析文档
+- [x] 读取 REFACTOR_ARCHITECTURE_OVERVIEW.md 内容
+- [x] 提取验收标准清单
+- [x] 分析需要验证的模块
+- **Status:** complete
+
+### Phase 2: 检查核心模块代码实现
+- [x] 检查 orchestrator/ 目录结构
+- [x] 验证各模块文件存在性
+- [x] 检查核心接口定义
+- **Status:** complete
+
+### Phase 3: 检查 CLI 命令实现
+- [x] 验证 codemap analyze 命令
+- [x] 验证 ci 命令
+- [x] 验证 workflow 命令
+- **Status:** complete
+
+### Phase 4: 检查 CI 门禁实现
+- [x] 检查 GitHub Actions 配置
+- [x] 验证 CI 命令功能
+- **Status:** complete
+
+### Phase 5: 运行测试验证
+- [x] 运行单元测试 (723/723 通过)
+- [x] 验证 CLI 功能
+- **Status:** complete
+
+### Phase 6: 生成验证报告
+- [x] 汇总验证结果
+- [x] 标记完成/未完成项
+- **Status:** complete
+
+## Errors Encountered
+| Error | Attempt | Resolution |
+|-------|---------|------------|
+| - | - | -

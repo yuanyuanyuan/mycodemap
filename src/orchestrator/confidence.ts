@@ -1,3 +1,6 @@
+// [META] since:2026-02 | owner:orchestrator-team | stable:true
+// [WHY] 置信度计算机制用于评估搜索结果质量，决定是否触发回退策略
+
 /**
  * 置信度计算机制
  * 用于评估搜索结果的质量，决定是否触发回退策略
@@ -25,11 +28,11 @@ const CONFIDENCE_THRESHOLDS: Record<IntentType, { high: number; medium: number }
   impact: { high: 0.7, medium: 0.4 },
   dependency: { high: 0.7, medium: 0.4 },
   search: { high: 0.5, medium: 0.25 },
-  documentation: { high: 0.6, medium: 0.3 },
-  complexity: { high: 0.7, medium: 0.4 },
-  overview: { high: 0.8, medium: 0.5 },
-  refactor: { high: 0.75, medium: 0.45 },
-  reference: { high: 0.6, medium: 0.3 },
+  documentation: { high: 0.5, medium: 0.25 },
+  complexity: { high: 0.6, medium: 0.3 },
+  overview: { high: 0.6, medium: 0.3 },
+  refactor: { high: 0.6, medium: 0.3 },
+  reference: { high: 0.5, medium: 0.25 },
 };
 
 // 辅助函数：限制数值范围

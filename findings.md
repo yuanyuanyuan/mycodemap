@@ -152,3 +152,52 @@ npx codemap complexity -f src/core/analyzer.ts --detail
 - 查询失败或警告会写入独立错误日志：`.codemap/logs/benchmark-errors/benchmark-errors-*.log`。
 - 控制台仅保留摘要，详细错误文本分流到错误日志，便于 CI 日志阅读。
 - 修复 `refer/benchmark-quality.ts` 的 CLI 入口副作用：仅在直接执行脚本时运行 `main()`，避免被测试 import 时重复执行基准。
+
+---
+
+## 2026-03-03 验证：REFACTOR_ARCHITECTURE_OVERVIEW.md 开发完成度
+
+### 已验证的实现
+
+#### 核心模块 (src/orchestrator/)
+| 模块 | 文件 | 状态 |
+|------|------|------|
+| 置信度机制 | confidence.ts | ✅ 已实现 |
+| 多工具结果融合 | result-fusion.ts | ✅ 已实现 |
+| 工具编排器 | tool-orchestrator.ts | ✅ 已实现 |
+| 测试关联器 | test-linker.ts | ✅ 已实现 |
+| Git 分析器 | git-analyzer.ts | ✅ 已实现 |
+| AI 饲料生成器 | ai-feed-generator.ts | ✅ 已实现 |
+| CI 门禁 - Commit 验证 | commit-validator.ts | ✅ 已实现 |
+| CI 门禁 - 文件头扫描 | file-header-scanner.ts | ✅ 已实现 |
+| 工作流编排器 | workflow/ | ✅ 已实现 |
+| 意图路由 | intent-router.ts | ✅ 已实现 |
+
+#### CLI 命令 (src/cli/commands/)
+| 命令 | 文件 | 状态 |
+|------|------|------|
+| analyze | analyze.ts | ✅ 已实现 |
+| ci | ci.ts | ✅ 已实现 |
+| workflow | workflow.ts | ✅ 已实现 |
+| query | query.ts | ✅ 已实现 |
+| impact | impact.ts | ✅ 已实现 |
+| deps | deps.ts | ✅ 已实现 |
+| complexity | complexity.ts | ✅ 已实现 |
+| generate | generate.ts | ✅ 已实现 |
+| cycles | cycles.ts | ✅ 已实现 |
+| init | init.ts | ✅ 已实现 |
+| watch | watch.ts | ✅ 已实现 |
+
+#### CI 门禁配置
+| 配置 | 位置 | 状态 |
+|------|------|------|
+| GitHub Actions | .github/workflows/ci-gateway.yml | ✅ 已配置 |
+| CI 命令集成 | ci.ts | ✅ 已实现 |
+
+### 待验证项（需要运行测试）
+- [ ] codemap analyze 命令可正常执行
+- [ ] codemap ci 命令可正常执行
+- [ ] codemap workflow 命令可正常执行
+- [ ] 置信度计算正确
+- [ ] 测试关联功能正常
+- [ ] 文件头注释检查正常

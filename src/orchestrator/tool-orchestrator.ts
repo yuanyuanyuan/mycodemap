@@ -4,7 +4,7 @@
  */
 
 import type { UnifiedResult, CodemapIntent, IntentType, ToolOptions } from './types.js';
-import { calculateConfidence, type ConfidenceResult } from './confidence.js';
+import { calculateConfidence, getThreshold, type ConfidenceResult } from './confidence.js';
 import type { ToolAdapter } from './adapters/base-adapter.js';
 
 /**
@@ -311,17 +311,7 @@ export class ToolOrchestrator {
    * 获取中等阈值
    */
   private getMediumThreshold(intent: IntentType): number {
-    const thresholds: Record<IntentType, number> = {
-      impact: 0.4,
-      dependency: 0.4,
-      search: 0.25,
-      documentation: 0.3,
-      complexity: 0.4,
-      overview: 0.5,
-      refactor: 0.45,
-      reference: 0.3,
-    };
-    return thresholds[intent] ?? 0.3;
+    return getThreshold(intent as import('./confidence.js').IntentType, 'medium');
   }
 }
 

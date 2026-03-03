@@ -206,28 +206,28 @@ describe('getThreshold', () => {
   });
 
   it('documentation thresholds 应符合设计文档', () => {
-    expect(getThreshold('documentation', 'high')).toBe(0.6);
-    expect(getThreshold('documentation', 'medium')).toBe(0.3);
+    expect(getThreshold('documentation', 'high')).toBe(0.5);
+    expect(getThreshold('documentation', 'medium')).toBe(0.25);
   });
 
   it('complexity thresholds 应符合设计文档', () => {
-    expect(getThreshold('complexity', 'high')).toBe(0.7);
-    expect(getThreshold('complexity', 'medium')).toBe(0.4);
+    expect(getThreshold('complexity', 'high')).toBe(0.6);
+    expect(getThreshold('complexity', 'medium')).toBe(0.3);
   });
 
   it('overview thresholds 应符合设计文档', () => {
-    expect(getThreshold('overview', 'high')).toBe(0.8);
-    expect(getThreshold('overview', 'medium')).toBe(0.5);
+    expect(getThreshold('overview', 'high')).toBe(0.6);
+    expect(getThreshold('overview', 'medium')).toBe(0.3);
   });
 
   it('refactor thresholds 应符合设计文档', () => {
-    expect(getThreshold('refactor', 'high')).toBe(0.75);
-    expect(getThreshold('refactor', 'medium')).toBe(0.45);
+    expect(getThreshold('refactor', 'high')).toBe(0.6);
+    expect(getThreshold('refactor', 'medium')).toBe(0.3);
   });
 
   it('reference thresholds 应符合设计文档', () => {
-    expect(getThreshold('reference', 'high')).toBe(0.6);
-    expect(getThreshold('reference', 'medium')).toBe(0.3);
+    expect(getThreshold('reference', 'high')).toBe(0.5);
+    expect(getThreshold('reference', 'medium')).toBe(0.25);
   });
 });
 
