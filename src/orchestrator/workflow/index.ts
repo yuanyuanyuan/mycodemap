@@ -18,3 +18,5 @@ export * from './phase-inheritance.js';
 export * from './test-linker.js';
 export * from './git-analyzer.js';
 export * from './ci-executor.js';
+export * from './visualizer.js';
+export * from './templates.js';
