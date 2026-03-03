@@ -82,6 +82,24 @@ function getModuleDependencies(codeMap: CodeMap, modulePath: string): {
 }
 
 /**
+ * 构建 dependents ID 到路径的映射
+ */
+function buildDependentsMap(
+  dependents: string[],
+  codeMap: CodeMap
+): Array<{ id: string; path: string }> {
+  return dependents.map(id => {
+    const depModule = codeMap.modules.find(m => m.id === id);
+    return {
+      id,
+      path: depModule
+        ? path.relative(codeMap.project.rootDir, depModule.absolutePath)
+        : id
+    };
+  });
+}
+
+/**
  * 分析依赖关系 - 纯逻辑函数
  * @param codeMap 代码地图数据
  * @param modulePaths 目标模块路径列表（可选，为空则分析所有模块）
@@ -96,16 +114,7 @@ function analyzeDeps(codeMap: CodeMap, modulePaths?: string[]): DepsResult {
     for (const modulePath of modulePaths) {
       const result = getModuleDependencies(codeMap, modulePath);
       if (result.module) {
-        // 构建 dependents 映射
-        const dependentsMap = result.module.dependents.map(id => {
-          const depModule = codeMap.modules.find(m => m.id === id);
-          return {
-            id,
-            path: depModule
-              ? path.relative(codeMap.project.rootDir, depModule.absolutePath)
-              : id
-          };
-        });
+        const dependentsMap = buildDependentsMap(result.module.dependents, codeMap);
 
         modules.push({
           path: result.module.absolutePath,
@@ -119,16 +128,7 @@ function analyzeDeps(codeMap: CodeMap, modulePaths?: string[]): DepsResult {
   } else {
     // 分析所有模块
     for (const module of codeMap.modules) {
-      // 构建 dependents 映射
-      const dependentsMap = module.dependents.map(id => {
-        const depModule = codeMap.modules.find(m => m.id === id);
-        return {
-          id,
-          path: depModule
-            ? path.relative(codeMap.project.rootDir, depModule.absolutePath)
-            : id
-        };
-      });
+      const dependentsMap = buildDependentsMap(module.dependents, codeMap);
 
       modules.push({
         path: module.absolutePath,
@@ -168,16 +168,7 @@ function formatDependencies(
     const output: Record<string, unknown> = {};
 
     if (options.module && targetModule) {
-      // 构建 dependents 映射
-      const dependentsMap = targetModule.dependents.map(id => {
-        const depModule = codeMap.modules.find(m => m.id === id);
-        return {
-          id,
-          path: depModule
-            ? path.relative(codeMap.project.rootDir, depModule.absolutePath)
-            : id
-        };
-      });
+      const dependentsMap = buildDependentsMap(targetModule.dependents, codeMap);
 
       output.module = {
         path: targetModule.absolutePath,
