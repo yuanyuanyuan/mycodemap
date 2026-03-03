@@ -1,3 +1,6 @@
+// [META] since:2026-03-03 | owner:orchestrator-team | stable:true
+// [WHY] 查询命令优化：改进缓存策略、添加索引结构、添加性能指标输出
+
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
@@ -10,6 +13,8 @@ interface QueryOptions {
   search?: string;
   limit?: number;
   json?: boolean;
+  verbose?: boolean;
+  cache?: boolean;
 }
 
 interface QueryResult {
@@ -17,6 +22,16 @@ interface QueryResult {
   query: string;
   count: number;
   results: QueryResultItem[];
+  // 性能指标（verbose 模式输出）
+  metrics?: QueryMetrics;
+}
+
+interface QueryMetrics {
+  indexLoadTime: number;
+  queryTime: number;
+  totalTime: number;
+  cacheHit: boolean;
+  indexSize: number;
 }
 
 interface QueryResultItem {
@@ -24,76 +39,298 @@ interface QueryResultItem {
   path?: string;
   kind?: string;
   details?: string;
+  // 结构化字段（JSON 模式）
+  location?: {
+    file: string;
+    line?: number;
+    column?: number;
+  };
+  isExported?: boolean;
 }
 
-// ===== 性能优化：添加缓存机制 =====
-let codeMapCache: { data: CodeMap | null; timestamp: number; path: string } | null = null;
-const CACHE_TTL = 5000; // 5秒缓存
+// ===== 性能优化：改进的缓存机制 =====
+
+// 缓存配置
+const CACHE_CONFIG = {
+  TTL: 60000,           // 60秒缓存（从5秒提升）
+  MAX_SIZE: 10,         // 最大缓存 10 个项目的索引
+};
+
+// 缓存存储结构
+interface IndexCache {
+  data: CodeMap | null;
+  timestamp: number;
+  path: string;
+  index: SymbolIndex | null;  // 预构建索引
+}
+
+const indexCache = new Map<string, IndexCache>();
 
 /**
- * 加载代码地图数据（带缓存）
+ * 符号索引 - 用于快速查找
  */
-function loadCodeMap(rootDir: string): CodeMap | null {
+interface SymbolIndex {
+  // 符号名 -> 符号列表（用于精确/模糊查询）
+  symbols: Map<string, SymbolEntry[]>;
+  // 模块路径 -> 模块索引
+  modules: Map<string, ModuleIndex>;
+  // 依赖名 -> 依赖列表
+  dependencies: Map<string, DependencyEntry[]>;
+  // 前缀索引（用于前缀匹配）
+  prefixIndex: Map<string, SymbolEntry[]>;
+}
+
+interface SymbolEntry {
+  name: string;
+  kind: string;
+  filePath: string;
+  line?: number;
+  column?: number;
+  isExported: boolean;
+}
+
+interface ModuleIndex {
+  absolutePath: string;
+  relativePath: string;
+  type: string;
+  exports: string[];
+}
+
+interface DependencyEntry {
+  name: string;
+  sourcePath: string;
+  type: 'dependency' | 'import';
+}
+
+/**
+ * 预构建索引以加速查询
+ */
+function buildIndex(codeMap: CodeMap, rootDir: string): SymbolIndex {
+  const index: SymbolIndex = {
+    symbols: new Map(),
+    modules: new Map(),
+    dependencies: new Map(),
+    prefixIndex: new Map(),
+  };
+
+  for (const module of codeMap.modules) {
+    const relativePath = path.relative(rootDir, module.absolutePath);
+    const moduleIndex: ModuleIndex = {
+      absolutePath: module.absolutePath,
+      relativePath,
+      type: module.type,
+      exports: module.exports.map(e => e.name),
+    };
+
+    // 索引模块（使用相对路径作为主键）
+    index.modules.set(relativePath.toLowerCase(), moduleIndex);
+
+    // 索引导出
+    for (const exp of module.exports) {
+      const entry: SymbolEntry = {
+        name: exp.name,
+        kind: exp.kind,
+        filePath: relativePath,
+        isExported: true,
+      };
+
+      // 精确索引
+      const lowerName = exp.name.toLowerCase();
+      if (!index.symbols.has(lowerName)) {
+        index.symbols.set(lowerName, []);
+      }
+      index.symbols.get(lowerName)!.push(entry);
+
+      // 前缀索引
+      for (let i = 1; i <= exp.name.length; i++) {
+        const prefix = exp.name.substring(0, i).toLowerCase();
+        if (!index.prefixIndex.has(prefix)) {
+          index.prefixIndex.set(prefix, []);
+        }
+        index.prefixIndex.get(prefix)!.push(entry);
+      }
+    }
+
+    // 索引符号
+    for (const sym of module.symbols) {
+      const entry: SymbolEntry = {
+        name: sym.name,
+        kind: sym.kind,
+        filePath: relativePath,
+        line: sym.location.line,
+        column: sym.location.column,
+        isExported: false,
+      };
+
+      const lowerName = sym.name.toLowerCase();
+      if (!index.symbols.has(lowerName)) {
+        index.symbols.set(lowerName, []);
+      }
+      index.symbols.get(lowerName)!.push(entry);
+
+      // 前缀索引
+      for (let i = 1; i <= sym.name.length; i++) {
+        const prefix = sym.name.substring(0, i).toLowerCase();
+        if (!index.prefixIndex.has(prefix)) {
+          index.prefixIndex.set(prefix, []);
+        }
+        index.prefixIndex.get(prefix)!.push(entry);
+      }
+    }
+
+    // 索引依赖
+    for (const dep of module.dependencies) {
+      const depEntry: DependencyEntry = {
+        name: dep,
+        sourcePath: relativePath,
+        type: 'dependency',
+      };
+
+      const lowerDep = dep.toLowerCase();
+      if (!index.dependencies.has(lowerDep)) {
+        index.dependencies.set(lowerDep, []);
+      }
+      index.dependencies.get(lowerDep)!.push(depEntry);
+    }
+
+    // 索引导入
+    for (const imp of module.imports) {
+      const impEntry: DependencyEntry = {
+        name: imp.source,
+        sourcePath: relativePath,
+        type: 'import',
+      };
+
+      const lowerSource = imp.source.toLowerCase();
+      if (!index.dependencies.has(lowerSource)) {
+        index.dependencies.set(lowerSource, []);
+      }
+      index.dependencies.get(lowerSource)!.push(impEntry);
+    }
+  }
+
+  return index;
+}
+
+/**
+ * 加载代码地图数据（带改进的缓存）
+ */
+function loadCodeMap(rootDir: string, useCache: boolean = true): {
+  codeMap: CodeMap | null;
+  index: SymbolIndex | null;
+  cacheHit: boolean;
+  loadTime: number;
+} {
   const codemapPath = path.join(rootDir, '.codemap', 'codemap.json');
+  const startTime = performance.now();
 
   // 检查缓存
-  if (codeMapCache && 
-      codeMapCache.path === codemapPath && 
-      Date.now() - codeMapCache.timestamp < CACHE_TTL) {
-    return codeMapCache.data;
+  if (useCache) {
+    const cached = indexCache.get(rootDir);
+    if (cached && Date.now() - cached.timestamp < CACHE_CONFIG.TTL) {
+      return {
+        codeMap: cached.data,
+        index: cached.index,
+        cacheHit: true,
+        loadTime: 0,
+      };
+    }
   }
 
   if (!fs.existsSync(codemapPath)) {
-    console.log(chalk.red('❌ 代码地图不存在，请先运行 codemap generate'));
-    return null;
+    console.log(chalk.red('错误: 代码地图不存在，请先运行 codemap generate'));
+    return { codeMap: null, index: null, cacheHit: false, loadTime: 0 };
   }
 
   try {
     const data = fs.readFileSync(codemapPath, 'utf-8');
     const parsed = JSON.parse(data) as CodeMap;
-    
-    // 更新缓存
-    codeMapCache = {
-      data: parsed,
-      timestamp: Date.now(),
-      path: codemapPath
+    const loadTime = performance.now() - startTime;
+
+    // 构建索引
+    const index = buildIndex(parsed, rootDir);
+
+    // 缓存（如果启用）
+    if (useCache) {
+      // 清理超出限制的旧缓存
+      if (indexCache.size >= CACHE_CONFIG.MAX_SIZE) {
+        // 删除最旧的缓存
+        let oldestKey: string | null = null;
+        let oldestTime = Infinity;
+        for (const [key, val] of indexCache.entries()) {
+          if (val.timestamp < oldestTime) {
+            oldestTime = val.timestamp;
+            oldestKey = key;
+          }
+        }
+        if (oldestKey) {
+          indexCache.delete(oldestKey);
+        }
+      }
+
+      indexCache.set(rootDir, {
+        data: parsed,
+        timestamp: Date.now(),
+        path: codemapPath,
+        index,
+      });
+    }
+
+    return {
+      codeMap: parsed,
+      index,
+      cacheHit: false,
+      loadTime,
     };
-    
-    return parsed;
   } catch (error) {
-    console.log(chalk.red('❌ 读取代码地图失败:', error instanceof Error ? error.message : String(error)));
-    return null;
+    console.log(chalk.red('错误: 读取代码地图失败:', error instanceof Error ? error.message : String(error)));
+    return { codeMap: null, index: null, cacheHit: false, loadTime: 0 };
   }
 }
 
 /**
- * 查询符号（支持子串匹配）
+ * 清除缓存
  */
-function querySymbol(codeMap: CodeMap, symbolName: string, limit: number): QueryResultItem[] {
+function clearCache(): void {
+  indexCache.clear();
+}
+
+/**
+ * 查询符号（使用索引）
+ */
+function querySymbol(index: SymbolIndex, codeMap: CodeMap, symbolName: string, limit: number): QueryResultItem[] {
   const results: QueryResultItem[] = [];
   const searchLower = symbolName.toLowerCase();
 
-  for (const module of codeMap.modules) {
-    // 搜索导出（子串匹配）
-    for (const exp of module.exports) {
-      if (exp.name.toLowerCase().includes(searchLower)) {
-        results.push({
-          name: exp.name,
-          path: module.absolutePath,
-          kind: exp.kind,
-          details: `导出于 ${path.relative(codeMap.project.rootDir, module.absolutePath)}`
-        });
-      }
+  // 首先尝试精确匹配
+  const exactMatches = index.symbols.get(searchLower);
+  if (exactMatches) {
+    for (const entry of exactMatches) {
+      results.push({
+        name: entry.name,
+        path: path.join(codeMap.project.rootDir, entry.filePath),
+        kind: entry.kind,
+        details: `${entry.isExported ? '导出于' : '定义于'} ${entry.filePath}${entry.line ? ':' + entry.line : ''}`,
+        location: { file: entry.filePath, line: entry.line, column: entry.column },
+        isExported: entry.isExported,
+      });
     }
+  }
 
-    // 搜索符号（子串匹配）
-    for (const sym of module.symbols) {
-      if (sym.name.toLowerCase().includes(searchLower)) {
+  // 如果没有精确匹配，尝试前缀匹配
+  if (results.length === 0) {
+    const prefixResults = index.prefixIndex.get(searchLower) || [];
+    for (const entry of prefixResults) {
+      // 避免重复
+      const key = `${entry.name}:${entry.filePath}`;
+      if (!results.some(r => `${r.name}:${r.path}` === key)) {
         results.push({
-          name: sym.name,
-          path: module.absolutePath,
-          kind: sym.kind,
-          details: `定义于 ${path.relative(codeMap.project.rootDir, module.absolutePath)}:${sym.location.line}`
+          name: entry.name,
+          path: path.join(codeMap.project.rootDir, entry.filePath),
+          kind: entry.kind,
+          details: `${entry.isExported ? '导出于' : '定义于'} ${entry.filePath}${entry.line ? ':' + entry.line : ''}`,
+          location: { file: entry.filePath, line: entry.line, column: entry.column },
+          isExported: entry.isExported,
         });
       }
     }
@@ -103,22 +340,23 @@ function querySymbol(codeMap: CodeMap, symbolName: string, limit: number): Query
 }
 
 /**
- * 查询模块
+ * 查询模块（使用索引）
  */
-function queryModule(codeMap: CodeMap, modulePath: string, limit: number): QueryResultItem[] {
+function queryModule(index: SymbolIndex, codeMap: CodeMap, modulePath: string, limit: number): QueryResultItem[] {
   const results: QueryResultItem[] = [];
   const searchPath = modulePath.toLowerCase();
 
-  for (const module of codeMap.modules) {
-    const relativePath = path.relative(codeMap.project.rootDir, module.absolutePath).toLowerCase();
-
-    if (relativePath.includes(searchPath) || module.absolutePath.toLowerCase().includes(searchPath)) {
-      const exports = module.exports.map(e => e.name).join(', ') || '无导出';
+  // 使用索引查找
+  for (const [key, moduleIdx] of index.modules.entries()) {
+    if (key.includes(searchPath) || moduleIdx.absolutePath.toLowerCase().includes(searchPath)) {
+      const exports = moduleIdx.exports.join(', ') || '无导出';
       results.push({
-        name: path.relative(codeMap.project.rootDir, module.absolutePath),
-        path: module.absolutePath,
-        kind: module.type,
-        details: `导出: ${exports}`
+        name: moduleIdx.relativePath,
+        path: moduleIdx.absolutePath,
+        kind: moduleIdx.type,
+        details: `导出: ${exports}`,
+        location: { file: moduleIdx.relativePath },
+        isExported: moduleIdx.exports.length > 0,
       });
     }
   }
@@ -127,39 +365,65 @@ function queryModule(codeMap: CodeMap, modulePath: string, limit: number): Query
 }
 
 /**
- * 查询依赖
+ * 查询依赖（使用索引）
  */
-function queryDeps(codeMap: CodeMap, depName: string, limit: number): QueryResultItem[] {
+function queryDeps(index: SymbolIndex, codeMap: CodeMap, depName: string, limit: number): QueryResultItem[] {
   const results: QueryResultItem[] = [];
   const searchDep = depName.toLowerCase();
 
-  for (const module of codeMap.modules) {
-    // 检查直接依赖
-    for (const dep of module.dependencies) {
-      if (dep.toLowerCase().includes(searchDep)) {
-        results.push({
-          name: dep,
-          path: module.absolutePath,
-          kind: 'dependency',
-          details: `被 ${path.relative(codeMap.project.rootDir, module.absolutePath)} 引用`
-        });
-      }
-    }
-
-    // 检查导入
-    for (const imp of module.imports) {
-      if (imp.source.toLowerCase().includes(searchDep)) {
-        results.push({
-          name: imp.source,
-          path: module.absolutePath,
-          kind: 'import',
-          details: `导入自 ${path.relative(codeMap.project.rootDir, module.absolutePath)}`
-        });
-      }
+  // 使用索引查找
+  const depEntries = index.dependencies.get(searchDep);
+  if (depEntries) {
+    for (const entry of depEntries) {
+      results.push({
+        name: entry.name,
+        path: path.join(codeMap.project.rootDir, entry.sourcePath),
+        kind: entry.type,
+        details: `${entry.type === 'dependency' ? '被' : '导入自'} ${entry.sourcePath} 引用`,
+        location: { file: entry.sourcePath },
+        isExported: false,
+      });
     }
   }
 
-  // 去重
+  return results.slice(0, limit);
+}
+
+/**
+ * 模糊搜索（使用索引）
+ */
+function search(index: SymbolIndex, codeMap: CodeMap, keyword: string, limit: number): QueryResultItem[] {
+  const results: QueryResultItem[] = [];
+  const searchLower = keyword.toLowerCase();
+
+  // 1. 搜索模块路径
+  for (const [key, moduleIdx] of index.modules.entries()) {
+    if (key.includes(searchLower)) {
+      results.push({
+        name: moduleIdx.relativePath,
+        path: moduleIdx.absolutePath,
+        kind: 'module',
+        details: `模块匹配`,
+        location: { file: moduleIdx.relativePath },
+        isExported: false,
+      });
+    }
+  }
+
+  // 2. 搜索符号和导出（使用前缀索引）
+  const prefixResults = index.prefixIndex.get(searchLower) || [];
+  for (const entry of prefixResults) {
+    results.push({
+      name: entry.name,
+      path: path.join(codeMap.project.rootDir, entry.filePath),
+      kind: entry.isExported ? `export (${entry.kind})` : entry.kind,
+      details: `${entry.isExported ? '导出于' : '定义于'} ${entry.filePath}${entry.line ? ':' + entry.line : ''}`,
+      location: { file: entry.filePath, line: entry.line, column: entry.column },
+      isExported: entry.isExported,
+    });
+  }
+
+  // 去重（基于 name:path 组合）
   const unique = new Map<string, QueryResultItem>();
   for (const item of results) {
     const key = `${item.name}:${item.path}`;
@@ -172,63 +436,15 @@ function queryDeps(codeMap: CodeMap, depName: string, limit: number): QueryResul
 }
 
 /**
- * 模糊搜索
- */
-function search(codeMap: CodeMap, keyword: string, limit: number): QueryResultItem[] {
-  const results: QueryResultItem[] = [];
-  const search = keyword.toLowerCase();
-
-  for (const module of codeMap.modules) {
-    const relativePath = path.relative(codeMap.project.rootDir, module.absolutePath).toLowerCase();
-
-    // 匹配模块路径
-    if (relativePath.includes(search)) {
-      results.push({
-        name: path.relative(codeMap.project.rootDir, module.absolutePath),
-        path: module.absolutePath,
-        kind: 'module',
-        details: `模块匹配`
-      });
-    }
-
-    // 匹配导出
-    for (const exp of module.exports) {
-      if (exp.name.toLowerCase().includes(search)) {
-        results.push({
-          name: exp.name,
-          path: module.absolutePath,
-          kind: `export (${exp.kind})`,
-          details: `导出于 ${path.relative(codeMap.project.rootDir, module.absolutePath)}`
-        });
-      }
-    }
-
-    // 匹配符号
-    for (const sym of module.symbols) {
-      if (sym.name.toLowerCase().includes(search)) {
-        results.push({
-          name: sym.name,
-          path: module.absolutePath,
-          kind: sym.kind,
-          details: `定义于 ${path.relative(codeMap.project.rootDir, module.absolutePath)}:${sym.location.line}`
-        });
-      }
-    }
-  }
-
-  return results.slice(0, limit);
-}
-
-/**
  * 格式化输出结果
  */
-function formatResults(result: QueryResult, isJson: boolean): void {
+function formatResults(result: QueryResult, isJson: boolean, verbose: boolean): void {
   if (isJson) {
     console.log(JSON.stringify(result, null, 2));
     return;
   }
 
-  console.log(chalk.cyan(`\n🔍 查询 "${result.query}" (${result.type})`));
+  console.log(chalk.cyan(`\n查询 "${result.query}" (${result.type})`));
   console.log(chalk.gray(`   找到 ${result.count} 个结果\n`));
 
   if (result.count === 0) {
@@ -249,6 +465,16 @@ function formatResults(result: QueryResult, isJson: boolean): void {
     }
     console.log('');
   }
+
+  // verbose 模式输出性能指标
+  if (verbose && result.metrics) {
+    const m = result.metrics;
+    console.log(chalk.cyan('性能指标:'));
+    console.log(chalk.gray(`   索引加载: ${m.indexLoadTime.toFixed(2)}ms ${m.cacheHit ? '(缓存命中)' : ''}`));
+    console.log(chalk.gray(`   查询执行: ${m.queryTime.toFixed(2)}ms`));
+    console.log(chalk.gray(`   总耗时: ${m.totalTime.toFixed(2)}ms`));
+    console.log(chalk.gray(`   索引大小: ${m.indexSize} 个条目`));
+  }
 }
 
 /**
@@ -257,58 +483,90 @@ function formatResults(result: QueryResult, isJson: boolean): void {
 export async function queryCommand(options: QueryOptions) {
   const rootDir = process.cwd();
   const limit = options.limit || 20;
+  const useCache = options.cache !== false;  // 默认启用缓存
+  const verbose = options.verbose || false;
+
+  // 清除缓存（如果指定 --no-cache）
+  if (!useCache) {
+    clearCache();
+  }
 
   // 加载代码地图（带缓存）
-  const codeMap = loadCodeMap(rootDir);
-  if (!codeMap) {
+  const startTotal = performance.now();
+  const { codeMap, index, cacheHit, loadTime } = loadCodeMap(rootDir, useCache);
+
+  if (!codeMap || !index) {
     process.exit(1);
   }
 
+  const indexLoadTime = loadTime;
+  const indexSize = index.symbols.size + index.modules.size + index.dependencies.size;
+
   let result: QueryResult;
+  const queryStartTime = performance.now();
 
   // 执行查询
   if (options.symbol) {
-    const items = querySymbol(codeMap, options.symbol, limit);
+    const items = querySymbol(index, codeMap, options.symbol, limit);
     result = {
       type: 'symbol',
       query: options.symbol,
       count: items.length,
-      results: items
+      results: items,
     };
   } else if (options.module) {
-    const items = queryModule(codeMap, options.module, limit);
+    const items = queryModule(index, codeMap, options.module, limit);
     result = {
       type: 'module',
       query: options.module,
       count: items.length,
-      results: items
+      results: items,
     };
   } else if (options.deps) {
-    const items = queryDeps(codeMap, options.deps, limit);
+    const items = queryDeps(index, codeMap, options.deps, limit);
     result = {
       type: 'deps',
       query: options.deps,
       count: items.length,
-      results: items
+      results: items,
     };
   } else if (options.search) {
-    const items = search(codeMap, options.search, limit);
+    const items = search(index, codeMap, options.search, limit);
     result = {
       type: 'search',
       query: options.search,
       count: items.length,
-      results: items
+      results: items,
     };
   } else {
-    console.log(chalk.red('❌ 请指定查询类型: --symbol, --module, --deps, 或 --search'));
+    console.log(chalk.red('错误: 请指定查询类型: --symbol, --module, --deps, 或 --search'));
     console.log(chalk.gray('\n用法:'));
     console.log(chalk.gray('   codemap query --symbol <name>    # 查询符号'));
     console.log(chalk.gray('   codemap query --module <path>   # 查询模块'));
     console.log(chalk.gray('   codemap query --deps <name>    # 查询依赖'));
     console.log(chalk.gray('   codemap query --search <word>  # 模糊搜索'));
+    console.log(chalk.gray('\n选项:'));
+    console.log(chalk.gray('   -l, --limit <number>  限制结果数量'));
+    console.log(chalk.gray('   -j, --json           JSON 格式输出'));
+    console.log(chalk.gray('   -v, --verbose        显示性能指标'));
+    console.log(chalk.gray('   --no-cache           禁用缓存'));
     process.exit(1);
   }
 
+  const queryTime = performance.now() - queryStartTime;
+  const totalTime = performance.now() - startTotal;
+
+  // 添加性能指标
+  if (verbose) {
+    result.metrics = {
+      indexLoadTime,
+      queryTime,
+      totalTime,
+      cacheHit,
+      indexSize,
+    };
+  }
+
   // 输出结果
-  formatResults(result, options.json || false);
+  formatResults(result, options.json || false, verbose);
 }

@@ -1,18 +1,24 @@
+// [META] since:2026-03-03 | owner:orchestrator-team | stable:true
+// [WHY] 提供代码复杂度分析命令，支持文件级和函数级复杂度详情
+
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
 import type { CodeMap, ModuleInfo } from '../../types/index.js';
 import type { UnifiedResult } from '../../orchestrator/types.js';
+import { analyzeFileComplexity, analyzeMultipleFiles, type FileComplexity, type FunctionComplexity } from '../../core/ast-complexity-analyzer.js';
 
 interface ComplexityOptions {
   file?: string;
   json?: boolean;
+  detail?: boolean;
 }
 
 // ===== 新增类型定义（供 ToolOrchestrator 使用） =====
 
 export interface ComplexityArgs {
   targets?: string[];
+  useAST?: boolean;
 }
 
 export interface ComplexityInfo {
@@ -22,6 +28,7 @@ export interface ComplexityInfo {
   functions: number;
   classes: number;
   lines: number;
+  functionDetails?: FunctionComplexity[];
 }
 
 export interface ComplexityResult {
@@ -103,27 +110,37 @@ function getModuleComplexity(module: ModuleInfo): ComplexityInfo {
       module.complexity.cyclomatic,
       commentRatio
     );
-    
+
     return {
       cyclomatic: module.complexity.cyclomatic,
       cognitive: module.complexity.cognitive || Math.round(module.complexity.cyclomatic * 1.5),
       maintainability,
-      functions: module.complexity.details?.functions.length || 
+      functions: module.complexity.details?.functions.length ||
                  module.symbols.filter(s => s.kind === 'function' || s.kind === 'method').length,
       classes: module.symbols.filter(s => s.kind === 'class').length,
-      lines: module.stats.codeLines
+      lines: module.stats.codeLines,
+      functionDetails: module.complexity.details?.functions.map(f => ({
+        name: f.name,
+        kind: 'function' as const,
+        line: 1,
+        column: 1,
+        cyclomatic: f.cyclomatic,
+        cognitive: f.cognitive,
+        nestingDepth: 0,
+        isHighComplexity: f.cyclomatic >= 10
+      }))
     };
   }
 
   // 否则基于符号数量估算
   const functions = module.symbols.filter(s => s.kind === 'function' || s.kind === 'method').length;
   const classes = module.symbols.filter(s => s.kind === 'class').length;
-  
+
   // 更合理的圈复杂度估算：基于函数数量和代码行数
   // 每个函数基础复杂度1，再加上基于行数的估算
   const cyclomatic = Math.max(1, functions + Math.floor(module.stats.codeLines / 50));
   const cognitive = Math.round(cyclomatic * 1.5);
-  
+
   const commentRatio = module.stats.commentLines / Math.max(1, module.stats.lines);
   const maintainability = calculateMaintainabilityIndex(module.stats.codeLines, cyclomatic, commentRatio);
 
@@ -138,9 +155,38 @@ function getModuleComplexity(module: ModuleInfo): ComplexityInfo {
 }
 
 /**
+ * 使用 AST 分析获取精确的模块复杂度信息
+ */
+function getModuleComplexityWithAST(module: ModuleInfo): ComplexityInfo {
+  try {
+    const astResult = analyzeFileComplexity(module.absolutePath);
+
+    return {
+      cyclomatic: astResult.cyclomatic,
+      cognitive: astResult.cognitive,
+      maintainability: astResult.maintainability,
+      functions: astResult.functions,
+      classes: astResult.classes,
+      lines: astResult.lines,
+      functionDetails: astResult.functionDetails
+    };
+  } catch (error) {
+    // 如果 AST 分析失败，回退到估算方式
+    console.warn(`警告: AST 分析失败，回退到估算方式: ${module.absolutePath}`);
+    return getModuleComplexity(module);
+  }
+}
+
+/**
  * 分析复杂度（纯逻辑函数）
  */
-function analyzeComplexity(codeMap: CodeMap, filePaths?: string[]): ComplexityResult {
+export interface AnalyzeComplexityOptions {
+  filePaths?: string[];
+  useAST?: boolean;  // 是否使用 AST 精确分析
+}
+
+function analyzeComplexity(codeMap: CodeMap, options: AnalyzeComplexityOptions = {}): ComplexityResult {
+  const { filePaths, useAST = false } = options;
   const result: ComplexityResult = {
     files: []
   };
@@ -158,10 +204,14 @@ function analyzeComplexity(codeMap: CodeMap, filePaths?: string[]): ComplexityRe
 
   // 计算每个模块的复杂度
   for (const module of modulesToAnalyze) {
+    const complexity = useAST
+      ? getModuleComplexityWithAST(module)
+      : getModuleComplexity(module);
+
     result.files.push({
       path: module.absolutePath,
       relativePath: path.relative(codeMap.project.rootDir, module.absolutePath),
-      complexity: getModuleComplexity(module)
+      complexity
     });
   }
 
@@ -238,7 +288,10 @@ export class ComplexityCommand {
       throw new Error('代码地图不存在，请先运行 codemap generate');
     }
 
-    return analyzeComplexity(codeMap, args.targets);
+    return analyzeComplexity(codeMap, {
+      filePaths: args.targets,
+      useAST: args.useAST ?? false
+    });
   }
 
   /**
@@ -321,6 +374,11 @@ function formatComplexity(
   allComplexities: Array<{ module: ModuleInfo; complexity: ComplexityInfo }>,
   options: ComplexityOptions
 ): void {
+  // 如果有详细数据，使用已有的复杂度信息
+  const activeComplexity = targetModule && allComplexities.length > 0
+    ? allComplexities[0].complexity
+    : (options.file && allComplexities.length > 0 ? allComplexities[0].complexity : undefined);
+
   if (options.json) {
     const output: Record<string, unknown> = {};
 
@@ -328,7 +386,7 @@ function formatComplexity(
       output.file = {
         path: targetModule.absolutePath,
         relativePath: path.relative(codeMap.project.rootDir, targetModule.absolutePath),
-        complexity: getModuleComplexity(targetModule)
+        complexity: activeComplexity || getModuleComplexity(targetModule)
       };
     } else {
       output.modules = allComplexities.map(({ module, complexity }) => ({
@@ -347,10 +405,21 @@ function formatComplexity(
     return;
   }
 
-  if (options.file && targetModule) {
+  // 检查是否需要显示单个文件详情（targetModule 存在 或 allComplexities 只有一个元素且有函数详情）
+  const showSingleFile = options.file && (targetModule || (allComplexities.length === 1 && allComplexities[0].complexity.functionDetails));
+
+  if (showSingleFile) {
     // 输出指定文件的复杂度
-    const complexity = getModuleComplexity(targetModule);
-    console.log(chalk.cyan(`\n📊 文件复杂度: ${path.relative(codeMap.project.rootDir, targetModule.absolutePath)}`));
+    // 如果有来自 AST 分析的详细数据则使用它
+    const complexity = allComplexities.length > 0 && allComplexities[0].complexity.functionDetails
+      ? allComplexities[0].complexity
+      : (targetModule ? getModuleComplexity(targetModule) : allComplexities[0].complexity);
+
+    const filePath = targetModule
+      ? path.relative(codeMap.project.rootDir, targetModule.absolutePath)
+      : (allComplexities.length > 0 ? allComplexities[0].module.absolutePath : options.file!);
+
+    console.log(chalk.cyan(`\n📊 文件复杂度: ${filePath}`));
     console.log(chalk.gray('─'.repeat(50)));
 
     console.log(chalk.yellow('\n圈复杂度 (Cyclomatic Complexity):'));
@@ -369,6 +438,28 @@ function formatComplexity(
     console.log(chalk.gray(`   代码行数: ${complexity.lines}`));
     console.log(chalk.gray(`   函数/方法: ${complexity.functions}`));
     console.log(chalk.gray(`   类: ${complexity.classes}`));
+
+    // 显示函数级详情（当有详细数据时）
+    if (options.detail && complexity.functionDetails && complexity.functionDetails.length > 0) {
+      console.log(chalk.yellow('\n函数级复杂度详情:'));
+      console.log(chalk.gray('─'.repeat(50)));
+
+      // 按圈复杂度排序
+      const sortedFunctions = [...complexity.functionDetails].sort(
+        (a, b) => b.cyclomatic - a.cyclomatic
+      );
+
+      for (const func of sortedFunctions) {
+        const complexityLevel = func.isHighComplexity
+          ? chalk.red(' ⚠️ 高')
+          : chalk.green(' ✓');
+        console.log(chalk.cyan(`\n   ${func.name} (${func.kind})`));
+        console.log(chalk.gray(`      行号: ${func.line}`));
+        console.log(chalk.gray(`      圈复杂度: ${func.cyclomatic} ${complexityLevel}`));
+        console.log(chalk.gray(`      认知复杂度: ${func.cognitive}`));
+        console.log(chalk.gray(`      嵌套深度: ${func.nestingDepth}`));
+      }
+    }
   } else {
     // 输出所有文件的复杂度
     console.log(chalk.cyan('\n📊 项目复杂度分析'));
@@ -444,6 +535,9 @@ export async function complexityCommand(options: ComplexityOptions) {
   let targetModule: ModuleInfo | undefined;
   const allComplexities: Array<{ module: ModuleInfo; complexity: ComplexityInfo }> = [];
 
+  // 使用 AST 分析时，detail 选项自动启用
+  const useAST = options.detail || false;
+
   if (options.file) {
     targetModule = codeMap.modules.find(m =>
       m.absolutePath.includes(options.file!) ||
@@ -454,12 +548,25 @@ export async function complexityCommand(options: ComplexityOptions) {
       console.log(chalk.red(`❌ 未找到文件: ${options.file}`));
       process.exit(1);
     }
+
+    // 如果使用 AST 分析，获取精确的函数级复杂度
+    if (useAST) {
+      const astComplexity = getModuleComplexityWithAST(targetModule);
+      allComplexities.push({
+        module: targetModule,
+        complexity: astComplexity
+      });
+      targetModule = undefined; // 使用 allComplexities 输出
+    }
   } else {
     // 计算所有模块的复杂度
     for (const module of codeMap.modules) {
+      const complexity = useAST
+        ? getModuleComplexityWithAST(module)
+        : getModuleComplexity(module);
       allComplexities.push({
         module,
-        complexity: getModuleComplexity(module)
+        complexity
       });
     }
   }

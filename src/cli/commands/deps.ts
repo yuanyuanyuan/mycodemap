@@ -1,3 +1,6 @@
+// [META] since:2026-03-03 | owner:orchestrator-team | stable:true
+// [WHY] 提供依赖分析命令，添加 dependentsMap 解决 ID 到路径映射
+
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
@@ -18,6 +21,11 @@ interface DepsModuleInfo {
   relativePath: string;
   dependencies: string[];
   dependents: string[];
+  // 新增：结构化 dependents（ID 到路径的映射）
+  dependentsMap?: Array<{
+    id: string;
+    path: string;
+  }>;
 }
 
 interface DepsResult {
@@ -88,22 +96,46 @@ function analyzeDeps(codeMap: CodeMap, modulePaths?: string[]): DepsResult {
     for (const modulePath of modulePaths) {
       const result = getModuleDependencies(codeMap, modulePath);
       if (result.module) {
+        // 构建 dependents 映射
+        const dependentsMap = result.module.dependents.map(id => {
+          const depModule = codeMap.modules.find(m => m.id === id);
+          return {
+            id,
+            path: depModule
+              ? path.relative(codeMap.project.rootDir, depModule.absolutePath)
+              : id
+          };
+        });
+
         modules.push({
           path: result.module.absolutePath,
           relativePath: path.relative(codeMap.project.rootDir, result.module.absolutePath),
           dependencies: result.dependencies,
-          dependents: result.dependents
+          dependents: result.dependents,
+          dependentsMap
         });
       }
     }
   } else {
     // 分析所有模块
     for (const module of codeMap.modules) {
+      // 构建 dependents 映射
+      const dependentsMap = module.dependents.map(id => {
+        const depModule = codeMap.modules.find(m => m.id === id);
+        return {
+          id,
+          path: depModule
+            ? path.relative(codeMap.project.rootDir, depModule.absolutePath)
+            : id
+        };
+      });
+
       modules.push({
         path: module.absolutePath,
         relativePath: path.relative(codeMap.project.rootDir, module.absolutePath),
         dependencies: module.dependencies,
-        dependents: module.dependents
+        dependents: module.dependents,
+        dependentsMap
       });
 
       allDependencies.push({
@@ -136,11 +168,23 @@ function formatDependencies(
     const output: Record<string, unknown> = {};
 
     if (options.module && targetModule) {
+      // 构建 dependents 映射
+      const dependentsMap = targetModule.dependents.map(id => {
+        const depModule = codeMap.modules.find(m => m.id === id);
+        return {
+          id,
+          path: depModule
+            ? path.relative(codeMap.project.rootDir, depModule.absolutePath)
+            : id
+        };
+      });
+
       output.module = {
         path: targetModule.absolutePath,
         relativePath: path.relative(codeMap.project.rootDir, targetModule.absolutePath),
         dependencies: targetModule.dependencies,
-        dependents: targetModule.dependents
+        dependents: targetModule.dependents,
+        dependentsMap
       };
     } else {
       output.allDependencies = Object.fromEntries(allDependencies);

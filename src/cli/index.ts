@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+// [META] since:2026-03-03 | owner:orchestrator-team | stable:true
+// [WHY] CLI 入口点，添加 --verbose 和 --detail 选项
+
 import { Command } from 'commander';
 import { generateCommand } from './commands/generate.js';
 import { initCommand } from './commands/init.js';
@@ -53,6 +56,8 @@ program
   .option('-S, --search <word>', '模糊搜索')
   .option('-l, --limit <number>', '限制结果数量', '20')
   .option('-j, --json', 'JSON 格式输出')
+  .option('-v, --verbose', '显示性能指标')
+  .option('--no-cache', '禁用缓存，强制重新加载索引')
   .action(queryCommand);
 
 program
@@ -73,6 +78,7 @@ program
   .command('complexity')
   .description('分析代码复杂度（圈复杂度、认知复杂度、可维护性）')
   .option('-f, --file <path>', '查看指定文件的复杂度')
+  .option('-d, --detail', '显示函数级复杂度详情（使用 AST 精确分析）')
   .option('-j, --json', 'JSON 格式输出')
   .action(complexityCommand);
 
