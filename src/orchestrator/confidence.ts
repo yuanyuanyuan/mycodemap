@@ -1,5 +1,6 @@
-// [META] since:2026-02 | owner:orchestrator-team | stable:true
-// [WHY] 置信度计算机制用于评估搜索结果质量，决定是否触发回退策略
+// [META] since:2026-03 | owner:orchestrator-team | stable:true
+// [WHY] Confidence calculation mechanism for evaluating search result quality
+// and determining fallback strategies based on result count, quality, and scenario matching
 
 /**
  * 置信度计算机制
