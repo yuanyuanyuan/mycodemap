@@ -14,6 +14,7 @@ import { createCodemapAdapter } from '../adapters/codemap-adapter.js';
 import { createAstGrepAdapter } from '../adapters/ast-grep-adapter.js';
 import { WorkflowPersistence } from './workflow-persistence.js';
 import { PhaseCheckpoint } from './phase-checkpoint.js';
+import { WorkflowTemplateManager } from './templates.js';
 import {
   type WorkflowContext,
   type WorkflowPhase,
@@ -28,6 +29,10 @@ import { WorkflowContextFactory, WorkflowContextValidator } from './workflow-con
 
 const execAsync = promisify(exec);
 
+interface StartWorkflowOptions {
+  template?: string;
+}
+
 /**
  * 工作流编排器类
  */
@@ -39,6 +44,7 @@ export class WorkflowOrchestrator {
   private toolOrchestrator: ToolOrchestrator;
   private intentRouter: IntentRouter;
   private resultFusion: ResultFusion;
+  private templateManager: WorkflowTemplateManager;
 
   constructor() {
     this.phaseDefinitions = this.initializePhaseDefinitions();
@@ -47,6 +53,7 @@ export class WorkflowOrchestrator {
     this.toolOrchestrator = new ToolOrchestrator();
     this.intentRouter = new IntentRouter();
     this.resultFusion = new ResultFusion();
+    this.templateManager = new WorkflowTemplateManager();
 
     // 注册工具适配器
     this.registerAdapters();
@@ -65,8 +72,13 @@ export class WorkflowOrchestrator {
   /**
    * 启动新的工作流
    */
-  async start(task: string): Promise<WorkflowContext> {
+  async start(task: string, options: StartWorkflowOptions = {}): Promise<WorkflowContext> {
+    this.phaseDefinitions = await this.resolvePhaseDefinitions(options.template);
     this.context = WorkflowContextFactory.create(task);
+    this.context.currentPhase = this.getFirstPhase(this.phaseDefinitions);
+    if (options.template) {
+      this.context.templateName = options.template;
+    }
 
     // 保存初始状态
     await this.persistence.save(this.context);
@@ -298,7 +310,7 @@ export class WorkflowOrchestrator {
   async getStatus(): Promise<WorkflowStatus> {
     if (!this.context) {
       // 尝试加载活动工作流
-      this.context = await this.persistence.loadActive();
+      this.context = await this.resumeActive();
     }
     if (!this.context) {
       return { active: false };
@@ -321,8 +333,45 @@ export class WorkflowOrchestrator {
     const context = await this.persistence.load(id);
     if (context) {
       this.context = context;
+      await this.syncPhaseDefinitionsWithContext(context);
     }
     return context;
+  }
+
+  /**
+   * 恢复当前活动工作流
+   */
+  async resumeActive(): Promise<WorkflowContext | null> {
+    const context = await this.persistence.loadActive();
+    if (context) {
+      this.context = context;
+      await this.syncPhaseDefinitionsWithContext(context);
+    }
+    return context;
+  }
+
+  /**
+   * 为活动工作流应用模板
+   */
+  async applyTemplate(templateName: string): Promise<WorkflowContext> {
+    if (!this.context) {
+      this.context = await this.persistence.loadActive();
+    }
+    if (!this.context) {
+      throw new Error('No active workflow');
+    }
+
+    this.phaseDefinitions = await this.resolvePhaseDefinitions(templateName);
+    this.context.templateName = templateName;
+
+    if (!this.phaseDefinitions.has(this.context.currentPhase)) {
+      this.context.currentPhase = this.getFirstPhase(this.phaseDefinitions);
+      this.context.phaseStatus = 'pending';
+    }
+
+    this.context.updatedAt = new Date();
+    await this.persistence.save(this.context);
+    return this.context;
   }
 
   /**
@@ -437,6 +486,34 @@ export class WorkflowOrchestrator {
         commands: []
       }]
     ]);
+  }
+
+  private async syncPhaseDefinitionsWithContext(context: WorkflowContext): Promise<void> {
+    this.phaseDefinitions = await this.resolvePhaseDefinitions(context.templateName);
+  }
+
+  private async resolvePhaseDefinitions(templateName?: string): Promise<Map<WorkflowPhase, PhaseDefinition>> {
+    if (!templateName) {
+      return this.initializePhaseDefinitions();
+    }
+
+    await this.templateManager.loadCustomTemplates();
+    const template = this.templateManager.getTemplate(templateName);
+    if (!template) {
+      throw new Error(`Template not found: ${templateName}`);
+    }
+    if (template.phases.length === 0) {
+      throw new Error(`Template invalid: ${templateName}`);
+    }
+    return new Map(template.phases.map((phase) => [phase.name, phase]));
+  }
+
+  private getFirstPhase(definitions: Map<WorkflowPhase, PhaseDefinition>): WorkflowPhase {
+    const firstPhase = definitions.keys().next().value;
+    if (!firstPhase) {
+      throw new Error('No phase definitions available');
+    }
+    return firstPhase;
   }
 
   /**

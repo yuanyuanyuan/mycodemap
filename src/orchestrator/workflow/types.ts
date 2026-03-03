@@ -1,3 +1,6 @@
+// [META] since:2026-03-02 | owner:workflow-team | stable:true
+// [WHY] Centralize workflow domain types shared by orchestrator, persistence, and CLI
+
 /**
  * 工作流编排器类型定义
  * 定义工作流阶段、上下文、交付物等核心类型
@@ -131,6 +134,8 @@ export interface WorkflowContext {
   id: string;
   /** 用户任务描述 */
   task: string;
+  /** 工作流模板名称（可选） */
+  templateName?: string;
   /** 当前阶段 */
   currentPhase: WorkflowPhase;
   /** 阶段状态 */

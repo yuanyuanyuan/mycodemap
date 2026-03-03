@@ -1,3 +1,6 @@
+// [META] since:2026-03-02 | owner:workflow-team | stable:true
+// [WHY] Persist workflow context safely with Map/Set/Date serialization and active-workflow recovery
+
 /**
  * 工作流持久化
  * 处理工作流上下文的序列化和反序列化
@@ -10,6 +13,7 @@ import type { WorkflowContext, WorkflowPhase, PhaseArtifacts, WorkflowSummary, C
 interface SerializedContext {
   id: string;
   task: string;
+  templateName?: string;
   currentPhase: WorkflowPhase;
   phaseStatus: string;
   artifacts: [WorkflowPhase, PhaseArtifacts][];
@@ -151,6 +155,7 @@ export class WorkflowPersistence {
     return {
       id: raw.id,
       task: raw.task,
+      templateName: raw.templateName,
       currentPhase: raw.currentPhase,
       phaseStatus: raw.phaseStatus as WorkflowContext['phaseStatus'],
       artifacts: processedArtifacts,

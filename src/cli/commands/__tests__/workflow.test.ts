@@ -13,9 +13,11 @@ vi.mock('../../../orchestrator/workflow/workflow-orchestrator.js', () => ({
     getStatus: vi.fn(),
     proceedToNextPhase: vi.fn(),
     resume: vi.fn(),
+    resumeActive: vi.fn(),
     checkpoint: vi.fn(),
     listWorkflows: vi.fn(),
     deleteWorkflow: vi.fn(),
+    applyTemplate: vi.fn(),
   })),
 }));
 
@@ -164,7 +166,7 @@ describe('Workflow CLI', () => {
 
       await workflowCommand.parseAsync(['node', 'workflow', 'start', 'Test task']);
 
-      expect(mockStart).toHaveBeenCalledWith('Test task');
+      expect(mockStart).toHaveBeenCalledWith('Test task', { template: undefined });
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('wf-123'));
     });
 
@@ -179,6 +181,22 @@ describe('Workflow CLI', () => {
 
       expect(mockExitCode).toBe(1);
       expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('E0014'));
+    });
+
+    it('should fail when template does not exist', async () => {
+      const mockOrchestrator = vi.mocked(WorkflowOrchestrator);
+      const mockStart = vi.fn();
+      mockOrchestrator.mockImplementation(() => ({
+        start: mockStart,
+      } as unknown as InstanceType<typeof WorkflowOrchestrator>));
+
+      await expect(
+        workflowCommand.parseAsync(['node', 'workflow', 'start', 'Test task', '--template', 'missing-template'])
+      ).rejects.toThrow('Process exit');
+
+      expect(mockStart).not.toHaveBeenCalled();
+      expect(mockExitCode).toBe(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('E0016'));
     });
   });
 
@@ -333,11 +351,12 @@ describe('Workflow CLI', () => {
 
     it('should resume active workflow without ID', async () => {
       const mockOrchestrator = vi.mocked(WorkflowOrchestrator);
+      const mockResumeActive = vi.fn().mockResolvedValue({
+        id: 'wf-456',
+        currentPhase: 'discovery',
+      });
       mockOrchestrator.mockImplementation(() => ({
-        resume: vi.fn().mockResolvedValue({
-          id: 'wf-456',
-          currentPhase: 'discovery',
-        }),
+        resumeActive: mockResumeActive,
         getStatus: vi.fn().mockResolvedValue({
           currentPhase: 'discovery',
           phaseStatus: 'in_progress',
@@ -347,6 +366,7 @@ describe('Workflow CLI', () => {
 
       await workflowCommand.parseAsync(['node', 'workflow', 'resume']);
 
+      expect(mockResumeActive).toHaveBeenCalled();
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('wf-456'));
     });
 
@@ -366,7 +386,7 @@ describe('Workflow CLI', () => {
     it('should show message when no active workflow to resume', async () => {
       const mockOrchestrator = vi.mocked(WorkflowOrchestrator);
       mockOrchestrator.mockImplementation(() => ({
-        resume: vi.fn().mockResolvedValue(null),
+        resumeActive: vi.fn().mockResolvedValue(null),
       } as unknown as InstanceType<typeof WorkflowOrchestrator>));
 
       await workflowCommand.parseAsync(['node', 'workflow', 'resume']);

@@ -115,6 +115,16 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
 
       expect(context1.id).not.toBe(context2.id);
     });
+
+    it('should apply template phase definitions on start', async () => {
+      const context = await orchestrator.start('bugfix task', { template: 'bugfix' });
+
+      expect(context.templateName).toBe('bugfix');
+      expect(context.currentPhase).toBe('reference');
+
+      const nextPhase = await orchestrator.proceedToNextPhase(true);
+      expect(nextPhase).toBe('implementation');
+    });
   });
 
   describe('executeCurrentPhase()', () => {
@@ -334,6 +344,46 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
       const result = await testOrchestrator.resume('non-existent');
       
       expect(result).toBeNull();
+    });
+
+    it('should resume active workflow and load template-specific phases', async () => {
+      const workflowData = {
+        id: 'wf-active-001',
+        task: 'template task',
+        templateName: 'bugfix',
+        currentPhase: 'reference',
+        phaseStatus: 'pending',
+        artifacts: [],
+        cachedResults: {},
+        userConfirmed: [],
+        startedAt: '2025-01-20T10:00:00Z',
+        updatedAt: '2025-01-20T10:30:00Z'
+      };
+
+      vi.mocked(fs.readFile).mockImplementation((path: string) => {
+        if (path.includes('active.json')) {
+          return Promise.resolve(JSON.stringify({ id: 'wf-active-001' }));
+        }
+        return Promise.resolve(JSON.stringify(workflowData));
+      });
+
+      const testOrchestrator = new WorkflowOrchestrator();
+      const resumed = await testOrchestrator.resumeActive();
+
+      expect(resumed?.templateName).toBe('bugfix');
+      expect(testOrchestrator.getPhaseDefinition('reference')?.nextPhase).toBe('implementation');
+    });
+  });
+
+  describe('applyTemplate()', () => {
+    it('should update active workflow phase definitions', async () => {
+      await orchestrator.start('test task');
+
+      const updated = await orchestrator.applyTemplate('bugfix');
+      const nextPhase = await orchestrator.proceedToNextPhase(true);
+
+      expect(updated.templateName).toBe('bugfix');
+      expect(nextPhase).toBe('implementation');
     });
   });
 

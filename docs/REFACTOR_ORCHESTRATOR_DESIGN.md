@@ -914,6 +914,19 @@ Completed phases: ${status.artifacts?.join(', ') || 'none'}
 `);
   });
 
+workflow.command('visualize')
+  .description('Visualize current workflow status')
+  .action(async () => {
+    // 读取活动工作流并渲染 ASCII 视图
+  });
+
+workflow.command('template')
+  .description('Workflow template management')
+  .command('apply <name>')
+  .action(async (name: string) => {
+    // 对活动工作流应用模板并持久化
+  });
+
 workflow.command('proceed')
   .description('Proceed to next phase')
   .option('-f, --force', 'Skip verification')

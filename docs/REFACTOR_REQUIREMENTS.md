@@ -872,14 +872,22 @@ codemap workflow start "实现文件重命名功能"
 # 查看当前状态
 codemap workflow status
 
+# 可视化当前工作流
+codemap workflow visualize
+
 # 推进到下一阶段
 codemap workflow proceed
 
-# 恢复中断的工作流
+# 恢复中断的工作流（默认恢复 active，可选指定 ID）
+codemap workflow resume
 codemap workflow resume <workflow-id>
 
 # 手动创建检查点
 codemap workflow checkpoint
+
+# 模板管理与应用
+codemap workflow template list --all
+codemap workflow template apply bugfix
 ```
 
 ### 9.5 交互式引导示例

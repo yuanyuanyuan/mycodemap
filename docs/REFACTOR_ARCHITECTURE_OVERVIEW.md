@@ -349,9 +349,11 @@ codemap ci check-output-contract # 验证输出契约（schemaVersion、Top-K、
 # 工作流命令 (v2.5 规划)
 codemap workflow start            # 启动交互式工作流
 codemap workflow status          # 查看当前工作流状态
+codemap workflow visualize       # 可视化当前工作流
 codemap workflow proceed         # 推进到下一阶段
 codemap workflow resume          # 恢复中断的工作流
 codemap workflow checkpoint      # 手动创建检查点
+codemap workflow template ...    # 模板管理与应用
 ```
 
 ### analyze 命令参数

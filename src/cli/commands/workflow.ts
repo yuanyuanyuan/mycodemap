@@ -9,7 +9,7 @@
 import { Command } from 'commander';
 import { WorkflowOrchestrator } from '../../orchestrator/workflow/workflow-orchestrator.js';
 import { WorkflowVisualizer } from '../../orchestrator/workflow/visualizer.js';
-import { WorkflowTemplateManager, recommendTemplate } from '../../orchestrator/workflow/templates.js';
+import { WorkflowTemplateManager, recommendTemplate, type WorkflowTemplate } from '../../orchestrator/workflow/templates.js';
 import type { AnalyzeArgs } from '../../orchestrator/types.js';
 
 /**
@@ -61,18 +61,33 @@ workflow.command('start')
   .action(async (task: string, options: { template?: string }) => {
     try {
       const orchestrator = new WorkflowOrchestrator();
-      const context = await orchestrator.start(task);
-
-      // 显示推荐模板
       const templateManager = new WorkflowTemplateManager();
       await templateManager.loadCustomTemplates();
+
+      let selectedTemplate: WorkflowTemplate | undefined;
+      if (options.template) {
+        selectedTemplate = templateManager.getTemplate(options.template);
+        if (!selectedTemplate) {
+          throw createError(
+            WorkflowErrorCode.E0016_TEMPLATE_NOT_FOUND,
+            `${ERROR_MESSAGES[WorkflowErrorCode.E0016_TEMPLATE_NOT_FOUND]}: ${options.template}`
+          );
+        }
+        if (!templateManager.validateTemplate(selectedTemplate)) {
+          throw createError(
+            WorkflowErrorCode.E0017_TEMPLATE_INVALID,
+            `${ERROR_MESSAGES[WorkflowErrorCode.E0017_TEMPLATE_INVALID]}: ${options.template}`
+          );
+        }
+      }
+
+      const context = await orchestrator.start(task, {
+        template: selectedTemplate?.name
+      });
       
       let templateNote = '';
-      if (options.template) {
-        const template = templateManager.getTemplate(options.template);
-        if (template) {
-          templateNote = `\nUsing template: ${template.name} (${template.type})`;
-        }
+      if (selectedTemplate) {
+        templateNote = `\nUsing template: ${selectedTemplate.name} (${selectedTemplate.type})`;
       } else {
         const recommended = recommendTemplate(task);
         templateNote = `\nRecommended template: ${recommended.name} (use --template ${recommended.name})`;
@@ -94,7 +109,24 @@ Next steps:
   4. codemap workflow proceed       # 进入下一阶段
 `);
     } catch (error) {
+      const err = error as Error & { code?: WorkflowErrorCode };
       const errMsg = error instanceof Error ? error.message : String(error);
+      if (err.code === WorkflowErrorCode.E0016_TEMPLATE_NOT_FOUND) {
+        console.error(`❌ ${errMsg}`);
+        process.exit(1);
+      }
+      if (err.code === WorkflowErrorCode.E0017_TEMPLATE_INVALID) {
+        console.error(`❌ ${errMsg}`);
+        process.exit(1);
+      }
+      if (errMsg.startsWith('Template not found:')) {
+        console.error(`❌ [${WorkflowErrorCode.E0016_TEMPLATE_NOT_FOUND}] ${ERROR_MESSAGES[WorkflowErrorCode.E0016_TEMPLATE_NOT_FOUND]}: ${errMsg.replace('Template not found: ', '')}`);
+        process.exit(1);
+      }
+      if (errMsg.startsWith('Template invalid:')) {
+        console.error(`❌ [${WorkflowErrorCode.E0017_TEMPLATE_INVALID}] ${ERROR_MESSAGES[WorkflowErrorCode.E0017_TEMPLATE_INVALID]}: ${errMsg.replace('Template invalid: ', '')}`);
+        process.exit(1);
+      }
       console.error(`❌ [${WorkflowErrorCode.E0014_WORKFLOW_CREATION_FAILED}] ${ERROR_MESSAGES[WorkflowErrorCode.E0014_WORKFLOW_CREATION_FAILED]}: ${errMsg}`);
       process.exit(1);
     }
@@ -184,7 +216,7 @@ workflow.command('resume')
         }
         console.log(`Resumed workflow: ${context.id}`);
       } else {
-        const context = await orchestrator.resume('');
+        const context = await orchestrator.resumeActive();
         if (!context) {
           console.log('No active workflow to resume.');
           return;
@@ -321,7 +353,7 @@ workflow.command('visualize')
       } else {
         context = await orchestrator.getContext();
         if (!context) {
-          const active = await orchestrator.resume('');
+          const active = await orchestrator.resumeActive();
           if (!active) {
             console.log('No active workflow. Run "codemap workflow start <task>" first.');
             return;
@@ -442,13 +474,24 @@ template.command('apply')
         process.exit(1);
       }
 
-      // 显示模板信息
+      if (!manager.validateTemplate(template)) {
+        console.error(`❌ [${WorkflowErrorCode.E0017_TEMPLATE_INVALID}] ${ERROR_MESSAGES[WorkflowErrorCode.E0017_TEMPLATE_INVALID]}: ${name}`);
+        process.exit(1);
+      }
+
+      const orchestrator = new WorkflowOrchestrator();
+      const context = await orchestrator.applyTemplate(name);
+
       console.log(`Applied template: ${template.name}`);
       console.log(`Type: ${template.type}`);
       console.log(`Phases: ${template.phases.map(p => p.name).join(' → ')}`);
-      console.log('\nNote: Template configuration is used when starting new workflows with --template flag');
+      console.log(`Current phase: ${context.currentPhase}`);
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
+      if (errMsg === 'No active workflow') {
+        console.error(`❌ [${WorkflowErrorCode.E0012_INVALID_WORKFLOW_STATE}] ${ERROR_MESSAGES[WorkflowErrorCode.E0012_INVALID_WORKFLOW_STATE]}: No active workflow.`);
+        process.exit(1);
+      }
       console.error(`❌ Failed to apply template: ${errMsg}`);
       process.exit(1);
     }
