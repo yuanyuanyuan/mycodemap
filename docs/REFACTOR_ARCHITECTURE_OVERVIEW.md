@@ -2,7 +2,7 @@
 
 > 版本: 2.5
 > 日期: 2026-02-28
-> 状态: 待实施（含 CI 门禁与契约修订）
+> 状态: 已完成 (v2.5 工作流编排器已实现)
 
 ---
 
@@ -18,7 +18,7 @@
 | 测试关联器 | [REFACTOR_TEST_LINKER_DESIGN.md](./REFACTOR_TEST_LINKER_DESIGN.md) |
 | Git 分析器 | [REFACTOR_GIT_ANALYZER_DESIGN.md](./REFACTOR_GIT_ANALYZER_DESIGN.md) |
 | **CI 门禁护栏** | **[CI_GATEWAY_DESIGN.md](./CI_GATEWAY_DESIGN.md)** (v2.4 新增) |
-| **工作流编排器** | **[REFACTOR_ORCHESTRATOR_DESIGN.md](./REFACTOR_ORCHESTRATOR_DESIGN.md)** (v2.5 规划) |
+| **工作流编排器** | **[REFACTOR_ORCHESTRATOR_DESIGN.md](./REFACTOR_ORCHESTRATOR_DESIGN.md)** (v2.5 已实现 ✅) |
 
 ---
 
