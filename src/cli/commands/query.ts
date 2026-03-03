@@ -470,10 +470,34 @@ function querySymbol(
   // 搜索键：不区分大小写时转换为小写
   const searchKey = caseSensitive ? symbolName : symbolName.toLowerCase();
 
-  // 首先尝试精确匹配
+  // 用于去重的 Set
+  const seenResults = new Set<string>();
+
+  // 首先尝试精确匹配（完全相等）
   const exactMatches = symbolsMap.get(searchKey);
   if (exactMatches) {
     for (const entry of exactMatches) {
+      const key = `${entry.name}:${entry.filePath}`;
+      if (!seenResults.has(key)) {
+        seenResults.add(key);
+        results.push({
+          name: entry.name,
+          path: path.join(codeMap.project.rootDir, entry.filePath),
+          kind: entry.kind,
+          details: `${entry.isExported ? '导出于' : '定义于'} ${entry.filePath}${entry.line ? ':' + entry.line : ''}`,
+          location: { file: entry.filePath, line: entry.line, column: entry.column },
+          isExported: entry.isExported,
+        });
+      }
+    }
+  }
+
+  // 尝试前缀匹配（以搜索词开头）
+  const prefixResults = prefixMap.get(searchKey) || [];
+  for (const entry of prefixResults) {
+    const key = `${entry.name}:${entry.filePath}`;
+    if (!seenResults.has(key)) {
+      seenResults.add(key);
       results.push({
         name: entry.name,
         path: path.join(codeMap.project.rootDir, entry.filePath),
@@ -485,21 +509,24 @@ function querySymbol(
     }
   }
 
-  // 如果没有精确匹配，尝试前缀匹配
-  if (results.length === 0) {
-    const prefixResults = prefixMap.get(searchKey) || [];
-    for (const entry of prefixResults) {
-      // 避免重复
-      const key = `${entry.name}:${entry.filePath}`;
-      if (!results.some(r => `${r.name}:${r.path}` === key)) {
-        results.push({
-          name: entry.name,
-          path: path.join(codeMap.project.rootDir, entry.filePath),
-          kind: entry.kind,
-          details: `${entry.isExported ? '导出于' : '定义于'} ${entry.filePath}${entry.line ? ':' + entry.line : ''}`,
-          location: { file: entry.filePath, line: entry.line, column: entry.column },
-          isExported: entry.isExported,
-        });
+  // 尝试子串匹配（包含匹配）
+  // 例如：搜索 "Analyzer" 应匹配 "GitAnalyzer"
+  for (const [key, entries] of symbolsMap.entries()) {
+    if (key.includes(searchKey) && !key.startsWith(searchKey)) {
+      // 跳过已经通过精确匹配和前缀匹配找到的键
+      for (const entry of entries) {
+        const resultKey = `${entry.name}:${entry.filePath}`;
+        if (!seenResults.has(resultKey)) {
+          seenResults.add(resultKey);
+          results.push({
+            name: entry.name,
+            path: path.join(codeMap.project.rootDir, entry.filePath),
+            kind: entry.kind,
+            details: `${entry.isExported ? '导出于' : '定义于'} ${entry.filePath}${entry.line ? ':' + entry.line : ''}`,
+            location: { file: entry.filePath, line: entry.line, column: entry.column },
+            isExported: entry.isExported,
+          });
+        }
       }
     }
   }

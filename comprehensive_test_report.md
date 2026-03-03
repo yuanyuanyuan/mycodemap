@@ -236,12 +236,12 @@
 
 | 场景               | 使用方式                | 示例命令                                                               |
 |--------------------|-------------------------|------------------------------------------------------------------------|
-| **重构前影响分析** | 必用impact命令          | `./codemap impact -f src/core/analyzer.ts --transitive`                |
-| **依赖架构审查**   | 必用deps命令            | `./codemap deps -m "src/parser"`                                       |
-| **循环依赖检测**   | 必用cycles命令          | `./codemap cycles`                                                     |
-| **发布前风险评估** | impact + complexity组合 | `./codemap impact -f changed.ts && ./codemap complexity -f changed.ts` |
-| **IDE插件开发**    | query + JSON输出        | `./codemap query -s "SymbolName" -j`                                   |
-| **CI/CD依赖检查**  | deps + cycles           | `./codemap deps && ./codemap cycles`                                   |
+| **重构前影响分析** | 必用impact命令          | `npx codemap impact -f src/core/analyzer.ts --transitive`                |
+| **依赖架构审查**   | 必用deps命令            | `npx codemap deps -m "src/parser"`                                       |
+| **循环依赖检测**   | 必用cycles命令          | `npx codemap cycles`                                                     |
+| **发布前风险评估** | impact + complexity组合 | `npx codemap impact -f changed.ts && npx codemap complexity -f changed.ts` |
+| **IDE插件开发**    | query + JSON输出        | `npx codemap query -s "SymbolName" -j`                                   |
+| **CI/CD依赖检查**  | deps + cycles           | `npx codemap deps && npx codemap cycles`                                   |
 
 ### 6.2 不推荐/需谨慎场景
 
@@ -256,16 +256,16 @@
 
 ```bash
 # 场景1: 快速定位符号定义，然后理解上下文
-./codemap query -s "ModuleInfo" -j           # 获取定义位置和类型
+npx codemap query -s "ModuleInfo" -j           # 获取定义位置和类型
 rg -n "ModuleInfo" src/ -A 3 -B 1            # 查看代码上下文
 
 # 场景2: 分析变更影响范围
-./codemap impact -f src/core/analyzer.ts --transitive   # 获取传递依赖
+npx codemap impact -f src/core/analyzer.ts --transitive   # 获取传递依赖
 rg -l "analyzer" src/                                   # 快速文本验证
 
 # 场景3: 依赖分析 + 复杂度检查
-./codemap deps -m "src/core"                 # 分析模块依赖
-./codemap complexity -f src/core/analyzer.ts # 检查复杂度（仅供参考）
+npx codemap deps -m "src/core"                 # 分析模块依赖
+npx codemap complexity -f src/core/analyzer.ts # 检查复杂度（仅供参考）
 eslint src/core/analyzer.ts --rule 'complexity: [error, 10]'  # 精确复杂度检查
 ```
 

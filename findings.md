@@ -97,15 +97,15 @@
 
 ```bash
 # 查询功能测试
-./codemap query -s "ModuleInfo"
-./codemap query -d "analyzer"
+npx codemap query -s "ModuleInfo"
+npx codemap query -d "analyzer"
 
 # 影响分析测试
-./codemap impact -f src/core/analyzer.ts
+npx codemap impact -f src/core/analyzer.ts
 
 # 复杂度测试
-./codemap complexity
-./codemap complexity -f src/core/analyzer.ts --detail
+npx codemap complexity
+npx codemap complexity -f src/core/analyzer.ts --detail
 ```
 
 ---

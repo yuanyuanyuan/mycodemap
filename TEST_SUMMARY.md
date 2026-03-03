@@ -57,18 +57,18 @@
 
 ```bash
 # 1. 架构分析
-./codemap deps                    # 查看项目依赖结构
-./codemap cycles                  # 检测循环依赖
+npx codemap deps                    # 查看项目依赖结构
+npx codemap cycles                  # 检测循环依赖
 
 # 2. 变更影响评估
-./codemap impact -f src/core.ts --transitive
+npx codemap impact -f src/core.ts --transitive
 
 # 3. 代码质量分析
-./codemap complexity              # 识别高风险文件
+npx codemap complexity              # 识别高风险文件
 
 # 4. 符号查询
-./codemap query -s "ClassName"    # 查找类定义
-./codemap query -m "src/parser"   # 查看模块信息
+npx codemap query -s "ClassName"    # 查找类定义
+npx codemap query -m "src/parser"   # 查看模块信息
 ```
 
 ### 推荐使用 rg 的场景
