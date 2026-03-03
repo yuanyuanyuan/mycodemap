@@ -1,3 +1,5 @@
+// [META] since:2024-06 | owner:core-team | stable:true
+// [WHY] Core analysis engine that orchestrates parsing, dependency analysis, and code map generation
 import path from 'path';
 import fs from 'fs/promises';
 import { globby } from 'globby';
@@ -11,12 +13,23 @@ const DEFAULT_EXCLUDE = [
   'node_modules/**',
   'dist/**',
   'build/**',
-  '.git/**',
   'coverage/**',
   '*.test.ts',
   '*.spec.ts',
   '*.d.ts'
 ];
+
+// 动态检测是否排除 .git（兼容 worktree）
+function getGitExcludePattern(rootDir: string): string[] {
+  const gitPath = path.join(rootDir, '.git');
+  try {
+    const stats = require('fs').statSync(gitPath);
+    // 如果 .git 是目录，使用 .git/**；如果是文件（worktree），跳过
+    return stats.isDirectory() ? ['.git/**'] : [];
+  } catch {
+    return [];
+  }
+}
 
 // 阈值配置
 const HYBRID_THRESHOLD = 50; // 文件数 >= 50 时使用 Smart 模式
@@ -153,8 +166,11 @@ function convertToModuleInfo(result: ParseResult): ModuleInfo {
 // 发现文件
 async function discoverFiles(rootDir: string, include: string[], exclude: string[]): Promise<string[]> {
   const patterns = include.map(p => path.join(rootDir, p));
+  // 动态添加 .git 排除模式（兼容 worktree）
+  const gitExclude = getGitExcludePattern(rootDir);
+  const allExclude = [...exclude, ...gitExclude];
   const files = await globby(patterns, {
-    ignore: exclude,
+    ignore: allExclude,
     absolute: true,
     onlyFiles: true
   });
