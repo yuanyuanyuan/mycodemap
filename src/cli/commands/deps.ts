@@ -4,12 +4,13 @@
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
-import type { CodeMap, ModuleInfo } from '../../types/index.js';
+import type { CodeMap, ModuleInfo, SourceLocation } from '../../types/index.js';
 import type { UnifiedResult, HeatScore } from '../../orchestrator/types.js';
 
 interface DepsOptions {
   module?: string;
   json?: boolean;
+  structured?: boolean;
 }
 
 interface DepsArgs {
@@ -100,6 +101,17 @@ function buildDependentsMap(
 }
 
 /**
+ * 构建 SourceLocation 对象
+ */
+function buildLocation(filePath: string, line: number = 1, column: number = 1): SourceLocation {
+  return {
+    file: filePath,
+    line,
+    column,
+  };
+}
+
+/**
  * 分析依赖关系 - 纯逻辑函数
  * @param codeMap 代码地图数据
  * @param modulePaths 目标模块路径列表（可选，为空则分析所有模块）
@@ -169,16 +181,26 @@ function formatDependencies(
 
     if (options.module && targetModule) {
       const dependentsMap = buildDependentsMap(targetModule.dependents, codeMap);
+      const location = buildLocation(
+        path.relative(codeMap.project.rootDir, targetModule.absolutePath)
+      );
 
       output.module = {
         path: targetModule.absolutePath,
         relativePath: path.relative(codeMap.project.rootDir, targetModule.absolutePath),
+        location, // 新增：结构化位置信息
         dependencies: targetModule.dependencies,
         dependents: targetModule.dependents,
         dependentsMap
       };
     } else {
       output.allDependencies = Object.fromEntries(allDependencies);
+      output.modules = Array.from(allDependencies.entries()).map(([modulePath, info]) => ({
+        path: modulePath,
+        relativePath: path.relative(codeMap.project.rootDir, modulePath),
+        location: buildLocation(path.relative(codeMap.project.rootDir, modulePath)),
+        ...info
+      }));
     }
 
     console.log(JSON.stringify(output, null, 2));
@@ -384,13 +406,21 @@ export class DepsCommand {
         riskLevel: gravity > 0.7 ? 'high' : gravity > 0.4 ? 'medium' : 'low'
       };
 
+      // 构建 location
+      const location: SourceLocation = {
+        file: module.relativePath,
+        line: 1,
+        column: 1,
+      };
+
       unifiedResults.push({
         id,
         source: 'codemap',
         toolScore: 0.9,
         type: 'file',
         file: module.path,
-        line: 0,
+        line: 1,
+        location, // 新增：结构化位置信息
         content,
         relevance: 0.8,
         keywords: [],

@@ -4,7 +4,7 @@
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
-import type { CodeMap, ModuleInfo } from '../../types/index.js';
+import type { CodeMap, ModuleInfo, SourceLocation } from '../../types/index.js';
 import type { UnifiedResult } from '../../orchestrator/types.js';
 import { analyzeFileComplexity, analyzeMultipleFiles, type FileComplexity, type FunctionComplexity } from '../../core/ast-complexity-analyzer.js';
 
@@ -12,6 +12,7 @@ interface ComplexityOptions {
   file?: string;
   json?: boolean;
   detail?: boolean;
+  structured?: boolean;
 }
 
 // ===== 新增类型定义（供 ToolOrchestrator 使用） =====
@@ -36,6 +37,7 @@ export interface ComplexityResult {
     path: string;
     relativePath: string;
     complexity: ComplexityInfo;
+    location?: SourceLocation; // 新增：结构化位置信息
   }>;
   summary?: {
     totalModules: number;
@@ -178,6 +180,17 @@ function getModuleComplexityWithAST(module: ModuleInfo): ComplexityInfo {
 }
 
 /**
+ * 构建 SourceLocation 对象
+ */
+function buildLocation(filePath: string, line: number = 1, column: number = 1): SourceLocation {
+  return {
+    file: filePath,
+    line,
+    column,
+  };
+}
+
+/**
  * 分析复杂度（纯逻辑函数）
  */
 export interface AnalyzeComplexityOptions {
@@ -208,9 +221,12 @@ function analyzeComplexity(codeMap: CodeMap, options: AnalyzeComplexityOptions =
       ? getModuleComplexityWithAST(module)
       : getModuleComplexity(module);
 
+    const relativePath = path.relative(codeMap.project.rootDir, module.absolutePath);
+    
     result.files.push({
       path: module.absolutePath,
-      relativePath: path.relative(codeMap.project.rootDir, module.absolutePath),
+      relativePath,
+      location: buildLocation(relativePath, 1, 1), // 新增：结构化位置信息
       complexity
     });
   }
@@ -323,13 +339,21 @@ export class ComplexityCommand {
       // 生成人类可读的描述
       const content = `圈复杂度: ${complexity.cyclomatic}, 认知复杂度: ${complexity.cognitive}, 可维护性: ${complexity.maintainability}`;
 
+      // 使用已有的 location
+      const location: SourceLocation = file.location || {
+        file: file.relativePath,
+        line: 1,
+        column: 1,
+      };
+
       return {
         id: `codemap-${file.path}-0`,
         source: 'codemap',
         toolScore: 0.9,
         type,
         file: file.path,
-        line: 0,
+        line: 1,
+        location, // 新增：结构化位置信息
         content,
         relevance,
         keywords: [],
@@ -383,16 +407,22 @@ function formatComplexity(
     const output: Record<string, unknown> = {};
 
     if (options.file && targetModule) {
+      const relativePath = path.relative(codeMap.project.rootDir, targetModule.absolutePath);
       output.file = {
         path: targetModule.absolutePath,
-        relativePath: path.relative(codeMap.project.rootDir, targetModule.absolutePath),
+        relativePath,
+        location: buildLocation(relativePath, 1, 1), // 新增：结构化位置信息
         complexity: activeComplexity || getModuleComplexity(targetModule)
       };
     } else {
-      output.modules = allComplexities.map(({ module, complexity }) => ({
-        path: path.relative(codeMap.project.rootDir, module.absolutePath),
-        ...complexity
-      }));
+      output.modules = allComplexities.map(({ module, complexity }) => {
+        const relativePath = path.relative(codeMap.project.rootDir, module.absolutePath);
+        return {
+          path: relativePath,
+          location: buildLocation(relativePath, 1, 1), // 新增：结构化位置信息
+          ...complexity
+        };
+      });
       output.summary = {
         totalModules: codeMap.modules.length,
         averageCyclomatic: allComplexities.reduce((sum, c) => sum + c.complexity.cyclomatic, 0) / codeMap.modules.length,

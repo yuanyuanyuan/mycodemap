@@ -1,6 +1,8 @@
 // [META] since:2026-03-02 | owner:orchestrator-team | stable:true
 // [WHY] Core type definitions with optional fields for flexible unified results
 
+import type { SourceLocation } from '../types/index.js';
+
 /**
  * UnifiedResult 统一结果接口
  * 用于规范化不同工具的输出格式
@@ -16,8 +18,10 @@ export interface UnifiedResult {
   type: 'file' | 'symbol' | 'code' | 'documentation' | 'risk-assessment';
   /** 文件路径 */
   file: string;
-  /** 行号（可选） */
+  /** 行号（可选）- 保留向后兼容，建议使用 location */
   line?: number;
+  /** 结构化位置信息（新增） */
+  location?: SourceLocation;
   /** 截断后的内容 */
   content: string;
   /** 归一化相关度（0-1） */
@@ -113,6 +117,8 @@ export interface AnalyzeArgs {
   includeTests?: boolean;
   includeGitHistory?: boolean;
   json?: boolean;
+  /** 输出完全结构化的 JSON（不包含自然语言字符串） */
+  structured?: boolean;
   outputMode?: 'machine' | 'human';
 }
 

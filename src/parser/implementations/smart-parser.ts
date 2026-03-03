@@ -38,7 +38,7 @@ export class SmartParser implements IParser {
     const dependencies = this.extractDependencies(imports, exports);
     const typeInfo = this.extractTypeInfo(sourceFile);
     const callGraph = this.extractCallGraph(sourceFile);
-    const complexity = this.calculateComplexity(sourceFile);
+    const complexity = this.calculateComplexity(sourceFile, content);
 
     return {
       path: filePath,
@@ -1452,7 +1452,7 @@ export class SmartParser implements IParser {
   /**
    * 计算复杂度
    */
-  private calculateComplexity(sourceFile: ts.SourceFile): ComplexityMetrics {
+  private calculateComplexity(sourceFile: ts.SourceFile, content: string): ComplexityMetrics {
     let cyclomatic = 1;
     let cognitive = 0;
     const details: ComplexityMetrics['details']['functions'] = [];
@@ -1500,10 +1500,28 @@ export class SmartParser implements IParser {
 
     visit(sourceFile, 0);
 
+    // 计算代码行数和注释比例
+    const lines = content.split('\n');
+    let codeLines = 0;
+    let commentLines = 0;
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed === '') continue;
+      if (trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+        commentLines++;
+      } else {
+        codeLines++;
+      }
+    }
+    const commentRatio = codeLines > 0 ? commentLines / (codeLines + commentLines) : 0;
+    
+    // 计算可维护性指数
+    const maintainability = this.calculateMaintainabilityIndex(codeLines, cyclomatic, commentRatio);
+
     return {
       cyclomatic,
       cognitive,
-      maintainability: 85,
+      maintainability,
       details: { functions: details.slice(0, 10) }
     };
   }
@@ -1568,6 +1586,39 @@ export class SmartParser implements IParser {
 
     return cognitive;
   }
+  /**
+   * 计算可维护性指数 (Microsoft Maintainability Index)
+   * 
+   * 基于微软的可维护性指数公式进行适应性调整：
+   * MI = MAX(0, (171 - 5.2 * ln(Halstead Volume) - 0.23 * Cyclomatic - 16.2 * ln(LOC)) * 100 / 171)
+   * 
+   * 简化版本（无需 Halstead Volume）：
+   * - 基于圈复杂度和代码行数计算
+   * - 结果范围 0-100
+   * - 考虑了文件大小和复杂度的平衡
+   */
+  private calculateMaintainabilityIndex(loc: number, cyclomatic: number, commentRatio: number): number {
+    // 规范化输入
+    const normalizedLOC = Math.max(1, loc);
+    const normalizedCC = Math.max(1, cyclomatic);
+    
+    // 基础分 100
+    let mi = 100;
+    
+    // 圈复杂度惩罚（每点复杂度减少2分）
+    mi -= (normalizedCC - 1) * 2;
+    
+    // 代码行数惩罚（对数缩放，避免大文件过度惩罚）
+    // 100行: -5分, 500行: -15分, 1000行: -20分
+    mi -= Math.log(normalizedLOC / 10 + 1) * 5;
+    
+    // 注释奖励（最多+15分）
+    mi += commentRatio * 15;
+    
+    // 确保结果在 0-100 范围内
+    return Math.max(0, Math.min(100, Math.round(mi)));
+  }
+
 
   /**
    * 获取模块类型

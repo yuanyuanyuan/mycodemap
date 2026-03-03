@@ -9,6 +9,7 @@ import { ImpactCommand } from './impact.js';
 import { DepsCommand } from './deps.js';
 import { ComplexityCommand } from './complexity.js';
 import type { AnalyzeArgs, IntentType, CodemapOutput, UnifiedResult, Confidence } from '../../orchestrator/types.js';
+import type { SourceLocation } from '../../types/index.js';
 import { resolveTestFile } from '../../orchestrator/test-linker.js';
 import { ToolOrchestrator } from '../../orchestrator/tool-orchestrator.js';
 import { ResultFusion } from '../../orchestrator/result-fusion.js';
@@ -184,18 +185,45 @@ export class AnalyzeCommand {
       };
     }
 
+    // 为结果添加 location 字段
+    const resultsWithLocation = this.enrichWithLocation(orchestratedResults);
+
     return {
       schemaVersion: 'v1.0.0',
       intent: intent as IntentType,
       tool: 'codemap-orchestrated',
       confidence,
-      results: orchestratedResults,
+      results: resultsWithLocation,
       metadata: {
         total: orchestratedResults.length,
         scope,
         resultCount: orchestratedResults.length,
       },
     };
+  }
+
+  /**
+   * 为 UnifiedResult 添加 location 字段
+   */
+  private enrichWithLocation(results: UnifiedResult[]): UnifiedResult[] {
+    return results.map(result => {
+      // 如果已经有 line 字段，构建完整的 location
+      if (result.line && result.line > 0) {
+        const location: SourceLocation = {
+          file: result.file,
+          line: result.line,
+          column: 1, // 默认列号
+        };
+        return { ...result, location };
+      }
+      // 否则只添加 file
+      const location: SourceLocation = {
+        file: result.file,
+        line: 1,
+        column: 1,
+      };
+      return { ...result, location };
+    });
   }
 
   /**
@@ -220,7 +248,10 @@ export class AnalyzeCommand {
       level: confidenceScore >= 0.7 ? 'high' : confidenceScore >= 0.4 ? 'medium' : 'low',
     };
 
-    const typedResults = resultsWithTests as UnifiedResult[];
+    // 添加 location 字段
+    const resultsWithLocation = this.enrichWithLocation(resultsWithTests as UnifiedResult[]);
+
+    const typedResults = resultsWithLocation;
 
     // 输出格式处理
     if (this.args.outputMode === 'machine' || this.args.json) {
@@ -290,7 +321,10 @@ export class AnalyzeCommand {
       level: confidenceScore >= 0.7 ? 'high' : confidenceScore >= 0.4 ? 'medium' : 'low',
     };
 
-    const typedResults = resultsWithTests as UnifiedResult[];
+    // 添加 location 字段
+    const resultsWithLocation = this.enrichWithLocation(resultsWithTests as UnifiedResult[]);
+
+    const typedResults = resultsWithLocation;
 
     // 输出格式处理
     if (this.args.outputMode === 'machine' || this.args.json) {
@@ -343,7 +377,10 @@ export class AnalyzeCommand {
       level: confidenceScore >= 0.7 ? 'high' : confidenceScore >= 0.4 ? 'medium' : 'low',
     };
 
-    const typedResults = resultsWithTests as UnifiedResult[];
+    // 添加 location 字段
+    const resultsWithLocation = this.enrichWithLocation(resultsWithTests as UnifiedResult[]);
+
+    const typedResults = resultsWithLocation;
 
     // 输出格式处理
     if (this.args.outputMode === 'machine' || this.args.json) {
@@ -405,13 +442,16 @@ export class AnalyzeCommand {
 
     const resultsArray = results as Array<{
       file: string;
+      line?: number;
+      location?: SourceLocation;
       content: string;
       relevance: number;
       metadata?: Record<string, unknown>;
     }>;
 
     for (const result of resultsArray) {
-      console.log(chalk.cyan(`📁 ${result.file}`));
+      const lineInfo = result.location?.line ? `:${result.location.line}` : '';
+      console.log(chalk.cyan(`📁 ${result.file}${lineInfo}`));
       console.log(`   ${result.content}`);
       console.log(chalk.gray(`   相关度: ${(result.relevance * 100).toFixed(1)}%`));
       if (result.metadata?.testFile) {
@@ -465,6 +505,10 @@ export function parseAnalyzeArgs(argv: string[]): AnalyzeArgs {
           type: 'boolean',
           default: false,
         },
+        structured: {
+          type: 'boolean',
+          default: false,
+        },
         'output-mode': {
           type: 'string',
         },
@@ -490,6 +534,7 @@ export function parseAnalyzeArgs(argv: string[]): AnalyzeArgs {
       includeTests: values['include-tests'] as boolean,
       includeGitHistory: values['include-git-history'] as boolean,
       json: values.json as boolean,
+      structured: values.structured as boolean,
       outputMode: values['output-mode'] as AnalyzeArgs['outputMode'],
     };
   } catch {
@@ -516,13 +561,27 @@ export async function analyzeCommand(argv: string[]): Promise<void> {
     const output = await command.execute();
 
     if (args.outputMode === 'machine' || args.json) {
-      console.log(JSON.stringify(output, null, 2));
+      // 如果是 structured 模式，移除 content 字段（自然语言描述）
+      if (args.structured) {
+        const structuredOutput = JSON.parse(JSON.stringify(output)) as CodemapOutput;
+        if (structuredOutput.results) {
+          structuredOutput.results = structuredOutput.results.map(r => {
+            const { content, ...rest } = r;
+            void content; // 标记为有意忽略的变量
+            return rest as UnifiedResult;
+          });
+        }
+        console.log(JSON.stringify(structuredOutput, null, 2));
+      } else {
+        console.log(JSON.stringify(output, null, 2));
+      }
     } else {
       // human 模式：打印格式化输出
       const typedOutput = output as CodemapOutput;
       console.log(chalk.bold(`\n📊 ${typedOutput.intent?.toUpperCase() || 'ANALYSIS'} 分析结果\n`));
       for (const result of typedOutput.results || []) {
-        console.log(chalk.cyan(`📁 ${result.file}${result.line ? `:${result.line}` : ''}`));
+        const lineInfo = result.location?.line ? `:${result.location.line}` : '';
+        console.log(chalk.cyan(`📁 ${result.file}${lineInfo}`));
         console.log(`   ${result.content}`);
         console.log(chalk.gray(`   相关度: ${(result.relevance * 100).toFixed(1)}%`));
         if (result.metadata?.testFile) {
@@ -562,6 +621,7 @@ ${chalk.bold('选项:')}
   --include-tests             包含测试文件
   --include-git-history       包含 Git 历史
   --json                     JSON 格式输出
+  --structured               输出完全结构化的 JSON（移除自然语言字符串）
   --output-mode <mode>       输出模式 (machine|human)
   -h, --help                 显示帮助
 
@@ -569,6 +629,7 @@ ${chalk.bold('示例:')}
   codemap analyze -i impact -t src/index.ts
   codemap analyze -i dependency -t src/utils --scope transitive --json
   codemap analyze -i complexity -t src/ --include-tests
+  codemap analyze -i search -k "SourceLocation" --json --structured
 `);
 }
 

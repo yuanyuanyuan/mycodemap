@@ -59,6 +59,7 @@ program
   .option('-S, --search <word>', '模糊搜索')
   .option('-l, --limit <number>', '限制结果数量', '50')
   .option('-j, --json', 'JSON 格式输出')
+  .option('--structured', '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 使用）')
   .option('-v, --verbose', '显示性能指标')
   .option('-r, --regex', '使用正则表达式搜索（仅适用于 -S/--search）')
   .option('-c, --context <lines>', '显示代码上下文行数', '0')
@@ -73,6 +74,7 @@ program
   .description('分析项目模块依赖关系')
   .option('-m, --module <path>', '查看指定模块的依赖')
   .option('-j, --json', 'JSON 格式输出')
+  .option('--structured', '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 使用）')
   .action(depsCommand);
 
 program
@@ -80,6 +82,7 @@ program
   .description('检测项目中的循环依赖')
   .option('-d, --depth <number>', '检测深度', '5')
   .option('-j, --json', 'JSON 格式输出')
+  .option('--structured', '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 使用）')
   .action(cyclesCommand);
 
 program
@@ -88,6 +91,7 @@ program
   .option('-f, --file <path>', '查看指定文件的复杂度')
   .option('-d, --detail', '显示函数级复杂度详情（使用 AST 精确分析）')
   .option('-j, --json', 'JSON 格式输出')
+  .option('--structured', '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 使用）')
   .action(complexityCommand);
 
 program
@@ -96,6 +100,7 @@ program
   .option('-f, --file <path>', '指定要分析的文件（必填）')
   .option('-t, --transitive', '包含传递依赖')
   .option('-j, --json', 'JSON 格式输出')
+  .option('--structured', '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 使用）')
   .action(impactCommand);
 
 program
@@ -109,6 +114,7 @@ program
   .option('--include-tests', '包含测试文件')
   .option('--include-git-history', '包含 Git 历史')
   .option('--json', 'JSON 格式输出')
+  .option('--structured', '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 或 --output-mode=machine 使用）')
   .option('--output-mode <mode>', '输出模式 (machine|human)')
   .action(async () => {
     // 跳过 program name 和 command name

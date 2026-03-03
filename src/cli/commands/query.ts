@@ -23,6 +23,8 @@ interface QueryOptions {
   context?: number;
   // 新增：包含引用信息
   includeReferences?: boolean;
+  // 新增：结构化输出模式（完全结构化，移除自然语言字符串）
+  structured?: boolean;
 }
 
 interface QueryResult {
@@ -127,6 +129,19 @@ interface DependencyEntry {
   name: string;
   sourcePath: string;
   type: 'dependency' | 'import';
+}
+
+/**
+ * 标准化依赖名称，用于去重比较
+ * 1. 去除扩展名（如 .ts, .js）
+ * 2. 去除 ./ 前缀
+ * 3. 转换为小写
+ */
+function normalizeDependencyName(name: string): string {
+  return name
+    .replace(/\.[jt]s$/, "")      // 去除 .ts 或 .js 扩展名
+    .replace(/^\.\//, "")         // 去除 ./ 前缀
+    .toLowerCase();
 }
 
 /**
@@ -237,12 +252,25 @@ function buildIndex(codeMap: CodeMap, rootDir: string): SymbolIndex {
       }
     }
 
-    // 索引依赖
+    // 索引依赖和导入，进行去重处理
+    // 使用 Set 跟踪当前模块已添加的依赖（基于标准化名称）
+    const seenDeps = new Set<string>();
+
+    // 先索引 dependencies（优先保留）
     for (const dep of module.dependencies) {
+      const normalizedDep = normalizeDependencyName(dep);
+      const depKey = `${relativePath}:${normalizedDep}`;
+      
+      // 跳过已存在的依赖
+      if (seenDeps.has(depKey)) {
+        continue;
+      }
+      seenDeps.add(depKey);
+
       const depEntry: DependencyEntry = {
         name: dep,
         sourcePath: relativePath,
-        type: 'dependency',
+        type: "dependency",
       };
 
       const lowerDep = dep.toLowerCase();
@@ -252,12 +280,21 @@ function buildIndex(codeMap: CodeMap, rootDir: string): SymbolIndex {
       index.dependencies.get(lowerDep)!.push(depEntry);
     }
 
-    // 索引导入
+    // 再索引 imports（如果与 dependency 重复则跳过）
     for (const imp of module.imports) {
+      const normalizedSource = normalizeDependencyName(imp.source);
+      const impKey = `${relativePath}:${normalizedSource}`;
+      
+      // 跳过已存在的依赖（避免与 dependency 重复）
+      if (seenDeps.has(impKey)) {
+        continue;
+      }
+      seenDeps.add(impKey);
+
       const impEntry: DependencyEntry = {
         name: imp.source,
         sourcePath: relativePath,
-        type: 'import',
+        type: "import",
       };
 
       const lowerSource = imp.source.toLowerCase();
@@ -730,9 +767,22 @@ function search(
 /**
  * 格式化输出结果
  */
-function formatResults(result: QueryResult, isJson: boolean, verbose: boolean): void {
+function formatResults(result: QueryResult, isJson: boolean, verbose: boolean, structured: boolean = false): void {
   if (isJson) {
-    console.log(JSON.stringify(result, null, 2));
+    // 如果是 structured 模式，移除 details 字段
+    if (structured) {
+      const structuredResult = {
+        ...result,
+        results: result.results.map(item => {
+          const { details, ...rest } = item;
+          void details; // 标记为有意忽略的变量
+          return rest;
+        })
+      };
+      console.log(JSON.stringify(structuredResult, null, 2));
+    } else {
+      console.log(JSON.stringify(result, null, 2));
+    }
     return;
   }
 
@@ -891,5 +941,5 @@ export async function queryCommand(options: QueryOptions) {
   }
 
   // 输出结果
-  formatResults(result, options.json || false, verbose);
+  formatResults(result, options.json || false, verbose, options.structured || false);
 }
