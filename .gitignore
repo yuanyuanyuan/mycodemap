@@ -144,3 +144,8 @@ codemap-output/
 
 .worktrees/
 custom-output/
+# ============================================
+# Triad Task Generation (工作流生成文件)
+# ============================================
+.tasks/
+src/parser/implementations/*.backup
