@@ -86,7 +86,6 @@
 │   │   ├── intent-router.ts      # 意图路由
 │   │   ├── test-linker.ts        # 测试关联器
 │   │   ├── git-analyzer.ts       # Git 分析器
-│   │   ├── ai-feed-generator.ts  # AI 饲料生成器
 │   │   ├── file-header-scanner.ts
 │   │   ├── commit-validator.ts
 │   │   └── types.ts
@@ -108,10 +107,6 @@
 │   │   ├── plugin-registry.ts
 │   │   ├── plugin-loader.ts
 │   │   └── built-in/             # 内置插件
-│   ├── ai/                       # AI 集成层
-│   │   ├── provider.ts
-│   │   ├── claude.ts
-│   │   └── codex.ts
 │   ├── worker/                   # 工作线程
 │   │   ├── index.ts
 │   │   └── parse-worker.ts
@@ -329,7 +324,7 @@ export default defineConfig({
 **pre-commit**：
 1. 运行与变更相关的测试（失败阻断提交）
 2. 检查文件头注释 `[META]`/`[WHY]`（失败阻断提交）
-3. 生成 AI 饲料（警告级，不阻断）
+3. 生成代码地图（警告级，不阻断）
 
 **commit-msg**：
 - 强制提交格式：`[TAG] scope: message`
@@ -347,7 +342,7 @@ export default defineConfig({
 4. 运行测试（`npm test`）
 5. 检查提交格式（`codemap ci check-commits`）
 6. 检查文件头（`codemap ci check-headers`）
-7. 生成 AI 饲料并验证同步
+7. 生成代码地图并验证同步
 8. 风险评估（`codemap ci assess-risk`）
 9. 检查输出契约（`codemap ci check-output-contract`）
 
@@ -654,7 +649,6 @@ Prefer retrieval-led reasoning over pre-training-led reasoning for any tasks.
 | `context/` | 各模块的详细上下文 |
 | `codemap.json` | 完整的结构化 JSON 数据 |
 | `dependency-graph.md` | Mermaid 格式的依赖关系图 |
-| `ai-feed.txt` | AI 饲料文件（v2.4 新增） |
 | `logs/` | CodeMap 执行日志（v0.2+） |
 | `issues/` | 问题跟踪目录（v0.2+） |
 

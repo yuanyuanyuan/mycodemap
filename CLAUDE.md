@@ -77,14 +77,12 @@ src/
 │   ├── intent-router.ts
 │   ├── test-linker.ts
 │   ├── git-analyzer.ts
-│   ├── ai-feed-generator.ts
 │   ├── file-header-scanner.ts
 │   └── commit-validator.ts
 ├── generator/              # Output generators (AI_MAP.md, JSON, Mermaid)
 ├── cache/                  # LRU cache + file hash cache
 ├── watcher/                # File watcher + daemon
 ├── plugins/                # Plugin system
-└── ai/                     # AI Provider abstraction
 ```
 
 ---
@@ -177,7 +175,7 @@ codemap ci check-output-contract                     # Validate output contract
 **pre-commit**:
 1. Run related tests (blocks if failed)
 2. Check file headers `[META]`/`[WHY]` (blocks if failed)
-3. Generate AI feed (warning, non-blocking)
+3. Generate code map (warning, non-blocking)
 
 **commit-msg**:
 - Format: `[TAG] scope: message`
@@ -195,7 +193,7 @@ Steps:
 4. Run tests (`npm test`)
 5. Check commit format (`codemap ci check-commits`)
 6. Check file headers (`codemap ci check-headers`)
-7. Generate AI feed and verify sync
+7. Generate code map and verify sync
 8. Risk assessment (`codemap ci assess-risk`)
 9. Check output contract
 
@@ -389,6 +387,5 @@ Running `codemap generate` produces (in `.codemap/`):
 | `context/` | Detailed context per module |
 | `codemap.json` | Complete structured JSON data |
 | `dependency-graph.md` | Mermaid dependency diagram |
-| `ai-feed.txt` | AI feed file (v2.4+) |
 | `logs/` | CodeMap execution logs |
 | `issues/` | Issue tracking for CodeMap bugs/enhancements |

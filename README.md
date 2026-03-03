@@ -87,7 +87,7 @@ codemap generate -o ./docs/codemap  # 指定输出目录
 |------|------|--------|
 | `-m, --mode <mode>` | 分析模式：`fast`（正则匹配）、`smart`（TypeScript AST）或 `hybrid`（自动选择） | `hybrid` |
 | `-o, --output <dir>` | 输出目录 | `.codemap` |
-| `--ai-context` | 为每个文件生成 AI 描述（需要配置 AI Provider） | - |
+| `--ai-context` | 为每个文件生成描述 | - |
 
 **模式说明：**
 
@@ -456,10 +456,6 @@ src/
   │   └── built-in/     # 内置插件
   │       ├── complexity-analyzer.ts # 复杂度分析
   │       └── call-graph.ts          # 调用图分析
-  ├── ai/               # AI 集成层
-  │   ├── provider.ts   # AI Provider 抽象
-  │   ├── claude.ts     # Claude 适配器
-  │   └── codex.ts      # Codex 适配器
   └── types/            # 类型定义
       └── index.ts      # 核心类型
 ```
