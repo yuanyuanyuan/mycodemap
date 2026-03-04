@@ -1,135 +1,57 @@
-# Task Plan: 实现 POST_TASK_PLAN.md 后续任务
+# Task Plan: Review 并合并 NPM 发布设计方案
 
 ## Goal
-实现 CodeMap POST_TASK_PLAN.md 中的所有后续任务，包括文档更新、WorkflowResultFusion、PhaseInheritance、E2E测试等功能模块。
+对 `docs/archive/PUBLISH_NPM_DESIGN_V1.md` 与 `docs/archive/PUBLISH_NPM_DESIGN_V2.md` 做第三方设计评审，给出带证据（本地代码 + 官方最佳实践）的问题与建议；在用户确认后，合并为一份可执行的最终设计文档，并补充实施执行附录与覆盖矩阵。
+
+## Scope & Constraints
+- 只评审 NPM 发布相关设计，不扩展到无关重构。
+- 证据必须可追溯到本地文件行号或官方文档 URL。
+- 先评审与确认，再执行合并。
 
 ## Current Phase
 COMPLETE ✅
 
 ## Phases
 
-### Phase 1: Requirements & Discovery
-- [x] 阅读 POST_TASK_PLAN.md 了解任务全貌
-- [x] 阅读相关设计文档
-- **Status:** complete
+### Phase 1: 资料收集与基线核对
+- [x] 阅读两份设计文档并提取差异
+- [x] 核对项目当前代码与配置现状
+- [x] 收集 npm/Node/TypeScript/发布流程官方最佳实践证据
+- Status: complete
 
-### Phase 2: P0 任务 - README 文档更新
-- [x] 更新 README.md 工作流文档
-- **Status:** complete
+### Phase 2: 第三方评审输出
+- [x] 给出系统设计风险（高/中/低）
+- [x] 给出实施风险（高/中/低）
+- [x] 每条意见附证据标签与来源
+- [x] 与用户确认评审意见
+- Status: complete
 
-### Phase 3: P1 任务 - 核心扩展功能
-- [x] T003: WorkflowResultFusion
-- [x] T004: PhaseInheritance
-- [x] T005: E2E集成测试
-- **Status:** complete
+### Phase 3: 合并最终文档
+- [x] 生成统一版设计文档结构
+- [x] 合并/修订冲突项与遗漏项
+- [x] 自检文档可执行性（DoD、失败场景、验证步骤）
+- Status: complete
 
-### Phase 4: P2 任务 - 高级功能
-- [x] T006: WorkflowTestLinker (PHASE_TEST_STRATEGY)
-- [x] T007: WorkflowGitAnalyzer (PHASE_GIT_CONFIG)
-- [x] T008: WorkflowCIExecutor (7种CI检查)
-- **Status:** complete
+### Phase 4: 收尾与同步检查
+- [x] 检查是否需同步更新 `AGENTS.md` / `README.md` / `CLAUDE.md` / `docs/`
+- [x] 更新 progress 与 findings
+- Status: complete
 
-### Phase 5: P3 任务 - 可视化与模板
-- [x] T009: 工作流可视化 UI
-  - [x] 工作流状态可视化 (ASCII 图表)
-  - [x] 阶段进度图表
-  - [x] 结果展示界面
-- [x] T010: 工作流模板系统
-  - [x] 预定义工作流模板 (refactoring, bugfix, feature, hotfix)
-  - [x] 模板加载和保存
-- **Status:** complete
+## Definition of Done
+- 输出一份经确认的评审结论（含证据）
+- 产出一份最终设计方案文档（可直接用于实施）
+- 明确至少 1 个失败场景及规避方案
 
-### Phase 6: 验收与交付
-- [x] TypeScript 类型检查通过
-- [x] 单元测试通过 (723/723)
-- [x] E2E 测试 (15/21 通过，6 个失败为已有测试代码问题)
-- [x] 代码提交
-- **Status:** complete
+## Deliverables
+- 新增：`docs/PUBLISH_NPM_DESIGN_FINAL.md`（最终合并版）
+- 归档：`docs/archive/PUBLISH_NPM_DESIGN_V1.md`、`docs/archive/PUBLISH_NPM_DESIGN_V2.md`
+- 已确认：基线为“scoped 包 + 双前缀兼容一版 + 两阶段实施（P0/P1）”
 
-## 实现状态汇总
+## Risks
+- 全量改名仍存在潜在遗漏，需在实施阶段通过回归测试覆盖。
+- Trusted publishing 依赖仓库与 npm 侧配置正确绑定。
 
-| 优先级 | 任务ID | 任务描述 | 状态 | 实现文件 | 大小 |
-|--------|--------|----------|------|----------|------|
-| P0 | T002 | README.md 更新 | ✅ | README.md | 17.5KB |
-| P1 | T003 | WorkflowResultFusion | ✅ | workflow/result-fusion.ts | 9.2KB |
-| P1 | T004 | PhaseInheritance | ✅ | workflow/phase-inheritance.ts | 10.1KB |
-| P1 | T005 | E2E集成测试 | ✅ | tests/e2e/workflow.e2e.test.ts | 16.9KB |
-| P2 | T006 | WorkflowTestLinker | ✅ | workflow/test-linker.ts | 13.2KB |
-| P2 | T007 | WorkflowGitAnalyzer | ✅ | workflow/git-analyzer.ts | 16.8KB |
-| P2 | T008 | WorkflowCIExecutor | ✅ | workflow/ci-executor.ts | 15.4KB |
-| P3 | T009 | 工作流可视化 UI | ✅ | workflow/visualizer.ts | 14.9KB |
-| P3 | T010 | 工作流模板系统 | ✅ | workflow/templates.ts | 17.4KB |
-
-**总计:** 9 个任务完成，8 个新模块，约 115KB 代码
-
-## Key Decisions
-
-| Decision | Rationale |
-|----------|-----------|
-| 使用 planning-with-files 技能 | 复杂多步骤任务需要持久化跟踪 |
-| 按 P0→P1→P2→P3 顺序实现 | 符合依赖关系和交付里程碑 |
-| 采用阶段策略映射模式 | 设计文档定义了清晰的阶段配置 |
-| T009 终端可视化 | CLI 工具使用 ASCII 图表展示状态 |
-| T010 模板系统 | 支持常见开发场景的预配置工作流 |
-
-## T009: WorkflowVisualizer 功能
-
-```
-workflow visualize           # 完整工作流可视化
-workflow visualize --timeline   # 时间线视图
-workflow visualize --results    # 结果表格
-```
-
-- 工作流管道流程图 (6 阶段)
-- 进度条显示
-- 阶段详情展示
-- 结果表格 (Rank/File/Score/Type)
-- 时间线渲染
-- 工作流对比
-
-## T010: WorkflowTemplates 功能
-
-```
-workflow start <task> --template <name>
-workflow template list
-workflow template info <name>
-workflow template recommend <task>
-```
-
-内置模板:
-- **refactoring**: 标准重构流程 (6 阶段)
-- **bugfix**: 快速 Bug 修复 (4 阶段)
-- **feature**: 新功能开发 (6 阶段)
-- **hotfix**: 紧急热修复 (4 阶段)
-
-## 验收结果
-
-| 检查项 | 状态 | 备注 |
-|--------|------|------|
-| TypeScript 类型检查 | ✅ | 无错误 |
-| 单元测试 | ✅ | 723/723 通过 |
-| E2E 测试 | ⚠️ | 15/21 通过 (6 个已有测试代码问题) |
-| 代码质量 | ✅ | 符合项目规范 |
-| 文档完整性 | ✅ | 所有文件含 [META]/[WHY] |
-
-## 新文件清单
-
-```
-src/orchestrator/workflow/
-├── visualizer.ts       # T009: 工作流可视化 (NEW)
-├── templates.ts        # T010: 工作流模板系统 (NEW)
-└── index.ts            # 更新导出
-
-src/cli/commands/
-└── workflow.ts         # 更新 CLI 命令 (添加 visualize/template)
-```
-
-## 总结
-
-✅ **Phase 5 已完成** - 所有 P3 任务实现完毕
-✅ **全部任务完成** - P0/P1/P2/P3 共 9 个任务
-✅ **代码质量通过** - 类型检查 + 单元测试全通过
-✅ **功能完整** - 可视化 + 模板系统 + CLI 集成
-
----
-*Task Plan completed following superpower workflow*
+## Errors Encountered
+| Error | Attempt | Resolution |
+|---|---:|---|
+| 临时 Python 小脚本语法错误（括号/字符串） | 1 | 修正脚本后重跑成功 |

@@ -1,86 +1,19 @@
-# Progress Log: POST_TASK_PLAN 实现
+# Progress Log
 
-## Session: 2026-03-03
-
-### Phase 1: Requirements & Discovery
-- **Status:** complete
-
-### Phase 2: P0 任务 - README 文档更新
-- **Status:** complete ✅ COMMITTED
-
-### Phase 3: P1 任务 - 核心扩展功能
-- **Status:** complete ✅ ALL COMMITTED
-
-### Phase 4: P2 任务 - 高级功能
-- **Status:** complete ✅ ALL COMMITTED
-
-### Phase 5: P3 任务 - 可视化与模板
-- **Status:** complete ✅ COMMITTED
-- T009: 工作流可视化 UI - ✅ 实现完成
-- T010: 工作流模板系统 - ✅ 实现完成
-
-### Phase 6: 验收与交付
-- **Status:** in-progress
-- TypeScript 类型检查: ✅ 通过
-- 单元测试: ✅ 723/723 通过
-- 性能验收: ⏳ 待验证 (Hit@8, Token 降低)
-
----
-
-## Commit History
-
-| Commit | Task | Message |
-|--------|------|---------|
-| `78942d7` | T002 | [DOCS] readme: add workflow orchestration documentation |
-| `6b36c2d` | T003 | [FEATURE] workflow: implement WorkflowResultFusion |
-| `1a22635` | T004 | [FEATURE] workflow: implement PhaseInheritance |
-| `2297ce2` | T005 | [FEATURE] e2e: add workflow integration tests |
-| `d6613d4` | T006 | [FEATURE] workflow: implement WorkflowTestLinker |
-| `20a2b22` | T007 | [FEATURE] workflow: implement WorkflowGitAnalyzer |
-| `63b995b` | T008 | [FEATURE] workflow: implement WorkflowCIExecutor |
-| `2471320` | - | [REFACTOR] workflow: export new modules |
-| `TBD` | T009 | [FEATURE] workflow: implement WorkflowVisualizer |
-| `TBD` | T010 | [FEATURE] workflow: implement WorkflowTemplates |
-
----
-
-## Test Results
-
-| Test | Input | Expected | Actual | Status |
-|------|-------|----------|--------|--------|
-| All commits | 8 commits | 通过 pre-commit hooks | 全部通过 | ✅ |
-| TypeScript 类型检查 | npm run typecheck | 无错误 | 通过 | ✅ |
-| 文件头注释 | [META]/[WHY] | 所有新文件已添加 | 通过 | ✅ |
-| 单元测试 | 723 tests | 全部通过 | 723/723 | ✅ |
-| 新模块测试 | visualizer, templates | 编译通过 | 通过 | ✅ |
-
----
-
-## Phase 5 实现详情
-
-### T009: WorkflowVisualizer (src/orchestrator/workflow/visualizer.ts)
-- 工作流状态可视化 (ASCII 图表)
-- 阶段进度图表 (进度条)
-- 结果展示界面 (表格)
-- 时间线渲染
-- 工作流对比
-
-### T010: WorkflowTemplates (src/orchestrator/workflow/templates.ts)
-- 4 个预定义模板: refactoring, bugfix, feature, hotfix
-- WorkflowTemplateManager 类
-- 模板保存/加载功能
-- 模板推荐系统
-- CLI 集成 (workflow template 子命令)
-
-### CLI 更新 (src/cli/commands/workflow.ts)
-- `workflow visualize` - 可视化工作流
-- `workflow visualize --timeline` - 时间线视图
-- `workflow visualize --results` - 结果表格
-- `workflow template list` - 列出模板
-- `workflow template info <name>` - 模板详情
-- `workflow template recommend <task>` - 推荐模板
-- `workflow start --template <name>` - 使用模板启动
-
----
-
-*Update after completing each phase or encountering errors*
+## 2026-03-04
+- 已读取并启用 `using-superpowers` 与 `planning-with-files` 技能说明。
+- 已执行 session catchup，发现上次会话对 V2 文档有未同步上下文提示。
+- 已初始化本任务的 `task_plan.md` / `findings.md` / `progress.md`。
+- 下一步：阅读两份设计文档并构建差异清单。
+- 已完整阅读 V2（390 行）与 V1 的关键章节（目标、包配置、平台检测、report、实施步骤、风险）。
+- 已核对本地关键实现文件：`package.json`、`src/cli/index.ts`、`src/cli/commands/init.ts`、`src/cli/runtime-logger.ts`、`.githooks/pre-commit`、CI workflow。
+- 已使用 CodeMap CLI 执行模块/符号检索作为辅助索引验证。
+- 已补充官方文档证据：npm package.json/files、npm publish、scoped publish、trusted publishing/OIDC、Node exports。
+- 已执行 `npm pack --dry-run --json` 进行预测试，确认发布包缺失 `LICENSE`/schema/CHANGELOG（当前仓库实测）。
+- 当前进入“输出评审意见并向用户确认”的阶段。
+- 用户已确认合并基线（“同意”）。
+- 已完成两份设计文档合并并生成最终版：`docs/PUBLISH_NPM_DESIGN_FINAL.md`。
+- 已更新 task_plan/findings/progress 状态为完成。
+- 响应新增需求：已在 `docs/PUBLISH_NPM_DESIGN_FINAL.md` 增补实施执行附录（Runbook）与 V1/V2 覆盖矩阵。
+- 已将 V1/V2 文档迁移至 `docs/archive/` 并同步修正 V3 内引用路径。
+- 当前状态：V3 可作为 docs 目录内唯一实施基线文档。
