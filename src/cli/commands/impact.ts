@@ -3,6 +3,7 @@
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
+import { resolveDataPath } from '../paths.js';
 import type { CodeMap, ModuleInfo } from '../../types/index.js';
 import type { UnifiedResult, HeatScore } from '../../orchestrator/types.js';
 
@@ -52,7 +53,7 @@ interface ImpactResult {
  * 加载代码地图数据
  */
 function loadCodeMap(rootDir: string): CodeMap | null {
-  const codemapPath = path.join(rootDir, '.codemap', 'codemap.json');
+  const codemapPath = resolveDataPath(rootDir);
 
   if (!fs.existsSync(codemapPath)) {
     return null;

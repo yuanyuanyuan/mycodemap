@@ -1,6 +1,10 @@
+// [META] since:2026-03 | owner:cli-team | stable:true
+// [WHY] Provide circular dependency detection command for CLI
+
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
+import { resolveDataPath } from '../paths.js';
 import type { CodeMap, ModuleInfo } from '../../types/index.js';
 
 interface CyclesOptions {
@@ -12,7 +16,7 @@ interface CyclesOptions {
  * 加载代码地图数据
  */
 function loadCodeMap(rootDir: string): CodeMap | null {
-  const codemapPath = path.join(rootDir, '.codemap', 'codemap.json');
+  const codemapPath = resolveDataPath(rootDir);
 
   if (!fs.existsSync(codemapPath)) {
     console.log(chalk.red('❌ 代码地图不存在，请先运行 codemap generate'));

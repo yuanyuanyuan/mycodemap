@@ -4,6 +4,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { analyze } from '../../core/analyzer.js';
 import { generateAIMap, generateJSON, generateContext, generateMermaidGraph } from '../../generator/index.js';
+import { resolveOutputDir } from '../paths.js';
 import type { AnalysisOptions } from '../../types/index.js';
 
 export async function generateCommand(options: {
@@ -14,7 +15,7 @@ export async function generateCommand(options: {
   'ai-context'?: boolean;
 }) {
   const mode = (options.mode as 'fast' | 'smart' | 'hybrid') || 'hybrid';
-  const outputDir = options.output || '.codemap';
+  const { outputDir, isLegacy } = resolveOutputDir(options.output);
 
   // 显示模式信息
   if (mode === 'hybrid') {
@@ -23,14 +24,19 @@ export async function generateCommand(options: {
     console.log(chalk.blue(`🔍 使用 ${mode} 模式生成代码地图...`));
   }
 
+  // 显示迁移提示（如果使用旧路径）
+  if (isLegacy) {
+    console.warn(chalk.yellow('⚠️  检测到使用旧目录 .codemap，请迁移到 .mycodemap'));
+  }
+
   const spinner = ora('扫描项目文件...').start();
 
   try {
-    // 执行分析
+    // 执行分析（保持原始 output 传递以向后兼容）
     const analysisOptions: AnalysisOptions = {
       mode,
       rootDir: process.cwd(),
-      output: outputDir
+      output: options.output || '.mycodemap'
     };
 
     const codeMap = await analyze(analysisOptions);

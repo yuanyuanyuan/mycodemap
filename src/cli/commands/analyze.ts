@@ -16,6 +16,7 @@ import { ResultFusion } from '../../orchestrator/result-fusion.js';
 import { CodemapAdapter } from '../../orchestrator/adapters/codemap-adapter.js';
 import { AstGrepAdapter } from '../../orchestrator/adapters/ast-grep-adapter.js';
 import { IntentRouter } from '../../orchestrator/intent-router.js';
+import { resolveOutputDir } from '../paths.js';
 
 /**
  * 错误码定义
@@ -144,7 +145,7 @@ export class AnalyzeCommand {
     const orchestrator = new ToolOrchestrator();
 
     // 注册适配器
-    const codemapAdapter = new CodemapAdapter({ codemapPath: '.codemap' });
+    const codemapAdapter = new CodemapAdapter({ codemapPath: resolveOutputDir().outputDir });
     const astGrepAdapter = new AstGrepAdapter();
     orchestrator.registerAdapter(codemapAdapter);
     orchestrator.registerAdapter(astGrepAdapter);

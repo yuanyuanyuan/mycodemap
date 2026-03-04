@@ -17,6 +17,7 @@ export enum CIErrorCode {
   E0008_MISSING_HEADER = 'E0008',
   E0009_MISSING_WHY = 'E0009',
   E0010_OUTPUT_CONTRACT_VIOLATION = 'E0010',
+  E0011_COMMIT_TOO_LARGE = 'E0011',
 }
 
 /**
@@ -27,7 +28,13 @@ export const CI_ERROR_MESSAGES: Record<CIErrorCode, string> = {
   [CIErrorCode.E0008_MISSING_HEADER]: '文件头缺少 [META] 注释',
   [CIErrorCode.E0009_MISSING_WHY]: '文件头缺少 [WHY] 注释',
   [CIErrorCode.E0010_OUTPUT_CONTRACT_VIOLATION]: '输出契约校验失败',
+  [CIErrorCode.E0011_COMMIT_TOO_LARGE]: 'Commit 包含文件数量超过限制',
 };
+
+/**
+ * 单 commit 文件数量限制
+ */
+const MAX_FILES_PER_COMMIT = 10;
 
 function parseGitDiffFiles(command: string): string[] {
   return command
@@ -279,6 +286,128 @@ async function assessRiskAction(options: { files?: string; threshold?: string })
 }
 
 /**
+ * check-commit-size 子命令 - 检查 commit 文件数量
+ * 规则: 单 commit 文件数量不能超过 10 个（初始化 commit 除外）
+ */
+async function checkCommitSizeAction(options: {
+  range?: string;
+  maxFiles?: string;
+}): Promise<void> {
+  const maxFiles = parseInt(options.maxFiles ?? String(MAX_FILES_PER_COMMIT), 10);
+  const { execSync } = await import('child_process');
+
+  // 检测是否存在 remote
+  let baseBranch = 'main';
+  try {
+    execSync('git remote get-url origin', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
+    baseBranch = 'origin/main';
+  } catch {
+    baseBranch = 'main';
+  }
+
+  const range = options.range || `${baseBranch}..HEAD`;
+
+  // 获取指定范围内的所有 commit
+  let commitHashes: string[] = [];
+  try {
+    const output = execSync(`git log --format=%H ${range}`, {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    commitHashes = output.split('\n').filter(Boolean);
+  } catch {
+    // 本地分支不存在 origin/main 时，使用最近 10 个提交
+    try {
+      const output = execSync('git log --format=%H -10', {
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      commitHashes = output.split('\n').filter(Boolean);
+    } catch {
+      console.log('No commits found for validation.');
+      return;
+    }
+  }
+
+  if (commitHashes.length === 0) {
+    console.log('No commits found for validation.');
+    return;
+  }
+
+  // 检查是否是仓库的第一个 commit（没有父提交）
+  let isInitialCommit = false;
+  try {
+    const firstCommit = commitHashes[commitHashes.length - 1];
+    const parentCount = execSync(`git cat-file -p ${firstCommit} | grep -c '^parent '`, {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+    // 如果第一个 commit 没有 parent，且这是唯一的 commit，认为是初始化 commit
+    if (parentCount === '0' && commitHashes.length === 1) {
+      isInitialCommit = true;
+    }
+  } catch {
+    // 忽略错误，继续检查
+  }
+
+  let hasErrors = false;
+  const largeCommits: { hash: string; message: string; fileCount: number }[] = [];
+
+  for (const hash of commitHashes) {
+    const message = execSync(`git log -1 --format=%s ${hash}`, {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+
+    const fileCount = parseInt(
+      execSync(`git diff-tree --no-commit-id --name-only -r ${hash} | wc -l`, {
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }).trim(),
+      10
+    );
+
+    if (fileCount > maxFiles) {
+      // 初始化 commit 豁免
+      if (hash === commitHashes[commitHashes.length - 1] && isInitialCommit) {
+        console.log(`PASS (init): ${hash.substring(0, 7)} - ${message} (${fileCount} files, init commit exempt)`);
+        continue;
+      }
+
+      largeCommits.push({ hash, message, fileCount });
+      console.error(`ERROR: ${CIErrorCode.E0011_COMMIT_TOO_LARGE}`);
+      console.error(`  Commit: ${hash.substring(0, 7)} - ${message}`);
+      console.error(`  Files: ${fileCount} (limit: ${maxFiles})`);
+      hasErrors = true;
+    } else {
+      console.log(`PASS: ${hash.substring(0, 7)} - ${message} (${fileCount} files)`);
+    }
+  }
+
+  if (hasErrors) {
+    console.error('');
+    console.error(`ERROR: ${largeCommits.length} commit(s) exceed file count limit (${maxFiles})`);
+    console.error('');
+    console.error('Large commits make code review difficult and increase rollback risk.');
+    console.error('Please split your changes into smaller, focused commits.');
+    console.error('');
+    console.error('Valid exceptions (requires justification in commit body):');
+    console.error('  - Bulk dependency updates with lock file changes');
+    console.error('  - Automated code generation results');
+    console.error('  - Mass refactoring with no logic changes');
+    console.error('');
+    console.error('To split a large commit:');
+    console.error('  git reset HEAD~1');
+    console.error('  git add -p        # Selectively stage files');
+    console.error(`  git commit -m '[TAG] scope: message'`);
+    console.error('');
+    process.exit(1);
+  }
+
+  console.log(`All ${commitHashes.length} commits pass file count check (limit: ${maxFiles})`);
+}
+
+/**
  * check-output-contract 子命令 - 验证输出契约
  */
 async function checkOutputContractAction(options: {
@@ -411,6 +540,13 @@ export function createCICommand(): Command {
     .option('-k, --top-k <number>', '期望的 Top-K 限制', '8')
     .option('-t, --max-tokens <number>', '每个结果的最大 token 数', '160')
     .action(checkOutputContractAction);
+
+  ci
+    .command('check-commit-size')
+    .description('检查 commit 文件数量是否超过限制（初始化 commit 除外）')
+    .option('-r, --range <range>', '检查指定 git log 范围，例如 origin/main..HEAD')
+    .option('-m, --max-files <number>', '最大允许的文件数量', '10')
+    .action(checkCommitSizeAction);
 
   return ci;
 }

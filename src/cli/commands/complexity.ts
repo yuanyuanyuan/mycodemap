@@ -4,6 +4,7 @@
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
+import { resolveDataPath } from '../paths.js';
 import type { CodeMap, ModuleInfo, SourceLocation } from '../../types/index.js';
 import type { UnifiedResult } from '../../orchestrator/types.js';
 import { analyzeFileComplexity, analyzeMultipleFiles, type FileComplexity, type FunctionComplexity } from '../../core/ast-complexity-analyzer.js';
@@ -53,7 +54,7 @@ export interface ComplexityResult {
  * 加载代码地图数据
  */
 function loadCodeMap(rootDir: string): CodeMap | null {
-  const codemapPath = path.join(rootDir, '.codemap', 'codemap.json');
+  const codemapPath = resolveDataPath(rootDir);
 
   if (!fs.existsSync(codemapPath)) {
     return null;
@@ -533,7 +534,7 @@ function formatComplexity(
  * 加载代码地图数据（兼容旧函数，带控制台输出）
  */
 function loadCodeMapWithOutput(rootDir: string): CodeMap | null {
-  const codemapPath = path.join(rootDir, '.codemap', 'codemap.json');
+  const codemapPath = resolveDataPath(rootDir);
 
   if (!fs.existsSync(codemapPath)) {
     console.log(chalk.red('❌ 代码地图不存在，请先运行 codemap generate'));
