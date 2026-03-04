@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mycodemap.dev/schema/config.json",
+  "title": "MyCodeMap Configuration",
+  "description": "Configuration schema for MyCodeMap CLI tool",
+  "type": "object",
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": ["fast", "smart"],
+      "default": "fast",
+      "description": "Parsing mode: fast (regex-based) or smart (TypeScript AST)"
+    },
+    "include": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": ["src/**/*"],
+      "description": "Glob patterns to include"
+    },
+    "exclude": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": ["node_modules/**", "dist/**", "**/*.test.ts", "**/*.spec.ts"],
+      "description": "Glob patterns to exclude"
+    },
+    "output": {
+      "type": "string",
+      "default": ".mycodemap",
+      "description": "Output directory for generated files"
+    },
+    "watch": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable watch mode for file changes"
+    }
+  },
+  "additionalProperties": false
+}
