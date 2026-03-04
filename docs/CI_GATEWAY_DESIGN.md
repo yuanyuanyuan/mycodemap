@@ -1,8 +1,8 @@
 # CI 门禁护栏详细设计
 
-> 版本: 1.2
+> 版本: 1.3
 > 所属模块: CI/CD - Git 工作流门禁
-> 日期: 2026-03-03
+> 日期: 2026-03-04
 
 ---
 
@@ -29,9 +29,11 @@
 | **本地** | 测试通过 | ❌ 阻止提交 | `npm test` |
 | **本地** | Commit 格式 | ❌ 阻止提交 | commit-msg hook |
 | **本地** | 文件头注释 | ❌ 阻止提交 | pre-commit hook |
+| **本地** | Commit 文件数量 | ❌ 阻止提交 | commit-msg hook / pre-commit hook |
 | **本地** | 生成代码地图 | ⚠️ 警告 | `codemap generate` |
 | **服务端** | 测试通过 | ❌ 阻止合并 | `npm test` |
 | **服务端** | Commit 格式 | ❌ 阻止合并 | `codemap ci check-commits` |
+| **服务端** | Commit 文件数量 | ❌ 阻止合并 | `codemap ci check-commit-size` |
 | **服务端** | 文件头注释 | ❌ 阻止合并 | `codemap ci check-headers` |
 | **服务端** | 代码地图同步 | ❌ 阻止合并 | `git diff --exit-code` |
 | **服务端** | 危险置信度 | ❌ 阻止合并 | `codemap ci assess-risk` |
@@ -46,109 +48,155 @@
 **文件**: `.git/hooks/commit-msg`
 
 ```bash
-#!/bin/bash
-# commit-msg hook - 验证 Commit 格式
-# 总代码量: ~30 行
+#!/bin/sh
+# Commit-msg hook: 验证 Commit 消息格式和文件数量
 
 MSG_FILE=$1
 MSG=$(head -1 "$MSG_FILE")
 
-# 极简正则: 必须以大写标签开头
-if ! echo "$MSG" | grep -qE "^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\\]"; then
-    echo "ERROR: 提交信息必须以大写标签开头"
-    echo ""
-    echo "格式: [TAG] scope: message"
-    echo ""
-    echo "允许的 TAG:"
-    echo "  [BUGFIX]   - 修复问题"
-    echo "  [FEATURE]  - 新功能"
-    echo "  [REFACTOR] - 重构"
-    echo "  [CONFIG]   - 配置变更"
-    echo "  [DOCS]     - 文档"
-    echo "  [DELETE]   - 删除代码"
-    echo ""
-    echo "示例:"
-    echo "  [BUGFIX] git-analyzer: fix risk score calculation"
-    echo "  [FEATURE] orchestrator: add confidence scoring"
+VALID_TAGS="BUGFIX FEATURE REFACTOR CONFIG DOCS DELETE"
+
+# 1. 检查 commit 格式
+if ! echo "$MSG" | grep -qE '^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]'; then
+    echo "ERROR: Commit message must start with an uppercase tag."
+    echo "Format: [TAG] scope: message"
+    echo "Valid tags: $VALID_TAGS"
     exit 1
 fi
 
-# 检查 scope 是否存在
-if ! echo "$MSG" | grep -qE "^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\\]\s+[^:]+:"; then
-    echo "ERROR: scope 不能为空"
-    echo "格式: [TAG] scope: message"
-    echo "示例: [FEATURE] git-analyzer: add new feature"
+if ! echo "$MSG" | grep -qE '^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]\s+[^:]+:\s+.+'; then
+    echo "ERROR: scope and message are required."
+    echo "Format: [TAG] scope: message"
+    echo "Example: [FEATURE] cli: add new command"
     exit 1
 fi
 
-echo "✓ Commit 格式验证通过"
+# 2. 检查 commit 文件数量（初始化 commit 除外）
+MAX_FILES_PER_COMMIT=10
+COMMIT_FILE_COUNT=$(git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null | wc -l)
+
+IS_INITIAL_COMMIT=false
+if [ -z "$(git rev-parse --verify HEAD 2>/dev/null)" ]; then
+    IS_INITIAL_COMMIT=true
+fi
+
+if [ "$COMMIT_FILE_COUNT" -gt "$MAX_FILES_PER_COMMIT" ] && [ "$IS_INITIAL_COMMIT" = "false" ]; then
+    echo "ERROR: Commit contains $COMMIT_FILE_COUNT files, exceeding limit of $MAX_FILES_PER_COMMIT"
+    echo "Please split your changes into smaller, focused commits."
+    exit 1
+fi
+
+echo "Commit message validated"
 exit 0
 ```
 
-### 3.2 pre-commit Hook
+### 3.2 Commit 文件数量检查
+
+**规则**: 单 commit 文件数量不能超过 **10 个**，超过需要合理理由。
+
+**豁免情况**:
+- **初始化 commit**: 仓库的第一个 commit 可以超过 10 个文件
+- **特殊场景**: 需要提供充分的理由说明（在 commit body 中解释）
+
+**本地检查**:
+- pre-commit hook 检查 staged 文件数量
+- commit-msg hook 检查最终 commit 的文件数量
+
+**服务端检查**:
+- `codemap ci check-commit-size` 检查范围内的所有 commit
+
+**有效例外场景**:
+1. 批量依赖更新（包含 lock 文件变更）
+2. 自动化代码生成结果
+3. 大规模重构（无逻辑变更）
+
+**拆分大型 commit 的方法**:
+```bash
+# 撤销最后一次 commit（保留改动）
+git reset HEAD~1
+
+# 选择性添加文件
+git add -p
+
+# 分批次提交
+git commit -m "[FEATURE] module-a: add feature X"
+git add <more-files>
+git commit -m "[FEATURE] module-b: add feature Y"
+```
+
+### 3.4 pre-commit Hook
 
 **文件**: `.git/hooks/pre-commit`
 
 ```bash
-#!/bin/bash
-# pre-commit hook - 运行测试和文件头检查
-# 总代码量: ~40 行
+#!/bin/sh
+# Pre-commit hook: 运行测试和文件头检查
 
 echo "Running pre-commit checks..."
 
-# 1. 运行测试
-echo "→ Running tests..."
-npm test
+# 1. 运行与变更相关的测试（失败即阻断）
+echo "Running tests for changed files..."
+npx vitest run --changed
 if [ $? -ne 0 ]; then
-    echo "ERROR: 测试未通过，提交被拒绝"
+    echo "ERROR: Tests failed, commit rejected"
     exit 1
 fi
-echo "✓ Tests passed"
 
-# 2. 检查文件头注释（只检查修改的 TS 文件）
-echo "→ Checking file headers..."
+echo "Tests passed"
 
+# 2. 检查 staged 文件数量（初始化 commit 除外）
+MAX_FILES_PER_COMMIT=10
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | wc -l)
+
+IS_INITIAL_COMMIT=false
+git rev-parse --verify HEAD >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+    IS_INITIAL_COMMIT=true
+fi
+
+if [ "$STAGED_FILES" -gt "$MAX_FILES_PER_COMMIT" ] && [ "$IS_INITIAL_COMMIT" = "false" ]; then
+    echo "WARNING: Staged files count ($STAGED_FILES) exceeds limit ($MAX_FILES_PER_COMMIT)"
+    echo "Single commit should not contain more than $MAX_FILES_PER_COMMIT files."
+    echo "Please consider splitting your changes into smaller, focused commits."
+    exit 1
+fi
+
+# 3. 检查文件头注释（只检查 staged 的 TS 源文件）
+echo "Checking file headers..."
 STAGED_TS_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.ts$' | grep -v '\.test\.ts$' | grep -v '\.d\.ts$')
 
-if [ -z "$STAGED_TS_FILES" ]; then
-    echo "✓ No TS files to check"
-    exit 0
-fi
+if [ -n "$STAGED_TS_FILES" ]; then
+    MISSING_HEADERS=0
+    for file in $STAGED_TS_FILES; do
+        if [ ! -f "$file" ]; then
+            continue
+        fi
+        HEAD_CONTENT=$(head -10 "$file")
+        if ! echo "$HEAD_CONTENT" | grep -q '\[META\]'; then
+            echo "ERROR: $file missing [META] comment"
+            MISSING_HEADERS=$((MISSING_HEADERS + 1))
+        fi
+        if ! echo "$HEAD_CONTENT" | grep -q '\[WHY\]'; then
+            echo "ERROR: $file missing [WHY] comment"
+            MISSING_HEADERS=$((MISSING_HEADERS + 1))
+        fi
+    done
 
-MISSING_HEADERS=0
-for file in $STAGED_TS_FILES; do
-    if [ -f "$file" ]; then
-        # 检查前10行是否包含 [META] 和 [WHY]
-        HEAD=$(head -10 "$file")
-        
-        if ! echo "$HEAD" | grep -q "\[META\]"; then
-            echo "ERROR: $file 缺少 [META] 注释"
-            MISSING_HEADERS=$((MISSING_HEADERS + 1))
-        fi
-        
-        if ! echo "$HEAD" | grep -q "\[WHY\]"; then
-            echo "ERROR: $file 缺少 [WHY] 注释"
-            MISSING_HEADERS=$((MISSING_HEADERS + 1))
-        fi
+    if [ $MISSING_HEADERS -gt 0 ]; then
+        echo "Add header comments at file top:"
+        echo "// [META] since:YYYY-MM | owner:team | stable:false"
+        echo "// [WHY] Explain why this file exists"
+        exit 1
     fi
-done
-
-if [ $MISSING_HEADERS -gt 0 ]; then
-    echo ""
-    echo "请在文件顶部添加以下注释:"
-    echo "// [META] since:YYYY-MM | owner:team | stable:false"
-    echo "// [WHY] 回答为什么存在这个文件"
-    echo ""
-    exit 1
 fi
 
-echo "✓ File headers valid"
+echo "File headers passed"
 
-# 3. 生成代码地图（可选，异步执行）
-echo "→ Generating code map..."
-npx codemap generate --quiet &
+# 4. 生成 AI 饲料（警告级，不阻断）
+echo "Generating AI feed..."
+npx mycodemap generate --quiet >/dev/null 2>&1 &
 
-echo "✓ All pre-commit checks passed"
+echo "Pre-commit checks passed"
 exit 0
 ```
 
@@ -220,17 +268,21 @@ jobs:
     - name: Check commit format
       run: npx codemap ci check-commits
     
-    # 3. 检查文件头注释
+    # 3. 检查 Commit 文件数量
+    - name: Check commit size
+      run: npx codemap ci check-commit-size
+    
+    # 4. 检查文件头注释
     - name: Check file headers
       run: npx codemap ci check-headers
     
-    # 4. 生成代码地图并检查同步
+    # 5. 生成代码地图并检查同步
     - name: Generate code map
       run: |
         npx codemap generate
         git diff --exit-code .codemap/ || (echo "Code map is out of sync. Run 'codemap generate' and commit the changes." && exit 1)
     
-    # 5. 评估危险置信度
+    # 6. 评估危险置信度
     - name: Assess risk
       run: npx codemap ci assess-risk --threshold=0.7
 
@@ -352,6 +404,44 @@ ci.command('assess-risk')
     } else {
       console.log('✓ Risk assessment passed');
     }
+  });
+
+// 检查 Commit 文件数量
+ci.command('check-commit-size')
+  .description('Check if commit file count exceeds limit (init commit exempt)')
+  .option('-r, --range <range>', 'Git log range to check', 'origin/main..HEAD')
+  .option('-m, --max-files <number>', 'Max files per commit', '10')
+  .action(async (options) => {
+    const maxFiles = parseInt(options.maxFiles, 10);
+    const { execSync } = require('child_process');
+    
+    const range = options.range || 'origin/main..HEAD';
+    const commits = execSync(`git log --format=%H ${range}`, { encoding: 'utf-8' })
+      .split('\n')
+      .filter(Boolean);
+    
+    let hasErrors = false;
+    
+    for (const hash of commits) {
+      const message = execSync(`git log -1 --format=%s ${hash}`, { encoding: 'utf-8' }).trim();
+      const fileCount = parseInt(
+        execSync(`git diff-tree --no-commit-id --name-only -r ${hash} | wc -l`, { encoding: 'utf-8' }).trim(),
+        10
+      );
+      
+      if (fileCount > maxFiles) {
+        console.error(`ERROR: Commit ${hash.substring(0, 7)} has ${fileCount} files (limit: ${maxFiles})`);
+        console.error(`  Message: ${message}`);
+        hasErrors = true;
+      }
+    }
+    
+    if (hasErrors) {
+      console.error('\nLarge commits detected. Please split your changes.');
+      process.exit(1);
+    }
+    
+    console.log(`All ${commits.length} commits pass file count check`);
   });
 
 // 输出契约校验 (P1-1 新增)
@@ -561,6 +651,7 @@ CI Gateway
     │
     ├── CLI Commands (src/cli/commands/ci.ts)
     │   ├── check-commits
+    │   ├── check-commit-size (v1.3 新增)
     │   ├── check-headers
     │   ├── assess-risk (简化版)
     │   └── check-output-contract (P1-1 新增)
@@ -663,6 +754,7 @@ class WorkflowCIExecutor {
 |--------|------|--------|------|
 | 测试通过 | ✅ | ✅ | `npm test` |
 | Commit 格式 `[TAG]` | ✅ | ✅ | `commit-msg hook` / `codemap ci check-commits` |
+| Commit 文件数量 (≤10) | ✅ | ✅ | `commit-msg hook` / `codemap ci check-commit-size` |
 | 文件头 `[META]` | ✅ | ✅ | `pre-commit hook` / `codemap ci check-headers` |
 | 文件头 `[WHY]` | ✅ | ✅ | `pre-commit hook` / `codemap ci check-headers` |
 | 代码地图生成 | ⚠️ | ✅ | `codemap generate` |
@@ -675,10 +767,10 @@ class WorkflowCIExecutor {
 
 | 组件 | 代码量 | 文件 |
 |------|--------|------|
-| commit-msg hook | ~30 行 | `.git/hooks/commit-msg` |
-| pre-commit hook | ~40 行 | `.git/hooks/pre-commit` |
-| CI 子命令 | ~80 行 | `src/cli/commands/ci.ts` |
-| **总计** | **~150 行** | **符合极简原则** |
+| commit-msg hook | ~50 行 | `.git/hooks/commit-msg` |
+| pre-commit hook | ~60 行 | `.git/hooks/pre-commit` |
+| CI 子命令 | ~100 行 | `src/cli/commands/ci.ts` |
+| **总计** | **~210 行** | **符合极简原则** |
 
 ---
 
@@ -689,3 +781,4 @@ class WorkflowCIExecutor {
 | 1.0 | 2026-02-28 | 初始版本 |
 | 1.1 | 2026-03-01 | 添加输出契约校验 |
 | 1.2 | 2026-03-03 | 移除 AI 饲料相关功能，简化风险评估 |
+| 1.3 | 2026-03-04 | 添加 commit 文件数量限制检查（≤10 个）|

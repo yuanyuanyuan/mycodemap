@@ -21,7 +21,7 @@
 - **调用图分析** - 分析函数/方法间的调用关系
 - **插件系统** - 可扩展的插件架构，支持自定义分析和输出
 - **编排层** - 意图路由、置信度计算、结果融合、工具编排器
-- **CI 门禁** - Commit 格式验证、文件头检查、风险评估、输出契约检查
+- **CI 门禁** - Commit 格式验证、文件数量限制(≤10)、文件头检查、风险评估、输出契约检查
 - **工作流编排** - 阶段管理、上下文持久化、检查点机制
 
 ### 技术栈
@@ -323,13 +323,15 @@ export default defineConfig({
 
 **pre-commit**：
 1. 运行与变更相关的测试（失败阻断提交）
-2. 检查文件头注释 `[META]`/`[WHY]`（失败阻断提交）
-3. 生成代码地图（警告级，不阻断）
+2. 检查 staged 文件数量 ≤ 10（初始化 commit 除外，失败阻断提交）
+3. 检查文件头注释 `[META]`/`[WHY]`（失败阻断提交）
+4. 生成代码地图（警告级，不阻断）
 
 **commit-msg**：
 - 强制提交格式：`[TAG] scope: message`
 - 有效标签：`BUGFIX`, `FEATURE`, `REFACTOR`, `CONFIG`, `DOCS`, `DELETE`
 - 示例：`[FEATURE] cli: add new command`
+- 检查 commit 文件数量 ≤ 10（初始化 commit 除外）
 
 ### GitHub Actions
 
@@ -341,16 +343,20 @@ export default defineConfig({
 3. 安装依赖（`npm ci`）
 4. 运行测试（`npm test`）
 5. 检查提交格式（`codemap ci check-commits`）
-6. 检查文件头（`codemap ci check-headers`）
-7. 生成代码地图并验证同步
-8. 风险评估（`codemap ci assess-risk`）
-9. 检查输出契约（`codemap ci check-output-contract`）
+6. 检查 commit 文件数量（`codemap ci check-commit-size`）
+7. 检查文件头（`codemap ci check-headers`）
+8. 生成代码地图并验证同步
+9. 风险评估（`codemap ci assess-risk`）
+10. 检查输出契约（`codemap ci check-output-contract`）
 
 ### CI 门禁命令
 
 ```bash
 # 检查提交格式
 codemap ci check-commits --range origin/main..HEAD
+
+# 检查 commit 文件数量（单 commit ≤ 10 文件，初始化 commit 除外）
+codemap ci check-commit-size --range origin/main..HEAD
 
 # 检查文件头注释
 codemap ci check-headers
