@@ -401,8 +401,15 @@ export class WorkflowCIExecutor {
   ): Promise<CICheckResult> {
     const fs = await import('fs');
     const path = await import('path');
+    const { existsSync } = await import('fs');
 
-    const outputDir = path.join(this.projectRoot, '.codemap');
+    // 路径兼容：优先 .mycodemap，回退 .codemap
+    const newOutputDir = path.join(this.projectRoot, '.mycodemap');
+    const oldOutputDir = path.join(this.projectRoot, '.codemap');
+    const outputDir = existsSync(newOutputDir) || !existsSync(oldOutputDir)
+      ? newOutputDir
+      : oldOutputDir;
+
     const requiredFiles = ['AI_MAP.md', 'CONTEXT.md', 'codemap.json'];
 
     const missingFiles: string[] = [];

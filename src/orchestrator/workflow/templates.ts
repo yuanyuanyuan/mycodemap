@@ -4,8 +4,51 @@
  */
 
 import { writeFile, readFile, mkdir, access } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { cwd } from 'node:process';
 import type { PhaseDefinition, WorkflowPhase, PhaseAction, PhaseCondition } from './types.js';
+
+/**
+ * 路径兼容常量
+ */
+const DEFAULT_OUTPUT_DIR_NEW = '.mycodemap';
+const DEFAULT_OUTPUT_DIR_OLD = '.codemap';
+
+/**
+ * 解析工作流目录路径
+ */
+function resolveWorkflowDir(): string {
+  const rootDir = cwd();
+  const newPath = join(rootDir, DEFAULT_OUTPUT_DIR_NEW, 'workflow');
+
+  if (existsSync(newPath) || !existsSync(join(rootDir, DEFAULT_OUTPUT_DIR_OLD, 'workflow'))) {
+    return join(DEFAULT_OUTPUT_DIR_NEW, 'workflow');
+  }
+
+  return join(DEFAULT_OUTPUT_DIR_OLD, 'workflow');
+}
+
+/**
+ * 解析模板目录路径
+ */
+function resolveTemplatesDir(): string {
+  const rootDir = cwd();
+  const newPath = join(rootDir, DEFAULT_OUTPUT_DIR_NEW, 'templates');
+
+  if (existsSync(newPath) || !existsSync(join(rootDir, DEFAULT_OUTPUT_DIR_OLD, 'templates'))) {
+    return join(DEFAULT_OUTPUT_DIR_NEW, 'templates');
+  }
+
+  return join(DEFAULT_OUTPUT_DIR_OLD, 'templates');
+}
+
+/**
+ * 获取工作流文件路径（用于模板定义）
+ */
+function wf(file: string): string {
+  return join(resolveWorkflowDir(), file);
+}
 
 // ============================================
 // 模板类型定义
@@ -74,7 +117,7 @@ export const REFACTORING_TEMPLATE: WorkflowTemplate = {
       analyzeIntent: 'reference',
       entryCondition: { minConfidence: 0.3 } as PhaseCondition,
       deliverables: [
-        { name: 'reference-results', path: '.codemap/workflow/reference.json', validator: () => true }
+        { name: 'reference-results', path: wf('reference.json'), validator: () => true }
       ],
       nextPhase: 'impact',
       commands: ['codemap analyze --intent reference']
@@ -85,7 +128,7 @@ export const REFACTORING_TEMPLATE: WorkflowTemplate = {
       analyzeIntent: 'impact',
       entryCondition: { minConfidence: 0.4 } as PhaseCondition,
       deliverables: [
-        { name: 'impact-report', path: '.codemap/workflow/impact.json', validator: () => true }
+        { name: 'impact-report', path: wf('impact.json'), validator: () => true }
       ],
       nextPhase: 'risk',
       commands: ['codemap analyze --intent impact']
@@ -96,7 +139,7 @@ export const REFACTORING_TEMPLATE: WorkflowTemplate = {
       ciCommand: 'codemap ci assess-risk --threshold 0.7',
       entryCondition: {} as PhaseCondition,
       deliverables: [
-        { name: 'risk-assessment', path: '.codemap/workflow/risk.json', validator: () => true }
+        { name: 'risk-assessment', path: wf('risk.json'), validator: () => true }
       ],
       nextPhase: 'implementation',
       commands: ['codemap ci assess-risk']
@@ -152,7 +195,7 @@ export const BUGFIX_TEMPLATE: WorkflowTemplate = {
       analyzeIntent: 'reference',
       entryCondition: { minConfidence: 0.2 } as PhaseCondition, // Lower threshold for speed
       deliverables: [
-        { name: 'bug-location', path: '.codemap/workflow/reference.json', validator: () => true }
+        { name: 'bug-location', path: wf('reference.json'), validator: () => true }
       ],
       nextPhase: 'implementation',
       commands: ['codemap analyze --intent reference --priority speed']
@@ -208,7 +251,7 @@ export const FEATURE_TEMPLATE: WorkflowTemplate = {
       analyzeIntent: 'reference',
       entryCondition: { minConfidence: 0.4 } as PhaseCondition,
       deliverables: [
-        { name: 'reference-results', path: '.codemap/workflow/reference.json', validator: () => true }
+        { name: 'reference-results', path: wf('reference.json'), validator: () => true }
       ],
       nextPhase: 'impact',
       commands: ['codemap analyze --intent reference']
@@ -219,7 +262,7 @@ export const FEATURE_TEMPLATE: WorkflowTemplate = {
       analyzeIntent: 'impact',
       entryCondition: { minConfidence: 0.5 } as PhaseCondition,
       deliverables: [
-        { name: 'impact-report', path: '.codemap/workflow/impact.json', validator: () => true }
+        { name: 'impact-report', path: wf('impact.json'), validator: () => true }
       ],
       nextPhase: 'risk',
       commands: ['codemap analyze --intent impact']
@@ -230,7 +273,7 @@ export const FEATURE_TEMPLATE: WorkflowTemplate = {
       ciCommand: 'codemap ci assess-risk --threshold 0.6',
       entryCondition: {} as PhaseCondition,
       deliverables: [
-        { name: 'risk-assessment', path: '.codemap/workflow/risk.json', validator: () => true }
+        { name: 'risk-assessment', path: wf('risk.json'), validator: () => true }
       ],
       nextPhase: 'implementation',
       commands: ['codemap ci assess-risk']
@@ -287,7 +330,7 @@ export const HOTFIX_TEMPLATE: WorkflowTemplate = {
       analyzeIntent: 'reference',
       entryCondition: { minConfidence: 0.1 } as PhaseCondition, // Minimal threshold
       deliverables: [
-        { name: 'hotfix-location', path: '.codemap/workflow/reference.json', validator: () => true }
+        { name: 'hotfix-location', path: wf('reference.json'), validator: () => true }
       ],
       nextPhase: 'implementation',
       commands: ['codemap analyze --intent reference --quick']
@@ -339,8 +382,8 @@ export class WorkflowTemplateManager {
   private templatesDir: string;
   private customTemplates: Map<string, WorkflowTemplate> = new Map();
 
-  constructor(templatesDir: string = '.codemap/templates') {
-    this.templatesDir = templatesDir;
+  constructor(templatesDir?: string) {
+    this.templatesDir = templatesDir || resolveTemplatesDir();
   }
 
   /**

@@ -3,6 +3,32 @@
  * [WHY] 集中管理工作流与各模块的集成配置
  */
 
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { cwd } from 'node:process';
+
+/**
+ * 路径兼容常量
+ */
+const DEFAULT_OUTPUT_DIR_NEW = '.mycodemap';
+const DEFAULT_OUTPUT_DIR_OLD = '.codemap';
+
+/**
+ * 解析工作流目录路径（兼容逻辑）
+ */
+function resolveWorkflowDir(): string {
+  const rootDir = cwd();
+  const newPath = join(rootDir, DEFAULT_OUTPUT_DIR_NEW, 'workflow');
+
+  // 优先检查新路径
+  if (existsSync(newPath) || !existsSync(join(rootDir, DEFAULT_OUTPUT_DIR_OLD, 'workflow'))) {
+    return join(DEFAULT_OUTPUT_DIR_NEW, 'workflow');
+  }
+
+  // 回退到旧路径
+  return join(DEFAULT_OUTPUT_DIR_OLD, 'workflow');
+}
+
 /**
  * CI 门禁集成配置
  */
@@ -88,7 +114,7 @@ export const WORKFLOW_CONFIG = {
   /** 是否启用工作流 */
   enabled: true,
   /** 持久化路径 */
-  persistencePath: '.codemap/workflow',
+  persistencePath: resolveWorkflowDir(),
   /** 最大并发阶段数 */
   maxConcurrentPhases: 1,
   /** 是否自动保存检查点 */

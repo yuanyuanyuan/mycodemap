@@ -6,9 +6,16 @@
  * 处理工作流上下文的序列化和反序列化
  */
 
-import { promises as fs } from 'node:fs';
+import { promises as fs, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { cwd } from 'node:process';
 import type { WorkflowContext, WorkflowPhase, PhaseArtifacts, WorkflowSummary, CachedResults } from './types.js';
+
+/**
+ * 路径兼容常量
+ */
+const DEFAULT_OUTPUT_DIR_NEW = '.mycodemap';
+const DEFAULT_OUTPUT_DIR_OLD = '.codemap';
 
 interface SerializedContext {
   id: string;
@@ -24,11 +31,31 @@ interface SerializedContext {
 }
 
 /**
+ * 解析工作流目录路径
+ */
+function resolveWorkflowDir(): string {
+  const rootDir = cwd();
+  const newPath = join(rootDir, DEFAULT_OUTPUT_DIR_NEW, 'workflow');
+
+  if (existsSync(newPath) || !existsSync(join(rootDir, DEFAULT_OUTPUT_DIR_OLD, 'workflow'))) {
+    return join(DEFAULT_OUTPUT_DIR_NEW, 'workflow');
+  }
+
+  return join(DEFAULT_OUTPUT_DIR_OLD, 'workflow');
+}
+
+/**
  * 工作流持久化类
  */
 export class WorkflowPersistence {
-  private storagePath = '.codemap/workflow';
-  private activePath = '.codemap/workflow/active.json';
+  private storagePath: string;
+  private activePath: string;
+
+  constructor() {
+    const workflowDir = resolveWorkflowDir();
+    this.storagePath = workflowDir;
+    this.activePath = join(workflowDir, 'active.json');
+  }
 
   /**
    * 保存工作流上下文

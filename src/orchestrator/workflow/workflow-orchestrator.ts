@@ -5,6 +5,9 @@
 
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { cwd } from 'node:process';
 import type { AnalyzeArgs, UnifiedResult, ConfidenceResult, CodemapIntent } from '../types.js';
 import { calculateConfidence } from '../confidence.js';
 import { ToolOrchestrator } from '../tool-orchestrator.js';
@@ -28,6 +31,26 @@ import {
 import { WorkflowContextFactory, WorkflowContextValidator } from './workflow-context.js';
 
 const execAsync = promisify(exec);
+
+/**
+ * 路径兼容常量
+ */
+const DEFAULT_OUTPUT_DIR_NEW = '.mycodemap';
+const DEFAULT_OUTPUT_DIR_OLD = '.codemap';
+
+/**
+ * 解析工作流目录路径
+ */
+function resolveWorkflowDir(): string {
+  const rootDir = cwd();
+  const newPath = join(rootDir, DEFAULT_OUTPUT_DIR_NEW, 'workflow');
+
+  if (existsSync(newPath) || !existsSync(join(rootDir, DEFAULT_OUTPUT_DIR_OLD, 'workflow'))) {
+    return join(DEFAULT_OUTPUT_DIR_NEW, 'workflow');
+  }
+
+  return join(DEFAULT_OUTPUT_DIR_OLD, 'workflow');
+}
 
 interface StartWorkflowOptions {
   template?: string;
@@ -423,6 +446,7 @@ export class WorkflowOrchestrator {
    * 初始化阶段定义
    */
   private initializePhaseDefinitions(): Map<WorkflowPhase, PhaseDefinition> {
+    const workflowDir = resolveWorkflowDir();
     return new Map<WorkflowPhase, PhaseDefinition>([
       ['reference', {
         name: 'reference',
@@ -430,7 +454,7 @@ export class WorkflowOrchestrator {
         analyzeIntent: 'reference',
         entryCondition: { minConfidence: 0.3 },
         deliverables: [
-          { name: 'reference-results', path: '.codemap/workflow/reference.json', validator: () => true }
+          { name: 'reference-results', path: join(workflowDir, 'reference.json'), validator: () => true }
         ],
         nextPhase: 'impact',
         commands: ['codemap analyze --intent reference']
@@ -441,7 +465,7 @@ export class WorkflowOrchestrator {
         analyzeIntent: 'impact',
         entryCondition: { minConfidence: 0.4 },
         deliverables: [
-          { name: 'impact-report', path: '.codemap/workflow/impact.json', validator: () => true }
+          { name: 'impact-report', path: join(workflowDir, 'impact.json'), validator: () => true }
         ],
         nextPhase: 'risk',
         commands: ['codemap analyze --intent impact']
@@ -452,7 +476,7 @@ export class WorkflowOrchestrator {
         ciCommand: 'codemap ci assess-risk --threshold 0.7',
         entryCondition: {},
         deliverables: [
-          { name: 'risk-assessment', path: '.codemap/workflow/risk.json', validator: () => true }
+          { name: 'risk-assessment', path: join(workflowDir, 'risk.json'), validator: () => true }
         ],
         nextPhase: 'implementation',
         commands: ['codemap ci assess-risk']
