@@ -51,7 +51,7 @@ echo "File headers passed"
 
 # 3. 生成 AI 饲料（警告级，不阻断）
 echo "Generating AI feed..."
-npx codemap generate --quiet >/dev/null 2>&1 &
+npx mycodemap generate --quiet >/dev/null 2>&1 &
 if [ $? -ne 0 ]; then
     echo "WARNING: Failed to start AI feed generation"
 fi

@@ -1,11 +1,12 @@
 #!/bin/sh
-# Commit-msg hook: 验证 Commit 消息格式
+# Commit-msg hook: 验证 Commit 消息格式和文件数量
 
 MSG_FILE=$1
 MSG=$(head -1 "$MSG_FILE")
 
 VALID_TAGS="BUGFIX FEATURE REFACTOR CONFIG DOCS DELETE"
 
+# 1. 检查 commit 格式
 if ! echo "$MSG" | grep -qE '^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]'; then
     echo "ERROR: Commit message must start with an uppercase tag."
     echo "Format: [TAG] scope: message"
@@ -17,6 +18,44 @@ if ! echo "$MSG" | grep -qE '^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]\s
     echo "ERROR: scope and message are required."
     echo "Format: [TAG] scope: message"
     echo "Example: [FEATURE] cli: add new command"
+    exit 1
+fi
+
+# 2. 检查 commit 文件数量（初始化 commit 除外）
+# 规则: 单 commit 文件数量不能超过 10 个
+MAX_FILES_PER_COMMIT=10
+COMMIT_FILE_COUNT=$(git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null | wc -l)
+
+# 检查是否是初始化 commit（没有 HEAD）
+IS_INITIAL_COMMIT=false
+if [ -z "$(git rev-parse --verify HEAD 2>/dev/null)" ]; then
+    IS_INITIAL_COMMIT=true
+fi
+
+# 如果是 amend 或者 rebase，获取 staged 文件数量
+if [ "$COMMIT_FILE_COUNT" -eq 0 ]; then
+    COMMIT_FILE_COUNT=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | wc -l)
+fi
+
+if [ "$COMMIT_FILE_COUNT" -gt "$MAX_FILES_PER_COMMIT" ] && [ "$IS_INITIAL_COMMIT" = "false" ]; then
+    echo ""
+    echo "ERROR: Commit contains $COMMIT_FILE_COUNT files, exceeding limit of $MAX_FILES_PER_COMMIT"
+    echo ""
+    echo "Single commit should not contain more than $MAX_FILES_PER_COMMIT files."
+    echo "Large commits make code review difficult and increase rollback risk."
+    echo ""
+    echo "Please split your changes into smaller, focused commits:"
+    echo "  git reset HEAD~1"
+    echo "  git add -p        # 选择性添加文件"
+    echo "  git commit -m '[TAG] scope: message'"
+    echo ""
+    echo "Exceptions (requires strong justification):"
+    echo "  - Bulk dependency updates with lock file changes"
+    echo "  - Automated code generation results"
+    echo "  - Mass refactoring with no logic changes"
+    echo ""
+    echo "If you have a very good reason, use: git commit --no-verify"
+    echo ""
     exit 1
 fi
 
