@@ -22,7 +22,8 @@ const program = new Command();
 setupRuntimeLogging(process.argv.slice(2));
 
 program
-  .name('codemap')
+  .name('mycodemap')
+  .alias('codemap')  // 兼容旧命令名
   .description('TypeScript 代码地图工具 - 为 AI 辅助开发提供结构化上下文')
   .version('0.1.0');
 
@@ -36,7 +37,7 @@ program
   .command('generate')
   .description('生成代码地图')
   .option('-m, --mode <mode>', '分析模式 (fast|smart|hybrid)', 'hybrid')
-  .option('-o, --output <dir>', '输出目录', '.codemap')
+  .option('-o, --output <dir>', '输出目录', '.mycodemap')
   .option('--ai-context', '为每个文件生成 AI 描述（需要 AI Provider）', false)
   .action(generateCommand);
 
@@ -44,7 +45,7 @@ program
   .command('watch')
   .description('监听文件变更并自动更新代码地图')
   .option('-m, --mode <mode>', '分析模式 (fast|smart|hybrid)', 'hybrid')
-  .option('-o, --output <dir>', '输出目录', '.codemap')
+  .option('-o, --output <dir>', '输出目录', '.mycodemap')
   .option('-d, --detach', '以后台守护进程方式运行')
   .option('-s, --stop', '停止后台守护进程')
   .option('-t, --status', '查看后台守护进程状态')

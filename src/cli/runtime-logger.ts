@@ -7,7 +7,7 @@ import path from 'node:path';
 import util from 'node:util';
 import zlib from 'node:zlib';
 
-const DEFAULT_LOG_DIR = '.codemap/logs';
+const DEFAULT_LOG_DIR = '.mycodemap/logs';
 const DEFAULT_RETENTION_DAYS = 14;
 const DEFAULT_MAX_FILES = 30;
 const DEFAULT_MAX_SIZE_MB = 10;
@@ -132,16 +132,52 @@ export function appendRuntimeLog(logFilePath: string, line: string, maxFileSizeB
   }
 }
 
+let _deprecatedWarningPrinted = false;
+
+function getEnvWithFallback(
+  newKey: string,
+  oldKey: string,
+  env: NodeJS.ProcessEnv
+): string | undefined {
+  const newValue = env[newKey];
+  if (newValue !== undefined) {
+    return newValue;
+  }
+  const oldValue = env[oldKey];
+  if (oldValue !== undefined) {
+    if (!_deprecatedWarningPrinted) {
+      _deprecatedWarningPrinted = true;
+      console.warn(`[DEPRECATION] "${oldKey}" is deprecated. Please use "${newKey}" instead.`);
+    }
+    return oldValue;
+  }
+  return undefined;
+}
+
 export function resolveRuntimeLogConfig(
   cwd: string,
   env: NodeJS.ProcessEnv = process.env,
   now = new Date()
 ): RuntimeLogConfig {
-  const enabled = shouldEnableRuntimeLog(env.CODEMAP_RUNTIME_LOG_ENABLED);
-  const logDir = path.resolve(cwd, env.CODEMAP_RUNTIME_LOG_DIR || DEFAULT_LOG_DIR);
-  const retentionDays = parsePositiveInt(env.CODEMAP_RUNTIME_LOG_RETENTION_DAYS, DEFAULT_RETENTION_DAYS);
-  const maxFiles = parsePositiveInt(env.CODEMAP_RUNTIME_LOG_MAX_FILES, DEFAULT_MAX_FILES);
-  const maxFileSizeMb = parsePositiveInt(env.CODEMAP_RUNTIME_LOG_MAX_SIZE_MB, DEFAULT_MAX_SIZE_MB);
+  const enabled = shouldEnableRuntimeLog(
+    getEnvWithFallback('MYCODEMAP_RUNTIME_LOG_ENABLED', 'CODEMAP_RUNTIME_LOG_ENABLED', env)
+  );
+  const logDir = path.resolve(
+    cwd,
+    getEnvWithFallback('MYCODEMAP_RUNTIME_LOG_DIR', 'CODEMAP_RUNTIME_LOG_DIR', env) || DEFAULT_LOG_DIR
+  );
+  const retentionDays = parsePositiveInt(
+    getEnvWithFallback('MYCODEMAP_RUNTIME_LOG_RETENTION_DAYS', 'CODEMAP_RUNTIME_LOG_RETENTION_DAYS', env),
+    DEFAULT_RETENTION_DAYS
+  );
+  const maxFiles = parsePositiveInt(
+    getEnvWithFallback('MYCODEMAP_RUNTIME_LOG_MAX_FILES', 'CODEMAP_RUNTIME_LOG_MAX_FILES', env),
+    DEFAULT_MAX_FILES
+  );
+  const maxFileSizeMb = parsePositiveInt(
+    getEnvWithFallback('MYCODEMAP_RUNTIME_LOG_MAX_SIZE_MB', 'CODEMAP_RUNTIME_LOG_MAX_SIZE_MB', env),
+    DEFAULT_MAX_SIZE_MB
+  );
 
   return {
     enabled,
