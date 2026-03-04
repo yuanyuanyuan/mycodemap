@@ -17,3 +17,12 @@
 - 响应新增需求：已在 `docs/PUBLISH_NPM_DESIGN_FINAL.md` 增补实施执行附录（Runbook）与 V1/V2 覆盖矩阵。
 - 已将 V1/V2 文档迁移至 `docs/archive/` 并同步修正 V3 内引用路径。
 - 当前状态：V3 可作为 docs 目录内唯一实施基线文档。
+
+## 2026-03-04 续 - P0 实施
+- 用户确认计划，立即执行
+- 已更新 task_plan.md 为 P0 实施任务
+- 已创建 Agent Team：`npm-publish-p0`
+- 已创建 6 个任务（Step A-F），设置依赖关系
+- Step A 完成：package.json 已更新为 @mycodemap/mycodemap，新增 LICENSE/CHANGELOG/schema
+- 验证通过：npm pack 包含所有必需文件
+- 已并行启动 4 个 agent：cli-compat(B), path-compat(C), env-compat(D), ci-release(E)
