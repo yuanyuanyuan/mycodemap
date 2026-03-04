@@ -1,9 +1,7 @@
 {
-  "$schema": "https://codemap.dev/schema.json",
+  "$schema": "./mycodemap.config.schema.json",
   "mode": "fast",
-  "include": [
-    "src/**/*.ts"
-  ],
+  "include": ["src/**/*.ts"],
   "exclude": [
     "node_modules/**",
     "dist/**",
@@ -11,5 +9,5 @@
     "*.test.ts",
     "*.spec.ts"
   ],
-  "output": ".codemap"
+  "output": ".mycodemap"
 }

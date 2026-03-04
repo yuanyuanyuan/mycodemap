@@ -47,7 +47,7 @@ export async function initCommand(_options: { yes?: boolean }) {
       '*.test.ts',
       '*.spec.ts'
     ],
-    output: '.codemap'
+    output: '.mycodemap'
   };
 
   await fs.writeFile(newConfigPath, JSON.stringify(defaultConfig, null, 2));
