@@ -1,7 +1,11 @@
+// [META] since:2026-03 | owner:cli-team | stable:true
+// [WHY] Foreground file watching for development mode
+
 import chalk from 'chalk';
 import chokidar from 'chokidar';
 import { analyze } from '../../core/analyzer.js';
 import { generateAIMap, generateJSON, generateContext } from '../../generator/index.js';
+import { resolveOutputDir } from '../paths.js';
 import type { AnalysisOptions } from '../../types/index.js';
 
 export interface WatchCommandForegroundOptions {
@@ -14,7 +18,7 @@ export interface WatchCommandForegroundOptions {
  */
 export async function watchCommandForeground(options: WatchCommandForegroundOptions) {
   const mode = (options.mode as 'fast' | 'smart') || 'fast';
-  const outputDir = options.output || '.codemap';
+  const { outputDir } = resolveOutputDir(options.output);
   const rootDir = process.cwd();
 
   console.log(chalk.blue('👀 启动 Watch 模式...'));

@@ -4,6 +4,7 @@
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
+import { resolveDataPath } from '../paths.js';
 import type { CodeMap, ModuleInfo, ExportInfo, ModuleSymbol } from '../../types/index.js';
 
 interface QueryOptions {
@@ -317,7 +318,7 @@ function loadCodeMap(rootDir: string, useCache: boolean = true): {
   cacheHit: boolean;
   loadTime: number;
 } {
-  const codemapPath = path.join(rootDir, '.codemap', 'codemap.json');
+  const codemapPath = resolveDataPath(rootDir);
   const startTime = performance.now();
 
   // 检查缓存

@@ -1,6 +1,10 @@
+// [META] since:2026-03 | owner:cli-team | stable:true
+// [WHY] Watch mode command with daemon support
+
 import chalk from 'chalk';
 import { watchCommandForeground } from './watch-foreground.js';
 import { createWatchDaemon } from '../../watcher/index.js';
+import { resolveOutputDir } from '../paths.js';
 
 export interface WatchCommandOptions {
   mode?: string;
@@ -15,7 +19,10 @@ export interface WatchCommandOptions {
  */
 export async function watchCommand(options: WatchCommandOptions) {
   const mode = (options.mode as 'fast' | 'smart') || 'fast';
-  const outputDir = options.output || '.codemap';
+  // 保持原始 output 传递以向后兼容测试
+  const output = options.output || '.mycodemap';
+  // 获取完整路径用于内部操作
+  const { outputDir } = resolveOutputDir(options.output);
   const rootDir = process.cwd();
 
   // 状态查询
@@ -39,7 +46,7 @@ export async function watchCommand(options: WatchCommandOptions) {
   // 前台模式（默认）
   await watchCommandForeground({
     mode,
-    output: outputDir
+    output: output
   });
 }
 
