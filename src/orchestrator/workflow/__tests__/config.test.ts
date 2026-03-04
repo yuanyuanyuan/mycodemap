@@ -113,7 +113,7 @@ describe('PHASE 1: Configuration Constants', () => {
     it('should export WORKFLOW_CONFIG with persistence settings', () => {
       expect(WORKFLOW_CONFIG).toBeDefined();
       expect(WORKFLOW_CONFIG.enabled).toBe(true);
-      expect(WORKFLOW_CONFIG.persistencePath).toBe('.codemap/workflow');
+      expect(WORKFLOW_CONFIG.persistencePath).toBe('.mycodemap/workflow');
       expect(WORKFLOW_CONFIG.maxConcurrentPhases).toBe(1);
       expect(WORKFLOW_CONFIG.autoCheckpoint).toBe(true);
       expect(WORKFLOW_CONFIG.checkpointInterval).toBe(300);

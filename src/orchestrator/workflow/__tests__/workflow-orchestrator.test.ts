@@ -73,6 +73,10 @@ vi.mock('node:fs', () => ({
     readdir: vi.fn().mockResolvedValue([]),
     unlink: vi.fn().mockResolvedValue(undefined),
     access: vi.fn().mockResolvedValue(undefined)
+  },
+  existsSync: vi.fn(() => true),
+  default: {
+    existsSync: vi.fn(() => true)
   }
 }));
 
@@ -102,7 +106,7 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
     it('should persist initial state', async () => {
       await orchestrator.start('test task');
 
-      expect(fs.mkdir).toHaveBeenCalledWith('.codemap/workflow', { recursive: true });
+      expect(fs.mkdir).toHaveBeenCalledWith('.mycodemap/workflow', { recursive: true });
       expect(fs.writeFile).toHaveBeenCalled();
     });
 

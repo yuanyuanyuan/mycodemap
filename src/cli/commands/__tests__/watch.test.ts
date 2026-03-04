@@ -69,7 +69,7 @@ describe('Watch CLI', () => {
 
       expect(mockWatchForeground).toHaveBeenCalledWith({
         mode: 'fast',
-        output: '.codemap',
+        output: '.mycodemap',
       });
     });
 
@@ -133,7 +133,7 @@ describe('Watch CLI', () => {
       mockDaemonGetStatus.mockResolvedValue({
         pid: 12345,
         rootDir: '/project',
-        outputDir: '.codemap',
+        outputDir: '.mycodemap',
         mode: 'fast',
         startedAt: Date.now(),
       });

@@ -19,6 +19,10 @@ vi.mock('node:fs', () => ({
     readFile: vi.fn(),
     readdir: vi.fn(),
     unlink: vi.fn()
+  },
+  existsSync: vi.fn(() => true),
+  default: {
+    existsSync: vi.fn(() => true)
   }
 }));
 
@@ -60,7 +64,7 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
       
       await persistence.save(context);
 
-      expect(fs.mkdir).toHaveBeenCalledWith('.codemap/workflow', { recursive: true });
+      expect(fs.mkdir).toHaveBeenCalledWith('.mycodemap/workflow', { recursive: true });
       expect(fs.writeFile).toHaveBeenCalled();
       
       const writeCall = vi.mocked(fs.writeFile).mock.calls[0];
@@ -105,7 +109,7 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
       
       await persistence.save(context);
 
-      expect(fs.mkdir).toHaveBeenCalledWith('.codemap/workflow', { recursive: true });
+      expect(fs.mkdir).toHaveBeenCalledWith('.mycodemap/workflow', { recursive: true });
     });
 
     it('should write active marker file', async () => {
@@ -115,7 +119,7 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
 
       expect(fs.writeFile).toHaveBeenCalledTimes(2);
       expect(fs.writeFile).toHaveBeenLastCalledWith(
-        '.codemap/workflow/active.json',
+        '.mycodemap/workflow/active.json',
         JSON.stringify({ id: 'wf-test-001' }, null, 2)
       );
     });
@@ -407,7 +411,7 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
 
       await persistence.delete('wf-test-001');
 
-      expect(fs.unlink).toHaveBeenCalledWith('.codemap/workflow/wf-test-001.json');
+      expect(fs.unlink).toHaveBeenCalledWith('.mycodemap/workflow/wf-test-001.json');
     });
 
     it('should clear active marker if deleting active workflow', async () => {
@@ -415,9 +419,9 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
 
       await persistence.delete('wf-test-001');
 
-      expect(fs.unlink).toHaveBeenCalledWith('.codemap/workflow/wf-test-001.json');
+      expect(fs.unlink).toHaveBeenCalledWith('.mycodemap/workflow/wf-test-001.json');
       expect(fs.writeFile).toHaveBeenCalledWith(
-        '.codemap/workflow/active.json',
+        '.mycodemap/workflow/active.json',
         JSON.stringify({ id: null }, null, 2)
       );
     });

@@ -29,7 +29,7 @@ describe('runtime-logger', () => {
     const config = resolveRuntimeLogConfig(cwd, {});
 
     expect(config.enabled).toBe(true);
-    expect(config.logDir).toBe(path.resolve(cwd, '.codemap/logs'));
+    expect(config.logDir).toBe(path.resolve(cwd, '.mycodemap/logs'));
     expect(config.logFilePath).toMatch(/codemap-\d{4}-\d{2}-\d{2}\.log$/);
     expect(config.retentionDays).toBe(14);
     expect(config.maxFiles).toBe(30);

@@ -174,7 +174,7 @@ describe('Watch Foreground CLI', () => {
       await watchCommandForeground({});
 
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('fast'));
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('.codemap'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('.mycodemap'));
     });
 
     it('should call generator functions after analysis', async () => {

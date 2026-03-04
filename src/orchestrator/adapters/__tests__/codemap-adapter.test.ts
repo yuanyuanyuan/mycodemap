@@ -116,7 +116,7 @@ describe('CodemapAdapter', () => {
       expect(result).toBe(true);
       expect(readFile).toHaveBeenCalled();
       const callArg = vi.mocked(readFile).mock.calls[0][0];
-      expect(callArg).toContain('.codemap');
+      expect(callArg).toContain('.mycodemap');
       expect(callArg).toContain('codemap.json');
     });
 

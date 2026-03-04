@@ -33,7 +33,7 @@ vi.mock('../../generator/index.js', () => ({
 
 describe('generate command', () => {
   const testDir = path.join(process.cwd(), 'test-output');
-  const outputDir = path.join(testDir, '.codemap');
+  const outputDir = path.join(testDir, '.mycodemap');
 
   beforeEach(async () => {
     // Clean up test directories
