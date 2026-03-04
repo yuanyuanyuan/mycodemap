@@ -72,7 +72,7 @@ Codemap (结构化输入 → 执行分析)
 | 搜索范围 | TS/JS + Markdown | 配置约束 |
 | Commit 格式 | `[TAG] scope: message` | 强制标签化 (v2.4 新增) |
 | 文件头注释 | `[META]`/`[WHY]` 必填 | CI 门禁 (v2.4 新增) |
-| AI 饲料 | `.codemap/ai-feed.txt` | 自动生成 (v2.4 新增) |
+| AI 饲料 | `.mycodemap/ai-feed.txt` | 自动生成 (v2.4 新增) |
 
 ### 2.3 Benchmark 协议
 
@@ -294,7 +294,7 @@ tests/golden/
 - 扫描文件头注释 `[META]`/`[WHY]`/`[DEPS]`
 - 分析 Git 历史（30天修改频率、标签分布）
 - 计算 GRAVITY/HEAT/IMPACT 三维评分
-- 输出 `.codemap/ai-feed.txt`
+- 输出 `.mycodemap/ai-feed.txt`
 
 > 风险评分公式统一以 `REFACTOR_REQUIREMENTS.md` 第 8.6 节为单一真源。
 
@@ -503,7 +503,7 @@ src/
 | **Phase 5** | 1 天 | 改造现有命令为可调用模式 | 复用能力 | 现有命令模块化，可被编排器调用 | Phase 4 完成 | 本阶段回滚：保留编排器 |
 | **Phase 6** | 1 天 | 实现 `AnalyzeCommand` + 测试关联 | 统一入口 | CLI 入口测试通过，测试关联功能正常 | Phase 5 完成 | 本阶段回滚：保留模块化命令 |
 | **Phase 7** | 1 天 | 实现 Git 分析器 | Git 风险评分 | Git 历史分析、风险评分功能正常 | Phase 6 完成 | 本阶段回滚：保留入口命令 |
-| **Phase 8** | 1 天 | 实现 AI 饲料生成器 | `.codemap/ai-feed.txt` | 生成结构化 AI 消费数据 | Phase 7 完成 | 本阶段回滚：保留 Git 分析 |
+| **Phase 8** | 1 天 | 实现 AI 饲料生成器 | `.mycodemap/ai-feed.txt` | 生成结构化 AI 消费数据 | Phase 7 完成 | 本阶段回滚：保留 Git 分析 |
 | **Phase 9** | 1 天 | 实现 CI 门禁护栏 | CI Gateway | Commit 格式、文件头检查、风险评级 | Phase 8 完成 | 本阶段回滚：保留 AI 饲料 |
 | **Phase 10** | 1 天 | 测试 + 基准验证 | 30 条查询评测 | Hit@8 >= 90%, Token 降低 >= 40% | Phase 9 完成 | 本阶段回滚：保留完整功能 |
 

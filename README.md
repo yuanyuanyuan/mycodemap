@@ -98,7 +98,7 @@ mycodemap generate -o ./docs/codemap  # 指定输出目录
 | 选项 | 说明 | 默认值 |
 |------|------|--------|
 | `-m, --mode <mode>` | 分析模式：`fast`（正则匹配）、`smart`（TypeScript AST）或 `hybrid`（自动选择） | `hybrid` |
-| `-o, --output <dir>` | 输出目录 | `.codemap` |
+| `-o, --output <dir>` | 输出目录 | `.mycodemap` |
 | `--ai-context` | 为每个文件生成描述 | - |
 
 **模式说明：**
@@ -124,7 +124,7 @@ mycodemap watch -m smart        # 使用 smart 模式监听
 | 选项 | 说明 | 默认值 |
 |------|------|--------|
 | `-m, --mode <mode>` | 分析模式 (fast/smart/hybrid) | `hybrid` |
-| `-o, --output <dir>` | 输出目录 | `.codemap` |
+| `-o, --output <dir>` | 输出目录 | `.mycodemap` |
 | `-d, --detach` | 以后台守护进程方式运行 | - |
 | `-s, --stop` | 停止后台守护进程 | - |
 | `-t, --status` | 查看后台守护进程状态 | - |
@@ -366,7 +366,7 @@ mycodemap ci check-output-contract
   ],
 
   // 输出目录
-  "output": ".codemap"
+  "output": ".mycodemap"
 }
 ```
 
@@ -375,7 +375,7 @@ mycodemap ci check-output-contract
 | `mode` | `"fast" \| "smart"` | 分析模式 | `"fast"` |
 | `include` | `string[]` | 包含的文件 glob 模式 | `["src/**/*.ts"]` |
 | `exclude` | `string[]` | 排除的文件 glob 模式 | `["node_modules/**", "dist/**", ...]` |
-| `output` | `string` | 输出目录路径 | `".codemap"` |
+| `output` | `string` | 输出目录路径 | `".mycodemap"` |
 
 ## 输出文件说明
 

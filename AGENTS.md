@@ -629,7 +629,7 @@ Prefer retrieval-led reasoning over pre-training-led reasoning for any tasks.
     "*.test.ts",
     "*.spec.ts"
   ],
-  "output": ".codemap"
+  "output": ".mycodemap"
 }
 ```
 
@@ -646,7 +646,7 @@ Prefer retrieval-led reasoning over pre-training-led reasoning for any tasks.
 
 ## 输出文件说明
 
-运行 `codemap generate` 后，会在输出目录（默认 `.codemap/`）中生成：
+运行 `codemap generate` 后，会在输出目录（默认 `.mycodemap/`）中生成：
 
 | 文件 | 说明 |
 |------|------|

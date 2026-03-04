@@ -280,7 +280,7 @@ jobs:
     - name: Generate code map
       run: |
         npx codemap generate
-        git diff --exit-code .codemap/ || (echo "Code map is out of sync. Run 'codemap generate' and commit the changes." && exit 1)
+        git diff --exit-code .mycodemap/ || (echo "Code map is out of sync. Run 'codemap generate' and commit the changes." && exit 1)
     
     # 6. 评估危险置信度
     - name: Assess risk

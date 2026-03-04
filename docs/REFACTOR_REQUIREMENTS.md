@@ -12,7 +12,7 @@
 - **CI 门禁护栏**：增加 Git Hook + GitHub Actions 双门禁
 - **极简 Commit 格式**：`[TAG] scope: message` 格式，AI 可正则解析
 - **文件头注释强制**：所有 TS 文件必须有 `[META]` 和 `[WHY]` 注释
-- **AI 饲料生成器**：`codemap generate` 生成 `.codemap/ai-feed.txt`
+- **AI 饲料生成器**：`codemap generate` 生成 `.mycodemap/ai-feed.txt`
 - **工作流上下文持久化协议**：`Map/Set` 显式序列化，恢复时反序列化
 - **机器输出契约**：`--output-mode machine --json` 必须为纯 JSON（无前缀日志）
 - **风险评分单一真源**：以本文第 8.6 节公式为唯一实现依据
@@ -42,7 +42,7 @@
 | 搜索范围 | TS/JS + Markdown | 配置约束 |
 | Commit 格式 | `[TAG] scope: message` | 强制标签化 |
 | 文件头注释 | `[META]`/`[WHY]` 必填 | CI 门禁 |
-| AI 饲料 | `.codemap/ai-feed.txt` | 自动生成 |
+| AI 饲料 | `.mycodemap/ai-feed.txt` | 自动生成 |
 
 ### 1.3 技术约束
 
@@ -356,7 +356,7 @@ git commit -m "[FEATURE] git-analyzer: add risk scoring"
 | 1 | 测试通过 | `npm test` | ✅ 所有测试通过 |
 | 2 | Commit 格式 | `CommitValidator.validate()` | ✅ 符合 `[TAG]` 格式 |
 | 3 | 文件头注释 | `FileHeaderScanner.validate()` | ✅ 所有修改文件有 `[META]`+`[WHY]` |
-| 4 | 生成 AI 饲料 | `AIFeedGenerator.generate()` | ✅ 更新 `.codemap/ai-feed.txt` |
+| 4 | 生成 AI 饲料 | `AIFeedGenerator.generate()` | ✅ 更新 `.mycodemap/ai-feed.txt` |
 
 **提交成功** → 推送代码
 
@@ -417,7 +417,7 @@ import { db } from "./db/connection";
 
 ---
 
-**AI 饲料输出示例**（`.codemap/ai-feed.txt`）：
+**AI 饲料输出示例**（`.mycodemap/ai-feed.txt`）：
 
 ```text
 # CODEMAP AI FEED
@@ -441,7 +441,7 @@ DEPS: none
 
 > 用户: "我要改 auth 模块，有什么风险？"
 
-Claude 读取 `.codemap/ai-feed.txt`：
+Claude 读取 `.mycodemap/ai-feed.txt`：
 - `jwt.ts`: GRAVITY=12, HEAT=8/BUGFIX, IMPACT=15 → **火山灰，高风险**
 - `date.ts`: GRAVITY=0, HEAT=0, IMPACT=0 → **沉积岩，低风险**
 
@@ -635,7 +635,7 @@ Confidence: high (0.88)
 
 **Claude Code 翻译**：
 ```bash
-codemap generate --output .codemap/ai-feed.txt
+codemap generate --output .mycodemap/ai-feed.txt
 codemap ci assess-risk --files src/features/rename/
 ```
 
@@ -643,7 +643,7 @@ codemap ci assess-risk --files src/features/rename/
 
 | 步骤 | 操作 | 代码执行 | 输出 |
 |------|------|----------|------|
-| 1 | 生成 AI 饲料 | `AIFeedGenerator.generate()` | 更新 `.codemap/ai-feed.txt` |
+| 1 | 生成 AI 饲料 | `AIFeedGenerator.generate()` | 更新 `.mycodemap/ai-feed.txt` |
 | 2 | 风险文件识别 | `RiskAssessor.identifyHighRiskFiles()` | 高风险文件列表 |
 | 3 | 风险评分计算 | `RiskAssessor.calculateRiskScore(files)` | 每文件风险分 |
 | 4 | 风险聚合 | `RiskAssessor.aggregateRisk()` | 整体风险评估 |
@@ -850,7 +850,7 @@ git add src && git commit -/features/rename/m "[FEATURE] file-rename: add batch 
 
 1. **状态机**：每个阶段有 `pending` → `running` → `completed` → `verified` 状态转换
 2. **检查点**：每个阶段结束时必须产出"交付物"才能进入下一阶段
-3. **上下文持久化**：阶段间自动传递数据和产物到 `.codemap/workflow/`
+3. **上下文持久化**：阶段间自动传递数据和产物到 `.mycodemap/workflow/`
 4. **交互式引导**：CLI 交互式推进各阶段
 
 ### 9.3 阶段契约定义
@@ -910,7 +910,7 @@ $ codemap workflow start "实现文件重命名功能"
 ### 9.6 上下文持久化
 
 ```json
-// .codemap/workflow/{workflow-id}.json
+// .mycodemap/workflow/{workflow-id}.json
 {
   "id": "wf-20260228-001",
   "task": "实现文件重命名功能",

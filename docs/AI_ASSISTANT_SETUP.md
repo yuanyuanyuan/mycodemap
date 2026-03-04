@@ -318,9 +318,9 @@ mycodemap deps -m src/parser
 
 ### 输出文件
 
-- `.codemap/AI_MAP.md` - 项目全局概览，AI 首先读取此文件
-- `.codemap/codemap.json` - 结构化数据
-- `.codemap/context/` - 各模块详细上下文
+- `.mycodemap/AI_MAP.md` - 项目全局概览，AI 首先读取此文件
+- `.mycodemap/codemap.json` - 结构化数据
+- `.mycodemap/context/` - 各模块详细上下文
 ```
 
 #### 方式三：AGENTS.md 指引（详细）
@@ -362,7 +362,7 @@ mycodemap impact -f "src/file.ts"
 ## 关键文件
 
 - `codemap.config.json` - CodeMap 配置文件
-- `.codemap/AI_MAP.md` - 项目全局概览
+- `.mycodemap/AI_MAP.md` - 项目全局概览
 
 ## 开发规范
 
@@ -408,7 +408,7 @@ Use CodeMap CLI for code analysis:
 - `mycodemap impact -f "file"` - Analyze change impact
 - `mycodemap deps -m "module"` - Show dependency tree
 
-Project structure is documented in `.codemap/AI_MAP.md`.
+Project structure is documented in `.mycodemap/AI_MAP.md`.
 ```
 
 ---
@@ -557,7 +557,7 @@ Use CodeMap for code analysis:
 
 ## Key Files
 
-- `.codemap/AI_MAP.md` - Project overview for AI
+- `.mycodemap/AI_MAP.md` - Project overview for AI
 ```
 
 或在 `.vscode/settings.json`：

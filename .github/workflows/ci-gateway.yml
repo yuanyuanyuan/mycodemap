@@ -41,7 +41,7 @@ jobs:
       - name: Generate AI feed and verify sync
         run: |
           npx mycodemap generate
-          git diff --exit-code .codemap/ai-feed.txt || (echo "ERROR: AI feed is out of sync. Run 'mycodemap generate' and commit changes." && exit 1)
+          git diff --exit-code .mycodemap/ai-feed.txt || (echo "ERROR: AI feed is out of sync. Run 'mycodemap generate' and commit changes." && exit 1)
 
       - name: Assess risk
         run: npx mycodemap ci assess-risk --threshold=0.7

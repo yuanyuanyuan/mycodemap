@@ -12,7 +12,7 @@
 
 **新增功能 (v2.4)**:
 - 极简 Commit 格式验证 `[TAG]` 格式
-- AI 饲料生成器 (`.codemap/ai-feed.txt`)
+- AI 饲料生成器 (`.mycodemap/ai-feed.txt`)
 - 文件头注释扫描 `[META]`/`[WHY]`/`[DEPS]`
 - 基于 GRAVITY/HEAT/IMPACT 的危险置信度计算
 
@@ -630,7 +630,7 @@ Git 分析器 (git-analyzer.ts)
     ├── AI 饲料生成器 (ai-feed-generator.ts)
     │   ├── 依赖: FileHeaderScanner
     │   ├── 依赖: GitAnalyzer
-    │   └── 输出: .codemap/ai-feed.txt
+    │   └── 输出: .mycodemap/ai-feed.txt
     │
     ├── Commit 验证器 (commit-validator.ts)
     │   └── 用于: Git Hook / CI

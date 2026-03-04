@@ -693,7 +693,7 @@ class WorkflowOrchestrator {
         analyzeIntent: 'reference',
         entryCondition: { minConfidence: 0.3 },
         deliverables: [
-          { name: 'reference-results', path: '.codemap/workflow/reference.json', validator: () => true }
+          { name: 'reference-results', path: '.mycodemap/workflow/reference.json', validator: () => true }
         ],
         nextPhase: 'impact',
         commands: ['codemap analyze --intent reference']
@@ -704,7 +704,7 @@ class WorkflowOrchestrator {
         analyzeIntent: 'impact',
         entryCondition: { minConfidence: 0.4 },
         deliverables: [
-          { name: 'impact-report', path: '.codemap/workflow/impact.json', validator: () => true }
+          { name: 'impact-report', path: '.mycodemap/workflow/impact.json', validator: () => true }
         ],
         nextPhase: 'risk',
         commands: ['codemap analyze --intent impact']
@@ -715,7 +715,7 @@ class WorkflowOrchestrator {
         ciCommand: 'codemap ci assess-risk --threshold 0.7',
         entryCondition: {},
         deliverables: [
-          { name: 'risk-assessment', path: '.codemap/workflow/risk.json', validator: () => true }
+          { name: 'risk-assessment', path: '.mycodemap/workflow/risk.json', validator: () => true }
         ],
         nextPhase: 'implementation',
         commands: ['codemap ci assess-risk']
@@ -760,7 +760,7 @@ class WorkflowOrchestrator {
 
 class WorkflowPersistence {
   private storagePath = '.codemap/workflow';
-  private activePath = '.codemap/workflow/active.json';
+  private activePath = '.mycodemap/workflow/active.json';
 
   async save(context: WorkflowContext): Promise<void> {
     const fs = require('fs').promises;
