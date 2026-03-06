@@ -151,3 +151,4 @@ custom-output/
 .tasks/
 src/parser/implementations/*.backup
 .mcp.json
+.omc
