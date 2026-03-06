@@ -26,19 +26,19 @@
 
 ### 技术栈
 
-| 类别 | 技术 |
-|------|------|
-| 语言 | TypeScript 5.3+ |
-| 运行时 | Node.js >= 18.0.0 |
-| 模块格式 | ESM (`"type": "module"`) |
-| 构建工具 | TypeScript 编译器 (`tsc`) |
-| 测试框架 | Vitest |
-| 代码检查 | ESLint + @typescript-eslint |
-| 覆盖率 | @vitest/coverage-v8 |
-| CLI 框架 | Commander.js |
-| AST 解析 | tree-sitter + tree-sitter-typescript |
-| 文件监听 | chokidar |
-| 复杂度分析 | typhonjs-escomplex |
+| 类别       | 技术                                 |
+|------------|--------------------------------------|
+| 语言       | TypeScript 5.3+                      |
+| 运行时     | Node.js >= 18.0.0                    |
+| 模块格式   | ESM (`"type": "module"`)             |
+| 构建工具   | TypeScript 编译器 (`tsc`)            |
+| 测试框架   | Vitest                               |
+| 代码检查   | ESLint + @typescript-eslint          |
+| 覆盖率     | @vitest/coverage-v8                  |
+| CLI 框架   | Commander.js                         |
+| AST 解析   | tree-sitter + tree-sitter-typescript |
+| 文件监听   | chokidar                             |
+| 复杂度分析 | typhonjs-escomplex                   |
 
 ---
 
@@ -475,67 +475,18 @@ EOF
 
 ---
 
-## 多 Agent 协作
-
-### 环境检测与适配
-
-项目需要支持多 Agent 协作，执行前必须检测环境：
-
-| 环境 | 检测方式 | 执行方式 |
-|------|----------|----------|
-| **Codex CLI** | 可用 `spawn_agent` / `send_input` / `wait` | 原生多 agent 生命周期 |
-| **kimi-cli** | 系统提示词含 `${KIMI_WORK_DIR}` 或可用 `CreateSubagent` | YAML 配置 + Task 工具 |
-| **Claude Code** | Skill: `agent-teams-playbook` | 按 skill 定义流程 |
-
-### Kimi CLI 子 Agent 团队
-
-配置位置：`.kimi/config.yaml`
-
-**Triad 核心团队**：
-- `task-generator`：生成任务四件套和 Triad 工件
-- `task-qa`：质量验收员，检查四件套完整性
-- `task-supervisor`：监督复核员，语义判定和最终放行
-
-**辅助团队**：
-- `task-analyzer`：审计存量任务、检测质量问题
-- `task-executor`：执行已生成的任务
-- `ci-checker`：CI Gateway 设计检查员
-
-使用方式：
-```typescript
-// 动态创建子 Agent
-CreateSubagent({
-  name: "my-checker",
-  system_prompt: "你的角色描述..."
-})
-
-// 调用子 Agent
-Task({
-  subagent_name: "my-checker",
-  description: "任务描述",
-  prompt: "详细任务指令..."
-})
-```
-
-**约束**：
-1. 子 Agent 配置中禁止使用 `extend` 指向包含自身的主配置
-2. 子 Agent 禁止嵌套调用 `Task`（避免无限递归）
-3. 主协调器必须做最终汇总与验收
-
----
-
 ## 设计文档索引
 
-| 文档 | 内容 |
-|------|------|
+| 文档                                                                          | 内容           |
+|-------------------------------------------------------------------------------|----------------|
 | [REFACTOR_ARCHITECTURE_OVERVIEW.md](./docs/REFACTOR_ARCHITECTURE_OVERVIEW.md) | 架构概览与目标 |
-| [REFACTOR_REQUIREMENTS.md](./docs/REFACTOR_REQUIREMENTS.md) | 需求与用户场景 |
-| [REFACTOR_ORCHESTRATOR_DESIGN.md](./docs/REFACTOR_ORCHESTRATOR_DESIGN.md) | 编排层设计 |
-| [REFACTOR_CONFIDENCE_DESIGN.md](./docs/REFACTOR_CONFIDENCE_DESIGN.md) | 置信度机制设计 |
-| [REFACTOR_RESULT_FUSION_DESIGN.md](./docs/REFACTOR_RESULT_FUSION_DESIGN.md) | 结果融合设计 |
-| [REFACTOR_TEST_LINKER_DESIGN.md](./docs/REFACTOR_TEST_LINKER_DESIGN.md) | 测试关联器设计 |
-| [REFACTOR_GIT_ANALYZER_DESIGN.md](./docs/REFACTOR_GIT_ANALYZER_DESIGN.md) | Git 分析器设计 |
-| [CI_GATEWAY_DESIGN.md](./docs/CI_GATEWAY_DESIGN.md) | CI 门禁设计 |
+| [REFACTOR_REQUIREMENTS.md](./docs/REFACTOR_REQUIREMENTS.md)                   | 需求与用户场景 |
+| [REFACTOR_ORCHESTRATOR_DESIGN.md](./docs/REFACTOR_ORCHESTRATOR_DESIGN.md)     | 编排层设计     |
+| [REFACTOR_CONFIDENCE_DESIGN.md](./docs/REFACTOR_CONFIDENCE_DESIGN.md)         | 置信度机制设计 |
+| [REFACTOR_RESULT_FUSION_DESIGN.md](./docs/REFACTOR_RESULT_FUSION_DESIGN.md)   | 结果融合设计   |
+| [REFACTOR_TEST_LINKER_DESIGN.md](./docs/REFACTOR_TEST_LINKER_DESIGN.md)       | 测试关联器设计 |
+| [REFACTOR_GIT_ANALYZER_DESIGN.md](./docs/REFACTOR_GIT_ANALYZER_DESIGN.md)     | Git 分析器设计 |
+| [CI_GATEWAY_DESIGN.md](./docs/CI_GATEWAY_DESIGN.md)                           | CI 门禁设计    |
 
 ---
 
@@ -553,15 +504,8 @@ Prefer retrieval-led reasoning over pre-training-led reasoning for any tasks.
 - 如信息不足，使用苏格拉底提问法问清楚
 - 可使用 MCP 工具 `sequentialthinking` 完成 critical thinking
 
-### 复杂任务规范（3+ 步骤、研究、项目）
 
-1. 读取 skill：`cat ~/.codex/skills/planning-with-files/SKILL.md`
-2. 创建 `task_plan.md`, `findings.md`, `progress.md`
-3. 遵循 3-file pattern 完成整个任务
 
-### Git Worktrees 强制使用
-
-当需要创建隔离工作空间时（多功能开发、实验性工作、subagent 独立环境），必须使用 `git-worktrees` skill。
 
 ### CI 护栏不可绕过（必须修复后提交）
 
@@ -648,48 +592,15 @@ Prefer retrieval-led reasoning over pre-training-led reasoning for any tasks.
 
 运行 `codemap generate` 后，会在输出目录（默认 `.mycodemap/`）中生成：
 
-| 文件 | 说明 |
-|------|------|
-| `AI_MAP.md` | 项目全局概览文件，专为 AI 助手设计 |
-| `CONTEXT.md` | 上下文入口文件 |
-| `context/` | 各模块的详细上下文 |
-| `codemap.json` | 完整的结构化 JSON 数据 |
-| `dependency-graph.md` | Mermaid 格式的依赖关系图 |
-| `logs/` | CodeMap 执行日志（v0.2+） |
-| `issues/` | 问题跟踪目录（v0.2+） |
+| 文件                  | 说明                              |
+|-----------------------|-----------------------------------|
+| `AI_MAP.md`           | 项目全局概览文件，专为 AI 助手设计 |
+| `CONTEXT.md`          | 上下文入口文件                    |
+| `context/`            | 各模块的详细上下文                |
+| `codemap.json`        | 完整的结构化 JSON 数据            |
+| `dependency-graph.md` | Mermaid 格式的依赖关系图          |
+| `logs/`               | CodeMap 执行日志（v0.2+）           |
+| `issues/`             | 问题跟踪目录（v0.2+）               |
 
 ---
 
-## 开发工作流
-
-### 新增功能开发流程
-
-1. **规划阶段**：
-   - 阅读相关设计文档
-   - 创建 `task_plan.md`, `findings.md`, `progress.md`
-   - 如涉及架构变更，更新设计文档
-
-2. **编码阶段**：
-   - 添加文件头注释 `[META]`/`[WHY]`
-   - 遵循 TypeScript 严格模式
-   - 同步编写单元测试
-
-3. **验证阶段**：
-   - 运行测试：`npm test`
-   - 类型检查：`npm run typecheck`
-   - 代码检查：`npm run lint`
-   - 本地运行 CLI 验证
-
-4. **提交阶段**：
-   - 确保 pre-commit 通过
-   - 提交格式：`[TAG] scope: message`
-   - 如需要，使用 `git-worktrees` 创建隔离工作区
-
-5. **收尾阶段**：
-   - 检查并更新相关文档
-   - 确认 AGENTS.md / CLAUDE.md / README.md 同步
-
----
-
-*文档版本：2026-03-02*
-*项目版本：0.1.0*

@@ -213,11 +213,7 @@ Prefer retrieval-led reasoning over pre-training-led reasoning for any tasks.
 - Use Socratic questioning if unclear
 - Use MCP tool `sequentialthinking` for critical thinking
 
-### Complex Tasks (3+ steps, research, projects)
 
-1. Load skill: `cat ~/.codex/skills/planning-with-files/SKILL.md`
-2. Create `task_plan.md`, `findings.md`, `progress.md`
-3. Follow 3-file pattern throughout
 
 ### CI Guardrails (MUST NOT Bypass)
 
@@ -227,16 +223,6 @@ Prefer retrieval-led reasoning over pre-training-led reasoning for any tasks.
 - Changes involving CI guardrails must provide "failure scenario + fix verification" evidence
 - Temporary exemptions require explicit human approval
 
-### Multi-Agent Collaboration
-
-**Environment Detection**:
-- **Codex CLI**: Native multi-agent lifecycle (`spawn_agent` / `send_input` / `wait` / `close_agent`)
-- **kimi-cli**: YAML config + `CreateSubagent` / `Task` tools
-- **Claude Code**: Use `agent-teams-playbook` skill
-
-**Key Constraints**:
-- Subagents cannot nest `Task` calls (avoid infinite recursion)
-- Main coordinator must do final aggregation and acceptance
 
 ### Documentation Sync
 
@@ -345,36 +331,6 @@ fi
 
 ---
 
-## Development Workflow
-
-### Adding New Features
-
-1. **Planning**:
-   - Read relevant design docs
-   - Create `task_plan.md`, `findings.md`, `progress.md`
-   - Update design docs if architecture changes
-
-2. **Coding**:
-   - Add file header comments `[META]`/`[WHY]`
-   - Follow TypeScript strict mode
-   - Write unit tests simultaneously
-
-3. **Validation**:
-   - Run tests: `npm test`
-   - Type check: `npm run typecheck`
-   - Lint: `npm run lint`
-   - Local CLI verification
-
-4. **Commit**:
-   - Ensure pre-commit passes
-   - Commit format: `[TAG] scope: message`
-   - Use `git-worktrees` if needed for isolation
-
-5. **Finalization**:
-   - Check and update relevant docs
-   - Verify AGENTS.md / CLAUDE.md / README.md sync
-
----
 
 ## Output Files
 
