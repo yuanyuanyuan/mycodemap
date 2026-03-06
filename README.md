@@ -207,6 +207,55 @@ mycodemap impact -f src/cli/index.ts -j     # JSON 格式输出
 | `-t, --transitive` | 包含传递依赖（间接影响） | - |
 | `-j, --json` | 以 JSON 格式输出 | - |
 
+### `mycodemap report`
+
+生成代码地图分析报告，汇总分析结果和运行日志。
+
+```bash
+mycodemap report                   # 生成最近 7 天的报告
+mycodemap report -d 14             # 生成最近 14 天的报告
+mycodemap report -o ./reports      # 指定输出目录
+mycodemap report -v                # 显示详细信息
+```
+
+| 选项 | 说明 | 默认值 |
+|------|------|------|
+| `-o, --output <dir>` | 输出目录 | `.mycodemap` |
+| `-d, --days <number>` | 报告覆盖的天数 | `7` |
+| `-j, --json` | JSON 格式输出 | - |
+| `-v, --verbose` | 显示详细信息 | - |
+
+### `mycodemap logs`
+
+管理代码地图运行时日志（列出、导出、清理）。
+
+```bash
+# 列出日志
+mycodemap logs list                # 列出最近 10 条日志
+mycodemap logs list -l 20          # 列出最近 20 条
+mycodemap logs list --level ERROR  # 仅列出错误日志
+mycodemap logs list -j             # JSON 格式输出
+
+# 导出日志
+mycodemap logs export              # 导出最近 7 天的日志
+mycodemap logs export -d 30        # 导出最近 30 天的日志
+mycodemap logs export -o ./logs.zip # 指定导出文件
+mycodemap logs export --format txt # 导出为文本格式
+
+# 清理日志
+mycodemap logs clear -d 30 --confirm  # 清理 30 天前的日志
+```
+
+| 选项 | 说明 | 默认值 |
+|------|------|------|
+| `-l, --limit <number>` | 限制显示数量 | `10` |
+| `--level <level>` | 按级别过滤 (`INFO`/`WARN`/`ERROR`/`DEBUG`) | - |
+| `-j, --json` | JSON 格式输出 | - |
+| `-o, --output <file>` | 导出文件路径 | - |
+| `-d, --days <number>` | 天数 | 视子命令而定 |
+| `--format <format>` | 导出格式 (`json`/`txt`) | `json` |
+| `-c, --confirm` | 确认清理操作 | - |
+
 ## 工作流编排 (v2.5)
 
 CodeMap v2.5 引入智能工作流编排系统，将复杂任务分解为 6 个有序阶段，每个阶段自动分析并传递上下文。

@@ -15,11 +15,52 @@ import { impactCommand } from './commands/impact.js';
 import { analyzeCommand } from './commands/analyze.js';
 import { ciCommand } from './commands/ci.js';
 import { workflowCommand } from './commands/workflow.js';
+import { reportCommand } from './commands/report.js';
+import { logsCommand } from './commands/logs.js';
 import { setupRuntimeLogging } from './runtime-logger.js';
+import { runFirstRunGuide } from './first-run-guide.js';
+import { printMigrationWarning } from './paths.js';
+import { validatePlatform } from './platform-check.js';
+import { commandRequiresTreeSitter, validateTreeSitter } from './tree-sitter-check.js';
 
 const program = new Command();
 
+// 检测并显示迁移提示（需要在 runtime-logging 之前执行，避免创建 .mycodemap 影响检测）
+printMigrationWarning();
+
+// 检测并显示首次运行引导（需要在 runtime-logging 之前执行，避免创建 .mycodemap 影响检测）
+runFirstRunGuide();
+
 setupRuntimeLogging(process.argv.slice(2));
+
+// 验证平台支持（CLI 启动时执行）
+try {
+  const platformInfo = validatePlatform();
+  if (platformInfo.supportLevel === 'partial') {
+    console.warn('⚠️  平台支持级别: partial');
+    platformInfo.warnings.forEach(w => console.warn(`  - ${w}`));
+  }
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+}
+
+/**
+ * 包装命令 action，按需检测 tree-sitter
+ */
+function wrapWithTreeSitterCheck<T>(commandName: string, action: (options: T) => void | Promise<void>): (options: T) => void | Promise<void> {
+  return async (options: T) => {
+    if (commandRequiresTreeSitter(commandName)) {
+      try {
+        validateTreeSitter();
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exit(1);
+      }
+    }
+    return action(options);
+  };
+}
 
 program
   .name('mycodemap')
@@ -127,5 +168,31 @@ program.addCommand(ciCommand);
 
 // Workflow 命令
 program.addCommand(workflowCommand);
+
+// Report 命令
+program
+  .command('report')
+  .description('生成代码地图分析报告')
+  .option('-o, --output <dir>', '输出目录', '.mycodemap')
+  .option('-d, --days <number>', '报告覆盖的天数', '7')
+  .option('-j, --json', 'JSON 格式输出')
+  .option('-v, --verbose', '显示详细信息')
+  .action(reportCommand);
+
+// Logs 命令
+program
+  .command('logs')
+  .description('管理代码地图日志')
+  .argument('<subcommand>', '子命令 (list|export|clear)')
+  .option('-l, --limit <number>', '限制显示数量', '10')
+  .option('--level <level>', '按级别过滤 (INFO|WARN|ERROR|DEBUG)')
+  .option('-j, --json', 'JSON 格式输出')
+  .option('-o, --output <file>', '导出文件路径')
+  .option('-d, --days <number>', '天数')
+  .option('--format <format>', '导出格式 (json|txt)', 'json')
+  .option('-c, --confirm', '确认清理操作')
+  .action(async (subcommand: string, options: Record<string, unknown>) => {
+    await logsCommand(subcommand, options);
+  });
 
 program.parse();
