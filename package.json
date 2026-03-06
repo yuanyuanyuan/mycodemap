@@ -29,7 +29,8 @@
     "typecheck": "tsc --noEmit",
     "benchmark": "bash scripts/run-benchmark.sh",
     "test:all": "npm run test && npm run benchmark",
-    "prepublishOnly": "npm run build && npm test"
+    "prepublishOnly": "npm run build && npm test",
+    "validate-pack": "node scripts/validate-pack.js"
   },
   "keywords": [
     "typescript",
