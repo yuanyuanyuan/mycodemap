@@ -382,4 +382,4 @@ codemap generate
 
 - [CodeMap GitHub](https://github.com/stark020/codemap)
 - [CodeMap npm](https://www.npmjs.com/package/@mycodemap/mycodemap)
-- [完整 CLI 文档](./README.md)
+- [完整 CLI 文档](../../README.md)

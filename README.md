@@ -60,6 +60,8 @@ ls .mycodemap/
 
 | 文档 | 目标读者 | 内容 |
 |------|----------|------|
+| [🧭 文档索引](docs/README.md) | 所有读者 | 文档分层、阅读顺序与迁移状态 |
+| [🏗️ 架构总图](ARCHITECTURE.md) | 开发者 / AI | 系统地图、模块边界、主执行流 |
 | [📖 安装配置指南](docs/SETUP_GUIDE.md) | 人类开发者 | 完整的安装、配置和使用指南 |
 | [🤖 AI 助手集成指南](docs/AI_ASSISTANT_SETUP.md) | AI 用户 | Kimi/Claude/Codex/Copilot 配置指引 |
 | [📁 配置示例](examples/) | 所有用户 | 各平台的现成配置文件 |
@@ -550,7 +552,7 @@ mkdir -p .agents/skills/codemap
 cp examples/codex/codemap-agent.md .agents/skills/codemap/SKILL.md
 ```
 
-详细配置请参考 [AI_ASSISTANT_SETUP.md](docs/AI_ASSISTANT_SETUP.md)。
+详细配置请参考 [AI_ASSISTANT_SETUP.md](docs/AI_ASSISTANT_SETUP.md)，设计与规则入口请先看 [docs/README.md](docs/README.md)。
 
 ## 新增 CLI 命令
 

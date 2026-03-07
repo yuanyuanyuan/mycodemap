@@ -296,7 +296,7 @@ tests/golden/
 - 计算 GRAVITY/HEAT/IMPACT 三维评分
 - 输出 `.mycodemap/ai-feed.txt`
 
-> 风险评分公式统一以 `REFACTOR_REQUIREMENTS.md` 第 8.6 节为单一真源。
+> 风险评分公式统一以 `../product-specs/REFACTOR_REQUIREMENTS.md` 第 8.6 节为单一真源。
 
 **详见**: [REFACTOR_GIT_ANALYZER_DESIGN.md](./REFACTOR_GIT_ANALYZER_DESIGN.md) 第4节
 
@@ -544,7 +544,7 @@ src/
 
 - 评估报告: `CODEMAP_ASSESSMENT_REPORT.md`
 - 方案对比: `MULTI_TOOL_REFACTOR_OPTIONS.md`
-- 需求与用户场景: `REFACTOR_REQUIREMENTS.md`
+- 需求与用户场景: `../product-specs/REFACTOR_REQUIREMENTS.md`
 - **CI 门禁设计: `CI_GATEWAY_DESIGN.md` (v2.4 新增)**
 
 ### 参考资源

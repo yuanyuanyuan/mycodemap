@@ -959,11 +959,11 @@ $ codemap workflow start "实现文件重命名功能"
 
 - 评估报告: `CODEMAP_ASSESSMENT_REPORT.md`
 - 方案对比: `MULTI_TOOL_REFACTOR_OPTIONS.md`
-- 系统架构与功能设计: `REFACTOR_ARCHITECTURE_DESIGN.md`
-- Git 分析器设计: `REFACTOR_GIT_ANALYZER_DESIGN.md` (含 AI 饲料生成器)
-- CI 门禁设计: `CI_GATEWAY_DESIGN.md`
-- 结果融合设计: `REFACTOR_RESULT_FUSION_DESIGN.md`
-- 编排层设计: `REFACTOR_ORCHESTRATOR_DESIGN.md` (含工作流编排器 v2.5 规划)
+- 系统架构与功能设计: `../design-docs/REFACTOR_ARCHITECTURE_OVERVIEW.md`
+- Git 分析器设计: `../design-docs/REFACTOR_GIT_ANALYZER_DESIGN.md` (含 AI 饲料生成器)
+- CI 门禁设计: `../design-docs/CI_GATEWAY_DESIGN.md`
+- 结果融合设计: `../design-docs/REFACTOR_RESULT_FUSION_DESIGN.md`
+- 编排层设计: `../design-docs/REFACTOR_ORCHESTRATOR_DESIGN.md` (含工作流编排器 v2.5 规划)
 
 ### B. 参考资源
 

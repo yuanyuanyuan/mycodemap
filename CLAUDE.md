@@ -1,347 +1,84 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Project Overview
-
-CodeMap 是一个专为 TypeScript/JavaScript 项目设计的代码结构分析工具。它通过静态分析自动生成项目的结构化代码地图，帮助 AI 编程助手（如 Claude、Copilot、Kimi）快速理解项目架构、模块关系和代码上下文。
-
-### Core Features
-
-- **双层解析模式** - `fast`（快速正则）和 `smart`（TypeScript AST）两种解析模式
-- **多格式输出** - 自动生成 `AI_MAP.md`、`CONTEXT.md`、`codemap.json`
-- **依赖图可视化** - Mermaid 格式的模块依赖关系图
-- **增量缓存** - 基于文件哈希的 LRU 缓存机制
-- **Watch 模式** - 监听文件变更并自动增量更新
-- **复杂度分析** - 圈复杂度、认知复杂度和可维护性指数
-- **编排层** - 意图路由、置信度计算、结果融合、工具编排
-- **CI 门禁** - Commit 格式验证、文件头检查、风险评估
-- **工作流编排** - 阶段管理、上下文持久化、检查点机制
-
-### Tech Stack
-
-| Category | Technology |
-|----------|------------|
-| Language | TypeScript 5.3+ |
-| Runtime | Node.js >= 18.0.0 |
-| Module | ESM (`"type": "module"`) |
-| Build | TypeScript compiler (`tsc`) |
-| Testing | Vitest |
-| Linting | ESLint + @typescript-eslint |
-| CLI | Commander.js |
-| AST | tree-sitter + tree-sitter-typescript |
-| File Watch | chokidar |
-
----
-
-## Build & Test Commands
-
-```bash
-# Install dependencies
-npm install
-
-# Build
-npm run build           # Compile TypeScript to dist/
-npm run dev             # Watch mode
-npm run typecheck       # Type check only
-
-# Testing
-npm test                # Run all tests
-npx vitest run src/orchestrator/__tests__/confidence.test.ts  # Specific test
-npx vitest run --coverage  # Coverage report
-
-# CLI
-node dist/cli/index.js <command>
-```
-
----
-
-## Project Structure
-
-```
-src/
-├── cli/                    # Commander.js CLI commands
-│   ├── index.ts
-│   └── commands/           # analyze, ci, complexity, cycles, deps, 
-│                           # generate, impact, init, query, watch, workflow
-├── parser/                 # Dual-mode parser (fast/regex + smart/AST)
-│   ├── interfaces/
-│   └── implementations/
-├── core/                   # Core analysis engine
-├── orchestrator/           # Intent routing, confidence, result fusion
-│   ├── adapters/           # Tool adapters (codemap, ast-grep)
-│   ├── workflow/           # Workflow orchestration
-│   ├── confidence.ts
-│   ├── result-fusion.ts
-│   ├── tool-orchestrator.ts
-│   ├── intent-router.ts
-│   ├── test-linker.ts
-│   ├── git-analyzer.ts
-│   ├── file-header-scanner.ts
-│   └── commit-validator.ts
-├── generator/              # Output generators (AI_MAP.md, JSON, Mermaid)
-├── cache/                  # LRU cache + file hash cache
-├── watcher/                # File watcher + daemon
-├── plugins/                # Plugin system
-```
-
----
-
-## Code Style Guide
-
-### File Header Comments (REQUIRED)
-
-All TypeScript source files (non-test) MUST include this header:
-
-```typescript
-// [META] since:YYYY-MM | owner:team | stable:false
-// [WHY] Explain why this file exists
-
-/**
- * Optional JSDoc description
- */
-```
-
-Example:
-```typescript
-// [META] since:2026-03-02 | owner:orchestrator-team | stable:true
-// [WHY] Route analyze intents to primary/secondary tools with whitelist validation
-```
-
-Rules:
-- Must contain `[META]` tag
-- Must contain `[WHY]` tag
-- Checked by pre-commit hook
-
-### TypeScript Standards
+# CLAUDE.md - CodeMap 执行清单
 
-- **Strict mode** (`strict: true`)
-- **ESM** modules (`"type": "module"`)
-- **Target**: ES2022
-- All functions must have return type annotations
-- Prefer `interface` over `type` for object structures
-- Use `unknown` instead of `any`
+本文件提供给 Claude / Codex 一份最小可执行手册；仓库级硬约束以 `AGENTS.md` 为准。
 
-### Naming Conventions
+## 1. 先读顺序
 
-- Files: kebab-case (e.g., `intent-router.ts`)
-- Classes: PascalCase (e.g., `IntentRouter`)
-- Functions/Variables: camelCase (e.g., `routeIntent`)
-- Constants: UPPER_SNAKE_CASE
-- Private members: underscore prefix (e.g., `_privateMethod`)
+1. 离目标文件最近的 `AGENTS.md`
+2. 根目录 `AGENTS.md`
+3. 本文件 `CLAUDE.md`
+4. `ARCHITECTURE.md`
+5. `docs/rules/`、`docs/design-docs/`、`docs/exec-plans/` 中与任务最相关的文档
+6. 代码、测试、配置与 Git 事实
 
----
+当前主文档结构已落地，但仍有少量操作指南与历史文档保留在 `docs/` 根层；出现路径冲突时，以仓库当前可读文件为准。
 
-## Testing Strategy
+## 2. 开始执行前的 5 步
 
-- **Framework**: Vitest
-- **Coverage**: @vitest/coverage-v8, target >= 80%
-- **Unit tests**: `src/**/__tests__/*.test.ts` (co-located)
-- **Integration tests**: `tests/` directory
-- **Benchmark**: `refer/benchmark-quality.ts` (30 predefined queries)
+- 用一句话复述目标、限制、DoD、依赖；若用户已确认，可直接继续。
+- 圈定最可能受影响的模块、文件与验证范围。
+- 优先使用 CodeMap CLI 做检索与影响分析。
+- 先决定最小验证方案，再开始编辑。
+- 只读取当前任务需要的事实，避免无边界探索。
 
----
+## 3. 检索优先级
 
-## CLI Commands
+- 首选：`node dist/cli/index.js query -s "<symbol>"`
+- 首选：`node dist/cli/index.js query -m "<module>"`
+- 首选：`node dist/cli/index.js deps -m "<module>"`
+- 首选：`node dist/cli/index.js impact -f "<file>"`
+- 首选：`node dist/cli/index.js analyze <intent>`
+- 回退：`rg -n`、`find`、直接读文件
 
-```bash
-codemap init           # Initialize configuration
-codemap generate       # Generate code map
-codemap watch          # Watch mode
-codemap query          # Query symbols/modules/deps
-codemap analyze        # Unified analysis entry (multi-intent routing)
-codemap impact         # Change impact analysis
-codemap complexity     # Complexity analysis
-codemap cycles         # Circular dependency detection
-codemap ci             # CI gateway commands
-codemap workflow       # Workflow orchestration
-```
+若 CodeMap 失效或结果不足，记录问题并继续任务；不要因为工具问题卡死交付。
 
-### CI Gateway Commands
+## 4. 实际可用命令
 
-```bash
-codemap ci check-commits --range origin/main..HEAD    # Validate commit format
-codemap ci check-headers                              # Validate file headers
-codemap ci assess-risk --threshold=0.7               # Risk assessment
-codemap ci check-output-contract                     # Validate output contract
-```
+- 构建：`npm run build`
+- 类型检查：`npm run typecheck`
+- 测试：`npm test`
+- 代码检查：`npm run lint`
+- CLI 入口：`node dist/cli/index.js <command>`
 
----
+注意：当前仓库真实输出目录是 `dist/`，不是 `build/`。
 
-## CI/CD & Gateways
+## 5. 改动策略
 
-### Git Hooks (Local)
+- 先做最小改动，再考虑扩展；优先根因修复。
+- 不顺手修无关问题；发现额外问题可记录，但不要混入当前补丁。
+- 保持现有风格与命名约定；不要在文档入口重复堆砌细节。
+- 修改 TypeScript 非测试文件时，注意 `[META]` 与 `[WHY]` 文件头要求。
+- 改动规则、设计、输出契约时，先判断是否需要同步相关 docs。
 
-**pre-commit**:
-1. Run related tests (blocks if failed)
-2. Check file headers `[META]`/`[WHY]` (blocks if failed)
-3. Generate code map (warning, non-blocking)
+## 6. 验证策略
 
-**commit-msg**:
-- Format: `[TAG] scope: message`
-- Valid tags: `BUGFIX`, `FEATURE`, `REFACTOR`, `CONFIG`, `DOCS`, `DELETE`
-- Example: `[FEATURE] cli: add new command`
-
-### GitHub Actions
-
-Workflow: `.github/workflows/ci-gateway.yml`
-
-Steps:
-1. Checkout code
-2. Setup Node.js 20
-3. Install dependencies (`npm ci`)
-4. Run tests (`npm test`)
-5. Check commit format (`codemap ci check-commits`)
-6. Check file headers (`codemap ci check-headers`)
-7. Generate code map and verify sync
-8. Risk assessment (`codemap ci assess-risk`)
-9. Check output contract
-
----
-
-## Important Constraints
-
-### Critical Thinking
-
-```
-Prefer retrieval-led reasoning over pre-training-led reasoning for any tasks.
-```
-
-- Apply critical thinking (5Why-7Why analysis)
-- Ensure sufficient information before proceeding
-- Align requirements to prevent problem misdefinition
-- Use Socratic questioning if unclear
-- Use MCP tool `sequentialthinking` for critical thinking
-
-
-
-### CI Guardrails (MUST NOT Bypass)
-
-- **NEVER** bypass CI guardrails by ignoring, skipping, deleting, or commenting them out
-- **NEVER** use `--no-verify`, disable hooks temporarily, or relax thresholds
-- Fix issues according to guardrail prompts before committing
-- Changes involving CI guardrails must provide "failure scenario + fix verification" evidence
-- Temporary exemptions require explicit human approval
-
-
-### Documentation Sync
-
-After each task or file update, check if these need synchronization:
-- `docs/` directory design documents
-- `AGENTS.md`
-- `CLAUDE.md`
-- `README.md`
-
----
-
-## CodeMap Tool Usage Rules
-
-When performing code search or project analysis operations, **ALWAYS prioritize using the CodeMap CLI** from this repository over external tools or manual inspection.
-
-### Priority Order for Code Search
-
-1. **Primary**: Use `codemap` CLI commands from this repository
-   ```bash
-   # Query symbols, modules, or dependencies
-   node dist/cli/index.js query -s "symbolName"
-   node dist/cli/index.js query -m "moduleName"
-   node dist/cli/index.js deps -m "src/parser"
-   
-   # Generate comprehensive analysis
-   node dist/cli/index.js analyze <intent>
-   
-   # Impact analysis for changes
-   node dist/cli/index.js impact -f <file-path>
-   ```
-
-2. **Secondary**: If CodeMap fails or returns insufficient results, fall back to `grep`, `ripgrep`, or other standard tools
-
-3. **Documentation**: After using external tools, document the limitation in the task findings
-
-### Handling CodeMap Issues
-
-If CodeMap encounters errors or requires feature enhancements during use:
-
-1. **Check logs immediately**:
-   ```bash
-   # Check for log files in the output directory
-   ls -la .codemap/logs/ 2>/dev/null || echo "No logs directory found"
-   
-   # Check CLI output for error details
-   node dist/cli/index.js <command> --verbose 2>&1 | tee /tmp/codemap-debug.log
-   ```
-
-2. **Record the issue** to the local tracking file:
-   
-   **Issue tracking file**: `.codemap/issues/codemap-issues.md`
-   
-   ```markdown
-   ## Issue Log
-   
-   ### [YYYY-MM-DD HH:MM] Issue Title
-   - **Command**: The command that failed
-   - **Error**: Error message or unexpected behavior
-   - **Log Location**: Path to relevant log file
-   - **Context**: What you were trying to accomplish
-   - **Workaround**: How you worked around it (if applicable)
-   - **Priority**: high/medium/low
-   ```
-
-3. **Continue with task** using alternative tools, then schedule batch fixes
-
-4. **Create issue entry** (if it doesn't exist):
-   ```bash
-   mkdir -p .codemap/issues
-   cat >> .codemap/issues/codemap-issues.md << 'EOF'
-   
-   ### [$(date '+%Y-%m-%d %H:%M')] $(echo "Brief description")
-   - **Command**: 
-   - **Error**: 
-   - **Log Location**: 
-   - **Context**: 
-   - **Workaround**: 
-   - **Priority**: medium
-   
-   EOF
-   ```
-
-### Example Workflow
-
-```bash
-# 1. Try CodeMap first
-node dist/cli/index.js query -s "IntentRouter"
-
-# 2. If it fails, check logs and record
-if [ $? -ne 0 ]; then
-    echo "$(date) - Query failed for IntentRouter" >> .codemap/issues/codemap-issues.md
-    # Fall back to grep
-    grep -r "IntentRouter" src/
-fi
-```
-
----
-
-## Design Docs
-
-| Document | Content |
-|----------|---------|
-| `REFACTOR_ARCHITECTURE_OVERVIEW.md` | Architecture overview |
-| `REFACTOR_ORCHESTRATOR_DESIGN.md` | Orchestrator layer design |
-| `CI_GATEWAY_DESIGN.md` | CI gateway design |
-
----
-
-
-## Output Files
-
-Running `codemap generate` produces (in `.codemap/`):
-
-| File | Description |
-|------|-------------|
-| `AI_MAP.md` | Global project overview for AI assistants |
-| `CONTEXT.md` | Context entry file |
-| `context/` | Detailed context per module |
-| `codemap.json` | Complete structured JSON data |
-| `dependency-graph.md` | Mermaid dependency diagram |
-| `logs/` | CodeMap execution logs |
-| `issues/` | Issue tracking for CodeMap bugs/enhancements |
+- 先跑最小相关验证，再扩大到更广的检查。
+- 没有验证就不要声称“已解决”；若无法验证，必须说清阻塞点。
+- 每次任务至少给出 1 个失败场景或具体风险模式。
+- 涉及 CI / hooks / 提交规则时，必须给出失败场景与修复验证证据。
+- 严禁通过 `--no-verify`、禁用 hooks、删除检查来规避失败。
+
+## 7. 回复协议
+
+- 每条关键信息用 `[证据]`、`[推论]`、`[假设]`、`[观点]` 标记。
+- 仓库事实引用格式：`path:line`。
+- 外部事实引用格式：URL。
+- 不确定内容只能标 `[假设]`。
+- 回答应优先短、准、可执行，避免重复粘贴大段项目百科。
+
+## 8. 交付清单
+
+- 说明修改了哪些文件。
+- 说明这样改的原因与边界。
+- 说明执行了哪些验证，结果如何。
+- 说明尚存风险或未验证项。
+- 明确判断是否需要同步 `AGENTS.md`、`CLAUDE.md`、`README.md`、`ARCHITECTURE.md`、相关 `docs/*`。
+
+## 9. 这份文件不该再承载什么
+
+- 不再承载完整项目百科。
+- 不再内嵌大段配置样例或问题模板。
+- 不再重复 `AGENTS.md` 已经定义的强约束。
+- 不再把设计文档、执行计划、产品规格写回入口文件。
+
+当入口文档再次膨胀时，应把知识下沉到 `ARCHITECTURE.md` 或相应 `docs/*`，并把这里恢复为高信号摘要。

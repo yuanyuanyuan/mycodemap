@@ -482,4 +482,4 @@ codemap --version
 ### 14.2 归档策略
 
 - [观点] `docs/archive/PUBLISH_NPM_DESIGN_V1.md` 与 `docs/archive/PUBLISH_NPM_DESIGN_V2.md` 为历史参考，不再作为实施基线。
-- [观点] `docs/PUBLISH_NPM_DESIGN_FINAL.md` 作为唯一实施设计文档。
+- [观点] `docs/design-docs/PUBLISH_NPM_DESIGN_FINAL.md` 作为唯一实施设计文档。

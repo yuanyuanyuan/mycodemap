@@ -323,7 +323,7 @@ jobs:
 
 ### 其他 CI 平台
 
-参考 [CI_GATEWAY_DESIGN.md](./CI_GATEWAY_DESIGN.md) 了解所有检查项。
+参考 [CI_GATEWAY_DESIGN.md](./design-docs/CI_GATEWAY_DESIGN.md) 了解所有检查项。
 
 ---
 
@@ -404,4 +404,4 @@ CLI 运行日志默认写入 `.mycodemap/logs/mycodemap-YYYY-MM-DD.log`
 
 - 了解 [AI 助手配置](./AI_ASSISTANT_SETUP.md)
 - 查看 [CLI 完整命令参考](../README.md#cli-命令)
-- 阅读 [架构设计文档](./REFACTOR_ARCHITECTURE_OVERVIEW.md)
+- 阅读 [架构设计文档](./design-docs/REFACTOR_ARCHITECTURE_OVERVIEW.md)

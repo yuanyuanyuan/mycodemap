@@ -279,7 +279,7 @@ calculateRiskScore(
   const unstableRatio = unstableCount / (fileFeeds.length || 1);
   const stabilityBoost = unstableRatio * 0.15;
 
-  // 6. 综合评分（单一真源：REFACTOR_REQUIREMENTS.md 8.6）
+  // 6. 综合评分（单一真源：../product-specs/REFACTOR_REQUIREMENTS.md 8.6）
   const totalScore = Math.min(
     Math.max(
       gravityScore * 0.30 +
@@ -589,7 +589,7 @@ class CommitValidator {
 
 ### 6.1 三维评估模型
 
-> **注意**: 风险评分公式以 `REFACTOR_REQUIREMENTS.md` 为单一真源。
+> **注意**: 风险评分公式以 `../product-specs/REFACTOR_REQUIREMENTS.md` 为单一真源。
 > 此处实现应与需求文档保持一致。
 
 | 维度 | 指标 | 计算方式 | 权重 |
