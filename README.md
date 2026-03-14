@@ -2,7 +2,7 @@
 
 > TypeScript 代码地图工具 - 为 AI 辅助开发提供结构化上下文
 
-CodeMap 是一个专为 TypeScript/JavaScript 项目设计的代码分析工具。它通过静态分析自动生成项目的结构化代码地图，帮助 AI 编程助手（如 Claude、Copilot）快速理解项目架构、模块关系和代码上下文。
+CodeMap 是一个专为 TypeScript/JavaScript/Go 项目设计的代码分析工具。它通过静态分析自动生成项目的结构化代码地图，帮助 AI 编程助手（如 Claude、Copilot）快速理解项目架构、模块关系和代码上下文。
 
 ## 特性
 
@@ -62,6 +62,7 @@ ls .mycodemap/
 |------|----------|------|
 | [🧭 文档索引](docs/README.md) | 所有读者 | 文档分层、阅读顺序与迁移状态 |
 | [🏗️ 架构总图](ARCHITECTURE.md) | 开发者 / AI | 系统地图、模块边界、主执行流 |
+| [🛡️ Codex 工程规则](docs/rules/engineering-with-codex-openai.md) | 开发者 / AI | 面向 agent 的工程约束、CLI / CI 护栏 |
 | [📖 安装配置指南](docs/SETUP_GUIDE.md) | 人类开发者 | 完整的安装、配置和使用指南 |
 | [🤖 AI 助手集成指南](docs/AI_ASSISTANT_SETUP.md) | AI 用户 | Kimi/Claude/Codex/Copilot 配置指引 |
 | [📁 配置示例](examples/) | 所有用户 | 各平台的现成配置文件 |
@@ -561,10 +562,10 @@ cp examples/codex/codemap-agent.md .agents/skills/codemap/SKILL.md
 统一分析入口，支持多意图路由：
 
 ```bash
-mycodemap analyze "分析 tool-orchestrator 的影响范围"
-mycodemap analyze --intent impact --file src/cli/index.ts
-mycodemap analyze --intent dependency --file src/cli/index.ts
-mycodemap analyze --intent search "UnifiedResult"
+mycodemap analyze -i overview -t src/orchestrator
+mycodemap analyze -i impact -t src/cli/index.ts --include-tests
+mycodemap analyze -i dependency -t src/cli/index.ts
+mycodemap analyze -i search -k UnifiedResult
 ```
 
 ## 贡献指南

@@ -5,14 +5,14 @@
 
 ## 1. 系统定位
 
-CodeMap 是一个面向 TypeScript / JavaScript 项目的静态分析工具，提供两种使用形态：
+CodeMap 是一个面向 TypeScript / JavaScript / Go 项目的静态分析工具，提供两种使用形态：
 
 - 作为 CLI：通过 `codemap` / `mycodemap` 命令执行初始化、生成、查询、依赖分析、影响评估、CI 门禁与工作流编排。
 - 作为库：通过 `dist/index.js` 暴露分析、解析与生成能力。
 
 当前运行时与构建事实：
 
-- 语言与模块：TypeScript + ESM
+- 语言与模块：TypeScript + JavaScript + Go
 - 编译输出：`dist/`
 - CLI 入口：`dist/cli/index.js`
 - 目标环境：Node.js >= 18
