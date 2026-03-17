@@ -5,7 +5,8 @@
 
 import { readFile, access } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
-import { glob, Glob } from 'glob';
+import pkg from 'glob';
+const { glob, Glob } = pkg;
 
 /**
  * CodemapData - 代码映射数据结构
