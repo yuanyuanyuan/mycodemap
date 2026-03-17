@@ -28,7 +28,7 @@ import { ParserBase, ParseError } from '../interfaces/ParserBase.js';
  */
 export class GoParser extends ParserBase {
   readonly languageId = 'go' as const;
-  readonly fileExtensions = ['.go'];
+  readonly fileExtensions = ['go'];
   readonly name = 'Go Parser';
   
   protected supportedFeatures = new Set([

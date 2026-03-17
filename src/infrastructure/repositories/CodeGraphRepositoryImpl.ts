@@ -132,7 +132,11 @@ export class CodeGraphRepositoryImpl implements CodeGraphRepository {
     try {
       const graphData = await this.storage.loadCodeGraph();
       // 单个存储实例只对应一个项目
-      return [graphData.project.id];
+      // 过滤掉空 ID（未初始化的空图）
+      if (graphData.project.id && graphData.project.id.trim() !== '') {
+        return [graphData.project.id];
+      }
+      return [];
     } catch {
       return [];
     }

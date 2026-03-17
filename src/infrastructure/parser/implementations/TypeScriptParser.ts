@@ -37,7 +37,7 @@ import { ParserBase, ParseError } from '../interfaces/ParserBase.js';
  */
 export class TypeScriptParser extends ParserBase {
   readonly languageId = 'typescript' as const;
-  readonly fileExtensions = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
+  readonly fileExtensions = ['ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs'];
   readonly name = 'TypeScript Parser';
   
   protected supportedFeatures = new Set([
