@@ -26,7 +26,7 @@
     "dev": "tsc --watch",
     "docs:check": "node scripts/validate-docs.js",
     "test": "vitest run",
-    "lint": "eslint src --ext .ts",
+    "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "benchmark": "bash scripts/run-benchmark.sh",
     "test:all": "npm run test && npm run benchmark",
@@ -63,10 +63,10 @@
   "devDependencies": {
     "@types/glob": "^8.1.0",
     "@types/node": "^20.10.0",
-    "@typescript-eslint/eslint-plugin": "^6.15.0",
-    "@typescript-eslint/parser": "^6.15.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
     "@vitest/coverage-v8": "^1.6.1",
-    "eslint": "^8.55.0",
+    "eslint": "^8.57.1",
     "vitest": "^1.1.0"
   },
   "engines": {
