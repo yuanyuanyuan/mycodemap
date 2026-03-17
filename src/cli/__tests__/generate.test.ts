@@ -12,6 +12,10 @@ import { generateAIMap, generateJSON, generateContext, generateMermaidGraph } fr
 // Mock dependencies
 vi.mock('../../core/analyzer.js', () => ({
   analyze: vi.fn().mockResolvedValue({
+    project: {
+      name: 'test-project',
+      rootDir: '/test'
+    },
     summary: {
       totalFiles: 10,
       totalLines: 500,
