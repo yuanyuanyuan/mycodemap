@@ -3,13 +3,43 @@
 // ============================================
 
 import chalk from 'chalk';
-import { writeFile } from 'fs/promises';
+import { writeFile, readFile, access } from 'fs/promises';
+import { join } from 'path';
 import { storageFactory } from '../../infrastructure/storage/StorageFactory.js';
 import { AnalysisHandler } from '../../server/handlers/AnalysisHandler.js';
 import { CodeGraphBuilder } from '../../domain/services/CodeGraphBuilder.js';
 
 interface ExportOptions {
   output?: string;
+}
+
+/**
+ * Codemap数据格式（来自codemap.json）
+ */
+interface CodemapData {
+  version: string;
+  generatedAt: string;
+  project: {
+    name: string;
+    rootDir: string;
+  };
+  summary: {
+    totalFiles: number;
+    totalModules: number;
+  };
+  modules: Array<{
+    id: string;
+    path: string;
+    absolutePath: string;
+    exports?: Array<{
+      name: string;
+      kind: string;
+    }>;
+    imports?: Array<{
+      source: string;
+      specifiers?: string[];
+    }>;
+  }>;
 }
 
 export async function exportCommand(format: string, options: ExportOptions): Promise<void> {
@@ -24,38 +54,56 @@ export async function exportCommand(format: string, options: ExportOptions): Pro
 
     console.log(chalk.blue(`📤 导出代码图为 ${format.toUpperCase()} 格式...\n`));
 
-    // 创建存储实例
+    // Mermaid格式直接从codemap.json读取
+    if (format === 'mermaid') {
+      const codemapPath = join(process.cwd(), '.mycodemap', 'codemap.json');
+
+      // 检查文件是否存在
+      try {
+        await access(codemapPath);
+      } catch {
+        console.log(chalk.yellow('⚠️  未找到代码图数据'));
+        console.log(chalk.gray('请先运行: mycodemap generate'));
+        process.exit(0);
+      }
+
+      // 读取codemap数据
+      const data = await readFile(codemapPath, 'utf-8');
+      const codemap: CodemapData = JSON.parse(data);
+
+      // 检查数据是否为空
+      if (!codemap.modules || codemap.modules.length === 0) {
+        console.log(chalk.yellow('⚠️  代码图数据为空'));
+        console.log(chalk.gray('请先运行: mycodemap generate'));
+        process.exit(0);
+      }
+
+      // 转换为Mermaid格式
+      const mermaidData = toMermaid(codemap);
+      const outputPath = options.output ?? 'codemap.mmd';
+      await writeFile(outputPath, mermaidData, 'utf-8');
+
+      console.log(chalk.green(`✅ 导出成功！`));
+      console.log(chalk.white(`📁 文件: ${chalk.cyan(outputPath)}`));
+      console.log(chalk.white(`📊 大小: ${chalk.cyan(formatBytes(mermaidData.length))}`));
+      console.log(chalk.white(`📈 模块: ${chalk.cyan(codemap.modules.length)} 个`));
+      return;
+    }
+
+    // 其他格式使用原有的handler方式
     const storage = await storageFactory.createForProject(
       process.cwd(),
-      { type: 'filesystem', outputPath: '.codemap/storage' }
+      { type: 'filesystem', outputPath: '.mycodemap' }
     );
 
-    // 创建分析处理器
     const builder = CodeGraphBuilder.create({
       mode: 'fast',
       rootDir: process.cwd(),
     });
     const handler = new AnalysisHandler(storage, builder);
 
-    // 执行导出
-    let result: { data: string; contentType: string; filename: string };
-    
-    if (format === 'mermaid') {
-      // Mermaid 格式需要特殊处理
-      const graph = await storage.loadCodeGraph();
-      result = {
-        data: toMermaid(graph),
-        contentType: 'text/markdown',
-        filename: 'codemap.mmd',
-      };
-    } else {
-      result = await handler.export(format as 'json' | 'graphml' | 'dot');
-    }
-
-    // 确定输出路径
+    const result = await handler.export(format as 'json' | 'graphml' | 'dot');
     const outputPath = options.output ?? result.filename;
-
-    // 写入文件
     await writeFile(outputPath, result.data, 'utf-8');
 
     console.log(chalk.green(`✅ 导出成功！`));
@@ -72,24 +120,31 @@ export async function exportCommand(format: string, options: ExportOptions): Pro
 /**
  * 转换为 Mermaid 格式
  */
-function toMermaid(graph: {
-  modules: Array<{ id: string; path: string }>;
-  dependencies: Array<{ sourceId: string; targetId: string; type: string }>;
-}): string {
+function toMermaid(codemap: CodemapData): string {
   const lines: string[] = ['graph TD'];
 
   // 添加节点
-  for (const module of graph.modules) {
+  for (const module of codemap.modules) {
     const label = module.path.split('/').pop() ?? module.path;
     const safeId = module.id.replace(/[^a-zA-Z0-9]/g, '_');
     lines.push(`  ${safeId}["${label}"]`);
   }
 
-  // 添加边
-  for (const dep of graph.dependencies) {
-    const sourceId = dep.sourceId.replace(/[^a-zA-Z0-9]/g, '_');
-    const targetId = dep.targetId.replace(/[^a-zA-Z0-9]/g, '_');
-    lines.push(`  ${sourceId} -->|${dep.type}| ${targetId}`);
+  // 添加边（从imports推断依赖关系）
+  for (const module of codemap.modules) {
+    if (module.imports) {
+      for (const imp of module.imports) {
+        // 查找源模块
+        const sourceModule = codemap.modules.find(m =>
+          m.path === imp.source || m.path.endsWith('/' + imp.source.replace(/\.js$/, '.ts'))
+        );
+        if (sourceModule) {
+          const targetId = module.id.replace(/[^a-zA-Z0-9]/g, '_');
+          const sourceId = sourceModule.id.replace(/[^a-zA-Z0-9]/g, '_');
+          lines.push(`  ${sourceId} --> ${targetId}`);
+        }
+      }
+    }
   }
 
   return lines.join('\n');
