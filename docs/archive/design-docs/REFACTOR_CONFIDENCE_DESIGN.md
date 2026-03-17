@@ -1,5 +1,11 @@
 # 置信度机制详细设计
 
+> 归档时间：2026-03-15
+> 归档原因：历史重构设计稿，数据结构与当前实现已出现偏差。
+> 当前依据：`ARCHITECTURE.md`、`src/orchestrator/confidence.ts`、`src/orchestrator/types.ts`
+> 状态：仅供历史对照，不作为当前执行依据。
+
+
 > 版本: 2.4
 > 所属模块: 编排层 - 置信度计算
 

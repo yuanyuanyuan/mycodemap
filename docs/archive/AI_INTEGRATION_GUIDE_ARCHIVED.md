@@ -1,5 +1,11 @@
 # MyCodeMap AI 集成配置指南
 
+> 归档时间：2026-03-15
+> 归档原因：旧版 AI 集成指南，已被当前仓库的统一 AI 助手接入说明替代。
+> 当前依据：`docs/AI_ASSISTANT_SETUP.md`
+> 状态：仅供历史对照，不作为当前执行依据。
+
+
 > 让 AI 大模型（如 Claude、Copilot、Cursor）更好地理解和使用 CodeMap
 
 ## 目录

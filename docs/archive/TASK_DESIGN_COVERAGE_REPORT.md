@@ -1,5 +1,11 @@
 # CodeMap 任务与设计文档覆盖检查报告
 
+> 归档时间：2026-03-15
+> 归档原因：历史覆盖率报告，部分结论已被后续实现状态推翻。
+> 当前依据：`ARCHITECTURE.md`、`docs/exec-plans/completed/2026-03-03-post-task-plan.md`、`src/cli/commands/workflow.ts`
+> 状态：仅供历史对照，不作为当前执行依据。
+
+
 > 生成时间: 2026-03-01
 > 检查范围: Phase 1-10 vs 8个设计文档
 

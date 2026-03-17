@@ -1,5 +1,11 @@
 # MyCodeMap NPM 发布最终设计方案（Merged V3）
 
+> 归档时间：2026-03-15
+> 归档原因：历史迁移设计稿，包含已完成的发布迁移前提与过程性判断。
+> 当前依据：`docs/rules/deployment.md`、`package.json`、`.github/workflows/publish.yml`
+> 状态：仅供历史对照，不作为当前执行依据。
+
+
 > 版本：3.0（Final）  
 > 日期：2026-03-04  
 > 来源：合并 `docs/archive/PUBLISH_NPM_DESIGN_V1.md` + `docs/archive/PUBLISH_NPM_DESIGN_V2.md`

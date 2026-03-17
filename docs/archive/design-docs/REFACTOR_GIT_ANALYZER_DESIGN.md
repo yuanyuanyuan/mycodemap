@@ -1,5 +1,11 @@
 # Git 分析器详细设计
 
+> 归档时间：2026-03-15
+> 归档原因：历史重构设计稿，文件头与 AI feed 等细节已由现行规则和实现收敛。
+> 当前依据：`ARCHITECTURE.md`、`docs/rules/engineering-with-codex-openai.md`、`src/orchestrator/git-analyzer.ts`
+> 状态：仅供历史对照，不作为当前执行依据。
+
+
 > 版本: 2.5
 > 所属模块: 编排层 - Git 分析器
 > 更新日期: 2026-02-28

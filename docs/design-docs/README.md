@@ -1,21 +1,15 @@
 # docs/design-docs/
 
-本目录存放“为什么这样设计”的文档，而不是“今天怎么执行”的规则。
+本目录只存放“为什么这样设计”的当前有效文档，而不是已经完成迁移的历史旧稿。
 
-## 当前已迁入
+## 当前状态
 
-- `REFACTOR_ARCHITECTURE_OVERVIEW.md`
-- `REFACTOR_CONFIDENCE_DESIGN.md`
-- `REFACTOR_GIT_ANALYZER_DESIGN.md`
-- `REFACTOR_ORCHESTRATOR_DESIGN.md`
-- `REFACTOR_RESULT_FUSION_DESIGN.md`
-- `REFACTOR_TEST_LINKER_DESIGN.md`
-- `CI_GATEWAY_DESIGN.md`
-- `PUBLISH_NPM_DESIGN_FINAL.md`
+- 截至 2026-03-15，旧的重构/发布设计稿已统一归档到 `docs/archive/design-docs/`。
+- 当前活跃设计文档暂为空；如果后续需要新增设计，请按当前模板重新编写，不要直接复活旧稿。
 
 ## 应放内容
 
-- 架构与模块重构设计
+- 当前仍有效的架构与模块设计
 - 关键权衡、替代方案、已知限制
 - 验证状态、风险与待决问题
 - 与产品规格或规则冲突时的设计解释
@@ -25,6 +19,7 @@
 - 需求、用户场景、验收边界放 `docs/product-specs/`
 - 开发与验证规则放 `docs/rules/`
 - 任务推进与复盘放 `docs/exec-plans/`
+- 历史设计稿放 `docs/archive/design-docs/`
 
 ## 最小模板
 

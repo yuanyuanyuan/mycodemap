@@ -1,5 +1,11 @@
 # MyCodeMap NPM 发布设计方案
 
+> 归档时间：2026-03-15
+> 归档原因：历史发布方案草稿，已被后续迁移方案和当前实现事实替代。
+> 当前依据：`docs/rules/deployment.md`、`package.json`、`.github/workflows/publish.yml`
+> 状态：仅供历史对照，不作为当前执行依据。
+
+
 > 版本: 1.2  
 > 日期: 2026-03-04  
 > 方案: 完整体验版（方案 1，最终审查版）

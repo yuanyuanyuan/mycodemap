@@ -1,5 +1,11 @@
 # MyClaude 使用指南
 
+> 归档时间：2026-03-15
+> 归档原因：外部工具调研笔记，不属于当前仓库执行协议或现行规则。
+> 当前依据：`docs/references/README.md` 与对应上游官方文档
+> 状态：仅供历史对照，不作为当前执行依据。
+
+
 > 基于官方 README 编写 | 官方仓库: https://github.com/stellarlinkco/myclaude
 
 ---

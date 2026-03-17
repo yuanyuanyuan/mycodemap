@@ -1,5 +1,11 @@
 # CI 门禁护栏详细设计
 
+> 归档时间：2026-03-15
+> 归档原因：历史 CI 设计稿，已被现行规则、hooks 和工作流实现替代。
+> 当前依据：`docs/rules/engineering-with-codex-openai.md`、`docs/rules/validation.md`、`.githooks/pre-commit`、`.github/workflows/ci-gateway.yml`
+> 状态：仅供历史对照，不作为当前执行依据。
+
+
 > 版本: 1.3
 > 所属模块: CI/CD - Git 工作流门禁
 > 日期: 2026-03-04
