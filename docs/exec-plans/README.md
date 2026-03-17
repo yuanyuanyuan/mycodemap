@@ -8,10 +8,14 @@
 - `completed/`：已完成或已归档的历史计划
 - `tech-debt/`：技术债、待处理项、批量修复清单
 
-## 当前已迁入
+## 当前状态
 
-- `active/POST_TASK_PLAN.md`
-- `completed/2026-03-03-deps-path-extension-fix.md`
+- `active/` 当前为空，后续进行中的计划应写入这里。
+- `completed/` 当前包含：
+  - `2026-03-03-deps-path-extension-fix.md`
+  - `2026-03-03-post-task-plan.md`
+- `tech-debt/` 当前包含：
+  - `2026-03-15-lint-guardrail-gap.md`
 
 ## 写作边界
 
@@ -21,4 +25,5 @@
 
 ## 迁移说明
 
-旧 `docs/plans/` 已停止作为新增计划入口；新计划优先写入本目录。
+- 旧 `docs/plans/` 已停止作为新增计划入口；历史文件已迁入 `docs/archive/plans/`。
+- 新计划优先写入本目录；不要在 `docs/` 根层或其他自定义目录另开平行计划线。

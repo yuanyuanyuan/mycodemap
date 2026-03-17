@@ -45,6 +45,14 @@ MyCodeMap 可以与多种 AI 编程助手集成，让 AI 能够：
 | `.mycodemap/context/` | 模块详细上下文 | ⭐ |
 | `.mycodemap/dependency-graph.md` | Mermaid 依赖图 | ⭐ |
 
+### 当前仓库维护者附加护栏
+
+如果你在维护当前 CodeMap 仓库，而不是只在使用安装包：
+
+- 修改 README、AI 助手提示、CLI 示例、测试事实后，先运行 `npm run docs:check`
+- 也可以通过 `mycodemap ci check-docs-sync` 走统一的 CI 子命令入口
+- 当前仓库的 agent 工程规则以 `docs/rules/engineering-with-codex-openai.md` 为准
+
 ---
 
 ## Kimi CLI 配置
@@ -621,6 +629,15 @@ Use CodeMap for code analysis:
 ---
 
 ## 高级配置
+
+### 仓库级护栏
+
+当 AI 助手配置文档本身被修改时，建议在提交前执行：
+
+```bash
+npm run docs:check
+mycodemap ci check-docs-sync
+```
 
 ### 自定义输出格式
 

@@ -3,8 +3,10 @@
 ## 最小验证顺序
 
 1. 先验证与你改动最相关的命令、测试或模块。
-2. 再扩大到 `npm run typecheck`、`npm test`、`npm run lint`。
-3. 涉及发布或打包时，再执行 `npm run build` 与 `npm run validate-pack`。
+2. 若改动影响 agent 路由、CLI 示例、规则文档或测试事实，先执行 `npm run docs:check`。
+3. 若改动同时影响 CLI 护栏入口，再补 `node dist/cli/index.js ci check-docs-sync`。
+4. 再扩大到 `npm run typecheck`、`npm test`、`npm run lint`。
+5. 涉及发布或打包时，再执行 `npm run build` 与 `npm run validate-pack`。
 
 ## 强约束
 
@@ -16,6 +18,8 @@
 ## 常用命令
 
 ```bash
+npm run docs:check
+node dist/cli/index.js ci check-docs-sync
 npm run typecheck
 npm test
 npm run lint

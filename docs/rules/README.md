@@ -4,6 +4,7 @@
 
 ## 当前文件
 
+- `engineering-with-codex-openai.md`：面向 agent 的工程原则与当前仓库 CLI / CI 护栏。
 - `testing.md`：测试框架、覆盖率、测试文件位置。
 - `validation.md`：构建、类型检查、lint、CI 验证顺序。
 - `deployment.md`：打包、发布前检查与发布边界。

@@ -270,6 +270,9 @@ fi
 # 可选：运行测试
 # npm test
 
+# 可选：当改动 README / docs / CLI 示例时检查文档护栏
+# npm run docs:check
+
 # 可选：检查文件头
 # mycodemap ci check-headers
 
@@ -304,21 +307,39 @@ jobs:
       
       - name: Install dependencies
         run: npm ci
+
+      - name: Validate docs sync
+        run: npm run docs:check
+
+      - name: Run typecheck
+        run: npm run typecheck
       
       - name: Run tests
         run: npm test
       
       - name: Check commits
         run: npx mycodemap ci check-commits --range origin/main..HEAD
+
+      - name: Check docs sync via CLI
+        run: npx mycodemap ci check-docs-sync
+      
+      - name: Check commit size
+        run: npx mycodemap ci check-commit-size --range origin/main..HEAD
       
       - name: Check headers
         run: npx mycodemap ci check-headers
+
+      - name: Assess risk
+        run: npx mycodemap ci assess-risk --threshold=0.7
       
-      - name: Generate codemap
+      - name: Generate AI feed
         run: npx mycodemap generate
       
-      - name: Check codemap sync
-        run: git diff --exit-code .mycodemap/
+      - name: Check AI feed sync
+        run: git diff --exit-code .mycodemap/ai-feed.txt
+
+      - name: Check output contract
+        run: npx mycodemap ci check-output-contract --schema-version v1.0.0 --top-k 8 --max-tokens 160
 ```
 
 ### 其他 CI 平台
