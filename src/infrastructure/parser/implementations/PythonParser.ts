@@ -32,7 +32,7 @@ import { ParserBase, ParseError } from '../interfaces/ParserBase.js';
  */
 export class PythonParser extends ParserBase {
   readonly languageId = 'python' as const;
-  readonly fileExtensions = ['.py'];
+  readonly fileExtensions = ['py'];
   readonly name = 'Python Parser';
   
   protected supportedFeatures = new Set([
