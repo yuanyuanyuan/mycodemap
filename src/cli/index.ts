@@ -12,7 +12,6 @@ import { depsCommand } from './commands/deps.js';
 import { cyclesCommand } from './commands/cycles.js';
 import { complexityCommand } from './commands/complexity.js';
 import { impactCommand } from './commands/impact.js';
-import { analyzeCommand } from './commands/analyze.js';
 import { ciCommand } from './commands/ci.js';
 import { workflowCommand } from './commands/workflow.js';
 import { reportCommand } from './commands/report.js';
@@ -159,6 +158,7 @@ program
   .option('--structured', '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 或 --output-mode=machine 使用）')
   .option('--output-mode <mode>', '输出模式 (machine|human)')
   .action(async () => {
+    const { analyzeCommand } = await import('./commands/analyze.js');
     // 跳过 program name 和 command name
     await analyzeCommand(process.argv.slice(2));
   });

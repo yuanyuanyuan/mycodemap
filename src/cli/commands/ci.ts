@@ -3,6 +3,9 @@
  * [WHY] 提供 CI 门禁相关的子命令
  */
 
+import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { Command } from 'commander';
 import { validateCommitMessage, validateRecentCommits, VALID_TAGS } from '../../orchestrator/commit-validator.js';
 import { scanDirectory, scanFileHeader, type FileHeaderResult } from '../../orchestrator/file-header-scanner.js';
@@ -18,6 +21,7 @@ export enum CIErrorCode {
   E0009_MISSING_WHY = 'E0009',
   E0010_OUTPUT_CONTRACT_VIOLATION = 'E0010',
   E0011_COMMIT_TOO_LARGE = 'E0011',
+  E0012_DOCS_GUARDRAIL_FAILED = 'E0012',
 }
 
 /**
@@ -29,6 +33,7 @@ export const CI_ERROR_MESSAGES: Record<CIErrorCode, string> = {
   [CIErrorCode.E0009_MISSING_WHY]: '文件头缺少 [WHY] 注释',
   [CIErrorCode.E0010_OUTPUT_CONTRACT_VIOLATION]: '输出契约校验失败',
   [CIErrorCode.E0011_COMMIT_TOO_LARGE]: 'Commit 包含文件数量超过限制',
+  [CIErrorCode.E0012_DOCS_GUARDRAIL_FAILED]: '文档护栏校验失败',
 };
 
 /**
@@ -41,6 +46,29 @@ function parseGitDiffFiles(command: string): string[] {
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+export function resolveDocsGuardrailScriptPath(projectRoot: string = process.cwd()): string {
+  return path.join(projectRoot, 'scripts', 'validate-docs.js');
+}
+
+export function runDocsGuardrailCheck(options: { root?: string; projectRoot?: string } = {}): void {
+  const projectRoot = options.projectRoot ?? process.cwd();
+  const scriptPath = resolveDocsGuardrailScriptPath(projectRoot);
+
+  if (!existsSync(scriptPath)) {
+    throw new Error(`Documentation guardrail script not found: ${scriptPath}`);
+  }
+
+  const args = [scriptPath];
+  if (options.root) {
+    args.push('--root', options.root);
+  }
+
+  execFileSync(process.execPath, args, {
+    cwd: projectRoot,
+    stdio: 'inherit',
+  });
 }
 
 async function getChangedFiles(options: { files?: string }): Promise<string[]> {
@@ -84,6 +112,16 @@ async function getChangedFiles(options: { files?: string }): Promise<string[]> {
     return parseGitDiffFiles(output);
   } catch {
     console.error('ERROR: Failed to detect changed files from git diff');
+    process.exit(1);
+  }
+}
+
+async function checkDocsSyncAction(options: { root?: string }): Promise<void> {
+  try {
+    runDocsGuardrailCheck({ root: options.root });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`ERROR: [${CIErrorCode.E0012_DOCS_GUARDRAIL_FAILED}] ${message}`);
     process.exit(1);
   }
 }
@@ -532,6 +570,12 @@ export function createCICommand(): Command {
     .option('-f, --files <files>', '逗号分隔的变更文件列表')
     .option('-t, --threshold <number>', '风险阈值 (0-1)', '0.7')
     .action(assessRiskAction);
+
+  ci
+    .command('check-docs-sync')
+    .description('验证当前仓库高信号文档、CLI 示例与护栏配置是否保持同步')
+    .option('--root <path>', '指定要校验的仓库根目录')
+    .action(checkDocsSyncAction);
 
   ci
     .command('check-output-contract')
