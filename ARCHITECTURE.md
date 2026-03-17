@@ -19,6 +19,40 @@ CodeMap 是一个面向 TypeScript / JavaScript / Go 项目的静态分析工具
 
 ## 2. 分层原则
 
+### 2.1 MVP3 分层架构（2026-03 重构）
+
+CodeMap 已完成 MVP3 架构重构，采用清晰的分层设计：
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        CLI Layer                            │
+│  命令行接口，注册命令、参数解析、用户交互                      │
+├─────────────────────────────────────────────────────────────┤
+│                      Server Layer                           │
+│  HTTP API 服务器，RESTful 端点，Handler 处理                  │
+├─────────────────────────────────────────────────────────────┤
+│                       Domain Layer                          │
+│  核心业务逻辑，领域实体 (Project/Module/Symbol/Dependency)    │
+│  领域服务 (CodeGraphBuilder)，领域事件                        │
+├─────────────────────────────────────────────────────────────┤
+│                   Infrastructure Layer                      │
+│  技术实现细节：                                              │
+│  ├── Storage (FileSystem/Memory/KùzuDB/Neo4j)              │
+│  ├── Parser (TypeScript/Go/Python + Registry)              │
+│  └── Repository (CodeGraphRepositoryImpl)                  │
+├─────────────────────────────────────────────────────────────┤
+│                     Interface Layer                         │
+│  类型定义与契约，跨层共享的接口                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**分层依赖规则**（严格自上而下）：
+- CLI → Server → Domain → Infrastructure → Interface
+- 禁止跨层依赖（如 Domain 层不得导入 CLI 模块）
+- 同层内可以相互依赖
+
+### 2.2 原有分层（逐步迁移中）
+
 - 入口层只负责接收用户意图与参数，不承载深层分析逻辑。
 - 编排层负责多工具路由、结果融合、CI 护栏与工作流协同。
 - 分析层负责文件发现、解析、全局索引、依赖图与项目摘要。
@@ -53,6 +87,22 @@ src/cli/index.ts
 ```
 
 ## 4. 顶层模块职责
+
+### 4.1 MVP3 新架构模块
+
+| 模块 | 层级 | 主要职责 | 关键入口 |
+|------|------|----------|----------|
+| `src/interface` | Interface | 类型定义中心，存储/解析器/配置契约 | `src/interface/types/`, `src/interface/config/` |
+| `src/infrastructure/storage` | Infrastructure | 存储适配器：FileSystem, Memory, KùzuDB, Neo4j | `src/infrastructure/storage/index.ts` |
+| `src/infrastructure/parser` | Infrastructure | 多语言解析器：TypeScript, Go, Python | `src/infrastructure/parser/index.ts` |
+| `src/infrastructure/repositories` | Infrastructure | 仓库实现，连接 Domain 与 Infrastructure | `src/infrastructure/repositories/index.ts` |
+| `src/domain/entities` | Domain | 领域实体：Project, Module, Symbol, Dependency | `src/domain/entities/` |
+| `src/domain/services` | Domain | 领域服务：CodeGraphBuilder | `src/domain/services/` |
+| `src/domain/repositories` | Domain | 仓库接口定义 | `src/domain/repositories/` |
+| `src/server` | Server | HTTP API 服务器，Query/Analysis Handler | `src/server/CodeMapServer.ts` |
+| `src/cli-new` | CLI | 新架构 CLI 命令（server, export, query） | `src/cli-new/index.ts` |
+
+### 4.2 原有模块（逐步迁移中）
 
 | 模块 | 主要职责 | 关键入口 |
 |------|----------|----------|

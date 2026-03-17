@@ -2,6 +2,79 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-03-17 - MVP3 Architecture Release
+
+### 🏗️ MVP3 分层架构重构
+
+CodeMap 完成重大架构升级，采用清晰的分层架构设计：Interface → Infrastructure → Domain → Server → CLI
+
+#### Interface Layer
+- 核心类型定义中心 (`src/interface/types/`)
+- 存储接口契约 (`IStorage`, `IStorageFactory`)
+- 解析器接口契约 (`ILanguageParser`, `IParserRegistry`)
+
+#### Infrastructure Layer
+- **存储抽象**: 支持多种存储后端
+  - `FileSystemStorage` - 文件系统存储（默认）
+  - `MemoryStorage` - 内存存储（测试用）
+  - `KuzuDBStorage` - KùzuDB 图数据库（可选）
+  - `Neo4jStorage` - Neo4j 图数据库（可选）
+  - `StorageFactory` - 自动选择存储后端
+- **解析器抽象**: 多语言支持架构
+  - `ParserBase` - 解析器抽象基类
+  - `ParserRegistry` - 解析器注册表
+  - `TypeScriptParser` - TypeScript/JavaScript 解析
+  - `GoParser` - Go 语言解析
+  - `PythonParser` - Python 解析
+- **仓库实现**: `CodeGraphRepositoryImpl` 连接 Domain 和 Infrastructure
+
+#### Domain Layer
+- 领域实体: `Project`, `Module`, `Symbol`, `Dependency`
+- 聚合根: `CodeGraph`
+- 领域服务: `CodeGraphBuilder`
+- 领域事件: `DomainEvent` 及其子类
+- 仓库接口: `CodeGraphRepository`
+
+#### Server Layer
+- HTTP API 服务器 (`CodeMapServer`)
+- RESTful 端点设计
+- `QueryHandler` - 查询处理
+- `AnalysisHandler` - 分析处理
+- 支持 CORS、健康检查、错误处理
+
+#### CLI Layer (MVP3 集成)
+- 新增 `server` 命令 - 启动 HTTP API 服务器
+- 新增 `export` 命令 - 导出代码图到多种格式
+
+### Added
+
+#### New CLI Commands
+- `mycodemap server` - 启动 HTTP API 服务器 (`-p`, `--host`, `--cors`, `--open`)
+- `mycodemap export` - 导出代码图 (`json`, `graphml`, `dot`, `mermaid`)
+
+#### HTTP API Endpoints
+- `GET /api/v1/health` - 健康检查
+- `GET /api/v1/stats` - 项目统计
+- `GET /api/v1/search/symbols?q=` - 符号搜索
+- `GET /api/v1/modules/:id` - 模块详情
+- `GET /api/v1/symbols/:id` - 符号详情
+- `POST /api/v1/analysis/impact` - 影响分析
+- `GET /api/v1/analysis/cycles` - 循环依赖检测
+- `GET /api/v1/graph` - 依赖图数据
+- `GET /api/v1/export/:format` - 数据导出
+
+#### Dependencies
+- `hono` - 轻量级 HTTP 框架
+- `@hono/node-server` - Node.js 服务器适配器
+
+### Test Coverage
+- 新增 37 个单元测试，总计 **742 个测试全部通过**
+- Domain 实体测试 (Project, Module)
+- Parser 测试 (ParserRegistry, TypeScriptParser)
+- Repository 测试 (CodeGraphRepositoryImpl)
+
+---
+
 ## [0.1.2] - TBD
 
 ### Fixed

@@ -14,6 +14,7 @@
 - `AGENTS.md`：仓库级强约束、交互协议、执行与验证底线。
 - `CLAUDE.md`：Claude / Codex 的启动清单、检索顺序、最小操作手册。
 - `ARCHITECTURE.md`：系统地图、模块边界、关键数据流、核心依赖关系。
+- **MVP3 架构文档**：`docs/exec-plans/MVP3-IMPLEMENTATION-ROADMAP.md` - 分层架构重构完整路线图。
 - `docs/rules/`：开发、测试、验证、部署规则。
 - `docs/design-docs/`：设计意图、权衡、验证状态、待决问题。
 - `docs/exec-plans/`：活跃计划、复盘记录、技术债跟踪。
@@ -21,6 +22,16 @@
 - `docs/product-specs/`：产品规格、需求边界、验收标准。
 - `docs/references/`：技术参考、外部资料、设计系统、工具链说明。
 - 若上述目标文件或目录尚未落地，视为迁移中；不得臆造其内容，必须回退到当前存在的 `docs/` 与代码事实。
+
+### MVP3 架构层路径（2026-03 更新）
+
+| 层级 | 路径 | 关键文件 |
+|------|------|----------|
+| **Interface** | `src/interface/` | `types/`, `config/` |
+| **Infrastructure** | `src/infrastructure/` | `storage/`, `parser/`, `repositories/` |
+| **Domain** | `src/domain/` | `entities/`, `services/`, `events/`, `repositories/` |
+| **Server** | `src/server/` | `CodeMapServer.ts`, `handlers/`, `routes/` |
+| **CLI** | `src/cli/` | `commands/`, `index.ts` |
 
 ## 3. 开始任务前
 

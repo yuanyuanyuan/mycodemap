@@ -83,11 +83,21 @@ AI 完成任务前必须自检并勾选：
 
 ## 4. 检索优先级
 
+### 4.1 代码检索（优先使用 CodeMap CLI）
 - 首选：`node dist/cli/index.js query -s "<symbol>"`
 - 首选：`node dist/cli/index.js query -m "<module>"`
 - 首选：`node dist/cli/index.js deps -m "<module>"`
 - 首选：`node dist/cli/index.js impact -f "<file>"`
 - 首选：`node dist/cli/index.js analyze <intent>`
+
+### 4.2 MVP3 架构层检索（按层次查找）
+- **Interface 层**：`src/interface/types/`, `src/interface/config/`
+- **Infrastructure 层**：`src/infrastructure/storage/`, `src/infrastructure/parser/`, `src/infrastructure/repositories/`
+- **Domain 层**：`src/domain/entities/`, `src/domain/services/`, `src/domain/repositories/`
+- **Server 层**：`src/server/`, `src/server/handlers/`, `src/server/routes/`
+- **CLI 层**：`src/cli/commands/`, `src/cli-new/`
+
+### 4.3 回退方案
 - 回退：`rg -n`、`find`、直接读文件
 
 若 CodeMap 失效或结果不足，记录问题并继续任务；不要因为工具问题卡死交付。
