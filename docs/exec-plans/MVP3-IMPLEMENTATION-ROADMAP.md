@@ -470,14 +470,14 @@ Day 5: 社区反馈
 | 计划 4 | Domain Layer | `08438ca` | ✅ 已合并 |
 | 计划 5 | Server Layer (HTTP API) | `a3ee2e7` | ✅ 已合并 |
 | 计划 6 | CLI Layer (cli-new) | `fa9db9c` | ✅ 已合并 |
+| 计划 7 | Parser Abstraction Layer | `3928fe3` | ✅ 已推送 |
+| 计划 8 | Repository Implementation | `2ce6771` | ✅ 已推送 |
 
 ### 进行中计划
 
 | 计划 | 名称 | 状态 |
 |------|------|------|
-| 计划 7 | Parser Abstraction Layer | 🔄 准备开始 |
-| 计划 8 | Repository Implementation | ⏳ 待开始 |
-| 计划 9 | New Architecture Test Coverage | ⏳ 待开始 |
+| 计划 9 | New Architecture Test Coverage | 🔄 准备开始 |
 | 计划 10 | CLI Migration | ⏳ 待开始 |
 
 ---
