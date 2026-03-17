@@ -473,13 +473,17 @@ Day 5: 社区反馈
 | 计划 6 | CLI Layer (cli-new) | `fa9db9c` | ✅ 已合并 |
 | 计划 7 | Parser Abstraction Layer | `3928fe3` | ✅ 已合并 |
 | 计划 8 | Repository Implementation | `2ce6771` | ✅ 已合并 |
-| 计划 9 | New Architecture Test Coverage | `015d7f8` | ✅ 已推送 |
+| 计划 9 | New Architecture Test Coverage | `015d7f8` | ✅ 已合并 |
+| 计划 10 | CLI Migration | 🔄 准备中 | 集成 server/export 命令 |
 
-### 进行中计划
+### MVP3 核心交付完成 ✅
 
-| 计划 | 名称 | 状态 |
-|------|------|------|
-| 计划 10 | CLI Migration | 🔄 可选/待开始 |
+所有 10 个核心计划已完成：
+- 6 个架构层 (Interface → Infrastructure → Domain → Server → CLI)
+- Parser 抽象层 (TypeScript, Go, Python)
+- Repository 实现
+- 测试覆盖 (742 tests)
+- CLI 命令集成 (server, export)
 
 ---
 
