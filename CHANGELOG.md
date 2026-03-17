@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2] - TBD
+
+### Fixed
+- glob v10+ 兼容性问题：更新 ESM 导入语法，使用 named export 替代 default export
+
 ## [0.1.1] - 2026-03-07
 
 ### Added

@@ -378,6 +378,12 @@ Current phase: reference
 CodeMap 提供 CI 阶段自动检查，确保代码质量。
 
 ```bash
+# 检查 README / docs / CLI 示例是否与仓库事实同步
+npm run docs:check
+
+# 通过统一 CLI 护栏入口复用同一检查
+mycodemap ci check-docs-sync
+
 # 检查提交格式 ([TAG] scope: message)
 mycodemap ci check-commits
 
@@ -592,6 +598,10 @@ npm run dev
 npm test                  # 功能测试（src/**/*.test.ts）
 npm run benchmark         # 性能基准测试（refer/benchmark-quality.test.ts）
 npm run test:all          # 功能 + 基准（串联执行）
+
+# 文档 / CLI 示例护栏
+npm run docs:check
+node dist/cli/index.js ci check-docs-sync
 
 # 类型检查
 npm run typecheck

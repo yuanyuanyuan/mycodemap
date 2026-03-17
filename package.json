@@ -24,6 +24,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
+    "docs:check": "node scripts/validate-docs.js",
     "test": "vitest run",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",

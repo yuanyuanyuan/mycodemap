@@ -78,7 +78,21 @@ fi
 
 echo "File headers passed"
 
-# 4. 生成 AI 饲料（警告级，不阻断）
+# 4. 检查文档与 CLI 护栏（仅在相关文件变更时阻断）
+DOC_GUARDRAIL_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(README\.md|package\.json|docs/|src/cli/index\.ts|vitest\.config\.ts|vitest\.benchmark\.config\.ts|\.github/workflows/ci-gateway\.yml)$' || true)
+
+if [ -n "$DOC_GUARDRAIL_FILES" ]; then
+    echo "Checking documentation guardrails..."
+    npm run docs:check
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Documentation guardrails failed, commit rejected"
+        exit 1
+    fi
+fi
+
+echo "Documentation guardrails passed"
+
+# 5. 生成 AI 饲料（警告级，不阻断）
 echo "Generating AI feed..."
 npx mycodemap generate --quiet >/dev/null 2>&1 &
 if [ $? -ne 0 ]; then

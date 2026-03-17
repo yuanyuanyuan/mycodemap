@@ -26,25 +26,37 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate documentation guardrails
+        run: npm run docs:check
+
+      - name: Run typecheck
+        run: npm run typecheck
+
       - name: Run tests
         run: npm test
 
+      - name: Build CLI
+        run: npm run build
+
+      - name: Check docs sync via CLI
+        run: node dist/cli/index.js ci check-docs-sync
+
       - name: Check commit format
-        run: npx mycodemap ci check-commits --range origin/main..HEAD
+        run: node dist/cli/index.js ci check-commits --range origin/main..HEAD
 
       - name: Check commit size
-        run: npx mycodemap ci check-commit-size --range origin/main..HEAD
+        run: node dist/cli/index.js ci check-commit-size --range origin/main..HEAD
 
       - name: Check file headers
-        run: npx mycodemap ci check-headers
+        run: node dist/cli/index.js ci check-headers
 
       - name: Generate AI feed and verify sync
         run: |
-          npx mycodemap generate
+          node dist/cli/index.js generate
           git diff --exit-code .mycodemap/ai-feed.txt || (echo "ERROR: AI feed is out of sync. Run 'mycodemap generate' and commit changes." && exit 1)
 
       - name: Assess risk
-        run: npx mycodemap ci assess-risk --threshold=0.7
+        run: node dist/cli/index.js ci assess-risk --threshold=0.7
 
       - name: Check output contract
-        run: npx mycodemap ci check-output-contract --schema-version v1.0.0 --top-k 8 --max-tokens 160
+        run: node dist/cli/index.js ci check-output-contract --schema-version v1.0.0 --top-k 8 --max-tokens 160
