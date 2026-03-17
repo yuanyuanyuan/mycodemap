@@ -236,8 +236,9 @@ Day 4-5: Parser Registry 完善
 ```
 
 **Phase 2 验收标准**:
-- [ ] 支持 7 种语言 (TS, JS, Go, Python, Java, Rust, C/C++)
-- [ ] 每种语言有对应的测试固件
+- [x] 支持 4 种语言 (TS, JS, Go, Python) - Parser 抽象层完成
+- [x] 新架构单元测试 37 个 (总计 742 个测试)
+- [ ] Java, Rust, C/C++ 支持 (V1.1)
 - [ ] 混合语言项目支持
 
 ---
@@ -470,15 +471,15 @@ Day 5: 社区反馈
 | 计划 4 | Domain Layer | `08438ca` | ✅ 已合并 |
 | 计划 5 | Server Layer (HTTP API) | `a3ee2e7` | ✅ 已合并 |
 | 计划 6 | CLI Layer (cli-new) | `fa9db9c` | ✅ 已合并 |
-| 计划 7 | Parser Abstraction Layer | `3928fe3` | ✅ 已推送 |
-| 计划 8 | Repository Implementation | `2ce6771` | ✅ 已推送 |
+| 计划 7 | Parser Abstraction Layer | `3928fe3` | ✅ 已合并 |
+| 计划 8 | Repository Implementation | `2ce6771` | ✅ 已合并 |
+| 计划 9 | New Architecture Test Coverage | `015d7f8` | ✅ 已推送 |
 
 ### 进行中计划
 
 | 计划 | 名称 | 状态 |
 |------|------|------|
-| 计划 9 | New Architecture Test Coverage | 🔄 准备开始 |
-| 计划 10 | CLI Migration | ⏳ 待开始 |
+| 计划 10 | CLI Migration | 🔄 可选/待开始 |
 
 ---
 
