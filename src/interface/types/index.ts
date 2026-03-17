@@ -611,3 +611,30 @@ export interface CodeGraph {
   symbols: Symbol[];
   dependencies: Dependency[];
 }
+
+// ============================================
+// Section 15: 从子模块重新导出
+// ============================================
+
+export type {
+  LanguageId,
+  ParseOptions,
+  CallGraphInfo,
+  ParseError as ParserParseError,
+  ParseResult,
+  LanguageFeature,
+  ILanguageParser,
+  IParserRegistry,
+} from './parser.js';
+
+export type {
+  StorageType,
+  StorageConfig,
+  SearchOptions,
+  SearchResult,
+  Cycle,
+  ImpactResult,
+  ProjectStatistics,
+  IStorage,
+  IStorageFactory,
+} from './storage.js';
