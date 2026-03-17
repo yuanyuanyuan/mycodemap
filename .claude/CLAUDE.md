@@ -1,177 +1,137 @@
-<\!-- OMC:START -->
-<!-- OMC:VERSION:4.6.0 -->
+# CLAUDE.md - CodeMap 项目特定指令
 
-# oh-my-claudecode - Intelligent Multi-Agent Orchestration
+> 本文件供 Claude Code 自动读取，作为项目级执行约束。
 
-You are running with oh-my-claudecode (OMC), a multi-agent orchestration layer for Claude Code.
-Your role is to coordinate specialized agents, tools, and skills so work is completed accurately and efficiently.
+## 强制执行规则
 
-<operating_principles>
+### 1. 任务开始前必须执行
 
-- Delegate specialized work to the most appropriate agent.
-- Keep users informed with concise progress updates.
-- Prefer clear evidence over assumptions: verify outcomes before final claims.
-- Choose the lightest-weight path that preserves quality (direct action, tmux worker, or agent).
-- Consult official documentation before implementing with SDKs, frameworks, or APIs.
-  </operating_principles>
+- [ ] **阅读 AGENTS.md**：`cat AGENTS.md` - 了解仓库级强约束
+- [ ] **阅读 CLAUDE.md**：`cat CLAUDE.md` - 了解执行清单
+- [ ] **评估任务等级**：根据 AGENTS.md 3.1 节评估 L0-L3 等级
+- [ ] **声明任务等级**：输出 "当前任务评估为 L[X] 级"
 
-<delegation_rules>
-Delegate for: multi-file changes, refactors, debugging, reviews, planning, research, verification, specialist work.
-Work directly for: trivial operations, small clarifications, single-command operations.
-Route code changes to `executor` (or `deep-executor` for complex autonomous work).
-For uncertain SDK/API usage, delegate to `document-specialist` to fetch official docs first.
-</delegation_rules>
+### 2. 任务执行必须遵循
 
-<model_routing>
-Pass `model` on Task calls: `haiku` (quick lookups), `sonnet` (standard implementation), `opus` (architecture, deep analysis).
-Direct writes OK for: `~/.claude/**`, `.omc/**`, `.claude/**`, `CLAUDE.md`, `AGENTS.md`.
-For source-code edits, prefer delegation to implementation agents.
-</model_routing>
+- **遵循 TDD 流程**（测试先行）：
+  1. 红阶段：编写失败的测试
+  2. 绿阶段：编写最小实现使测试通过
+  3. 重构阶段：优化实现，保持测试通过
 
-<agent_catalog>
-Use `oh-my-claudecode:` prefix for Task subagent types.
+- **遵循分层架构**（见 `docs/rules/architecture-guardrails.md`）：
+  - core 层禁止导入 cli/orchestrator 层
+  - 使用依赖注入而非直接实例化
+  - 接口定义在被依赖方
 
-Build/Analysis:
+- **遵守代码质量红线**（见 `docs/rules/code-quality-redlines.md`）：
+  - 禁止敏感信息硬编码
+  - 禁止 `any` 类型（边界文件除外）
+  - 函数不超过 50 行
+  - 必须处理 Promise 错误
+  - 禁止 `console.log` 遗留（使用 runtime-logger）
 
-- `explore` (haiku): codebase discovery, symbol/file mapping
-- `analyst` (opus): requirements clarity, acceptance criteria
-- `planner` (opus): task sequencing, execution plans
-- `architect` (opus): system design, boundaries, interfaces
-- `debugger` (sonnet): root-cause analysis, regression isolation
-- `executor` (sonnet): code implementation, refactoring
-- `deep-executor` (opus): complex autonomous goal-oriented tasks
-- `verifier` (sonnet): completion evidence, claim validation
+### 3. 任务完成必须执行
 
-Review:
+- [ ] **运行验证**：`npm run check:all`
+- [ ] **填写验收清单**（见 CLAUDE.md 第 3 节）
+- [ ] **提供可信度自评**（见 AGENTS.md 5.1 节格式）
+- [ ] **L0 任务**：直接提交
+- [ ] **L1+ 任务**：生成 PR 描述，暂停等待审查
 
-- `quality-reviewer` (sonnet): logic defects, maintainability, anti-patterns, performance
-- `security-reviewer` (sonnet): vulnerabilities, trust boundaries, authn/authz
-- `code-reviewer` (opus): comprehensive review, API contracts, backward compatibility
+## 禁止行为
 
-Domain:
+- ❌ 不要生成未测试的代码
+- ❌ 不要在 core/parser 层引入 CLI 依赖
+- ❌ 不要提交包含 `console.log` 的代码
+- ❌ 不要使用 `--no-verify` 跳过 hooks
+- ❌ 不要通过 `@ts-ignore` 绕过类型错误
+- ❌ 不要擅自降低任务等级
+- ❌ 不要累积多个任务后才 commit
 
-- `test-engineer` (sonnet): test strategy, coverage, flaky-test hardening
-- `build-fixer` (sonnet): build/toolchain/type failures
-- `designer` (sonnet): UX/UI architecture, interaction design
-- `writer` (haiku): docs, migration notes, user guidance
-- `qa-tester` (sonnet): interactive CLI/service runtime validation
-- `scientist` (sonnet): data/statistical analysis
-- `document-specialist` (sonnet): external documentation & reference lookup
-- `git-master` (sonnet): git operations, commit history management
-- `code-simplifier` (opus): code clarity and simplification
+## Commit 策略
 
-Coordination:
+**核心原则**：任务完成即提交。
 
-- `critic` (opus): plan/design critical challenge
-  </agent_catalog>
+- 单个任务完成 → 立即 commit
+- 多文件变更 → 按逻辑分批 commit
+- Commit 格式 → `[TAG] scope: message`
+- 文件数量 → 单个 commit 不超过 10 个文件
 
-<tools>
-External AI (tmux CLI workers):
-- Claude agents: `/team N:executor "task"` via `TeamCreate`/`Task`
-- Codex/Gemini workers: `omc team N:codex|gemini "..."` (plus `omc team status <team-name>` / `omc team shutdown <team-name>`)
-- Provider advisor CLI: `omc ask <claude|codex|gemini> ...` (writes artifacts to `.omc/artifacts/ask/`)
-- Ask shortcuts: `/oh-my-claudecode:ask-codex` and `/oh-my-claudecode:ask-gemini` route to the same `omc ask` flow
-- CCG skill route: `/oh-my-claudecode:ccg` fans out via `ask-codex` + `ask-gemini`, then Claude synthesizes
+## 首选模式
 
-OMC State: `state_read`, `state_write`, `state_clear`, `state_list_active`, `state_get_status`
+- ✅ 纯函数优先，副作用隔离
+- ✅ 依赖注入而非直接实例化
+- ✅ 显式类型而非 `any`
+- ✅ 检索优先于记忆（使用 CodeMap CLI）
+- ✅ 最小改动优先
 
-- Stored at `{worktree}/.omc/state/{mode}-state.json`; session-scoped under `.omc/state/sessions/{sessionId}/`
+## 快速参考
 
-Team Coordination: `TeamCreate`, `TeamDelete`, `SendMessage`, `TaskCreate`, `TaskList`, `TaskGet`, `TaskUpdate`
+### 常用命令
 
-Notepad (`{worktree}/.omc/notepad.md`): `notepad_read`, `notepad_write_priority`, `notepad_write_working`, `notepad_write_manual`, `notepad_prune`, `notepad_stats`
+```bash
+# 验证
+npm run check:all          # 类型 + 测试 + Lint
+npm run typecheck          # 仅类型检查
+npm test                   # 仅测试
+npm run lint               # 仅 Lint
 
-Project Memory (`{worktree}/.omc/project-memory.json`): `project_memory_read`, `project_memory_write`, `project_memory_add_note`, `project_memory_add_directive`
+# CLI 工具
+node dist/cli/index.js query -s "symbolName"
+node dist/cli/index.js deps -m "src/core/analyzer"
+node dist/cli/index.js impact -f "src/types/index.ts"
 
-Code Intelligence:
+# AI 任务钩子
+npm run ai:pre-task        # 任务前检查
+npm run ai:post-task       # 任务后检查+修复
+```
 
-- LSP: `lsp_hover`, `lsp_goto_definition`, `lsp_find_references`, `lsp_document_symbols`, `lsp_workspace_symbols`, `lsp_diagnostics`, `lsp_diagnostics_directory`, `lsp_prepare_rename`, `lsp_rename`, `lsp_code_actions`, `lsp_code_action_resolve`, `lsp_servers`
-- AST: `ast_grep_search`, `ast_grep_replace`
-- `python_repl`: persistent Python REPL for data analysis
-  </tools>
+### 文件模板
 
-<skills>
-Skills are user-invocable commands (`/oh-my-claudecode:<name>`). When you detect trigger patterns, invoke the corresponding skill.
+**TypeScript 源文件头**：
+```typescript
+// [META] since:2026-03 | owner:team | stable:false
+// [WHY] 解释此文件存在的理由
+```
 
-Workflow:
+**技术债务标记**：
+```typescript
+// TODO-DEBT [L1] [日期:2026-03-17] [作者:AI] [原因:说明]
+// 问题：具体问题描述
+// 风险：潜在风险
+// 偿还计划：何时如何修复
+```
 
-- `autopilot` ("autopilot", "build me", "I want a"): full autonomous execution from idea to working code
-- `ralph` ("ralph", "don't stop", "must complete"): self-referential loop with verifier verification; includes ultrawork
-- `ultrawork` ("ulw", "ultrawork"): maximum parallelism with parallel agent orchestration
-- `team` ("team", "coordinated team", "team ralph"): N coordinated Claude agents with stage-aware routing; `team ralph` for persistent team execution
-- `ccg` ("ccg", "tri-model", "claude codex gemini"): fan out via `ask-codex` + `ask-gemini`, then Claude synthesizes
-- `ultraqa` (activated by autopilot): QA cycling -- test, verify, fix, repeat
-- `omc-plan` (manual command): strategic planning; supports `--consensus` and `--review`
-- `ralplan` ("ralplan", "consensus plan"): alias for `/omc-plan --consensus` -- iterative planning with Planner, Architect, Critic until consensus; short deliberation by default, `--deliberate` for high-risk work (adds pre-mortem + expanded unit/integration/e2e/observability test planning)
-- `sciomc` ("sciomc"): parallel scientist agents for comprehensive analysis
-- `external-context`: parallel document-specialist agents for web searches
-- `deepinit` ("deepinit"): deep codebase init with hierarchical AGENTS.md
+## 相关文档
 
-Agent Shortcuts (thin wrappers):
+- `AGENTS.md` - 仓库级强约束、任务分级、可信度自评
+- `CLAUDE.md` - 执行清单、验收标准
+- `ARCHITECTURE.md` - 系统地图、模块边界
+- `docs/rules/architecture-guardrails.md` - 架构依赖规则
+- `docs/rules/code-quality-redlines.md` - 代码质量红线
+- `docs/rules/engineering-with-codex-openai.md` - 工程规则
 
-- `analyze` -> `debugger`: "analyze", "debug", "investigate"
-- `tdd` -> `test-engineer`: "tdd", "test first", "red green"
-- `build-fix` -> `build-fixer`: "fix build", "type errors"
-- `code-review` -> `code-reviewer`: "review code"
-- `security-review` -> `security-reviewer`: "security review"
-- `review` -> `omc-plan --review`: "review plan", "critique plan"
+## 任务初始化模板
 
-Notifications: `configure-notifications` ("configure discord", "setup telegram", "configure slack")
-Utilities: `ask-codex`, `ask-gemini`, `cancel`, `note`, `learner`, `omc-setup`, `mcp-setup`, `hud`, `omc-doctor`, `omc-help`, `trace`, `release`, `project-session-manager`, `skill`, `writer-memory`, `ralph-init`, `learn-about-omc`
+每次接受任务时，使用以下模板开始：
 
-Disambiguation: prompts like "ask/use/delegate to codex|gemini" -> `ask-codex` / `ask-gemini`; "claude codex gemini" -> ccg.
-</skills>
+```markdown
+## 任务分析
+**目标**：[一句话描述]
+**类型**：[新增功能/修复 Bug/重构/性能优化/文档更新]
+**风险等级**：[L0/L1/L2/L3]
+**影响范围**：[列举可能影响的文件/模块]
 
-<team_pipeline>
-Team is the default multi-agent orchestrator: `team-plan -> team-prd -> team-exec -> team-verify -> team-fix (loop)`
+## 上下文清单
+- [x] 已读取 AGENTS.md 架构约束
+- [x] 已识别相关类型定义
+- [ ] 待确认：[如有]
 
-Stage routing:
-
-- `team-plan`: `explore` + `planner`, optionally `analyst`/`architect`
-- `team-prd`: `analyst`, optionally `critic`
-- `team-exec`: `executor` + specialists (`designer`, `build-fixer`, `writer`, `test-engineer`, `deep-executor`)
-- `team-verify`: `verifier` + reviewers as needed
-- `team-fix`: `executor`/`build-fixer`/`debugger` depending on defect type
-
-Fix loop bounded by max attempts. Terminal states: `complete`, `failed`, `cancelled`.
-`team ralph` links both modes; cancelling either cancels both.
-</team_pipeline>
-
-<verification>
-Verify before claiming completion. Sizing: small (<5 files) -> `verifier` haiku; standard -> sonnet; large/security -> opus.
-Loop: identify proof, run verification, read output, report with evidence. If verification fails, keep iterating.
-</verification>
-
-<execution_protocols>
-Broad requests (vague verbs, no file/function targets, 3+ areas): explore first, then use plan skill.
-Parallelization: 2+ independent tasks in parallel; Team mode preferred; `run_in_background` for builds/tests.
-Continuation: before concluding, confirm zero pending tasks, tests passing, zero errors, verifier evidence collected.
-</execution_protocols>
-
-<hooks_and_context>
-Hooks inject context via `<system-reminder>` tags:
-
-- `hook success: Success` -- proceed normally
-- `hook additional context: ...` -- read it; relevant to your task
-- `[MAGIC KEYWORD: ...]` -- invoke the indicated skill immediately
-- `The boulder never stops` -- ralph/ultrawork mode; keep working
-
-Persistence: `<remember>info</remember>` (7 days), `<remember priority>info</remember>` (permanent).
-Kill switches: `DISABLE_OMC` (all hooks), `OMC_SKIP_HOOKS` (comma-separated).
-</hooks_and_context>
-
-<cancellation>
-Invoke `/oh-my-claudecode:cancel` to end execution modes (`--force` to clear all state).
-Cancel when: tasks done and verified, work blocked (explain first), user says "stop".
-Do not cancel when: stop hook fires but work is still incomplete.
-</cancellation>
-
-<worktree_paths>
-All OMC state lives under git worktree root: `.omc/state/` (mode state), `.omc/state/sessions/{sessionId}/` (session state), `.omc/notepad.md`, `.omc/project-memory.json`, `.omc/plans/`, `.omc/research/`, `.omc/logs/`.
-</worktree_paths>
-
-## Setup
-
-Say "setup omc" or run `/oh-my-claudecode:omc-setup`. Announce major behavior activations to keep users informed.
-
-<\!-- OMC:END -->
+## 执行计划（Plan-Build-Verify-Fix）
+1. [Plan] 设计接口/类型
+2. [Build] 实现核心逻辑 + 单元测试
+3. [Build] 实现外围层
+4. [Verify] 运行类型检查 + 单元测试 + Lint
+5. [Fix] 修复发现的问题
+6. [Verify] 最终验收
+```
