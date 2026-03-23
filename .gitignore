@@ -110,6 +110,7 @@ coverage/
 .nyc_output/
 *.lcov
 test*.md
+!docs/rules/testing.md
 test-*.md
 test_report*.md
 test-reports/
