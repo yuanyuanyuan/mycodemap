@@ -90,6 +90,13 @@ export async function runShipPipeline(ctx: ShipPipelineContext): Promise<Pipelin
     return { success: true, analyzeResult, versionResult, blocked: false };
   }
 
+  // versionType === 'none' 时跳过发布（只有文档或配置变更）
+  if (versionResult.versionType === 'none') {
+    console.log(chalk.yellow('\n⚠️ 无功能变更，跳过发布'));
+    console.log(SEPARATOR);
+    return { success: true, analyzeResult, versionResult, blocked: false };
+  }
+
   // Step 3: CHECK
   const checkStep = await runStep(
     '质量检查',
