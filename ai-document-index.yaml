@@ -3,7 +3,7 @@
 
 project:
   name: CodeMap
-  version: "0.3.6"
+  version: "0.3.7"
   description: "TypeScript 代码地图生成与分析工具，为 AI 辅助开发提供结构化上下文"
   repository: "https://github.com/mycodemap/mycodemap"
   license: "MIT"
@@ -317,6 +317,6 @@ cli_commands:
 
 # 版本兼容性
 version_compatibility:
-  current: "0.3.6"
+  current: "0.3.7"
   min_supported: "0.1.0"
   breaking_changes: []
