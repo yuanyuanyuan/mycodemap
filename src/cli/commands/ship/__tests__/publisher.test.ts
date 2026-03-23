@@ -105,4 +105,46 @@ describe('ship publisher', () => {
     expect(commands.some(command => command.includes('package-lock.json'))).toBe(true);
     expect(commands.some(command => command.includes('AI_DISCOVERY.md'))).toBe(true);
   });
+
+  it('should fallback to HTTPS push when SSH port 22 is unavailable', async () => {
+    execSyncMock.mockImplementation((command: string, options?: { encoding?: string }) => {
+      if (command.startsWith('npm version ')) {
+        const version = command.replace('npm version ', '').replace(' --no-git-tag-version', '').trim();
+        writeJson('package.json', { name: '@mycodemap/mycodemap', version });
+        writeJson('package-lock.json', { name: '@mycodemap/mycodemap', version, lockfileVersion: 3 });
+        return options?.encoding ? version : Buffer.from(version);
+      }
+
+      if (command === 'git rev-parse HEAD') {
+        return options?.encoding ? 'abc123head\n' : Buffer.from('abc123head\n');
+      }
+
+      if (command === 'git remote get-url origin') {
+        return options?.encoding
+          ? 'git@github.com:yuanyuanyuan/mycodemap.git\n'
+          : Buffer.from('git@github.com:yuanyuanyuan/mycodemap.git\n');
+      }
+
+      if (command === 'git push origin HEAD tag v0.4.1') {
+        const error = new Error('push failed');
+        Object.assign(error, {
+          stderr: Buffer.from('ssh: connect to host github.com port 22: Connection timed out\nfatal: Could not read from remote repository.\n')
+        });
+        throw error;
+      }
+
+      if (command.includes('http.extraheader="AUTHORIZATION: basic $BASIC" push https://github.com/yuanyuanyuan/mycodemap.git HEAD tag v0.4.1')) {
+        return options?.encoding ? '' : Buffer.from('');
+      }
+
+      return options?.encoding ? '' : Buffer.from('');
+    });
+
+    const result = await publish('0.4.1', { analyzeResult });
+
+    expect(result.success).toBe(true);
+    const commands = execSyncMock.mock.calls.map(call => call[0] as string);
+    expect(commands).toContain('git push origin HEAD tag v0.4.1');
+    expect(commands.some(command => command.includes('https://github.com/yuanyuanyuan/mycodemap.git'))).toBe(true);
+  });
 });

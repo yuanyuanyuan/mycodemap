@@ -18,6 +18,7 @@ interface ReplacementRule {
 }
 
 const CHANGELOG_HEADER = '# Changelog\n\nAll notable changes to this project will be documented in this file.\n\n';
+const COMMAND_MAX_BUFFER = 20 * 1024 * 1024;
 
 function updateFileByRules(rules: ReplacementRule[]): void {
   for (const rule of rules) {
@@ -175,6 +176,55 @@ function resolveRepoSlug(): string | undefined {
   }
 }
 
+function extractCommandError(error: unknown): string {
+  if (!error || typeof error !== 'object') {
+    return String(error);
+  }
+
+  const stderr = 'stderr' in error && typeof error.stderr === 'string'
+    ? error.stderr
+    : 'stderr' in error && Buffer.isBuffer(error.stderr)
+      ? error.stderr.toString('utf-8')
+      : '';
+
+  const stdout = 'stdout' in error && typeof error.stdout === 'string'
+    ? error.stdout
+    : 'stdout' in error && Buffer.isBuffer(error.stdout)
+      ? error.stdout.toString('utf-8')
+      : '';
+
+  const message = error instanceof Error ? error.message : String(error);
+  return [message, stderr.trim(), stdout.trim()].filter(Boolean).join('\n');
+}
+
+function shouldFallbackToHttps(errorText: string): boolean {
+  return /port 22|Connection timed out|Could not read from remote repository/i.test(errorText);
+}
+
+function pushReleaseRefs(tagName: string, repo?: string): void {
+  const baseOptions = {
+    stdio: 'pipe' as const,
+    encoding: 'utf-8' as const,
+    maxBuffer: COMMAND_MAX_BUFFER
+  };
+
+  try {
+    execSync(`git push origin HEAD tag ${tagName}`, baseOptions);
+    return;
+  } catch (error) {
+    const errorText = extractCommandError(error);
+    if (!repo || !shouldFallbackToHttps(errorText)) {
+      throw error;
+    }
+
+    console.log(chalk.yellow('  SSH push 失败，回退到 HTTPS token push...'));
+    execSync(
+      `TOKEN=$(gh auth token) && BASIC=$(printf 'x-access-token:%s' "$TOKEN" | base64 | tr -d '\\n') && git -c http.extraheader="AUTHORIZATION: basic $BASIC" push https://github.com/${repo}.git HEAD tag ${tagName}`,
+      baseOptions
+    );
+  }
+}
+
 export interface PublishResult {
   success: boolean;
   version: string;
@@ -253,7 +303,7 @@ export async function publish(version: string, options: PublishOptions = {}): Pr
 
     // 6. 推送版本提交和 tag，由 GitHub Actions 执行实际 npm 发布
     console.log(chalk.gray('  推送发布提交与 tag...'));
-    execSync(`git push origin HEAD tag ${tagName}`, { stdio: 'pipe' });
+    pushReleaseRefs(tagName, result.repo);
     result.pushed = true;
     result.pushedAtMs = Date.now();
 
