@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.4] - 2026-03-23 - CI Pipeline Fixes
+
+### 🔧 Configuration
+
+- **CI**: 修复 `.gitignore` 规则，允许 `scripts/*.js` 用于 CI 验证
+- **CI**: 添加 `docs/rules/testing.md` 到 git 跟踪
+- **CI**: 移除无效的 `ai-feed.txt` git diff 检查
+- **package**: 添加 `package-lock.json` 到 git 解决 CI 依赖问题
+
 ## [0.3.3] - 2026-03-23 - Ship Command Improvements
 
 ### 🐛 Bug Fixes
