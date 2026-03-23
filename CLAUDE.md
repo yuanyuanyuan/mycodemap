@@ -4,12 +4,31 @@
 
 ## 1. 先读顺序
 
+### 1.1 必读文档（按优先级）
+
 1. 离目标文件最近的 `AGENTS.md`
 2. 根目录 `AGENTS.md`
 3. 本文件 `CLAUDE.md`
-4. `ARCHITECTURE.md`
-5. `docs/rules/`、`docs/design-docs/`、`docs/exec-plans/` 中与任务最相关的文档
-6. 代码、测试、配置与 Git 事实
+4. **`AI_GUIDE.md`** - AI 专属快速参考（命令选择决策树、场景映射）
+5. `ARCHITECTURE.md`
+6. `docs/rules/`、`docs/design-docs/`、`docs/exec-plans/` 中与任务最相关的文档
+7. 代码、测试、配置与 Git 事实
+
+### 1.2 AI 专属文档导航
+
+如果你是 AI/Agent，优先查看以下文档：
+
+| 文档 | 用途 | 何时查看 |
+|------|------|---------|
+| `AI_GUIDE.md` | **AI 主指南** - 命令速查、决策树、提示词模板 | **必读** |
+| `docs/ai-guide/QUICKSTART.md` | 快速开始、场景-命令映射 | 首次使用 |
+| `docs/ai-guide/COMMANDS.md` | 完整 CLI 命令参数 | 需要具体命令时 |
+| `docs/ai-guide/OUTPUT.md` | JSON 输出结构、解析工具 | 解析命令输出时 |
+| `docs/ai-guide/PATTERNS.md` | 标准工作流模式 | 实现复杂任务时 |
+| `docs/ai-guide/PROMPTS.md` | 即用型提示词模板 | 直接使用或改编 |
+| `docs/ai-guide/INTEGRATION.md` | 错误处理、MCP 集成 | 集成到 Agent 系统时 |
+
+**快速入口**: `.cursorrules` | `.github/copilot-instructions.md`
 
 当前主文档结构已落地，但仍有少量操作指南与历史文档保留在 `docs/` 根层；出现路径冲突时，以仓库当前可读文件为准。
 
@@ -83,11 +102,21 @@ AI 完成任务前必须自检并勾选：
 
 ## 4. 检索优先级
 
+### 4.1 代码检索（优先使用 CodeMap CLI）
 - 首选：`node dist/cli/index.js query -s "<symbol>"`
 - 首选：`node dist/cli/index.js query -m "<module>"`
 - 首选：`node dist/cli/index.js deps -m "<module>"`
 - 首选：`node dist/cli/index.js impact -f "<file>"`
 - 首选：`node dist/cli/index.js analyze <intent>`
+
+### 4.2 MVP3 架构层检索（按层次查找）
+- **Interface 层**：`src/interface/types/`, `src/interface/config/`
+- **Infrastructure 层**：`src/infrastructure/storage/`, `src/infrastructure/parser/`, `src/infrastructure/repositories/`
+- **Domain 层**：`src/domain/entities/`, `src/domain/services/`, `src/domain/repositories/`
+- **Server 层**：`src/server/`, `src/server/handlers/`, `src/server/routes/`
+- **CLI 层**：`src/cli/commands/`, `src/cli/index.ts`
+
+### 4.3 回退方案
 - 回退：`rg -n`、`find`、直接读文件
 
 若 CodeMap 失效或结果不足，记录问题并继续任务；不要因为工具问题卡死交付。
@@ -115,6 +144,7 @@ AI 完成任务前必须自检并勾选：
 
 修改以下类型代码时，**必须**检查并更新对应文档：
 
+#### 人类用户文档
 - [ ] **新增/修改 CLI 命令** → 同步 `CLAUDE.md`、`docs/rules/engineering-with-codex-openai.md`
 - [ ] **修改类型定义/接口** → 同步相关注释、API 文档、使用示例
 - [ ] **修改 CI/CD 配置** → 同步 `docs/rules/validation.md`
@@ -125,7 +155,24 @@ AI 完成任务前必须自检并勾选：
 - [ ] **修改提交规范** → 同步 `AGENTS.md` 或 `docs/rules/engineering-with-codex-openai.md`
 - [ ] **发现文档与代码不符** → 立即修复相关文档
 
+#### AI/Agent 专属文档（强制性）
+- [ ] **新增/修改 CLI 命令** → 同步 **`AI_GUIDE.md`**、**`docs/ai-guide/COMMANDS.md`**、**`docs/ai-guide/PROMPTS.md`**
+- [ ] **修改 JSON 输出格式/契约** → 同步 **`docs/ai-guide/OUTPUT.md`**（TypeScript 接口定义）
+- [ ] **新增使用模式** → 同步 **`docs/ai-guide/PATTERNS.md`**
+- [ ] **新增典型任务** → 同步 **`docs/ai-guide/PROMPTS.md`**（添加提示词模板）
+- [ ] **修改架构分层** → 同步 **`AI_GUIDE.md`**（架构图）
+
+#### AI 友好性检查清单（文档更新时必须自检）
+- [ ] **结构清晰**: 文档使用层级标题（## ### ####），便于 AI 解析
+- [ ] **决策树**: 复杂流程提供决策树或流程图（文本格式）
+- [ ] **速查表**: 命令、选项、场景提供表格形式
+- [ ] **代码可复现**: 所有代码块可直接复制执行
+- [ ] **类型定义**: JSON 输出提供 TypeScript 接口定义
+- [ ] **交叉引用**: 提供相关文档的链接
+- [ ] **错误处理**: 包含常见错误及解决方案
+
 **决策原则**：若改动会影响其他开发者或 AI 的行为，就必须更新文档。
+**双重标准**：所有文档更新必须同时满足人类阅读和 AI 阅读的需求。
 
 ## 7. 验证策略
 

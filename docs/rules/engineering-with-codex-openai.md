@@ -81,40 +81,63 @@ AI 生成代码时，以下模式触发**硬性阻断**：
 
 **第一性原理**：业务逻辑必须与实现细节解耦，确保可测试性和技术栈可替换性。
 
-当前项目分层（从上至下依赖）：
+当前项目采用 **MVP3 分层架构**（从上至下依赖）：
 
 ```
-src/cli/           # 入口层（命令解析、平台检查）
-    ↓
-src/orchestrator/  # 编排层（多工具路由、CI 护栏、工作流）
-    ↓
-src/core/          # 分析层（文件发现、解析、全局索引、依赖图）
-    ↓
-src/parser/        # 解析层（fast/smart/hybrid 解析器）
-    ↓
-src/generator/     # 生成层（AI 地图、上下文、JSON 输出）
-src/plugins/       # 插件层（复杂度分析、调用图等扩展）
+┌─────────────────────────────────────────────────────────────┐
+│                        CLI Layer                            │
+│  src/cli/ - 命令行接口，注册命令、参数解析、用户交互          │
+├─────────────────────────────────────────────────────────────┤
+│                      Server Layer                           │
+│  src/server/ - HTTP API 服务器，RESTful 端点，Handler 处理    │
+├─────────────────────────────────────────────────────────────┤
+│                       Domain Layer                          │
+│  src/domain/ - 核心业务逻辑，领域实体与服务                   │
+│  - entities/: Project, Module, Symbol, Dependency, CodeGraph │
+│  - services/: CodeGraphBuilder                              │
+│  - events/: DomainEvent                                     │
+│  - repositories/: 仓库接口                                  │
+├─────────────────────────────────────────────────────────────┤
+│                   Infrastructure Layer                      │
+│  src/infrastructure/ - 技术实现细节                          │
+│  - storage/: FileSystemStorage, MemoryStorage, KuzuDBStorage, Neo4jStorage
+│  - parser/: TypeScriptParser, GoParser, PythonParser, ParserRegistry
+│  - repositories/: CodeGraphRepositoryImpl                   │
+├─────────────────────────────────────────────────────────────┤
+│                     Interface Layer                         │
+│  src/interface/ - 类型定义与契约，跨层共享的接口              │
+│  - types/: 核心类型定义                                     │
+│  - config/: 配置接口                                        │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+**分层依赖规则**（严格自上而下）：
+- CLI → Server → Domain → Infrastructure → Interface
+- **禁止跨层依赖**（如 Domain 层不得导入 CLI 模块）
+- 同层内可以相互依赖
 
 **Enforcement 规则**：
-1. **core 层禁止导入**：cli、orchestrator 层模块
-2. **parser 层禁止导入**：cli、orchestrator、generator 层模块
-3. **generator 层禁止导入**：cli、orchestrator 层模块
-4. **跨层调用必须通过依赖注入**，禁止直接实例化高阶服务
+1. **Domain 层禁止导入**：CLI、Server 层模块
+2. **Infrastructure 层禁止导入**：CLI、Server、Domain 中的具体实现
+3. **Server 层禁止导入**：CLI 层模块
+4. **跨层调用必须通过接口**，依赖 Interface 层契约
+
+**历史架构说明**：
+- MVP3 之前的旧架构（cli→orchestrator→core→parser→generator）已完成迁移
+- 原有 `src/orchestrator/` 部分功能已整合到 Server 层和 CLI 层
+- 原有 `src/core/`、`src/parser/`、`src/generator/` 已迁移到 Domain/Infrastructure 层
 
 **违规检测**：使用 `dependency-cruiser` 或 CodeMap 自身的 `deps` 命令检查跨层依赖。
 
 **违规示例**：
 ```typescript
-// ❌ 违规：core 层直接依赖 CLI 模块
-// src/core/analyzer.ts
-import { runtimeLogger } from '../cli/runtime-logger'; // 错误！core 禁止导入 cli
+// ❌ 违规：Domain 层直接依赖 Infrastructure 具体实现
+// src/domain/services/CodeGraphBuilder.ts
+import { FileSystemStorage } from '../infrastructure/storage/FileSystemStorage'; // 错误！
 
-// ✅ 合规：通过接口或参数传递
-// src/core/analyzer.ts
-export interface AnalyzerOptions {
-  logger?: (msg: string) => void; // 通过选项注入
-}
+// ✅ 合规：通过 Interface 层契约依赖
+// src/domain/services/CodeGraphBuilder.ts
+import type { IStorage } from '../interface/types/storage'; // 正确：只依赖接口
 ```
 
 ## 8. 文档与知识落点

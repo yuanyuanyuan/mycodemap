@@ -82,7 +82,7 @@ describe('validate-docs.js', () => {
 
     const readmePath = path.join(fixtureRoot, 'README.md');
     const updatedReadme = readFileSync(readmePath, 'utf8').replace(
-      'mycodemap ci check-docs-sync',
+      /mycodemap ci check-docs-sync/g,
       'mycodemap ci check-docs'
     );
     writeFileSync(readmePath, updatedReadme);

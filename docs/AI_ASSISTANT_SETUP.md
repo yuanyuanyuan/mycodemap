@@ -134,6 +134,57 @@ $CODEMAP_CMD cycles
 $CODEMAP_CMD complexity -f "<file-path>"
 ```
 
+### 统一分析入口（analyze）
+```bash
+# 影响分析
+$CODEMAP_CMD analyze -i impact -t "<file-path>"
+
+# 依赖分析
+$CODEMAP_CMD analyze -i dependency -t "<module-path>"
+
+# 复杂度分析
+$CODEMAP_CMD analyze -i complexity -t "<path>"
+
+# 搜索分析
+$CODEMAP_CMD analyze -i search -k "<keyword>"
+
+# 项目概览
+$CODEMAP_CMD analyze -i overview -t "<path>"
+
+# JSON 输出
+$CODEMAP_CMD analyze -i impact -t "<file>" --json
+```
+
+### CI 门禁（ci）
+```bash
+# 检查提交格式
+$CODEMAP_CMD ci check-commits
+
+# 检查文件头
+$CODEMAP_CMD ci check-headers
+
+# 评估变更风险
+$CODEMAP_CMD ci assess-risk
+
+# 验证输出契约
+$CODEMAP_CMD ci check-output-contract
+```
+
+### 工作流编排（workflow）
+```bash
+# 启动工作流
+$CODEMAP_CMD workflow start "<task-description>"
+
+# 查看状态
+$CODEMAP_CMD workflow status
+
+# 推进到下一阶段
+$CODEMAP_CMD workflow proceed
+
+# 可视化工作流
+$CODEMAP_CMD workflow visualize
+```
+
 ## 使用场景
 
 ### 场景 1：理解项目结构

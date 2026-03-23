@@ -16,6 +16,8 @@ import { ciCommand } from './commands/ci.js';
 import { workflowCommand } from './commands/workflow.js';
 import { reportCommand } from './commands/report.js';
 import { logsCommand } from './commands/logs.js';
+import { serverCommand } from './commands/server.js';
+import { exportCommand } from './commands/export.js';
 import { setupRuntimeLogging } from './runtime-logger.js';
 import { runFirstRunGuide } from './first-run-guide.js';
 import { printMigrationWarning } from './paths.js';
@@ -194,5 +196,27 @@ program
   .action(async (subcommand: string, options: Record<string, unknown>) => {
     await logsCommand(subcommand, options);
   });
+
+// ============================================
+// MVP3 新架构命令
+// ============================================
+
+// Server 命令
+program
+  .command('server')
+  .description('启动 CodeMap HTTP API 服务器 (MVP3)')
+  .option('-p, --port <number>', '服务器端口', '3000')
+  .option('-h, --host <string>', '服务器主机', '0.0.0.0')
+  .option('--cors', '启用 CORS', false)
+  .option('--open', '自动打开浏览器', false)
+  .action(serverCommand);
+
+// Export 命令
+program
+  .command('export')
+  .description('导出代码图到各种格式 (MVP3)')
+  .argument('<format>', '导出格式: json, graphml, dot, mermaid')
+  .option('-o, --output <path>', '输出文件路径')
+  .action(exportCommand);
 
 program.parse();
