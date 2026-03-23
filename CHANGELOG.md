@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 ### 📚 Documentation
 
 - **docs**: 同步版本号与发布文档到 v0.4.0
+- **docs**: 补录 workflow 驱动发布链路的基线校验说明
 
 ## [0.3.6] - 2026-03-23 - Ship Workflow Fixes
 
