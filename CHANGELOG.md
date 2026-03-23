@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.1] - 2026-03-23 - Ship Workflow Fixes
+
+### 🐛 Bug Fixes
+
+- ship: 为 push 增加 HTTPS 回退
+- ship: 放宽本地检查输出缓冲区
+- ship: 修复 dry-run 文案与 changelog 判定
+- ship: 切换到 workflow 驱动发布链路
+
+### 📚 Documentation
+
+- ship: 补录 changelog 发布校验说明
+- ship: 同步 workflow 发布文档与版本基线
+
+### 🔧 Maintenance
+
+- lock: update package-lock
+
 ## [0.4.0] - 2026-03-23 - Ship Workflow Release
 
 ### 🚀 New Features
