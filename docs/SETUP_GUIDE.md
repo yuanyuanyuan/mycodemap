@@ -178,6 +178,71 @@ mycodemap impact -f src/cli/index.ts
 mycodemap impact -f src/cli/index.ts --transitive
 ```
 
+### 统一分析（analyze）
+
+```bash
+# 影响分析
+mycodemap analyze -i impact -t src/cli/index.ts
+mycodemap analyze -i impact -t src/cli/index.ts --scope transitive --include-tests
+
+# 依赖分析
+mycodemap analyze -i dependency -t src/orchestrator
+
+# 复杂度分析
+mycodemap analyze -i complexity -t src/domain
+
+# 搜索分析
+mycodemap analyze -i search -k "UnifiedResult" --topK 10
+
+# 项目概览
+mycodemap analyze -i overview -t src/
+
+# JSON 输出
+mycodemap analyze -i impact -t src/index.ts --json
+```
+
+### 工作流编排（workflow）
+
+```bash
+# 启动工作流
+mycodemap workflow start "实现用户认证模块"
+mycodemap workflow start "修复登录接口 500" --template bugfix
+
+# 查看当前状态
+mycodemap workflow status
+
+# 可视化工作流
+mycodemap workflow visualize
+
+# 推进到下一阶段
+mycodemap workflow proceed
+
+# 列出所有工作流
+mycodemap workflow list
+```
+
+### CI 门禁（ci）
+
+```bash
+# 检查提交格式
+mycodemap ci check-commits
+mycodemap ci check-commits -c 5
+
+# 检查文件头注释
+mycodemap ci check-headers
+mycodemap ci check-headers -d src/domain
+
+# 评估变更风险
+mycodemap ci assess-risk
+mycodemap ci assess-risk -t 0.5
+
+# 验证输出契约
+mycodemap ci check-output-contract
+
+# 检查提交文件数量
+mycodemap ci check-commit-size
+```
+
 ### 监听模式
 
 ```bash

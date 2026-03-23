@@ -152,9 +152,9 @@ AI 生成代码时，以下模式触发**硬性阻断**：
 
 | 触发条件 | 必须更新的文档 | 示例 |
 |---------|--------------|------|
-| **新增/修改 CLI 命令** | `CLAUDE.md`、`docs/rules/engineering-with-codex-openai.md` | 新增 `codemap analyze` 子命令 |
+| **新增/修改 CLI 命令** | `CLAUDE.md`、`docs/rules/engineering-with-codex-openai.md`、**`AI_GUIDE.md`**、**`docs/ai-guide/COMMANDS.md`** | 新增 `codemap analyze` 子命令 |
 | **新增/修改配置项** | `README.md`、`docs/rules/*.md` | 新增 `mycodemap.config.json` 配置 |
-| **修改架构分层** | `ARCHITECTURE.md`、`docs/rules/architecture-guardrails.md` | 新增 orchestrator 层 |
+| **修改架构分层** | `ARCHITECTURE.md`、`docs/rules/architecture-guardrails.md`、**`AI_GUIDE.md`** | 新增 orchestrator 层 |
 | **修改 CI/CD 流程** | `.github/workflows/*.yml`、`docs/rules/validation.md` | 新增 CI 检查步骤 |
 | **修改 Git Hooks** | `.githooks/*`、`docs/rules/validation.md` | 修改 commit-msg 格式要求 |
 | **修改代码规范** | `docs/rules/code-quality-redlines.md` | 新增 ESLint 规则 |
@@ -162,6 +162,97 @@ AI 生成代码时，以下模式触发**硬性阻断**：
 | **修改提交格式** | `docs/rules/engineering-with-codex-openai.md` | 新增 commit tag 类型 |
 | **发现文档与代码不符** | 相关文档 | README 示例代码与实际 CLI 输出不一致 |
 | **引入新的依赖项** | `ARCHITECTURE.md`（如影响分层） | 新增 dependency-cruiser |
+| **修改输出格式/契约** | **`docs/ai-guide/OUTPUT.md`** | analyze 命令 JSON 结构变更 |
+| **新增使用模式** | **`docs/ai-guide/PATTERNS.md`** | 新的典型工作流模式 |
+
+### 9.1.1 AI 友好文档规范（新增）
+
+**强制性要求**: 所有文档更新必须同时满足人类阅读和 AI 阅读的需求。
+
+#### AI 友好文档检查清单
+
+更新或创建文档时，必须检查：
+
+- [ ] **结构清晰**: 使用层级标题（## ### ####），便于 AI 解析
+- [ ] **决策树**: 复杂流程必须提供决策树或流程图
+- [ ] **速查表**: 命令、选项、场景必须提供表格形式
+- [ ] **代码可复现**: 所有代码块必须是可直接复制的命令
+- [ ] **类型定义**: JSON 输出必须提供 TypeScript 接口定义
+- [ ] **提示词模板**: 常见任务必须提供即用型提示词模板
+- [ ] **错误处理**: 必须包含常见错误及解决方案
+- [ ] **导航链接**: 文档之间必须提供清晰的交叉引用
+
+#### 文档分层标准
+
+| 文档类型 | 人类友好要求 | AI 友好要求 |
+|---------|-------------|------------|
+| `README.md` | 入门引导、特性介绍 | 提供 AI 文档入口链接 |
+| `AI_GUIDE.md` | 快速参考 | **决策树**、场景映射、速查表 |
+| `docs/ai-guide/*.md` | 目录索引 | **结构化数据**、提示词模板、错误处理代码 |
+| `CLAUDE.md` | 执行手册 | **验收清单**、检索优先级 |
+| `AGENTS.md` | 约束规则 | **任务分级**、代码红线表格 |
+
+#### AI 文档发现机制
+
+必须确保 AI 能够自动发现相关文档：
+
+1. **根目录入口**: `AI_GUIDE.md` 必须存在且最新
+2. **编辑器规则**: `.cursorrules` 提供快速入口
+3. **GitHub Copilot**: `.github/copilot-instructions.md` 提供上下文
+4. **交叉引用**: 所有文档必须链接到相关文档
+5. **目录索引**: `docs/ai-guide/README.md` 提供完整导航
+
+**违规示例**:
+```markdown
+❌ 仅更新 README.md，未同步 AI_GUIDE.md
+❌ CLI 命令参数变更，未更新 docs/ai-guide/COMMANDS.md
+❌ JSON 输出结构变更，未更新 docs/ai-guide/OUTPUT.md
+❌ 新增工作流模式，未更新 docs/ai-guide/PATTERNS.md
+```
+
+**合规示例**:
+```markdown
+✅ 新增 CLI 命令 → 同步更新:
+   - README.md (人类用户)
+   - AI_GUIDE.md (AI 速查)
+   - docs/ai-guide/COMMANDS.md (详细参考)
+   - docs/ai-guide/PROMPTS.md (提示词模板)
+```
+
+#### 发布前强制检查
+
+**任何发布操作前必须执行**:
+
+```bash
+npm run docs:check:pre-release
+```
+
+**检查内容** (基于 `AI_FRIENDLINESS_AUDIT.md`):
+
+| 检查项 | 严重程度 | 失败后果 |
+|--------|---------|---------|
+| AI 文档完整性 | 🔴 阻断 | 发布失败 |
+| llms.txt 标准格式 | 🔴 阻断 | 发布失败 |
+| 版本一致性 | 🔴 阻断 | 发布失败 |
+| 交叉引用有效性 | 🟡 警告 | 需要确认 |
+| CHANGELOG 同步 | 🔴 阻断 | 发布失败 |
+| YAML 索引有效性 | 🔴 阻断 | 发布失败 |
+
+**CI/CD 集成**:
+- 发布工作流 (`.github/workflows/publish.yml`) 已自动集成
+- 任何检查失败都会阻止发布
+
+**版本同步清单**:
+
+更新版本号时必须同步以下文件:
+- [ ] `package.json` - 主版本号
+- [ ] `llms.txt` - 文中版本声明
+- [ ] `ai-document-index.yaml` - `project.version`
+- [ ] `AI_GUIDE.md` - 页眉版本信息
+- [ ] `AI_DISCOVERY.md` - 页眉版本信息
+- [ ] `CHANGELOG.md` - 版本条目
+
+**参考文档**: `docs/rules/pre-release-checklist.md`
 
 ### 9.2 文档更新决策流程
 

@@ -66,15 +66,35 @@ ls .mycodemap/
 
 ## 文档导航
 
+### 人类用户
+
 | 文档 | 目标读者 | 内容 |
 |------|----------|------|
 | [🧭 文档索引](docs/README.md) | 所有读者 | 文档分层、阅读顺序与迁移状态 |
-| [🏗️ 架构总图](ARCHITECTURE.md) | 开发者 / AI | 系统地图、模块边界、主执行流 |
+| [🏗️ 架构总图](ARCHITECTURE.md) | 开发者 | 系统地图、模块边界、主执行流 |
 | [📋 MVP3 实施路线图](docs/exec-plans/MVP3-IMPLEMENTATION-ROADMAP.md) | 开发者 | 分层架构重构完整计划与状态 |
-| [🛡️ Codex 工程规则](docs/rules/engineering-with-codex-openai.md) | 开发者 / AI | 面向 agent 的工程约束、CLI / CI 护栏 |
 | [📖 安装配置指南](docs/SETUP_GUIDE.md) | 人类开发者 | 完整的安装、配置和使用指南 |
-| [🤖 AI 助手集成指南](docs/AI_ASSISTANT_SETUP.md) | AI 用户 | Kimi/Claude/Codex/Copilot 配置指引 |
 | [📁 配置示例](examples/) | 所有用户 | 各平台的现成配置文件 |
+
+### 🤖 AI / Agent 专属文档
+
+> 如果你是 AI 助手或 Agent，**请优先阅读以下文档**：
+
+| 文档 | 说明 |
+|------|------|
+| **[📘 AI_GUIDE.md](AI_GUIDE.md)** | **AI 主指南** - 快速参考、命令选择决策树、提示词模板速用 |
+| **[🚀 docs/ai-guide/QUICKSTART.md](docs/ai-guide/QUICKSTART.md)** | 快速开始、场景-命令映射表 |
+| **[📚 docs/ai-guide/COMMANDS.md](docs/ai-guide/COMMANDS.md)** | 完整 CLI 命令参考 |
+| **[📊 docs/ai-guide/OUTPUT.md](docs/ai-guide/OUTPUT.md)** | JSON 输出结构解析 |
+| **[🔄 docs/ai-guide/PATTERNS.md](docs/ai-guide/PATTERNS.md)** | 标准工作流模式 |
+| **[💬 docs/ai-guide/PROMPTS.md](docs/ai-guide/PROMPTS.md)** | 即用型提示词模板 |
+| **[🔧 docs/ai-guide/INTEGRATION.md](docs/ai-guide/INTEGRATION.md)** | 集成指南、错误处理 |
+| **[🛡️ AGENTS.md](AGENTS.md)** | 仓库级强约束、任务分级、代码红线 |
+| **[⚡ CLAUDE.md](CLAUDE.md)** | AI 执行手册、验收清单 |
+| **[🤖 docs/AI_ASSISTANT_SETUP.md](docs/AI_ASSISTANT_SETUP.md)** | AI 助手配置指引 |
+| **[🛠️ docs/rules/engineering-with-codex-openai.md](docs/rules/engineering-with-codex-openai.md) | 面向 agent 的工程约束 |
+
+**AI 快速入口**: `.cursorrules` | `.github/copilot-instructions.md`
 
 ## CLI 命令
 
@@ -162,7 +182,7 @@ mycodemap query -S "plugin" -l 5       # 限制结果数量
 | `-m, --module <path>` | 查询模块信息 | - |
 | `-d, --deps <name>` | 查询依赖关系 | - |
 | `-S, --search <word>` | 模糊搜索 | - |
-| `-l, --limit <number>` | 限制结果数量 | `20` |
+| `-l, --limit <number>` | 限制结果数量 | `50` |
 | `-j, --json` | 以 JSON 格式输出 | - |
 
 ### `mycodemap deps`
@@ -636,14 +656,84 @@ cp examples/codex/codemap-agent.md .agents/skills/codemap/SKILL.md
 
 ### `mycodemap analyze`
 
-统一分析入口，支持多意图路由：
+统一分析入口，支持多意图路由和结构化输出：
 
 ```bash
-mycodemap analyze -i overview -t src/orchestrator
+# 影响分析（查看文件变更影响范围）
+mycodemap analyze -i impact -t src/cli/index.ts
+mycodemap analyze -i impact -t src/cli/index.ts --scope transitive
 mycodemap analyze -i impact -t src/cli/index.ts --include-tests
+
+# 依赖分析
 mycodemap analyze -i dependency -t src/cli/index.ts
+
+# 项目概览
+mycodemap analyze -i overview -t src/orchestrator
+
+# 复杂度分析
+mycodemap analyze -i complexity -t src/domain
+
+# 搜索分析
 mycodemap analyze -i search -k UnifiedResult
+
+# 重构建议
+mycodemap analyze -i refactor -t src/cache
+
+# 引用查找
+mycodemap analyze -i reference -t src/interface/types
+
+# 文档生成
+mycodemap analyze -i documentation -t src/domain/services
+
+# 机器可读输出（JSON）
+mycodemap analyze -i impact -t src/index.ts --json
+mycodemap analyze -i impact -t src/index.ts --structured --json
 ```
+
+| 选项 | 说明 | 默认值 |
+|------|------|--------|
+| `-i, --intent <type>` | 分析类型：`impact`/`dependency`/`search`/`documentation`/`complexity`/`overview`/`refactor`/`reference` | `impact` |
+| `-t, --targets <paths...>` | 目标文件/模块路径（必填） | - |
+| `-k, --keywords <words...>` | 搜索关键词（用于 search/documentation 意图） | - |
+| `-s, --scope <scope>` | 范围：`direct`（直接）/`transitive`（传递） | `direct` |
+| `-n, --topK <number>` | 返回结果数量 | `8` |
+| `--include-tests` | 包含测试文件关联 | - |
+| `--include-git-history` | 包含 Git 历史分析 | - |
+| `--json` | JSON 格式输出 | - |
+| `--structured` | 纯结构化输出（移除自然语言字段，配合 `--json` 使用） | - |
+| `--output-mode <mode>` | 输出模式：`machine`/`human` | `human` |
+
+### `mycodemap ci`
+
+CI Gateway - 代码质量门禁工具：
+
+```bash
+# 验证提交格式（[TAG] scope: message）
+mycodemap ci check-commits
+mycodemap ci check-commits -c 5
+mycodemap ci check-commits -r origin/main..HEAD
+
+# 验证文件头注释（[META], [WHY]）
+mycodemap ci check-headers
+mycodemap ci check-headers -d src/domain
+mycodemap ci check-headers -f "src/index.ts,src/cli/index.ts"
+
+# 评估变更风险
+mycodemap ci assess-risk
+mycodemap ci assess-risk -t 0.5
+
+# 验证文档同步
+mycodemap ci check-docs-sync
+
+# 验证输出契约
+mycodemap ci check-output-contract
+
+# 检查提交文件数量（限制 10 个文件）
+mycodemap ci check-commit-size
+mycodemap ci check-commit-size -m 15
+```
+
+支持的提交 TAG 类型：`[REFACTOR]`, `[TEST]`, `[DOCS]`, `[FEAT]`, `[FIX]`, `[CHORE]`, `[PERF]`, `[SECURITY]`, `[BREAKING]`, `[HOTFIX]`, `[MIGRATION]`, `[WIP]`
 
 ## 贡献指南
 
