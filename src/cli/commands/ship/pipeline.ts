@@ -254,6 +254,18 @@ export async function runShipPipeline(ctx: ShipPipelineContext): Promise<Pipelin
     console.log(chalk.blue('\n> 发布模拟'));
     console.log(chalk.gray(`  版本: v${versionResult.suggestedVersion}`));
     console.log(chalk.gray('  [dry-run] 跳过实际发布'));
+
+    console.log(SEPARATOR);
+    console.log(chalk.green('\n✅ Dry-run 完成'));
+    console.log(chalk.gray(`   推荐版本: v${versionResult.suggestedVersion}`));
+    console.log(chalk.gray('   未执行实际发布'));
+
+    return {
+      success: true,
+      analyzeResult,
+      versionResult,
+      checkOutput
+    };
   }
 
   // 成功输出

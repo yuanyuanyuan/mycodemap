@@ -199,20 +199,14 @@ export const shouldPassRules: QualityRule[] = [
     check: async (ctx) => {
       try {
         const changelogPath = path.join(process.cwd(), 'CHANGELOG.md');
-        const changelogStat = await fs.stat(changelogPath);
-        const changelogModified = changelogStat.mtime;
-
-        // 获取最新 commit 的时间
-        const latestCommitTime = execSync('git log -1 --format=%ct', { encoding: 'utf-8' }).trim();
-        const commitTime = new Date(parseInt(latestCommitTime) * 1000);
-
-        const isUpdated = changelogModified >= commitTime;
+        await fs.access(changelogPath);
+        const isUpdated = ctx.changedFiles.includes('CHANGELOG.md');
         return {
           passed: isUpdated,
-          message: isUpdated ? undefined : 'CHANGELOG.md 自上次提交后未更新'
+          message: isUpdated ? undefined : '自上次 tag 以来未检测到 CHANGELOG.md 变更'
         };
       } catch {
-        return { passed: true, message: undefined }; // 文件不存在，跳过
+        return { passed: false, message: '缺少 CHANGELOG.md' };
       }
     }
   },
