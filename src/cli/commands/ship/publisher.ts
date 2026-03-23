@@ -52,14 +52,14 @@ export async function publish(version: string, dryRun: boolean = false): Promise
     console.log(chalk.gray('  同步 AI 文档版本...'));
     syncAIDocsVersion(version);
 
-    // 3. 创建 git tag
-    console.log(chalk.gray('  创建 git tag...'));
-    execSync(`git tag v${version}`, { stdio: 'pipe' });
-
-    // 4. 提交版本更新
+    // 3. 提交版本更新（必须在创建 tag 之前）
     console.log(chalk.gray('  提交版本更新...'));
     execSync('git add package.json AI_GUIDE.md llms.txt ai-document-index.yaml CHANGELOG.md', { stdio: 'pipe' });
     execSync(`git commit -m "[CONFIG] version: bump to v${version}"`, { stdio: 'pipe' });
+
+    // 4. 创建 git tag（在 commit 之后）
+    console.log(chalk.gray('  创建 git tag...'));
+    execSync(`git tag v${version}`, { stdio: 'pipe' });
 
     result.tagCreated = true;
 
