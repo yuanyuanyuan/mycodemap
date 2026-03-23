@@ -35,7 +35,7 @@ export async function runQualityChecks(
   // 跳过 merge commits，只检查常规 commits
   const nonMergeCommits = analyzeResult.commits.filter(c => !c.type.toLowerCase().includes('merge'));
   const allCommitsConventional = nonMergeCommits.every(c =>
-    /^(feat|fix|docs|style|refactor|test|chore|ci|perf|breaking|feature|bugfix|hotfix|config|infra|enhance|improvement)(\(.+\))?:/i.test(c.type)
+    /^(feat|fix|docs|style|refactor|test|chore|ci|perf|breaking|feature|bugfix|hotfix|config|infra|enhance|improvement|breaking-change)(\(.+\))?:/i.test(c.type)
   );
 
   const confidence = calculateConfidence({
