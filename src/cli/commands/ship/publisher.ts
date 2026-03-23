@@ -39,7 +39,7 @@ export async function publish(version: string, dryRun: boolean = false): Promise
     // 3. 提交版本更新
     console.log(chalk.gray('  提交版本更新...'));
     execSync('git add package.json CHANGELOG.md', { stdio: 'pipe' });
-    execSync(`git commit -m "chore: bump version to v${version}"`, { stdio: 'pipe' });
+    execSync(`git commit -m "[CHORE] version: bump to v${version}"`, { stdio: 'pipe' });
 
     result.tagCreated = true;
 

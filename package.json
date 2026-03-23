@@ -1,6 +1,6 @@
 {
   "name": "@mycodemap/mycodemap",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "TypeScript 代码地图工具 - 为 AI 辅助开发提供结构化上下文",
   "main": "./dist/index.js",
   "type": "module",
