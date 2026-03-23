@@ -16,10 +16,11 @@
 3. **llms.txt 标准** - 必须符合 llmstxt.org 规范
 4. **交叉引用有效性** - 所有内部链接必须有效
 5. **CHANGELOG 同步** - 必须包含当前版本的更新记录
+6. **OIDC 配置** - 使用 Trusted Publishing 方式发布
 
 ---
 
-## 📋 检查项详情
+## 📋 检查项详情 (共10项)
 
 ### 1. AI 文档完整性检查
 
@@ -78,6 +79,16 @@
 - 必须符合语义化版本规范 (`x.x.x`)
 - 预发布版本可包含后缀 (`0.2.0-beta.1`)
 
+**版本同步清单**:
+
+更新版本号时必须同步以下文件:
+- [ ] `package.json` - 主版本号
+- [ ] `llms.txt` - 文中版本声明
+- [ ] `ai-document-index.yaml` - `project.version`
+- [ ] `AI_GUIDE.md` - 页眉版本信息
+- [ ] `AI_DISCOVERY.md` - 页眉版本信息
+- [ ] `CHANGELOG.md` - 版本条目
+
 ### 4. 交叉引用有效性检查
 
 **目标**: 确保文档间的引用关系完整
@@ -126,7 +137,102 @@
 - ...
 ```
 
-### 7. YAML 索引有效性检查
+### 7. 发布必需文件检查
+
+**目标**: 确保发布到 NPM/GitHub 所需的文件都存在
+
+**必需文件**:
+| 文件 | 用途 | 状态 |
+|------|------|------|
+| `CHANGELOG.md` | GitHub Release 引用 | 必需 |
+| `LICENSE` | NPM 包许可证 | 必需 |
+| `README.md` | NPM 包主页展示 | 必需 |
+
+### 8. Git Tag 一致性检查
+
+**目标**: 确保版本号与 git tag 一致
+
+**检查项**:
+- [ ] 本地 tag `v{x.x.x}` 是否存在
+- [ ] Tag 是否指向当前 commit
+- [ ] 远程 tag 是否已推送
+- [ ] 当前分支是否为 main/master
+
+**发布流程**:
+
+```bash
+# 方式1: 使用发布脚本（推荐）
+./scripts/release.sh patch   # patch/minor/major
+
+# 方式2: 手动发布
+# 1. 更新版本号
+npm version patch  # 自动创建 tag
+
+# 2. 推送 tag
+git push origin main --tags
+
+# 3. GitHub Actions 自动完成:
+#    - 构建项目
+#    - 运行测试
+#    - 发布到 NPM (通过 OIDC)
+#    - 创建 GitHub Release
+```
+
+**Tag 命名规范**:
+- 格式: `v{x.x.x}` (例如: `v0.2.0`)
+- 必须带有 `v` 前缀
+- 必须符合语义化版本规范
+
+**GitHub Release**:
+- 由 GitHub Actions 自动创建
+- 基于 CHANGELOG.md 生成 release notes
+- 包含预发布版本检测 (版本号包含 `-`)
+
+### 9. OIDC 发布配置检查
+
+**目标**: 确保使用 OIDC Trusted Publishing 方式发布
+
+**配置要求**:
+
+1. **NPM 端配置**:
+   - 访问 `https://www.npmjs.com/package/@mycodemap/mycodemap/access`
+   - 添加 GitHub Actions 作为 Trusted Publisher:
+     - GitHub Organization: `yuanyuanyuan`
+     - GitHub Repository: `mycodemap`
+     - Workflow Name: `publish.yml`
+
+2. **GitHub Secrets 检查**:
+   - [ ] **不应设置** `NPM_TOKEN` secret
+   - [ ] 如果需要 Token 方式，使用 `NPM_TOKEN` 并确保是 **Automation** 类型
+
+3. **Workflow 权限配置**:
+   ```yaml
+   permissions:
+     contents: write  # 用于创建 GitHub Release
+     id-token: write  # 用于 OIDC trusted publishing (必需)
+   ```
+
+4. **发布命令**:
+   ```yaml
+   # 正确：使用 OIDC
+   - name: Publish to NPM
+     run: npm publish --access public --provenance
+   
+   # 错误：设置 NODE_AUTH_TOKEN 会干扰 OIDC
+   # env:
+   #   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+   ```
+
+**验证命令**:
+```bash
+# 检查是否设置了 NPM_TOKEN（OIDC 方式应该为空）
+gh secret list | grep NPM_TOKEN
+
+# 如果存在，删除它
+gh secret remove NPM_TOKEN
+```
+
+### 10. YAML 索引有效性检查
 
 **目标**: 确保 `ai-document-index.yaml` 结构完整
 
@@ -141,7 +247,7 @@
 **引用验证**:
 - YAML 中引用的所有文件路径必须存在
 
-### 8. AGENTS.md 文档规范检查
+### 11. AGENTS.md 文档规范检查
 
 **目标**: 确保 AGENTS.md 包含 AI 友好文档的强制要求
 
@@ -179,34 +285,66 @@ npm run docs:check:pre-release 2>&1 | less
 
 ### 发布前准备
 
+**推荐方式: 使用发布脚本（一键完成）**
+
 ```bash
-# 1. 更新版本号
-npm version patch|minor|major
+# 使用发布脚本（自动处理版本、tag、推送）
+./scripts/release.sh patch    # patch 版本 (0.2.0 -> 0.2.1)
+./scripts/release.sh minor    # minor 版本 (0.2.0 -> 0.3.0)
+./scripts/release.sh major    # major 版本 (0.2.0 -> 1.0.0)
+./scripts/release.sh 0.3.0    # 指定具体版本
 
-# 2. 更新所有文档中的版本号
-#    - llms.txt
-#    - AI_GUIDE.md
-#    - AI_DISCOVERY.md
-#    - ai-document-index.yaml
+# 脚本会自动:
+# 1. 运行 npm run check:all
+# 2. 更新 package.json 版本
+# 3. 创建 git commit
+# 4. 创建 git tag
+# 5. 推送到远程仓库
+# 6. 触发 GitHub Actions 发布 (OIDC)
+```
 
-# 3. 更新 CHANGELOG.md
+**手动方式（需要更多控制时）**
 
-# 4. 运行发布前检查
+```bash
+# 1. 确保工作区干净
+git status
+
+# 2. 运行发布前检查
 npm run docs:check:pre-release
 
-# 5. 构建和测试
+# 3. 构建和测试
 npm run check:all
 
-# 6. 提交并推送
-git add .
-git commit -m "[RELEASE] Bump version to x.x.x"
+# 4. 更新版本号（会自动创建 tag）
+npm version patch|minor|major
+
+# 5. 推送代码和 tag
 git push origin main
-git push origin v$(node -p "require('./package.json').version")
+git push origin --tags
+
+# 6. GitHub Actions 自动完成发布
 ```
 
 ---
 
 ## ❌ 常见问题
+
+### OIDC 发布失败
+
+**问题**: GitHub Actions 发布失败，提示 403 Forbidden
+
+**解决**:
+1. 检查 NPM 端是否配置了 Trusted Publisher:
+   - 访问 `https://www.npmjs.com/package/@mycodemap/mycodemap/access`
+   - 确认已添加 GitHub Actions 作为 Trusted Publisher
+2. 检查 workflow 权限:
+   - 确保有 `id-token: write`
+3. 检查是否意外设置了 `NPM_TOKEN`:
+   ```bash
+   gh secret list | grep NPM_TOKEN
+   # 如果存在，删除：gh secret remove NPM_TOKEN
+   ```
+4. 检查 workflow 中是否设置了 `NODE_AUTH_TOKEN` 环境变量（不应该设置）
 
 ### 版本不一致
 
@@ -269,7 +407,9 @@ scripts/pre-release-check.js
 ├── checkAIFriendliness()     # AI 友好性
 ├── checkChangelogSync()      # CHANGELOG 同步
 ├── checkYamlIndex()          # YAML 索引有效性
-└── checkDocumentationStandards() # AGENTS.md 规范
+├── checkDocumentationStandards() # AGENTS.md 规范
+├── checkReleaseFiles()       # 发布必需文件
+└── checkGitTag()             # Git Tag 一致性
 ```
 
 ---
@@ -278,6 +418,7 @@ scripts/pre-release-check.js
 
 | 日期 | 版本 | 变更 |
 |------|------|------|
+| 2026-03-23 | 0.2.0 | 添加 OIDC Trusted Publishing 配置说明 |
 | 2026-03-22 | 0.2.0 | 初始发布，基于 AI_FRIENDLINESS_AUDIT.md |
 
 ---

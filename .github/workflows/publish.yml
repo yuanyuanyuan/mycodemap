@@ -1,5 +1,5 @@
 # [META] since:2026-03-04 | owner:release-team | stable:true
-# [WHY] NPM package publishing workflow - 支持 tag 触发和手动触发
+# [WHY] NPM package publishing workflow - 使用 OIDC Trusted Publishing
 
 name: Publish to NPM
 
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write  # 用于创建 GitHub Release
-      id-token: write  # 用于 OIDC trusted publishing (可选)
+      id-token: write  # 用于 OIDC trusted publishing (必需)
 
     steps:
       - name: Checkout code
@@ -37,8 +37,6 @@ jobs:
           node-version: '20'
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
-          # 如果使用 NPM_TOKEN 方式，取消下面这行的注释
-          # scope: '@mycodemap'
 
       - name: Get version from package.json
         id: package-version
@@ -92,20 +90,38 @@ jobs:
       - name: Validate package contents
         run: npm run validate-pack
 
-      # 方式A: 使用 NPM_TOKEN (需要在 GitHub Secrets 中配置 NPM_TOKEN)
-      - name: Publish to NPM (NPM_TOKEN)
-        if: env.NPM_TOKEN != ''
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      # 方式B: 使用 OIDC Trusted Publishing (需要在 npm 网站上配置)
-      - name: Publish to NPM (OIDC)
-        if: env.NPM_TOKEN == ''
+      # 使用 OIDC Trusted Publishing 发布
+      # OIDC 通过 id-token: write 权限自动获取认证，不需要 NPM_TOKEN
+      - name: Publish to NPM
         run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Generate Release Notes
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        id: release-notes
+        run: |
+          VERSION="${{ steps.package-version.outputs.version }}"
+          
+          # 从 CHANGELOG.md 提取当前版本的变更记录
+          if [ -f CHANGELOG.md ]; then
+            # 提取当前版本的变更内容（两个版本标题之间的内容）
+            NOTES=$(awk "/^## \[$VERSION\]/,/^## \[/" CHANGELOG.md | head -n -1)
+            if [ -n "$NOTES" ]; then
+              echo "Extracted release notes from CHANGELOG.md"
+            else
+              NOTES="See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details."
+            fi
+          else
+            NOTES="See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details."
+          fi
+          
+          # 转义特殊字符用于 GitHub Actions 输出
+          NOTES="${NOTES//'%'/'%25'}"
+          NOTES="${NOTES//$'\n'/'%0A'}"
+          NOTES="${NOTES//$'\r'/'%0D'}"
+          
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
@@ -114,16 +130,22 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          release_name: Release v${{ steps.package-version.outputs.version }}
           draft: false
           prerelease: ${{ contains(steps.package-version.outputs.version, '-') }}
           body: |
-            ## Changes
-            
-            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
-            
+            ${{ steps.release-notes.outputs.notes }}
+
+            ---
+
             ## Installation
-            
+
             ```bash
             npm install @mycodemap/mycodemap@${{ steps.package-version.outputs.version }}
             ```
+
+            ## AI Documentation
+
+            This version includes updated AI-friendly documentation:
+            - [AI Guide](https://github.com/${{ github.repository }}/blob/main/AI_GUIDE.md)
+            - [llms.txt](https://github.com/${{ github.repository }}/blob/main/llms.txt)

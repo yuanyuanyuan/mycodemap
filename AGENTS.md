@@ -237,6 +237,8 @@ npm run docs:check:pre-release
 | 交叉引用有效性 | 🟡 警告 | 需要确认 |
 | CHANGELOG 同步 | 🔴 阻断 | 发布失败 |
 | YAML 索引有效性 | 🔴 阻断 | 发布失败 |
+| 发布必需文件 | 🔴 阻断 | 发布失败 |
+| Git Tag 一致性 | 🟡 警告 | 需要确认 |
 
 **CI/CD 集成**:
 - 发布工作流 (`.github/workflows/publish.yml`) 已自动集成
@@ -251,6 +253,29 @@ npm run docs:check:pre-release
 - [ ] `AI_GUIDE.md` - 页眉版本信息
 - [ ] `AI_DISCOVERY.md` - 页眉版本信息
 - [ ] `CHANGELOG.md` - 版本条目
+
+**Git Tag & Release 流程**:
+
+```bash
+# 方式1: 使用发布脚本（推荐）
+./scripts/release.sh patch    # patch/minor/major
+
+# 方式2: 手动发布
+npm version patch             # 更新版本并创建 tag
+git push origin main --tags   # 推送触发 GitHub Actions
+```
+
+**GitHub Actions 自动完成**:
+1. 运行完整检查 (`npm run docs:check:pre-release`)
+2. 构建项目 (`npm run build`)
+3. 运行测试 (`npm test`)
+4. 发布到 NPM (`npm publish`)
+5. 创建 GitHub Release (基于 tag 和 CHANGELOG)
+
+**Tag 规范**:
+- 格式: `v{x.x.x}` (例如: `v0.2.0`)
+- 必须带有 `v` 前缀
+- 必须符合语义化版本规范
 
 **参考文档**: `docs/rules/pre-release-checklist.md`
 
