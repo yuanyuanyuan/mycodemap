@@ -2,6 +2,51 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2026-03-23 - AI Documentation & Quality Improvements
+
+### 🐛 Bug Fixes
+
+- **export**: 修复 Mermaid 导出空输出问题，正确保存到 MVP3 存储
+- **cli**: 修复 export 命令 Mermaid 格式输出为空的问题
+- **orchestrator**: 修复 test-linker 中 glob ESM 导入问题
+
+### 📚 Documentation Enhancements
+
+#### AI 友好文档系统
+- 新增 `AI_GUIDE.md` - AI 专属快速参考文档
+- 新增 `docs/ai-guide/` 目录结构，包含：
+  - `QUICKSTART.md` - 快速开始与场景映射
+  - `COMMANDS.md` - 完整 CLI 命令参数参考
+  - `OUTPUT.md` - JSON 输出结构与 TypeScript 类型定义
+  - `PATTERNS.md` - 标准工作流模式
+  - `PROMPTS.md` - 即用型提示词模板
+  - `INTEGRATION.md` - 错误处理与 MCP 集成
+
+#### 文档质量保障
+- 新增 `docs/AI_ASSISTANT_SETUP.md` - AI 助手配置指南
+- 新增 `docs/SETUP_GUIDE.md` - 完整安装设置指南
+- 更新 `docs/rules/architecture-guardrails.md` - 架构约束规则增强
+- 更新 `docs/rules/engineering-with-codex-openai.md` - 工程规范更新
+
+### 🔧 Developer Experience
+
+#### CLI 改进
+- `docs:check` 脚本升级，同步验证人类文档和 AI 文档
+- 新增独立验证命令：
+  - `npm run docs:check:human` - 仅验证人类文档
+  - `npm run docs:check:ai` - 仅验证 AI 文档
+- 新增 `npm run release` - 标准化发布流程
+
+#### 验证流程
+- `check:all` 整合文档检查，更严格的质量门禁
+- 发布工作流 (`.github/workflows/publish.yml`) 优化
+
+### 📦 Dependencies
+
+- 新增 `scripts/validate-ai-docs.js` - AI 文档验证脚本
+
+---
+
 ## [0.2.0] - 2026-03-17 - MVP3 Architecture Release
 
 ### 🏗️ MVP3 分层架构重构
@@ -75,10 +120,10 @@ CodeMap 完成重大架构升级，采用清晰的分层架构设计：Interface
 
 ---
 
-## [0.1.2] - TBD
+## [0.1.2] - 2026-03-20
 
-### Fixed
-- glob v10+ 兼容性问题：更新 ESM 导入语法，使用 named export 替代 default export
+### Changed
+- 文档同步更新：CLI 命令列表、MVP3 架构描述、代码示例全面刷新
 
 ## [0.1.1] - 2026-03-07
 
