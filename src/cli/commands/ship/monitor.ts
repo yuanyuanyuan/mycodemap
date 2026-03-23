@@ -38,14 +38,20 @@ async function getLatestWorkflowRun(): Promise<GitHubActionsRun | null> {
 
     const branch = execSync('git branch --show-current', { encoding: 'utf-8' }).trim();
 
+    const headers: Record<string, string> = {
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'codemap-ship'
+    };
+
+    // 使用 GITHUB_TOKEN 认证（如果有的话）
+    const token = process.env.GITHUB_TOKEN;
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch(
       `https://api.github.com/repos/${repo}/actions/runs?branch=${branch}&per_page=1`,
-      {
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'codemap-ship'
-        }
-      }
+      { headers }
     );
 
     if (!response.ok) {
