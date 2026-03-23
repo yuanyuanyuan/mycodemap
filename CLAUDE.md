@@ -129,7 +129,7 @@ AI 完成任务前必须自检并勾选：
 - 代码检查：`npm run lint`
 - CLI 入口：`node dist/cli/index.js <command>`
 - 全部检查：`npm run check:all`（类型 + 测试 + Lint）
-- 发布：`codemap ship`（一键智能发布）
+- 发布：`codemap ship`（创建版本提交与 tag，并触发 GitHub Actions 发布）
 
 注意：当前仓库真实输出目录是 `dist/`，不是 `build/`。
 

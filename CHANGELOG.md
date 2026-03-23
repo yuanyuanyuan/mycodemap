@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-03-23 - Ship Workflow Release
+
+### 🚀 New Features
+
+- **ship**: 在发布前自动同步 AI 文档版本
+- **cli**: 完成 `codemap ship` 发布流程的最终联调
+
+### 🐛 Bug Fixes
+
+- **ship**: 修复 git tag 创建早于版本提交的问题
+
+### 📚 Documentation
+
+- **docs**: 同步版本号与发布文档到 v0.4.0
+
 ## [0.3.6] - 2026-03-23 - Ship Workflow Fixes
 
 ### 🐛 Bug Fixes

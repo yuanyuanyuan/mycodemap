@@ -1,11 +1,10 @@
 # NPM 自动发布指南
-3
 > 本文档说明如何配置和触发 @mycodemap/mycodemap 的自动发布流程
 
 ## 📋 发布流程概览
 
-```
-本地执行 release.sh → 推送 tag → GitHub Actions → 发布到 NPM
+```text
+codemap ship / release.sh → 创建版本提交 → 推送 tag → GitHub Actions → 发布到 NPM
 ```
 
 ## 🔧 前置配置
@@ -49,7 +48,22 @@
 
 ## 🚀 发布操作
 
-### 方法 1: 使用发布脚本 (推荐)
+### 方法 0: 使用 `codemap ship` (推荐)
+
+```bash
+# 自动分析版本、运行检查、推送 tag，并监控 GitHub Actions
+codemap ship
+
+# 仅预览版本和检查结果
+codemap ship --dry-run
+
+# 置信度处于 60-75 时自动确认
+codemap ship --yes
+```
+
+`codemap ship` **不会在本地执行 `npm publish`**；它会创建版本提交、推送 tag，然后由 `.github/workflows/publish.yml` 完成真正的 OIDC 发布。
+
+### 方法 1: 使用发布脚本
 
 ```bash
 # 进入项目目录

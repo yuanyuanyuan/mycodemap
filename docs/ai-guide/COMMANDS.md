@@ -377,7 +377,7 @@ mycodemap ship --yes                       # 置信度 60-75 时自动确认
 1. **ANALYZE** - 分析 git commits，检测变更类型
 2. **VERSION** - 基于 conventional commits 计算版本号
 3. **CHECK** - mustPass/shouldPass 检查 + 置信度评分
-4. **PUBLISH** - npm 发布 + git tag
+4. **PUBLISH** - 创建版本提交 + git tag + push 触发 GitHub Actions
 5. **MONITOR** - GitHub Actions CI 状态监控
 
 **置信度判定:**

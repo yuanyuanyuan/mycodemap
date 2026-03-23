@@ -394,6 +394,7 @@
 | 看模块关系 | 模板 6: 依赖分析 |
 | 找复杂代码 | 模板 7: 复杂度分析 |
 | 做新功能 | 模板 8: 新功能实现 |
+| 验证自动发布 | 模板 9: ship 发布验证 |
 
 ### 如何自定义模板
 
@@ -411,4 +412,41 @@
   → 代码搜索 (模板 3) 
   → 变更影响分析 (模板 2) 
   → 代码审查 (模板 5)
+```
+
+---
+
+## 模板 9: ship 发布验证
+
+**适用场景**: 需要验证 `codemap ship` 是否会通过 tag push 触发 GitHub Actions，而不是本地直接发布
+
+```markdown
+我需要验证 `codemap ship` 的自动发布链路是否完整。
+
+请执行以下步骤：
+
+1. **先做预检查**
+   ```bash
+   npm run docs:check:pre-release
+   npm run build
+   npm test
+   ```
+
+2. **做无副作用预演**
+   ```bash
+   node dist/cli/index.js ship --dry-run
+   ```
+
+3. **确认发布路径**
+   - 必须是：版本提交 → git tag → `git push` → GitHub Actions → OIDC 发布
+   - 不允许：本地直接执行 `npm publish`
+
+4. **正式执行**
+   ```bash
+   node dist/cli/index.js ship --yes
+   ```
+
+5. **核验结果**
+   - 记录 tag 名称、workflow run URL、GitHub Release URL
+   - 如果失败，记录失败的 job/step，并定位根因
 ```
