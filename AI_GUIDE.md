@@ -36,6 +36,7 @@ cat .mycodemap/AI_MAP.md
 | "查找与 XXX 相关的代码" | `analyze -i search -k "XXX" --json` |
 | "这个改动安全吗" | `ci assess-risk` |
 | "需要重构建议" | `analyze -i refactor -t "src/" --json` |
+| "一键发布 npm 包" | `ship` 或 `ship --dry-run` |
 
 **完整决策树**: 见 [docs/ai-guide/QUICKSTART.md](./docs/ai-guide/QUICKSTART.md)
 

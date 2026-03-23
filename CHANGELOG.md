@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-03-23 - One-Click Ship Command
+
+### 🚀 New Features
+
+- **ship**: 新增 `codemap ship` 一键智能发布命令
+  - 自动分析 commits 并检测变更类型
+  - 基于 conventional commits 规范计算版本号
+  - mustPass/shouldPass 质量检查 + 置信度评分
+  - npm 发布（支持 OIDC 认证）+ git tag
+  - GitHub Actions CI 状态轮询监控
+
+### 📦 CLI Enhancements
+
+- **新增命令**: `codemap ship [--dry-run] [--verbose] [--yes]`
+  - `--dry-run`: 仅分析不发布
+  - `--verbose`: 显示详细输出
+  - `--yes`: 置信度 60-75 时自动确认
+
 ## [0.2.1] - 2026-03-23 - AI Documentation & Quality Improvements
 
 ### 🐛 Bug Fixes
