@@ -1,0 +1,294 @@
+// [META] since:2026-03-22 | owner:docs-team | stable:true
+// [WHY] 验证 AI 友好文档的完整性和合规性
+
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(__dirname, '..');
+
+// AI 文档清单
+const requiredAIDocs = [
+  { file: 'llms.txt', minLength: 50 },  // 标准 llms.txt 格式
+  { file: 'AI_GUIDE.md', minLength: 100 },
+  { file: 'AI_DISCOVERY.md', minLength: 100 },
+  { file: 'ai-document-index.yaml', minLength: 50 },
+  { file: 'docs/ai-guide/README.md', minLength: 50 },
+  { file: 'docs/ai-guide/QUICKSTART.md', minLength: 50 },
+  { file: 'docs/ai-guide/COMMANDS.md', minLength: 100 },
+  { file: 'docs/ai-guide/OUTPUT.md', minLength: 100 },
+  { file: 'docs/ai-guide/PATTERNS.md', minLength: 100 },
+  { file: 'docs/ai-guide/PROMPTS.md', minLength: 100 },
+  { file: 'docs/ai-guide/INTEGRATION.md', minLength: 100 },
+];
+
+// IDE 特定的可选文档
+const optionalIDEFiles = [
+  { file: '.cursorrules', description: 'Cursor IDE rules' },
+  { file: '.github/copilot-instructions.md', description: 'GitHub Copilot instructions' },
+];
+
+// AI 友好性检查清单
+// 注意：不是所有文档都需要所有检查项
+const aiFriendlyChecks = [
+  { pattern: /^##+\s+/m, name: '层级标题（##）', requiredFor: 'all' },
+  { pattern: /\|.*\|.*\|/, name: '表格（速查表）', requiredFor: 'all' },
+  { pattern: /```(bash|typescript|json|python)/, name: '可执行代码块', requiredFor: ['AI_GUIDE.md', 'QUICKSTART.md', 'COMMANDS.md', 'PATTERNS.md', 'PROMPTS.md', 'INTEGRATION.md'] },
+  { pattern: /interface\s+\w+|type\s+\w+|function\s+\w+/, name: '代码定义', requiredFor: ['OUTPUT.md', 'PATTERNS.md', 'INTEGRATION.md'] },
+  { pattern: /决策树|流程图|速查表|提示词|模板|模式|示例/, name: 'AI 友好关键词', requiredFor: 'all' },
+];
+
+function readText(filePath) {
+  const absolutePath = path.join(rootDir, filePath);
+  if (!existsSync(absolutePath)) {
+    return null;
+  }
+  return readFileSync(absolutePath, 'utf8');
+}
+
+function checkRequiredDocs(failures) {
+  console.log('Checking required AI documents...\n');
+  
+  for (const { file, minLength } of requiredAIDocs) {
+    const content = readText(file);
+    
+    if (!content) {
+      failures.push(`Missing required AI doc: ${file}`);
+      continue;
+    }
+    
+    const lines = content.split('\n').length;
+    if (lines < minLength) {
+      failures.push(`${file} is too short (${lines} lines, min ${minLength})`);
+    }
+    
+    console.log(`  ✅ ${file} (${lines} lines)`);
+  }
+  
+  // 检查可选 IDE 文件
+  console.log('\nChecking optional IDE-specific files...\n');
+  for (const { file, description } of optionalIDEFiles) {
+    const content = readText(file);
+    if (content) {
+      const lines = content.split('\n').length;
+      console.log(`  ✅ ${file} (${lines} lines) - ${description}`);
+    } else {
+      console.log(`  ⚠️  ${file} - ${description} (optional, not found)`);
+    }
+  }
+}
+
+function checkAIFriendliness(failures) {
+  console.log('\nChecking AI friendliness...\n');
+  
+  const aiDocs = requiredAIDocs.map(d => d.file);
+  
+  for (const doc of aiDocs) {
+    const content = readText(doc);
+    if (!content) continue;
+    
+    const docName = path.basename(doc);
+    const docFailures = [];
+    
+    // llms.txt 文件检查标准格式
+    if (doc === 'llms.txt') {
+      // 检查 llms.txt 标准结构 (支持中英文)
+      const hasH1 = /^#\s+\w+/m.test(content);
+      const hasSummary = /^>\s+/m.test(content);
+      const hasDocsSection = /##\s*(?:文档|Docs|快速开始|Quick Start)/i.test(content);
+      
+      if (!hasH1) docFailures.push('missing H1 title (llms.txt standard)');
+      if (!hasSummary) docFailures.push('missing blockquote summary (llms.txt standard)');
+      if (!hasDocsSection) docFailures.push('missing ## Docs/文档 section (llms.txt standard)');
+      
+      if (docFailures.length > 0) {
+        failures.push(`${doc}: ${docFailures.join(', ')}`);
+        console.log(`  ❌ ${doc}`);
+        docFailures.forEach(f => console.log(`      - ${f}`));
+      } else {
+        console.log(`  ✅ ${doc} (llms.txt standard format)`);
+      }
+      continue;
+    }
+    
+    // YAML 文件有独立的检查标准
+    if (doc.endsWith('.yaml') || doc.endsWith('.yml')) {
+      // 检查 YAML 基本结构
+      if (!content.includes('project:') || !content.includes('documentation:')) {
+        docFailures.push('missing required YAML structure');
+      }
+      if (docFailures.length > 0) {
+        failures.push(`${doc}: ${docFailures.join(', ')}`);
+        console.log(`  ❌ ${doc}`);
+        docFailures.forEach(f => console.log(`      - ${f}`));
+      } else {
+        console.log(`  ✅ ${doc} (YAML format)`);
+      }
+      continue;
+    }
+    
+    for (const { pattern, name, requiredFor } of aiFriendlyChecks) {
+      // 检查此文档是否需要此项
+      const isRequired = requiredFor === 'all' || 
+                        (Array.isArray(requiredFor) && requiredFor.includes(docName));
+      
+      if (!isRequired) continue;
+      
+      if (!pattern.test(content)) {
+        docFailures.push(`missing ${name}`);
+      }
+    }
+    
+    if (docFailures.length > 0) {
+      failures.push(`${doc}: ${docFailures.join(', ')}`);
+      console.log(`  ❌ ${doc}`);
+      docFailures.forEach(f => console.log(`      - ${f}`));
+    } else {
+      console.log(`  ✅ ${doc}`);
+    }
+  }
+}
+
+function checkCrossReferences(failures) {
+  console.log('\nChecking cross-references...\n');
+  
+  // README.md 必须链接到 AI_GUIDE.md
+  const readme = readText('README.md');
+  if (readme) {
+    if (!readme.includes('AI_GUIDE.md')) {
+      failures.push('README.md must reference AI_GUIDE.md');
+      console.log('  ❌ README.md missing AI_GUIDE.md link');
+    } else {
+      console.log('  ✅ README.md links to AI_GUIDE.md');
+    }
+  }
+  
+  // AGENTS.md 必须包含 AI 文档规范
+  const agents = readText('AGENTS.md');
+  if (agents) {
+    if (!agents.includes('AI 友好')) {
+      failures.push('AGENTS.md must contain AI-friendly doc requirements');
+      console.log('  ❌ AGENTS.md missing AI-friendly requirements');
+    } else {
+      console.log('  ✅ AGENTS.md contains AI-friendly requirements');
+    }
+  }
+  
+  // CLAUDE.md 必须链接到 AI 文档
+  const claude = readText('CLAUDE.md');
+  if (claude) {
+    if (!claude.includes('AI_GUIDE.md') || !claude.includes('docs/ai-guide/')) {
+      failures.push('CLAUDE.md must reference AI docs');
+      console.log('  ❌ CLAUDE.md missing AI docs references');
+    } else {
+      console.log('  ✅ CLAUDE.md links to AI docs');
+    }
+  }
+  
+  // AI_GUIDE.md 必须链接到 AI_DISCOVERY.md 和 ai-document-index.yaml
+  const aiGuide = readText('AI_GUIDE.md');
+  if (aiGuide) {
+    if (!aiGuide.includes('AI_DISCOVERY.md')) {
+      failures.push('AI_GUIDE.md must reference AI_DISCOVERY.md');
+      console.log('  ❌ AI_GUIDE.md missing AI_DISCOVERY.md link');
+    } else {
+      console.log('  ✅ AI_GUIDE.md links to AI_DISCOVERY.md');
+    }
+    
+    if (!aiGuide.includes('ai-document-index.yaml')) {
+      failures.push('AI_GUIDE.md must reference ai-document-index.yaml');
+      console.log('  ❌ AI_GUIDE.md missing ai-document-index.yaml link');
+    } else {
+      console.log('  ✅ AI_GUIDE.md links to ai-document-index.yaml');
+    }
+  }
+  
+  // llms.txt 必须链接到主要 AI 文档
+  const llmsTxt = readText('llms.txt');
+  if (llmsTxt) {
+    const requiredLinks = ['AI_GUIDE.md', 'ai-document-index.yaml'];
+    const missingLinks = requiredLinks.filter(link => !llmsTxt.includes(link));
+    
+    if (missingLinks.length > 0) {
+      failures.push(`llms.txt must reference: ${missingLinks.join(', ')}`);
+      console.log(`  ❌ llms.txt missing links: ${missingLinks.join(', ')}`);
+    } else {
+      console.log('  ✅ llms.txt links to AI_GUIDE.md and ai-document-index.yaml');
+    }
+  }
+}
+
+function checkPromptsLibrary(failures) {
+  console.log('\nChecking prompts library...\n');
+  
+  const promptsFile = readText('docs/ai-guide/PROMPTS.md');
+  if (!promptsFile) {
+    failures.push('PROMPTS.md is required for AI prompts library');
+    return;
+  }
+  
+  // 检查是否包含常见的提示词模板
+  const requiredPrompts = [
+    { pattern: /项目理解|理解项目/, name: '项目理解模板' },
+    { pattern: /变更影响|影响分析/, name: '变更影响分析模板' },
+    { pattern: /代码搜索|查找.*代码/, name: '代码搜索模板' },
+    { pattern: /重构|refactor/i, name: '重构评估模板' },
+  ];
+  
+  for (const { pattern, name } of requiredPrompts) {
+    if (!pattern.test(promptsFile)) {
+      failures.push(`PROMPTS.md missing: ${name}`);
+      console.log(`  ❌ Missing: ${name}`);
+    } else {
+      console.log(`  ✅ Has: ${name}`);
+    }
+  }
+}
+
+function checkDecisionTrees(failures) {
+  console.log('\nChecking decision trees...\n');
+  
+  const quickstart = readText('docs/ai-guide/QUICKSTART.md');
+  if (quickstart) {
+    // 检查是否有决策树（流程图或层级结构）
+    const hasDecisionTree = /开始.*\n.*↓\n|决策树|流程图/.test(quickstart);
+    
+    if (!hasDecisionTree) {
+      failures.push('QUICKSTART.md must contain decision tree');
+      console.log('  ❌ QUICKSTART.md missing decision tree');
+    } else {
+      console.log('  ✅ QUICKSTART.md has decision tree');
+    }
+  }
+}
+
+function validateAIDocs() {
+  console.log('========================================');
+  console.log('AI Documentation Guardrails Check');
+  console.log('========================================\n');
+  
+  const failures = [];
+  
+  checkRequiredDocs(failures);
+  checkAIFriendliness(failures);
+  checkCrossReferences(failures);
+  checkPromptsLibrary(failures);
+  checkDecisionTrees(failures);
+  
+  console.log('\n========================================');
+  
+  if (failures.length > 0) {
+    console.error('\n❌ AI documentation guardrails failed:\n');
+    for (const failure of failures) {
+      console.error(`  - ${failure}`);
+    }
+    console.log('\n========================================');
+    process.exit(1);
+  }
+  
+  console.log('\n✅ All AI documentation guardrails passed!\n');
+  console.log('========================================');
+}
+
+validateAIDocs();

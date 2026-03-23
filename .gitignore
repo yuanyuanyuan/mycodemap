@@ -22,6 +22,10 @@ out/
 !.eslintrc.js
 !.prettierrc.js
 !jest.config.js
+!scripts/validate-docs.js
+!scripts/validate-ai-docs.js
+!scripts/validate-pack.js
+!scripts/pre-release-check.js
 
 # ============================================
 # Logs
