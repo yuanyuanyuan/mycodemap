@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.3] - 2026-03-23 - Ship Command Improvements
+
+### 🐛 Bug Fixes
+
+- **ship**: 修复 commit 解析支持 `[TYPE]` 格式
+- **ship**: 修复 conventional commits 校验正则表达式
+- **ship**: 添加 CONFIG/INFRA 类型支持
+- **ship**: 修复版本 commit message 格式 (使用 CONFIG 标签)
+
+### 🔧 Configuration
+
+- **ship**: 同步 package.json 与 CHANGELOG 版本
+
 ## [0.3.0] - 2026-03-23 - One-Click Ship Command
 
 ### 🚀 New Features
