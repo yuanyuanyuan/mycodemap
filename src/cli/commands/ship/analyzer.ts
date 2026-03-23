@@ -145,7 +145,7 @@ export async function analyzeCommits(since?: string): Promise<AnalyzeResult> {
     refactors: commits.filter(c => c.type.includes('refactor')).length,
     docs: commits.filter(c => c.type.includes('docs')).length,
     other: commits.filter(c =>
-      !['feat', 'feature', 'enhance', 'improvement', 'fix', 'bugfix', 'hotfix', 'refactor', 'docs']
+      !['feat', 'feature', 'enhance', 'improvement', 'fix', 'bugfix', 'hotfix', 'refactor', 'docs', 'config', 'infra', 'merge']
         .some(t => c.type.includes(t))
     ).length
   };

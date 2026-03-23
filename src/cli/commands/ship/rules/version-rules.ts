@@ -19,7 +19,7 @@ export const versionRules: VersionRuleConfig = {
     major: ['breaking', 'breaking-change', 'BREAKING'],
     minor: ['feat', 'feature', 'enhance', 'improvement'],
     patch: ['fix', 'bugfix', 'hotfix'],
-    none: ['docs', 'style', 'refactor', 'test', 'chore', 'ci', 'perf', 'WIP']
+    none: ['docs', 'style', 'refactor', 'test', 'chore', 'ci', 'perf', 'WIP', 'config', 'CONFIG', 'infra', 'INFRA']
   },
 
   // 不触发版本变更的文件
