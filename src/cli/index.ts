@@ -18,6 +18,7 @@ import { reportCommand } from './commands/report.js';
 import { logsCommand } from './commands/logs.js';
 import { serverCommand } from './commands/server.js';
 import { exportCommand } from './commands/export.js';
+import { shipCommand } from './commands/ship/index.js';
 import { setupRuntimeLogging } from './runtime-logger.js';
 import { runFirstRunGuide } from './first-run-guide.js';
 import { printMigrationWarning } from './paths.js';
@@ -218,5 +219,14 @@ program
   .argument('<format>', '导出格式: json, graphml, dot, mermaid')
   .option('-o, --output <path>', '输出文件路径')
   .action(exportCommand);
+
+// Ship 命令
+program
+  .command('ship')
+  .description('一键智能发布 - 自动分析变更、计算版本、运行检查、发布 npm')
+  .option('--dry-run', '仅分析，不发布')
+  .option('--verbose', '显示详细输出')
+  .option('--yes, -y', '置信度 60-75 时自动确认（不询问）')
+  .action(shipCommand);
 
 program.parse();
