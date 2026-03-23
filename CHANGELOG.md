@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.6] - 2026-03-23 - Ship Workflow Fixes
+
+### 🐛 Bug Fixes
+
+- **ship**: 修复 versionType 为 none 时仍尝试发布的 bug
+
+### 📚 Documentation
+
+- **docs**: 同步版本号到 v0.3.6
+
 ## [0.3.4] - 2026-03-23 - CI Pipeline Fixes
 
 ### 🔧 Configuration
