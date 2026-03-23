@@ -33,6 +33,7 @@ const LOCAL_RELEASE_COMMANDS = [
   { name: 'build', command: 'npm run build' },
   { name: 'validate-pack', command: 'npm run validate-pack' }
 ] as const;
+const COMMAND_MAX_BUFFER = 20 * 1024 * 1024;
 
 function extractCommandError(error: unknown): string {
   if (!error || typeof error !== 'object') {
@@ -69,7 +70,11 @@ async function runLocalReleaseChecks(): Promise<CheckResult> {
 
   for (const { name, command } of LOCAL_RELEASE_COMMANDS) {
     try {
-      execSync(command, { encoding: 'utf-8', stdio: 'pipe' });
+      execSync(command, {
+        encoding: 'utf-8',
+        stdio: 'pipe',
+        maxBuffer: COMMAND_MAX_BUFFER
+      });
     } catch (error) {
       failed.push(name);
       details.push(`[${name}]\n${extractCommandError(error)}`);
