@@ -358,6 +358,40 @@ mycodemap export json -o ./output.json       # 指定输出
 
 ---
 
+### ship - 一键智能发布
+
+```bash
+mycodemap ship                              # 完整发布流程
+mycodemap ship --dry-run                   # 仅分析，不发布
+mycodemap ship --verbose                   # 显示详细输出
+mycodemap ship --yes                       # 置信度 60-75 时自动确认
+```
+
+| 选项 | 说明 | 默认值 |
+|------|------|--------|
+| `--dry-run` | 仅分析变更，不执行发布 | `false` |
+| `--verbose` | 显示详细输出 | `false` |
+| `--yes, -y` | 置信度 60-75 时自动确认 | `false` |
+
+**发布流程:**
+1. **ANALYZE** - 分析 git commits，检测变更类型
+2. **VERSION** - 基于 conventional commits 计算版本号
+3. **CHECK** - mustPass/shouldPass 检查 + 置信度评分
+4. **PUBLISH** - npm 发布 + git tag
+5. **MONITOR** - GitHub Actions CI 状态监控
+
+**置信度判定:**
+- `>= 75`: 自动发布
+- `60-75`: 需确认
+- `< 60`: 阻止发布
+
+**前置条件:**
+- 工作区干净
+- 在 main/master 分支
+- 所有检查通过
+
+---
+
 ## 全局选项
 
 所有命令支持：
