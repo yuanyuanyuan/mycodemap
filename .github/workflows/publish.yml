@@ -34,9 +34,23 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Upgrade npm to latest
+        run: npm install -g npm@latest
+
+      - name: Debug OIDC Configuration
+        run: |
+          echo "=== OIDC Debug Info ==="
+          echo "Repository: ${{ github.repository }}"
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Action: ${{ github.action }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Job: ${{ github.job }}"
+          echo "======================="
 
       - name: Get version from package.json
         id: package-version
