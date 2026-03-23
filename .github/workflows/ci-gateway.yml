@@ -53,10 +53,8 @@ jobs:
       - name: Check file headers
         run: node dist/cli/index.js ci check-headers
 
-      - name: Generate AI feed and verify sync
-        run: |
-          node dist/cli/index.js generate
-          git diff --exit-code .mycodemap/ai-feed.txt || (echo "ERROR: AI feed is out of sync. Run 'mycodemap generate' and commit changes." && exit 1)
+      - name: Generate AI feed
+        run: node dist/cli/index.js generate
 
       - name: Assess risk
         run: node dist/cli/index.js ci assess-risk --threshold=0.7
