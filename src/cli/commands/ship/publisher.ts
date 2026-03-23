@@ -3,6 +3,22 @@
 
 import chalk from 'chalk';
 import { execSync } from 'child_process';
+import { readFileSync, writeFileSync } from 'fs';
+
+function syncAIDocsVersion(version: string): void {
+  const files = ['AI_GUIDE.md', 'llms.txt', 'ai-document-index.yaml'];
+  const versionStr = version.replace(/^v/, '');
+
+  for (const file of files) {
+    try {
+      const content = readFileSync(file, 'utf-8');
+      const updated = content.replace(/0\.\d+\.\d+/g, versionStr);
+      writeFileSync(file, updated);
+    } catch {
+      // 文件不存在或读取失败，跳过
+    }
+  }
+}
 
 export interface PublishResult {
   success: boolean;
@@ -32,13 +48,17 @@ export async function publish(version: string, dryRun: boolean = false): Promise
     console.log(chalk.gray('  更新 package.json 版本...'));
     execSync(`npm version ${version} --no-git-tag-version`, { stdio: 'pipe' });
 
-    // 2. 创建 git tag
+    // 2. 同步 AI 文档版本
+    console.log(chalk.gray('  同步 AI 文档版本...'));
+    syncAIDocsVersion(version);
+
+    // 3. 创建 git tag
     console.log(chalk.gray('  创建 git tag...'));
     execSync(`git tag v${version}`, { stdio: 'pipe' });
 
-    // 3. 提交版本更新
+    // 4. 提交版本更新
     console.log(chalk.gray('  提交版本更新...'));
-    execSync('git add package.json CHANGELOG.md', { stdio: 'pipe' });
+    execSync('git add package.json AI_GUIDE.md llms.txt ai-document-index.yaml CHANGELOG.md', { stdio: 'pipe' });
     execSync(`git commit -m "[CONFIG] version: bump to v${version}"`, { stdio: 'pipe' });
 
     result.tagCreated = true;
