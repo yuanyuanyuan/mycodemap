@@ -1,0 +1,62 @@
+# CodeMap
+
+> CodeMap 是一个 TypeScript 代码地图生成与分析工具，为 AI 辅助开发提供结构化上下文。
+> 版本: 0.2.0 (MVP3) | 仓库: https://github.com/mycodemap/mycodemap
+
+CodeMap 帮助 AI 大模型、Agent 和开发者理解 TypeScript/JavaScript 项目的代码结构、依赖关系和模块边界。它生成结构化的代码地图，支持影响分析、依赖查询、复杂度评估等功能。
+
+## 快速开始
+
+如果你是 AI 大模型或 Agent，请按以下顺序阅读：
+
+- [AI Guide](./AI_GUIDE.md): AI/Agent 主索引 - 包含命令速查表和快速参考
+- [Quick Start](./docs/ai-guide/QUICKSTART.md): 场景到命令的映射 - 决策树和工作流
+- [AI Discovery](./AI_DISCOVERY.md): 通用发现机制 - SEO 优化和多平台策略
+
+## 完整文档
+
+### 核心参考
+- [Commands](./docs/ai-guide/COMMANDS.md): 完整 CLI 命令参考 - 所有命令和选项详解
+- [Output Schema](./docs/ai-guide/OUTPUT.md): JSON 输出结构解析 - TypeScript 接口定义
+- [Patterns](./docs/ai-guide/PATTERNS.md): 标准工作流模式 - 6种常见任务的标准流程
+
+### 模板与集成
+- [Prompts](./docs/ai-guide/PROMPTS.md): 即用型提示词模板 - 可直接使用或改编
+- [Integration](./docs/ai-guide/INTEGRATION.md): MCP/Agent 集成指南 - 错误处理和边界情况
+
+### 机器可读资源
+- [Document Index](./ai-document-index.yaml): 结构化 YAML 索引 - 完整的文档清单和命令索引
+- [AI Discovery](./AI_DISCOVERY.md): 包含 JSON-LD 结构化数据，适用于搜索引擎
+
+## 约束与规范
+
+- [AGENTS.md](./AGENTS.md): 仓库级 AI 协议和强约束
+- [CLAUDE.md](./CLAUDE.md): Claude/Codex 执行手册
+- [ARCHITECTURE.md](./ARCHITECTURE.md): 系统架构总图
+
+## 命令速查
+
+```bash
+# 生成代码地图
+node dist/cli/index.js generate
+
+# 查询符号定义
+node dist/cli/index.js query -s "symbolName"
+
+# 分析影响范围
+node dist/cli/index.js analyze -i impact -t "file.ts" --json
+
+# 检查代码质量
+node dist/cli/index.js analyze -i complexity -t "src/" --json
+```
+
+## 可选
+
+- [Changelog](./CHANGELOG.md): 版本历史和变更日志
+- [README](./README.md): 人类用户主入口
+- [License](./LICENSE): MIT 许可证
+
+---
+
+*本文档遵循 llms.txt 标准格式: https://llmstxt.org/*
+*最后更新: 2026-03-22*
