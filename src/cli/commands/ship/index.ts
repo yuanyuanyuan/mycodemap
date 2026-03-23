@@ -46,7 +46,7 @@ export function createShipCommand(): Command {
     .description('一键智能发布 - 自动分析变更、计算版本、运行检查、发布 npm')
     .option('--dry-run', '仅分析，不发布')
     .option('--verbose', '显示详细输出')
-    .option('--yes, -y', '置信度 60-75 时自动确认（不询问）')
+    .option('--yes', '置信度 60-75 时自动确认（不询问）')
     .action(async (opts) => {
       await shipCommand(opts);
     });
