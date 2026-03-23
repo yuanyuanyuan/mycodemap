@@ -35,8 +35,8 @@ function parseCommit(commitLine: string): GitCommit | null {
 
   const [, hash, rest] = match;
 
-  // 解析 type(scope): message
-  const typeMatch = rest.match(/^(\w+)(?:\(([^)]+)\))?:?\s*(.*)$/);
+  // 解析 type(scope): message 或 [TYPE] message
+  const typeMatch = rest.match(/^\[?(\w+)\]?(?:\(([^)]+)\))?:?\s*(.*)$/);
   if (!typeMatch) {
     return {
       hash,
