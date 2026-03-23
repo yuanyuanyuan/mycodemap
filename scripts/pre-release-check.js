@@ -94,9 +94,19 @@ function getFileSize(filePath) {
 }
 
 function extractVersionFromText(content) {
-  // 匹配 "version: x.x.x" 或 "版本: x.x.x" 或 "Version x.x.x"
-  const match = content.match(/(?:version|版本)[:\s]+v?(\d+\.\d+\.\d+)/i);
-  return match ? match[1] : null;
+  const patterns = [
+    /(?:version|版本)[:\s]+v?(\d+\.\d+\.\d+(?:-[\w.]+)?)/i,
+    /"version"\s*:\s*"(\d+\.\d+\.\d+(?:-[\w.]+)?)"/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = content.match(pattern);
+    if (match) {
+      return match[1];
+    }
+  }
+
+  return null;
 }
 
 function extractVersionFromYAML(content) {
@@ -238,6 +248,11 @@ async function checkVersionConsistency(failures) {
       versions[file] = version;
       console.log(`  📄 ${file}: v${version}`);
     } else {
+      failures.push({
+        type: 'missing_version_in_file',
+        file,
+        message: `${file} 中未找到可解析的版本号`,
+      });
       console.log(yellow(`  ⚠️  ${file}: 未找到版本号`));
     }
   }
@@ -655,7 +670,10 @@ async function runPreReleaseChecks() {
     f.type === 'missing_required_file' ||
     f.type === 'missing_llms_txt' ||
     f.type === 'version_mismatch' ||
+    f.type === 'missing_version_in_file' ||
+    f.type === 'invalid_semver' ||
     f.type === 'llms_txt_standard_violation' ||
+    f.type === 'changelog_not_synced' ||
     f.type === 'missing_release_file'
   );
   

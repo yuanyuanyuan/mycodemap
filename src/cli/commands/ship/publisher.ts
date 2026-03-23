@@ -1,46 +1,215 @@
 // [META] since:2026-03 | owner:cli-team | stable:false
-// [WHY] Step 4: 执行发布操作，npm publish + git tag
+// [WHY] Step 4: 创建发布提交和 git tag，并通过 push 触发 GitHub Actions 发布
 
 import chalk from 'chalk';
 import { execSync } from 'child_process';
-import { readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { AnalyzeResult, GitCommit } from './analyzer.js';
+
+export interface PublishOptions {
+  dryRun?: boolean;
+  analyzeResult?: AnalyzeResult;
+}
+
+interface ReplacementRule {
+  file: string;
+  pattern: RegExp;
+  replacement: string;
+}
+
+const CHANGELOG_HEADER = '# Changelog\n\nAll notable changes to this project will be documented in this file.\n\n';
+
+function updateFileByRules(rules: ReplacementRule[]): void {
+  for (const rule of rules) {
+    if (!existsSync(rule.file)) {
+      throw new Error(`缺少版本同步文件: ${rule.file}`);
+    }
+
+    const content = readFileSync(rule.file, 'utf-8');
+    if (!rule.pattern.test(content)) {
+      throw new Error(`无法在 ${rule.file} 中定位版本占位符`);
+    }
+
+    const updated = content.replace(rule.pattern, rule.replacement);
+    writeFileSync(rule.file, updated, 'utf-8');
+  }
+}
 
 function syncAIDocsVersion(version: string): void {
-  const files = ['AI_GUIDE.md', 'llms.txt', 'ai-document-index.yaml'];
   const versionStr = version.replace(/^v/, '');
+  const quotedVersion = `$1${versionStr}$3`;
 
-  for (const file of files) {
-    try {
-      const content = readFileSync(file, 'utf-8');
-      const updated = content.replace(/0\.\d+\.\d+/g, versionStr);
-      writeFileSync(file, updated);
-    } catch {
-      // 文件不存在或读取失败，跳过
+  updateFileByRules([
+    {
+      file: 'AI_GUIDE.md',
+      pattern: /(> 版本:\s*)\d+\.\d+\.\d+(?:-[\w.]+)?/m,
+      replacement: `$1${versionStr}`
+    },
+    {
+      file: 'llms.txt',
+      pattern: /(> 版本:\s*)\d+\.\d+\.\d+(?:-[\w.]+)?/m,
+      replacement: `$1${versionStr}`
+    },
+    {
+      file: 'AI_DISCOVERY.md',
+      pattern: /("version"\s*:\s*")(\d+\.\d+\.\d+(?:-[\w.]+)?)(")/,
+      replacement: quotedVersion
+    },
+    {
+      file: 'ai-document-index.yaml',
+      pattern: /(version:\s*")(\d+\.\d+\.\d+(?:-[\w.]+)?)(")/,
+      replacement: quotedVersion
+    },
+    {
+      file: 'ai-document-index.yaml',
+      pattern: /(current:\s*")(\d+\.\d+\.\d+(?:-[\w.]+)?)(")/,
+      replacement: quotedVersion
+    },
+    {
+      file: 'ai-document-index.yaml',
+      pattern: /(min_supported:\s*")(\d+\.\d+\.\d+(?:-[\w.]+)?)(")/,
+      replacement: quotedVersion
     }
+  ]);
+}
+
+function classifyCommitSection(type: string): string {
+  const normalized = type.toLowerCase();
+
+  if (['feat', 'feature', 'enhance', 'improvement'].some(item => normalized.includes(item))) {
+    return '### 🚀 New Features';
+  }
+  if (['fix', 'bugfix', 'hotfix'].some(item => normalized.includes(item))) {
+    return '### 🐛 Bug Fixes';
+  }
+  if (normalized.includes('docs')) {
+    return '### 📚 Documentation';
+  }
+  if (normalized.includes('refactor')) {
+    return '### ♻️ Refactors';
+  }
+
+  return '### 🔧 Maintenance';
+}
+
+function buildReleaseTitle(analyzeResult?: AnalyzeResult): string {
+  if (!analyzeResult) {
+    return 'Automated Ship Release';
+  }
+
+  if (analyzeResult.summary.features > 0) {
+    return 'Ship Workflow Release';
+  }
+  if (analyzeResult.summary.bugfixes > 0) {
+    return 'Ship Workflow Fixes';
+  }
+  if (analyzeResult.summary.docs > 0) {
+    return 'Documentation Sync';
+  }
+
+  return 'Automated Ship Release';
+}
+
+function formatCommitLine(commit: GitCommit): string {
+  if (commit.scope) {
+    return `- **${commit.scope}**: ${commit.message}`;
+  }
+  return `- ${commit.message}`;
+}
+
+function buildChangelogSections(analyzeResult?: AnalyzeResult): string[] {
+  if (!analyzeResult || analyzeResult.commits.length === 0) {
+    return [
+      '### 🔧 Maintenance',
+      '',
+      '- Automated release triggered by `codemap ship`'
+    ];
+  }
+
+  const groups = new Map<string, string[]>();
+  for (const commit of analyzeResult.commits) {
+    const section = classifyCommitSection(commit.type);
+    const lines = groups.get(section) ?? [];
+    lines.push(formatCommitLine(commit));
+    groups.set(section, lines);
+  }
+
+  return Array.from(groups.entries()).flatMap(([section, lines]) => [section, '', ...lines, '']);
+}
+
+function ensureChangelogEntry(version: string, analyzeResult?: AnalyzeResult): void {
+  const versionStr = version.replace(/^v/, '');
+  const existing = existsSync('CHANGELOG.md')
+    ? readFileSync('CHANGELOG.md', 'utf-8')
+    : CHANGELOG_HEADER;
+
+  if (new RegExp(`^## \\[${versionStr.replace(/\./g, '\\.')}]`, 'm').test(existing)) {
+    return;
+  }
+
+  const date = new Date().toISOString().slice(0, 10);
+  const title = buildReleaseTitle(analyzeResult);
+  const sections = buildChangelogSections(analyzeResult).join('\n').trimEnd();
+  const entry = `## [${versionStr}] - ${date} - ${title}\n\n${sections}\n\n`;
+
+  const content = existing.startsWith('# Changelog')
+    ? existing
+    : `${CHANGELOG_HEADER}${existing.trimStart()}\n`;
+
+  const prefix = content.startsWith(CHANGELOG_HEADER)
+    ? CHANGELOG_HEADER
+    : '# Changelog\n\n';
+
+  const remainder = content.startsWith(prefix) ? content.slice(prefix.length) : content;
+  writeFileSync('CHANGELOG.md', `${prefix}${entry}${remainder.replace(/^\n+/, '')}`, 'utf-8');
+}
+
+function resolveRepoSlug(): string | undefined {
+  try {
+    return execSync('git remote get-url origin', { encoding: 'utf-8' })
+      .trim()
+      .replace(/.*github\.com[/:]/, '')
+      .replace(/\.git$/, '');
+  } catch {
+    return undefined;
   }
 }
 
 export interface PublishResult {
   success: boolean;
   version: string;
-  npmPublished: boolean;
+  tagName: string;
+  versionCommitted: boolean;
   tagCreated: boolean;
   pushed: boolean;
+  headSha?: string;
+  pushedAtMs?: number;
+  repo?: string;
+  releaseUrl?: string;
   error?: string;
 }
 
-export async function publish(version: string, dryRun: boolean = false): Promise<PublishResult> {
+export async function publish(version: string, options: PublishOptions = {}): Promise<PublishResult> {
+  const dryRun = options.dryRun ?? false;
+  const tagName = `v${version.replace(/^v/, '')}`;
   const result: PublishResult = {
     success: false,
     version,
-    npmPublished: false,
+    tagName,
+    versionCommitted: false,
     tagCreated: false,
     pushed: false
   };
 
   if (dryRun) {
     console.log(chalk.gray('  [dry-run] 跳过实际发布'));
-    return { ...result, success: true, npmPublished: true, tagCreated: true, pushed: true };
+    return {
+      ...result,
+      success: true,
+      versionCommitted: true,
+      tagCreated: true,
+      pushed: true
+    };
   }
 
   try {
@@ -52,36 +221,43 @@ export async function publish(version: string, dryRun: boolean = false): Promise
     console.log(chalk.gray('  同步 AI 文档版本...'));
     syncAIDocsVersion(version);
 
-    // 3. 提交版本更新（必须在创建 tag 之前）
-    console.log(chalk.gray('  提交版本更新...'));
-    execSync('git add package.json AI_GUIDE.md llms.txt ai-document-index.yaml CHANGELOG.md', { stdio: 'pipe' });
-    execSync(`git commit -m "[CONFIG] version: bump to v${version}"`, { stdio: 'pipe' });
+    // 3. 生成 CHANGELOG 条目
+    console.log(chalk.gray('  生成 CHANGELOG 条目...'));
+    ensureChangelogEntry(version, options.analyzeResult);
 
-    // 4. 创建 git tag（在 commit 之后）
+    // 4. 提交版本更新（必须在创建 tag 之前）
+    console.log(chalk.gray('  提交版本更新...'));
+    const filesToAdd = [
+      'package.json',
+      'package-lock.json',
+      'AI_GUIDE.md',
+      'AI_DISCOVERY.md',
+      'llms.txt',
+      'ai-document-index.yaml',
+      'CHANGELOG.md'
+    ].filter(file => existsSync(file));
+    execSync(`git add ${filesToAdd.join(' ')}`, { stdio: 'pipe' });
+    execSync(`git commit -m "[CONFIG] version: bump to v${version}"`, { stdio: 'pipe' });
+    result.versionCommitted = true;
+    result.headSha = execSync('git rev-parse HEAD', { encoding: 'utf-8' }).trim();
+    result.repo = resolveRepoSlug();
+    if (result.repo) {
+      result.releaseUrl = `https://github.com/${result.repo}/releases/tag/${tagName}`;
+    }
+
+    // 5. 创建 git tag（在 commit 之后）
     console.log(chalk.gray('  创建 git tag...'));
-    execSync(`git tag v${version}`, { stdio: 'pipe' });
+    execSync(`git tag ${tagName}`, { stdio: 'pipe' });
 
     result.tagCreated = true;
 
-    // 4. npm publish (使用 OIDC，不需要 OTP)
-    console.log(chalk.gray('  发布到 npm...'));
-    try {
-      execSync('npm publish --access public', { stdio: 'pipe' });
-      result.npmPublished = true;
-    } catch (publishError) {
-      // npm publish 失败，tag 已经创建，可能需要手动处理
-      const errorMsg = publishError instanceof Error ? publishError.message : String(publishError);
-      console.log(chalk.yellow(`  ⚠️ npm publish 失败: ${errorMsg}`));
-      result.error = `npm publish 失败: ${errorMsg}`;
-      // 不立即返回，继续尝试 push
-    }
-
-    // 5. 推送所有到远程
-    console.log(chalk.gray('  推送到远程...'));
-    execSync('git push origin HEAD --tags', { stdio: 'pipe' });
+    // 6. 推送版本提交和 tag，由 GitHub Actions 执行实际 npm 发布
+    console.log(chalk.gray('  推送发布提交与 tag...'));
+    execSync(`git push origin HEAD tag ${tagName}`, { stdio: 'pipe' });
     result.pushed = true;
+    result.pushedAtMs = Date.now();
 
-    result.success = result.npmPublished && result.tagCreated && result.pushed;
+    result.success = result.versionCommitted && result.tagCreated && result.pushed;
     return result;
 
   } catch (error) {
@@ -96,18 +272,22 @@ export function formatPublishOutput(result: PublishResult): string {
   if (result.success) {
     lines.push('发布成功!');
     lines.push(`  版本: v${result.version}`);
-    lines.push(`  ✅ NPM 发布成功`);
+    lines.push(`  ✅ 版本提交已创建`);
     lines.push(`  ✅ Git tag 已创建`);
-    lines.push(`  ✅ 已推送到远程`);
+    lines.push(`  ✅ 已推送到远程，等待 GitHub Actions 发布`);
   } else {
     lines.push('发布部分成功:');
     lines.push(`  版本: v${result.version}`);
-    lines.push(`  ${result.npmPublished ? '✅' : '❌'} NPM 发布`);
+    lines.push(`  ${result.versionCommitted ? '✅' : '❌'} 版本提交`);
     lines.push(`  ${result.tagCreated ? '✅' : '❌'} Git tag 已创建`);
     lines.push(`  ${result.pushed ? '✅' : '❌'} 已推送到远程`);
     if (result.error) {
       lines.push(`  错误: ${result.error}`);
     }
+  }
+
+  if (result.releaseUrl) {
+    lines.push(`  预期 Release: ${result.releaseUrl}`);
   }
 
   return lines.join('\n');

@@ -164,7 +164,7 @@ export async function analyzeCommits(since?: string): Promise<AnalyzeResult> {
   };
 }
 
-export function formatAnalyzeOutput(result: AnalyzeResult): string {
+export function formatAnalyzeOutput(result: AnalyzeResult, verbose: boolean = false): string {
   const lines: string[] = [];
 
   lines.push(`变更分析 (自 ${result.lastTag}):`);
@@ -182,6 +182,14 @@ export function formatAnalyzeOutput(result: AnalyzeResult): string {
   }
   if (result.summary.other > 0) {
     lines.push(`   [OTHER] ${result.summary.other}个 - 其他`);
+  }
+
+  if (verbose) {
+    lines.push(`   commits: ${result.commitsSinceTag}`);
+    lines.push(`   changed files: ${result.changedFiles.length}`);
+    for (const commit of result.commits.slice(0, 5)) {
+      lines.push(`   - ${commit.hash} ${commit.type}: ${commit.message}`);
+    }
   }
 
   return lines.join('\n');

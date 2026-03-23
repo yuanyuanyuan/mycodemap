@@ -92,16 +92,18 @@ export async function calculateVersion(analyzeResult: AnalyzeResult): Promise<Ve
   };
 }
 
-export function formatVersionOutput(result: VersionResult): string {
+export function formatVersionOutput(result: VersionResult, verbose: boolean = false): string {
   const lines: string[] = [];
 
   if (!result.shouldRelease) {
     lines.push(`推荐版本: 无需发布`);
     lines.push(`  原因: ${result.reason}`);
   } else {
-    const typeLabel = result.versionType.toUpperCase();
     lines.push(`推荐版本: v${result.suggestedVersion} (${result.versionType})`);
     lines.push(`  原因: ${result.reason}`);
+    if (verbose) {
+      lines.push(`  当前版本: v${result.currentVersion}`);
+    }
   }
 
   return lines.join('\n');

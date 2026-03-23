@@ -25,7 +25,8 @@ export async function runQualityChecks(
     commits: analyzeResult.commits,
     changedFiles: analyzeResult.changedFiles,
     currentVersion: versionResult.currentVersion,
-    branch
+    branch,
+    versionType: versionResult.versionType
   };
 
   // 运行所有检查
@@ -42,7 +43,7 @@ export async function runQualityChecks(
     commits: analyzeResult.commits,
     changedFiles: analyzeResult.changedFiles,
     allCommitsConventional,
-    coverageAbove80: true, // 简化，实际应该从 shouldPassResults 获取
+    coverageAbove80: shouldPassResults.get('testCoverageAbove80')?.passed ?? false,
     changelogUpdated: shouldPassResults.get('changelogUpdated')?.passed ?? false,
     hasBreaking: analyzeResult.breakingChanges
   });
@@ -57,7 +58,7 @@ export async function runQualityChecks(
   };
 }
 
-export function formatCheckOutput(output: CheckOutput): string {
+export function formatCheckOutput(output: CheckOutput, verbose: boolean = false): string {
   const lines: string[] = [];
   const { mustPassResults, shouldPassResults, confidence } = output;
 
@@ -77,8 +78,22 @@ export function formatCheckOutput(output: CheckOutput): string {
   lines.push('');
   lines.push(`置信度: ${confidence.score}/100`);
 
-  for (const reason of confidence.reasons.slice(0, 5)) {
+  const reasons = verbose ? confidence.reasons : confidence.reasons.slice(0, 5);
+  for (const reason of reasons) {
     lines.push(`   ${reason}`);
+  }
+
+  if (verbose) {
+    lines.push('');
+    lines.push('建议检查:');
+    for (const [name, result] of shouldPassResults) {
+      const icon = result.passed ? '✅' : '⚠️';
+      const label = name.replace(/([A-Z])/g, ' $1').toLowerCase();
+      lines.push(`   ${icon} ${label}`);
+      if (result.message) {
+        lines.push(`      ${result.message}`);
+      }
+    }
   }
 
   return lines.join('\n');

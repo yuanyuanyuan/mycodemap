@@ -1,6 +1,8 @@
 // [META] since:2026-03 | owner:cli-team | stable:false
 // [WHY] 流水线编排，协调所有步骤的执行
 
+import { createInterface } from 'node:readline/promises';
+import { stdin as input, stdout as output } from 'node:process';
 import chalk from 'chalk';
 import { analyzeCommits, formatAnalyzeOutput, AnalyzeResult } from './analyzer.js';
 import { calculateVersion, formatVersionOutput, VersionResult } from './versioner.js';
@@ -26,6 +28,7 @@ export interface PipelineResult {
 }
 
 const SEPARATOR = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+const CONFIRM_TIMEOUT_MS = 30_000;
 
 async function runStep(
   name: string,
@@ -43,6 +46,44 @@ async function runStep(
       console.log(chalk.gray(`  ${error.message}`));
     }
     return false;
+  }
+}
+
+async function promptForReleaseConfirmation(
+  version: string,
+  checkOutput: CheckOutput
+): Promise<'confirmed' | 'rejected' | 'timeout' | 'unavailable'> {
+  if (!input.isTTY || !output.isTTY) {
+    return 'unavailable';
+  }
+
+  console.log(SEPARATOR);
+  console.log(chalk.yellow(`\n⚠️ 置信度: ${checkOutput.confidence.score}/100 — 需确认发布`));
+
+  const warnings = checkOutput.confidence.reasons
+    .filter(reason => reason.includes('-') || reason.includes('低') || reason.includes('修改'))
+    .slice(0, 3);
+
+  if (warnings.length > 0) {
+    console.log(chalk.gray('  风险提示:'));
+    for (const warning of warnings) {
+      console.log(chalk.gray(`    - ${warning}`));
+    }
+  }
+
+  console.log(chalk.gray(`  目标版本: v${version}`));
+
+  const readline = createInterface({ input, output });
+  const timer = setTimeout(() => readline.close(), CONFIRM_TIMEOUT_MS);
+
+  try {
+    const answer = await readline.question('确认发布? [y/N] ');
+    return /^y(?:es)?$/i.test(answer.trim()) ? 'confirmed' : 'rejected';
+  } catch {
+    return 'timeout';
+  } finally {
+    clearTimeout(timer);
+    readline.close();
   }
 }
 
@@ -64,7 +105,7 @@ export async function runShipPipeline(ctx: ShipPipelineContext): Promise<Pipelin
     async () => {
       analyzeResult = await analyzeCommits();
     },
-    () => analyzeResult ? formatAnalyzeOutput(analyzeResult) : ''
+    () => analyzeResult ? formatAnalyzeOutput(analyzeResult, ctx.verbose) : ''
   );
 
   if (!analyzeStep || !analyzeResult) {
@@ -77,7 +118,7 @@ export async function runShipPipeline(ctx: ShipPipelineContext): Promise<Pipelin
     async () => {
       versionResult = await calculateVersion(analyzeResult!);
     },
-    () => versionResult ? formatVersionOutput(versionResult) : ''
+    () => versionResult ? formatVersionOutput(versionResult, ctx.verbose) : ''
   );
 
   if (!versionStep || !versionResult) {
@@ -103,7 +144,7 @@ export async function runShipPipeline(ctx: ShipPipelineContext): Promise<Pipelin
     async () => {
       checkOutput = await runQualityChecks(analyzeResult!, versionResult!);
     },
-    () => checkOutput ? formatCheckOutput(checkOutput) : ''
+    () => checkOutput ? formatCheckOutput(checkOutput, ctx.verbose) : ''
   );
 
   if (!checkStep || !checkOutput) {
@@ -135,17 +176,26 @@ export async function runShipPipeline(ctx: ShipPipelineContext): Promise<Pipelin
 
   // 置信度 60-75 需要确认
   if (checkOutput.confidence.decision === 'confirm' && !ctx.autoConfirm) {
-    console.log(SEPARATOR);
-    console.log(chalk.yellow(`\n⚠️ 置信度: ${checkOutput.confidence.score}/100 — 需确认发布`));
-    console.log(chalk.gray('  如需发布，请运行: codemap ship --yes'));
-    return {
-      success: false,
-      analyzeResult,
-      versionResult,
-      checkOutput,
-      blocked: true,
-      blockReason: '需要手动确认'
-    };
+    const confirmResult = await promptForReleaseConfirmation(versionResult.suggestedVersion, checkOutput);
+    if (confirmResult !== 'confirmed') {
+      console.log(SEPARATOR);
+      if (confirmResult === 'unavailable') {
+        console.log(chalk.yellow('\n⚠️ 当前终端不可交互'));
+        console.log(chalk.gray('  如需发布，请运行: codemap ship --yes'));
+      } else if (confirmResult === 'timeout') {
+        console.log(chalk.yellow('\n⏱️ 确认超时，已取消发布'));
+      } else {
+        console.log(chalk.yellow('\n已取消发布'));
+      }
+      return {
+        success: false,
+        analyzeResult,
+        versionResult,
+        checkOutput,
+        blocked: true,
+        blockReason: '需要手动确认'
+      };
+    }
   }
 
   // Step 4: PUBLISH (仅非 dry-run)
@@ -154,7 +204,10 @@ export async function runShipPipeline(ctx: ShipPipelineContext): Promise<Pipelin
     console.log(SEPARATOR);
     console.log(chalk.blue('\n> 开始发布...'));
 
-    publishResult = await publish(versionResult.suggestedVersion, ctx.dryRun);
+    publishResult = await publish(versionResult.suggestedVersion, {
+      dryRun: ctx.dryRun,
+      analyzeResult
+    });
     console.log(chalk.green(formatPublishOutput(publishResult)));
 
     if (!publishResult.success) {
@@ -173,8 +226,27 @@ export async function runShipPipeline(ctx: ShipPipelineContext): Promise<Pipelin
 
     // Step 5: MONITOR
     console.log(SEPARATOR);
-    const monitorResult = await monitorCI(ctx.dryRun);
-    console.log(chalk.green(formatMonitorOutput(monitorResult)));
+    const monitorResult = await monitorCI({
+      dryRun: ctx.dryRun,
+      tagName: publishResult.tagName,
+      headSha: publishResult.headSha,
+      startedAtMs: publishResult.pushedAtMs
+    });
+    const monitorOutput = formatMonitorOutput(monitorResult, ctx.verbose);
+    console.log(monitorResult.success ? chalk.green(monitorOutput) : chalk.yellow(monitorOutput));
+
+    if (!monitorResult.success) {
+      return {
+        success: false,
+        analyzeResult,
+        versionResult,
+        checkOutput,
+        publishResult,
+        monitorResult,
+        blocked: true,
+        blockReason: monitorResult.status === 'timeout' ? 'CI 监控超时' : 'GitHub Actions 发布失败'
+      };
+    }
 
     result.monitorResult = monitorResult;
   } else {
@@ -188,13 +260,17 @@ export async function runShipPipeline(ctx: ShipPipelineContext): Promise<Pipelin
   console.log(SEPARATOR);
   console.log(chalk.green('\n🎉 发布成功!'));
   console.log(chalk.green(`   v${versionResult.suggestedVersion} 已上线`));
+  if (result.monitorResult?.releaseUrl) {
+    console.log(chalk.gray(`   ${result.monitorResult.releaseUrl}`));
+  }
 
   return {
     success: true,
     analyzeResult,
     versionResult,
     checkOutput,
-    publishResult
+    publishResult,
+    monitorResult: result.monitorResult
   };
 }
 
