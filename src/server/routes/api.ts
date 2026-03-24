@@ -7,12 +7,33 @@
 import { Hono } from 'hono';
 import type { QueryHandler } from '../handlers/QueryHandler.js';
 import type { AnalysisHandler } from '../handlers/AnalysisHandler.js';
+import { isUnsupportedAnalysisOperationError } from '../handlers/AnalysisHandler.js';
 import type { 
   ApiResponse, 
   SearchRequest,
   ImpactAnalysisRequest,
   PaginationParams,
 } from '../types/index.js';
+
+function toAnalysisErrorResponse(error: unknown, fallbackCode: string): {
+  status: 500 | 501;
+  code: string;
+  message: string;
+} {
+  if (isUnsupportedAnalysisOperationError(error)) {
+    return {
+      status: error.statusCode,
+      code: error.code,
+      message: error.message,
+    };
+  }
+
+  return {
+    status: 500,
+    code: fallbackCode,
+    message: String(error),
+  };
+}
 
 /**
  * 创建 API 路由
@@ -209,14 +230,15 @@ export function createApiRoutes(
         meta: { timestamp: new Date().toISOString(), requestId: generateRequestId() },
       });
     } catch (error) {
+      const failure = toAnalysisErrorResponse(error, 'ANALYSIS_ERROR');
       return c.json<ApiResponse<never>>({
         success: false,
         error: {
-          code: 'ANALYSIS_ERROR',
-          message: String(error),
+          code: failure.code,
+          message: failure.message,
         },
         meta: { timestamp: new Date().toISOString(), requestId: generateRequestId() },
-      }, 500);
+      }, failure.status);
     }
   });
 
@@ -230,14 +252,15 @@ export function createApiRoutes(
         meta: { timestamp: new Date().toISOString(), requestId: generateRequestId() },
       });
     } catch (error) {
+      const failure = toAnalysisErrorResponse(error, 'ANALYSIS_ERROR');
       return c.json<ApiResponse<never>>({
         success: false,
         error: {
-          code: 'ANALYSIS_ERROR',
-          message: String(error),
+          code: failure.code,
+          message: failure.message,
         },
         meta: { timestamp: new Date().toISOString(), requestId: generateRequestId() },
-      }, 500);
+      }, failure.status);
     }
   });
 
@@ -304,14 +327,15 @@ export function createApiRoutes(
         meta: { timestamp: new Date().toISOString(), requestId: generateRequestId() },
       });
     } catch (error) {
+      const failure = toAnalysisErrorResponse(error, 'ANALYSIS_ERROR');
       return c.json<ApiResponse<never>>({
         success: false,
         error: {
-          code: 'ANALYSIS_ERROR',
-          message: String(error),
+          code: failure.code,
+          message: failure.message,
         },
         meta: { timestamp: new Date().toISOString(), requestId: generateRequestId() },
-      }, 500);
+      }, failure.status);
     }
   });
 
@@ -326,14 +350,15 @@ export function createApiRoutes(
         meta: { timestamp: new Date().toISOString(), requestId: generateRequestId() },
       });
     } catch (error) {
+      const failure = toAnalysisErrorResponse(error, 'REFRESH_ERROR');
       return c.json<ApiResponse<never>>({
         success: false,
         error: {
-          code: 'REFRESH_ERROR',
-          message: String(error),
+          code: failure.code,
+          message: failure.message,
         },
         meta: { timestamp: new Date().toISOString(), requestId: generateRequestId() },
-      }, 500);
+      }, failure.status);
     }
   });
 

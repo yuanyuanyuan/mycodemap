@@ -238,6 +238,10 @@ export function resolveDocsGuardrailScriptPath(projectRoot: string = process.cwd
   return path.join(projectRoot, 'scripts', 'validate-docs.js');
 }
 
+export function resolveAnalyzeDocsSyncScriptPath(projectRoot: string = process.cwd()): string {
+  return path.join(projectRoot, 'scripts', 'sync-analyze-docs.js');
+}
+
 export function runDocsGuardrailCheck(options: { root?: string; projectRoot?: string } = {}): void {
   const projectRoot = options.projectRoot ?? process.cwd();
   const scriptPath = resolveDocsGuardrailScriptPath(projectRoot);
@@ -250,6 +254,26 @@ export function runDocsGuardrailCheck(options: { root?: string; projectRoot?: st
   if (options.root) {
     args.push('--root', options.root);
   }
+
+  execFileSync(process.execPath, args, {
+    cwd: projectRoot,
+    stdio: 'inherit',
+  });
+}
+
+export function runAnalyzeDocsSyncCheck(options: { root?: string; projectRoot?: string } = {}): void {
+  const projectRoot = options.projectRoot ?? process.cwd();
+  const scriptPath = resolveAnalyzeDocsSyncScriptPath(projectRoot);
+
+  if (!existsSync(scriptPath)) {
+    throw new Error(`Analyze docs sync script not found: ${scriptPath}`);
+  }
+
+  const args = [scriptPath];
+  if (options.root) {
+    args.push('--root', options.root);
+  }
+  args.push('--check');
 
   execFileSync(process.execPath, args, {
     cwd: projectRoot,
@@ -305,6 +329,7 @@ async function getChangedFiles(options: { files?: string }): Promise<string[]> {
 async function checkDocsSyncAction(options: { root?: string }): Promise<void> {
   try {
     runDocsGuardrailCheck({ root: options.root });
+    runAnalyzeDocsSyncCheck({ root: options.root });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`ERROR: [${CIErrorCode.E0012_DOCS_GUARDRAIL_FAILED}] ${message}`);

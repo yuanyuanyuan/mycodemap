@@ -40,6 +40,40 @@ export interface IncrementalUpdateRequest {
   }>;
 }
 
+type UnsupportedAnalysisOperation = 'analyze' | 'incrementalUpdate' | 'refresh';
+
+const UNSUPPORTED_ANALYSIS_ERROR_CODES = {
+  analyze: 'ANALYSIS_NOT_SUPPORTED',
+  incrementalUpdate: 'INCREMENTAL_UPDATE_NOT_SUPPORTED',
+  refresh: 'REFRESH_NOT_SUPPORTED',
+} as const;
+
+export class UnsupportedAnalysisOperationError extends Error {
+  readonly name = 'UnsupportedAnalysisOperationError';
+  readonly statusCode = 501;
+  readonly code: typeof UNSUPPORTED_ANALYSIS_ERROR_CODES[UnsupportedAnalysisOperation];
+  readonly operation: UnsupportedAnalysisOperation;
+
+  constructor(operation: UnsupportedAnalysisOperation) {
+    super(`Server Layer 当前仅保留 query / validate / export 能力，"${operation}" 尚未作为公共能力开放`);
+    this.operation = operation;
+    this.code = UNSUPPORTED_ANALYSIS_ERROR_CODES[operation];
+  }
+}
+
+export function isUnsupportedAnalysisOperationError(
+  error: unknown
+): error is UnsupportedAnalysisOperationError {
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    'statusCode' in error &&
+    'code' in error &&
+    'operation' in error &&
+    (error as { statusCode: unknown }).statusCode === 501
+  );
+}
+
 /**
  * 分析处理器
  *
@@ -52,30 +86,15 @@ export interface IncrementalUpdateRequest {
 export class AnalysisHandler {
   constructor(
     private storage: IStorage,
-    private builder: CodeGraphBuilder
+    _builder: CodeGraphBuilder
   ) {}
 
   /**
    * 执行完整分析
    */
   async analyze(request: AnalyzeRequest): Promise<AnalyzeResponse> {
-    const startTime = Date.now();
-    
-    // 初始化存储
-    await this.storage.initialize(request.projectPath);
-
-    // TODO: 实际分析逻辑（需集成 Parser 层）
-    // 目前返回模拟数据
-    const mockResult = {
-      projectId: `proj_${Date.now()}`,
-      modulesAnalyzed: 0,
-      symbolsFound: 0,
-      dependenciesFound: 0,
-      duration: Date.now() - startTime,
-      mode: (request.options?.mode === 'smart' ? 'smart' : 'fast') as 'fast' | 'smart',
-    };
-
-    return mockResult;
+    void request;
+    throw new UnsupportedAnalysisOperationError('analyze');
   }
 
   /**
@@ -87,44 +106,16 @@ export class AnalysisHandler {
     removed: number;
     errors: string[];
   }> {
-    const errors: string[] = [];
-    let updated = 0;
-    let added = 0;
-    let removed = 0;
-
-    for (const file of request.changedFiles) {
-      try {
-        switch (file.changeType) {
-          case 'added':
-            // TODO: 解析新文件并添加模块
-            added++;
-            break;
-          case 'modified':
-            // TODO: 重新解析并更新模块
-            updated++;
-            break;
-          case 'deleted':
-            await this.storage.deleteModule(file.path);
-            removed++;
-            break;
-        }
-      } catch (error) {
-        errors.push(`Failed to process ${file.path}: ${String(error)}`);
-      }
-    }
-
-    return { updated, added, removed, errors };
+    void request;
+    throw new UnsupportedAnalysisOperationError('incrementalUpdate');
   }
 
   /**
    * 刷新项目数据（重新分析整个项目）
    */
   async refresh(projectPath: string): Promise<AnalyzeResponse> {
-    // 删除现有数据
-    await this.storage.deleteProject();
-    
-    // 重新分析
-    return this.analyze({ projectPath });
+    void projectPath;
+    throw new UnsupportedAnalysisOperationError('refresh');
   }
 
   /**
