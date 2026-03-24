@@ -9,7 +9,27 @@ echo "Running tests for changed files..."
 if [ -f "node_modules/vitest/vitest.mjs" ]; then
     node node_modules/vitest/vitest.mjs run --changed
 else
-    npx vitest run --changed
+    if [ ! -e "node_modules/vitest" ]; then
+        VITEST_PACKAGE_DIR=$(find node_modules -type d -path '*/.pnpm/*/node_modules/vitest' | head -n 1)
+        if [ -n "$VITEST_PACKAGE_DIR" ]; then
+            ln -sfn "${VITEST_PACKAGE_DIR#node_modules/}" node_modules/vitest
+        fi
+    fi
+
+    if [ -f "node_modules/vitest/vitest.mjs" ]; then
+        node node_modules/vitest/vitest.mjs run --changed
+    else
+    VITEST_ENTRY=$(find node_modules -type f -path '*/.pnpm/*/node_modules/vitest/vitest.mjs' | head -n 1)
+    if [ -z "$VITEST_ENTRY" ]; then
+        VITEST_ENTRY=$(find node_modules -type f -path '*/.vitest-*/vitest.mjs' | head -n 1)
+    fi
+
+    if [ -n "$VITEST_ENTRY" ]; then
+        node "$VITEST_ENTRY" run --changed
+    else
+        npx --yes vitest run --changed
+    fi
+    fi
 fi
 if [ $? -ne 0 ]; then
     echo "ERROR: Tests failed, commit rejected"
