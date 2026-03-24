@@ -102,19 +102,9 @@ cat .mycodemap/AI_MAP.md
 }
 ```
 
-```jsonc
-{
-  "storage": {
-    "type": "neo4j",
-    "uri": "bolt://localhost:7687",
-    "username": "neo4j",
-    "password": "secret"
-  }
-}
-```
-
 - `generate` 会写入配置的图存储后端；`export` 与内部 `Server Layer` handler 会读取同一份后端数据。
-- 缺少 `kuzu` / `neo4j-driver`，或 Neo4j 连接失败时，会暴露显式错误，不会静默 fallback。
+- `neo4j` 已不再是正式支持的 backend；旧配置会暴露显式迁移错误，不会静默 fallback。
+- 选择 `kuzudb` 前先安装 `npm install kuzu`；缺少依赖时会暴露显式错误。
 - `storage.type = "auto"` 当前仍保守选择 `filesystem`；阈值字段是契约，不是已验证的自动切换承诺。
 - 图存储后端是存储面收口，不是重新开放公共 HTTP API 产品面。
 

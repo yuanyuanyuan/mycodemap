@@ -37,7 +37,7 @@ CI Gateway 已集成以下自动检查（按执行顺序）：
 - 文档声称扫描类命令会尊重 `.gitignore`，但实现仍保留手写跳过规则 → `analyze` 与 `check-headers -d` 的文件集合漂移。
 - 把 `workflow` 重新扩回非分析阶段，却没同步 README / AI 命令文档 / guardrail 脚本 → `npm run docs:check` 失败。
 - `config-loader` 已支持 `storage`，但 schema / README / AI 文档没同步 → 用户能写配置，编辑器和 guardrail 却仍把它当非法字段。
-- 图数据库后端缺少 `kuzu` / `neo4j-driver` 或连接失败，却被文档写成会自动 fallback → 现场排障方向错误，误判为实现 bug。
+- 旧的 `neo4j` 配置已经不受支持，但文档还把它写成正式 backend，或缺少 `kuzu` 时却被文档写成会自动 fallback → 现场排障方向错误，误判为实现 bug。
 
 ## 常用命令
 

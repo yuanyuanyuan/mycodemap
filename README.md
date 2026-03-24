@@ -435,12 +435,9 @@ mycodemap ci check-output-contract
 | `exclude` | `string[]` | 排除的文件 glob 模式 | `["node_modules/**", "dist/**", ...]` |
 | `output` | `string` | 输出目录路径 | `".mycodemap"` |
 | `watch` | `boolean` | 监听模式预留配置 | `false` |
-| `storage.type` | `"filesystem" \| "kuzudb" \| "neo4j" \| "memory" \| "auto"` | 图存储后端类型 | `"filesystem"` |
+| `storage.type` | `"filesystem" \| "kuzudb" \| "memory" \| "auto"` | 图存储后端类型 | `"filesystem"` |
 | `storage.outputPath` | `string` | 文件系统存储目录 | `".codemap/storage"` |
 | `storage.databasePath` | `string` | KùzuDB 数据目录（相对项目根目录） | - |
-| `storage.uri` | `string` | Neo4j 连接地址 | - |
-| `storage.username` | `string` | Neo4j 用户名 | - |
-| `storage.password` | `string` | Neo4j 密码 | - |
 | `storage.autoThresholds` | `object` | `auto` 后端选择阈值 | - |
 | `plugins.builtInPlugins` | `boolean` | 是否启用内置插件 | `true` |
 | `plugins.pluginDir` | `string` | 额外插件目录 | - |
@@ -458,19 +455,9 @@ mycodemap ci check-output-contract
 }
 ```
 
-```jsonc
-{
-  "storage": {
-    "type": "neo4j",
-    "uri": "bolt://localhost:7687",
-    "username": "neo4j",
-    "password": "secret"
-  }
-}
-```
-
 - `generate` 会把 CodeGraph 写入配置的 `storage` 后端，`export` 与内部 `Server Layer` handler 会读取同一份后端数据。
-- 缺少 `kuzu` / `neo4j-driver`，或 Neo4j 连接不可用时，会返回显式错误；不会静默 fallback 到 `filesystem`。
+- `neo4j` 已不再是正式支持的 backend；旧配置会返回显式迁移错误，不会静默 fallback 到 `filesystem`。
+- 选择 `kuzudb` 前先安装 `npm install kuzu`；缺少依赖时会返回显式错误。
 - `storage.type = "auto"` 当前仍以 `filesystem` 为保守默认值；阈值字段先作为显式契约保留，不伪装成已完成的自动切换能力。
 - 图存储后端生产化不等于重新开放公共 HTTP API 产品面；`Server Layer` 仍是内部架构层。
 
@@ -552,7 +539,7 @@ CodeMap 采用清晰的分层架构设计（MVP3），各层职责明确：
 │  │ - FileSystem     │ │ - TypeScript     │                 │
 │  │ - Memory         │ │ - Go             │                 │
 │  │ - KùzuDB         │ │ - Python         │                 │
-│  │ - Neo4j          │ │ - Registry       │                 │
+│  │ - Auto Select    │ │ - Registry       │                 │
 │  └──────────────────┘ └──────────────────┘                 │
 │  ┌──────────────────┐                                      │
 │  │ Repository       │  CodeGraphRepositoryImpl             │
@@ -598,7 +585,7 @@ src/
   │   └── repositories/       # 仓库接口
   ├── infrastructure/         # MVP3: 基础设施层
   │   ├── storage/            # 存储适配器
-  │   │   ├── adapters/       # FileSystem, Memory, KùzuDB, Neo4j
+  │   │   ├── adapters/       # FileSystem, Memory, KùzuDB
   │   │   └── StorageFactory.ts
   │   ├── parser/             # 解析器
   │   │   ├── interfaces/     # ParserBase

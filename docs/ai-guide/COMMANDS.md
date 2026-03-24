@@ -37,8 +37,8 @@ mycodemap generate --ai-context             # 生成 AI 描述
 
 **图存储运行时说明**:
 - `generate` 会读取 `mycodemap.config.json.storage`，并把 CodeGraph 写入所选后端。
-- `storage.type` 支持 `filesystem`、`kuzudb`、`neo4j`、`memory`、`auto`；默认是 `filesystem`。
-- 缺少 `kuzu` / `neo4j-driver`，或 Neo4j 连接失败时，会直接报错，不会静默 fallback 到 `filesystem`。
+- `storage.type` 支持 `filesystem`、`kuzudb`、`memory`、`auto`；默认是 `filesystem`。
+- 旧的 `neo4j` 配置会直接报迁移错误；缺少 `kuzu` 时也会直接报错，不会静默 fallback 到 `filesystem`。
 - `storage.type = "auto"` 当前仍保守走 `filesystem`；阈值字段是配置契约，不代表自动切换已完成。
 
 ---

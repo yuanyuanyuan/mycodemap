@@ -255,7 +255,7 @@ describe('validate-docs.js', () => {
 
     const readmePath = path.join(fixtureRoot, 'README.md');
     const updatedReadme = readFileSync(readmePath, 'utf8').replace(
-      '| `storage.type` | `"filesystem" \\| "kuzudb" \\| "neo4j" \\| "memory" \\| "auto"` | 图存储后端类型 | `"filesystem"` |',
+      '| `storage.type` | `"filesystem" \\| "kuzudb" \\| "memory" \\| "auto"` | 图存储后端类型 | `"filesystem"` |',
       '| `storage.kind` | `string` | 存储类型 | `"filesystem"` |'
     );
     writeFileSync(readmePath, updatedReadme);

@@ -537,8 +537,8 @@ function validateGraphStorageDocs(rootDir, failures) {
       'README.md graph storage contract',
       [
         '"storage": {',
-        '| `storage.type` | `"filesystem" \\| "kuzudb" \\| "neo4j" \\| "memory" \\| "auto"` | 图存储后端类型 | `"filesystem"` |',
-        '缺少 `kuzu` / `neo4j-driver`，或 Neo4j 连接不可用时，会返回显式错误；不会静默 fallback 到 `filesystem`。',
+        '| `storage.type` | `"filesystem" \\| "kuzudb" \\| "memory" \\| "auto"` | 图存储后端类型 | `"filesystem"` |',
+        '`neo4j` 已不再是正式支持的 backend；旧配置会返回显式迁移错误，不会静默 fallback 到 `filesystem`。',
         '图存储后端生产化不等于重新开放公共 HTTP API 产品面；`Server Layer` 仍是内部架构层。'
       ],
       [],
@@ -553,7 +553,7 @@ function validateGraphStorageDocs(rootDir, failures) {
       [
         '| "需要切换/排查图存储后端" | 编辑 `mycodemap.config.json.storage` → 运行 `generate` / `export` |',
         '`generate` 会写入配置的图存储后端；`export` 与内部 `Server Layer` handler 会读取同一份后端数据。',
-        '缺少 `kuzu` / `neo4j-driver`，或 Neo4j 连接失败时，会暴露显式错误，不会静默 fallback。'
+        '`neo4j` 已不再是正式支持的 backend；旧配置会暴露显式迁移错误，不会静默 fallback。'
       ],
       [],
       failures
@@ -593,8 +593,8 @@ function validateGraphStorageDocs(rootDir, failures) {
       'docs/SETUP_GUIDE.md graph storage contract',
       [
         '"storage": {',
-        '| `storage.type` | string | `"filesystem"` | 图存储后端类型：`filesystem` / `kuzudb` / `neo4j` / `memory` / `auto` |',
-        '缺少依赖或连接失败时会返回显式错误，不会静默 fallback 到 `filesystem`。'
+        '| `storage.type` | string | `"filesystem"` | 图存储后端类型：`filesystem` / `kuzudb` / `memory` / `auto` |',
+        '旧的 `neo4j` 配置已不再受支持，会返回显式迁移错误，不会静默 fallback 到 `filesystem`。'
       ],
       [],
       failures
@@ -608,7 +608,7 @@ function validateGraphStorageDocs(rootDir, failures) {
       [
         '若改动涉及 `mycodemap.config.json.storage` 或图数据库适配器',
         'schema / README / AI 文档没同步',
-        '图数据库后端缺少 `kuzu` / `neo4j-driver` 或连接失败，却被文档写成会自动 fallback'
+        '旧的 `neo4j` 配置已经不受支持，但文档还把它写成正式 backend'
       ],
       [],
       failures
@@ -621,10 +621,9 @@ function validateGraphStorageDocs(rootDir, failures) {
       'mycodemap.config.schema.json storage contract',
       [
         '"storage"',
-        '"enum": ["filesystem", "kuzudb", "neo4j", "memory", "auto"]',
+        '"enum": ["filesystem", "kuzudb", "memory", "auto"]',
         '"outputPath"',
         '"databasePath"',
-        '"uri"',
         '"autoThresholds"'
       ],
       [],

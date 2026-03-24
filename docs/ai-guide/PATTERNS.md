@@ -223,7 +223,7 @@ node dist/cli/index.js workflow checkpoint
 
 ### 模式 G: 切换图存储后端
 
-**适用场景**: 需要把 CodeGraph 从默认文件系统存储切到 KùzuDB / Neo4j，或验证 graph backend 是否真正生效
+**适用场景**: 需要把 CodeGraph 从默认文件系统存储切到 KùzuDB，或验证 graph backend 是否真正生效
 
 **执行步骤**:
 
@@ -239,10 +239,8 @@ cat mycodemap.config.json
 #   }
 # }
 
-# Step 3: 如需图数据库后端，安装可选依赖
+# Step 3: 如需 Kùzu 图数据库后端，安装可选依赖
 npm install kuzu
-# 或
-npm install neo4j-driver
 
 # Step 4: 重新生成代码地图
 node dist/cli/index.js generate
@@ -252,7 +250,7 @@ node dist/cli/index.js export json -o /tmp/codemap.json
 ```
 
 **决策要点**:
-- 缺少 `kuzu` / `neo4j-driver`，或 Neo4j 连接失败时，应看到显式错误，而不是静默 fallback。
+- 旧的 `neo4j` 配置现在应该直接报迁移错误；缺少 `kuzu` 时也应看到显式错误，而不是静默 fallback。
 - `storage.type = "auto"` 当前仍保守落到 `filesystem`，不要把阈值字段误读成已上线自动切换。
 - 图存储生产化只收口存储面，不重新开放公共 HTTP API 产品面。
 
