@@ -7,7 +7,7 @@ import chalk from 'chalk';
 import { analyzeCommits, formatAnalyzeOutput, AnalyzeResult } from './analyzer.js';
 import { calculateVersion, formatVersionOutput, VersionResult } from './versioner.js';
 import { runQualityChecks, formatCheckOutput, shouldBlockRelease, CheckOutput } from './checker.js';
-import { publish, formatPublishOutput, PublishResult } from './publisher.js';
+import { publish, formatPublishOutput, PublishResult, isLargeRelease, formatLargeReleaseWarning } from './publisher.js';
 import { monitorCI, formatMonitorOutput, MonitorResult } from './monitor.js';
 
 export interface ShipPipelineContext {
@@ -110,6 +110,14 @@ export async function runShipPipeline(ctx: ShipPipelineContext): Promise<Pipelin
 
   if (!analyzeStep || !analyzeResult) {
     return { ...result, blocked: true, blockReason: '变更分析失败' };
+  }
+
+  // 检测大规模发布并显示警告
+  if (isLargeRelease(analyzeResult.commits)) {
+    const warningLines = formatLargeReleaseWarning(analyzeResult.commits);
+    for (const line of warningLines) {
+      console.log(line);
+    }
   }
 
   // Step 2: VERSION

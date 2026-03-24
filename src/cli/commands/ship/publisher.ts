@@ -20,6 +20,127 @@ interface ReplacementRule {
 const CHANGELOG_HEADER = '# Changelog\n\nAll notable changes to this project will be documented in this file.\n\n';
 const COMMAND_MAX_BUFFER = 20 * 1024 * 1024;
 
+// Commit 数量警告阈值
+const LARGE_RELEASE_COMMIT_THRESHOLD = 20;
+
+interface MilestoneGroup {
+  name: string;
+  description: string;
+  commits: GitCommit[];
+}
+
+/**
+ * 检测 commit 是否属于 milestone 相关
+ * 基于 commit message 中的关键词识别 milestone/phase 变更
+ */
+function detectMilestoneKeywords(message: string): { isMilestone: boolean; phase?: string; type?: 'start' | 'close' | 'archive' | 'progress' } {
+  const lowerMsg = message.toLowerCase();
+
+  // Phase 相关
+  const phaseMatch = message.match(/phase\s*(\d+)/i);
+  const phase = phaseMatch ? `Phase ${phaseMatch[1]}` : undefined;
+
+  // 检测 milestone 生命周期
+  if (/\bstart\s+(v?\d+\.\d+|milestone)/i.test(message) || /启动.*milestone/i.test(message)) {
+    return { isMilestone: true, phase, type: 'start' };
+  }
+  if (/\b(close|complete|finish)\s+(v?\d+\.\d+|milestone)/i.test(message) || /完成.*milestone/i.test(message)) {
+    return { isMilestone: true, phase, type: 'close' };
+  }
+  if (/\barchive\b/i.test(message) || /归档/i.test(message)) {
+    return { isMilestone: true, phase, type: 'archive' };
+  }
+
+  // 检测 planning 文档变更
+  if (/planning:/i.test(message) || /\.planning\//i.test(message)) {
+    return { isMilestone: true, phase, type: 'progress' };
+  }
+
+  return { isMilestone: false };
+}
+
+/**
+ * 从 commits 中提取 milestone 信息
+ */
+function extractMilestoneInfo(commits: GitCommit[]): { milestoneName?: string; hasCompleteMilestone: boolean } {
+  // 查找 milestone close/start 的 commit
+  for (const commit of commits) {
+    const milestoneMatch = commit.message.match(/v?(\d+\.\d+)\s*milestone/i);
+    if (milestoneMatch) {
+      const closeMatch = /\b(close|complete|finish)\b/i.test(commit.message);
+      return {
+        milestoneName: `v${milestoneMatch[1]}`,
+        hasCompleteMilestone: closeMatch
+      };
+    }
+  }
+
+  return { hasCompleteMilestone: false };
+}
+
+/**
+ * 按 milestone/phase 分组 commits
+ */
+function groupCommitsByMilestone(commits: GitCommit[]): Map<string, MilestoneGroup> {
+  const groups = new Map<string, MilestoneGroup>();
+
+  for (const commit of commits) {
+    const milestoneInfo = detectMilestoneKeywords(commit.message);
+
+    if (milestoneInfo.isMilestone && milestoneInfo.phase) {
+      const key = milestoneInfo.phase;
+      const existing = groups.get(key);
+      if (existing) {
+        existing.commits.push(commit);
+      } else {
+        groups.set(key, {
+          name: key,
+          description: `${key} Delivery`,
+          commits: [commit]
+        });
+      }
+    }
+  }
+
+  return groups;
+}
+
+/**
+ * 检查是否为大规模发布，需要额外注意
+ */
+export function isLargeRelease(commits: GitCommit[]): boolean {
+  return commits.length > LARGE_RELEASE_COMMIT_THRESHOLD;
+}
+
+/**
+ * 生成大规模发布警告
+ */
+export function formatLargeReleaseWarning(commits: GitCommit[]): string[] {
+  const lines: string[] = [];
+  lines.push('');
+  lines.push(chalk.yellow('⚠️  检测到大规模发布'));
+  lines.push(chalk.gray(`   本次发布包含 ${commits.length} 个 commits，超过阈值 ${LARGE_RELEASE_COMMIT_THRESHOLD}`));
+
+  // 分析 milestone 分布
+  const milestoneGroups = groupCommitsByMilestone(commits);
+  if (milestoneGroups.size > 0) {
+    lines.push(chalk.gray('   发现以下 Phase/Milestone 分组:'));
+    for (const [name, group] of milestoneGroups) {
+      lines.push(chalk.gray(`     - ${name}: ${group.commits.length} commits`));
+    }
+  }
+
+  const { milestoneName, hasCompleteMilestone } = extractMilestoneInfo(commits);
+  if (milestoneName) {
+    lines.push(chalk.gray(`   Milestone: ${milestoneName} ${hasCompleteMilestone ? '(已完成)' : '(进行中)'}`));
+  }
+
+  lines.push(chalk.gray('   建议: 请仔细 review 生成的 CHANGELOG，确保 milestone 变更已完整记录'));
+  lines.push('');
+
+  return lines;
+}
+
 function updateFileByRules(rules: ReplacementRule[]): void {
   for (const rule of rules) {
     if (!existsSync(rule.file)) {
@@ -127,15 +248,66 @@ function buildChangelogSections(analyzeResult?: AnalyzeResult): string[] {
     ];
   }
 
-  const groups = new Map<string, string[]>();
-  for (const commit of analyzeResult.commits) {
-    const section = classifyCommitSection(commit.type);
-    const lines = groups.get(section) ?? [];
-    lines.push(formatCommitLine(commit));
-    groups.set(section, lines);
+  const { commits } = analyzeResult;
+  const lines: string[] = [];
+
+  // 1. 检查是否为大规模发布，添加 milestone 摘要
+  const { milestoneName, hasCompleteMilestone } = extractMilestoneInfo(commits);
+  if (milestoneName && hasCompleteMilestone) {
+    lines.push(`### 🏗️ ${milestoneName} Milestone`);
+    lines.push('');
+    lines.push(`${milestoneName} milestone 完成。`);
+    lines.push('');
   }
 
-  return Array.from(groups.entries()).flatMap(([section, lines]) => [section, '', ...lines, '']);
+  // 2. 按 Phase 分组（如果存在）
+  const phaseGroups = groupCommitsByMilestone(commits);
+  if (phaseGroups.size > 0) {
+    // 按 Phase 编号排序
+    const sortedPhases = Array.from(phaseGroups.entries())
+      .sort((a, b) => {
+        const numA = parseInt(a[0].match(/\d+/)?.[0] || '0', 10);
+        const numB = parseInt(b[0].match(/\d+/)?.[0] || '0', 10);
+        return numA - numB;
+      });
+
+    for (const [phaseName, group] of sortedPhases) {
+      lines.push(`#### ${group.description}`);
+      lines.push('');
+      for (const commit of group.commits.slice(0, 10)) { // 限制每个 phase 显示 10 条
+        lines.push(formatCommitLine(commit));
+      }
+      if (group.commits.length > 10) {
+        lines.push(`- ... and ${group.commits.length - 10} more commits`);
+      }
+      lines.push('');
+    }
+  }
+
+  // 3. 剩余 commits 按类型分组
+  const remainingCommits = commits.filter(c => !detectMilestoneKeywords(c.message).isMilestone);
+  const typeGroups = new Map<string, string[]>();
+
+  for (const commit of remainingCommits) {
+    const section = classifyCommitSection(commit.type);
+    const sectionLines = typeGroups.get(section) ?? [];
+    sectionLines.push(formatCommitLine(commit));
+    typeGroups.set(section, sectionLines);
+  }
+
+  // 4. 按优先级输出类型分组
+  const priority = ['### 🚀 New Features', '### 🐛 Bug Fixes', '### 📚 Documentation', '### ♻️ Refactors', '### 🔧 Maintenance'];
+  for (const section of priority) {
+    const sectionLines = typeGroups.get(section);
+    if (sectionLines && sectionLines.length > 0) {
+      lines.push(section);
+      lines.push('');
+      lines.push(...sectionLines);
+      lines.push('');
+    }
+  }
+
+  return lines;
 }
 
 function ensureChangelogEntry(version: string, analyzeResult?: AnalyzeResult): void {

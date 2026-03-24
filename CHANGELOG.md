@@ -4,14 +4,70 @@ All notable changes to this project will be documented in this file.
 
 ## [0.4.2] - 2026-03-25 - Test Infrastructure Fix
 
+### 🏗️ v1.3 Milestone: Kùzu-only Convergence & High-Signal Debt Cleanup
+
+v1.3 milestone 完成，核心产品面收敛为 Kùzu-only，清偿多项技术债务。
+
+#### Phase 13: Storage Backend Convergence
+- **refactor**: 移除 neo4j 运行时表面 (`8957fca`)
+- **docs**: 同步 kuzu-only public contract (`d07524e`)
+
+#### Phase 14: CLI Surface & Documentation Alignment
+- **refactor**: 收口 analyze 和 server 过渡差距 (`4a756d7`)
+- **docs**: 移除 workflow 过渡性 public 措辞 (`e5b9560`)
+
+#### Phase 15: Analysis Intent & Workflow Runtime
+- **feature**: 发布 public intent contract 和 outputs (`f4abfa6`)
+- **refactor**: 对齐 workflow 运行时编排核心 (`ddd1c80`)
+- **bugfix**: 扩展 quality 和回归测试覆盖 (`5eb38f7`)
+
+#### Phase 16: Core Debt Cleanup & Final Guardrails
+- **refactor**: 实现 plugin 真实 reload 生命周期 (`3a5fbc6`)
+- **refactor**: 收口 parser index 和 resolution 债务 (`f64432a`)
+- **refactor**: 使 analysis write paths 显式化 (`27458cd`)
+- **docs**: 同步 kuzu-only 和 docs gate contract (`a4c8e12`)
+
+#### Milestone Archive
+- **docs**: 归档 v1.0 CI 和 docs phases (`7d474df`)
+- **docs**: 归档 v1.0 analyze 和 workflow phases (`b3e43e4`)
+- **docs**: 归档 v1.0 kickoff 和 cli cleanup (`bb80e4b`)
+- **docs**: 归档 v1.1 plugin rollout phases (`35cfd60`)
+- **docs**: 归档 v1.1 docs 和 v1.2 activation (`0aed09c`)
+- **docs**: 归档 v1.2 backend validation (`a27bfb0`)
+- **docs**: 完成 v1.3 milestone 关闭 (`ccb7d12`)
+
+### 🚀 New Features
+
+- **storage**: 新增 adapter parity 和 validation (`b051dd8`)
+- **storage**: 接入 generate export 和共享 helpers (`f625596`)
+- **analyze**: 发布 public intent contract 和标准化输出 (`f4abfa6`)
+- **plugins**: 新增 runtime config 和 diagnostics surface (`74d7905`)
+- **workflow**: 扩展 quality 和回归测试覆盖 (`5eb38f7`)
+- **claude**: 引入完整的 GSD (Get Shit Done) workflow agents 和命令 (`ef537e2`)
+- **claude/gstack**: 新增 Docker 配置和 agent 定义 (`b83c000`)
+- **claude/gstack**: 新增 GitHub Actions workflows (`7ef301b`)
+
 ### 🐛 Bug Fixes
 
-- **test**: 修复 validate-docs 测试缺少 product-specs 文件的问题
+- **test**: 修复 validate-docs 测试缺少 product-specs 文件的问题 (`20d4293`)
+- **hooks**: 解决 vitest 跨 node_modules 布局的查找问题 (`d53a5ac`)
+- **hooks**: 添加本地 vitest entry 回退 (`d6542b5`)
+- **adapter**: 增加 method signature 测试超时 (`4e97ca5`)
 
 ### 📚 Documentation
 
-- **docs**: 同步 MVP3 产品规格文档基线
-- **docs**: 完成 v1.3 milestone 归档
+- **docs**: 同步 MVP3 产品规格文档基线 (`0c75108`)
+- **docs**: 完成 v1.3 milestone 归档 (`ccb7d12`)
+- **ai-guide**: 新增 ship troubleshooting section (`b7fe6d4`)
+- **guardrails**: 同步 hooks 和 validation 文档 (`38b1964`)
+- **planning**: 添加当前状态和 codebase map (`0bbd4ac`)
+
+### 🔧 Maintenance
+
+- **config**: 同步所有 AI 文档到 v0.4.2 (`43c7b17`)
+- **config**: 版本升级到 v0.4.2 (`d1f55c6`)
+- **config**: vitest 添加 lcov coverage reporter (`a4da751`)
+- **tooling**: checkpoint milestone metadata (`851ecf6`)
 
 ## [0.4.1] - 2026-03-23 - Ship Workflow Fixes
 

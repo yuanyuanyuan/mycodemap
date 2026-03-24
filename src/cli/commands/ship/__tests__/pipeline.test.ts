@@ -34,7 +34,9 @@ vi.mock('../checker.js', () => ({
 
 vi.mock('../publisher.js', () => ({
   publish: publishMock,
-  formatPublishOutput: () => 'publish'
+  formatPublishOutput: () => 'publish',
+  isLargeRelease: () => false,
+  formatLargeReleaseWarning: () => []
 }));
 
 vi.mock('../monitor.js', () => ({
