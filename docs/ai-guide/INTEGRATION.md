@@ -28,17 +28,17 @@
       }
     },
     {
-      "name": "codemap_analyze_impact",
+      "name": "codemap_read",
       "description": "分析文件变更的影响范围",
-      "command": "mycodemap analyze -i impact -t {target} --json",
+      "command": "mycodemap analyze -i read -t {target} --scope transitive --json",
       "parameters": {
         "target": { "type": "string", "description": "目标文件路径" }
       }
     },
     {
-      "name": "codemap_search",
+      "name": "codemap_find",
       "description": "搜索与关键词相关的代码",
-      "command": "mycodemap analyze -i search -k {keyword} --json",
+      "command": "mycodemap analyze -i find -k {keyword} --json",
       "parameters": {
         "keyword": { "type": "string", "description": "搜索关键词" }
       }
@@ -99,12 +99,12 @@ fi
 
 3. **分析变更影响**
    ```bash
-   $CODEMAP analyze -i impact -t "file.ts" --transitive --json
+   $CODEMAP analyze -i read -t "file.ts" --scope transitive --json
    ```
 
 4. **搜索代码**
    ```bash
-   $CODEMAP analyze -i search -k "keyword" --json
+   $CODEMAP analyze -i find -k "keyword" --json
    ```
 
 ## 完整文档
@@ -135,20 +135,20 @@ mycodemap query -s "SymbolName" -j
 
 ### Analyze Impact
 ```bash
-mycodemap analyze -i impact -t "file.ts" --transitive --json
+mycodemap analyze -i read -t "file.ts" --scope transitive --json
 ```
 
 ### Search Code
 ```bash
-mycodemap analyze -i search -k "keyword" --json
+mycodemap analyze -i find -k "keyword" --json
 ```
 
 ## Decision Tree
 
 1. Understanding project structure → `generate` + read `AI_MAP.md`
 2. Finding symbol location → `query -s`
-3. Assessing change impact → `analyze -i impact`
-4. Searching related code → `analyze -i search`
+3. Assessing change impact → `analyze -i read`
+4. Searching related code → `analyze -i find`
 
 ## Reference
 
@@ -168,15 +168,15 @@ Code analysis tool for TypeScript projects.
 
 - `codemap_generate`: Generate code map
 - `codemap_query`: Query symbols
-- `codemap_impact`: Analyze change impact
-- `codemap_search`: Search code
+- `codemap_read`: Analyze change impact and surrounding context
+- `codemap_find`: Search code
 
 ## Workflow
 
 1. Always start with `codemap_generate`
 2. Use `codemap_query` to find definitions
-3. Use `codemap_impact` before making changes
-4. Use `codemap_search` to find related code
+3. Use `codemap_read` before making changes
+4. Use `codemap_find` to find related code
 
 ## Documentation
 
@@ -199,6 +199,8 @@ Full guide: `AI_GUIDE.md`
 | `提交格式错误` | 不符合 [TAG] 格式 | 修改为 `[TAG] scope: message` |
 | `风险评分过高` | 变更文件太多 | 拆分提交或添加解释 |
 | `输出契约验证失败` | analyze 输出格式变更 | 检查 schemaVersion 和字段 |
+| `pluginReport.diagnostics` 出现 `initialize` / `generate` 错误 | 插件加载或执行失败 | 检查 `mycodemap.config.json` 的 `plugins` 段、插件导出格式和生成路径 |
+| `ADAPTER_NOT_AVAILABLE` / `KUZU_INIT_FAILED` / `NEO4J_INIT_FAILED` | 图存储后端缺少依赖或连接失败 | 检查 `mycodemap.config.json.storage`、安装 `kuzu` / `neo4j-driver`、确认 Neo4j URI 与凭证 |
 
 ---
 
@@ -249,7 +251,7 @@ async function findSymbol(symbolName: string): Promise<any[]> {
   
   // 尝试 3: 统一搜索
   console.log('模糊搜索无结果，尝试统一搜索...');
-  result = await exec(`mycodemap analyze -i search -k "${symbolName}" --topK 20 --json`);
+  result = await exec(`mycodemap analyze -i find -k "${symbolName}" --topK 20 --json`);
   data = JSON.parse(result);
   
   return data.results || [];
@@ -277,12 +279,12 @@ async function analyzeImpact(file: string, maxFiles: number = 50): Promise<any> 
 
 // 模式 4: 置信度太低，扩大搜索
 async function searchWithFallback(keyword: string): Promise<any[]> {
-  let result = await exec(`mycodemap analyze -i search -k "${keyword}" --topK 8 --json`);
+  let result = await exec(`mycodemap analyze -i find -k "${keyword}" --topK 8 --json`);
   let data = JSON.parse(result);
   
   if (data.confidence?.level === 'low') {
     console.log('置信度较低，扩大搜索范围...');
-    result = await exec(`mycodemap analyze -i search -k "${keyword}" --topK 20 --json`);
+    result = await exec(`mycodemap analyze -i find -k "${keyword}" --topK 20 --json`);
     data = JSON.parse(result);
   }
   
@@ -352,7 +354,7 @@ def find_symbol(symbol_name: str) -> List[Dict[str, Any]]:
     # 尝试 3: 统一搜索
     print('模糊搜索无结果，尝试统一搜索...')
     result = subprocess.run(
-        ['mycodemap', 'analyze', '-i', 'search', '-k', symbol_name, '--topK', '20', '--json'],
+        ['mycodemap', 'analyze', '-i', 'find', '-k', symbol_name, '--topK', '20', '--json'],
         capture_output=True, text=True
     )
     data = json.loads(result.stdout)
@@ -381,7 +383,7 @@ async function handleLargeProject() {
   // 分块查询
   const modules = ['src/cli', 'src/core', 'src/domain'];
   for (const module of modules) {
-    await exec(`mycodemap analyze -i overview -t "${module}" --json`);
+    await exec(`mycodemap analyze -i show -t "${module}" --json`);
   }
 }
 
@@ -508,6 +510,6 @@ npm rebuild
 # 强制重新生成
 mycodemap generate --force
 
-# 或使用 watch 模式自动更新
-mycodemap watch
+# 或重新运行一次 generate 刷新输出
+mycodemap generate
 ```

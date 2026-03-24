@@ -2,6 +2,10 @@
 
 > 本文档是 AI/Agent 使用 CodeMap 的**主索引**。
 > 
+> CodeMap 是一个 AI-first 代码地图工具。AI/Agent 是主要消费者；人类开发者负责配置、维护与按需阅读输出。  
+> 当前 CLI 过渡现实：多数命令通过 `--json` 输出机器可读结果；`analyze` 额外提供 `--output-mode machine|human`。  
+> 命名边界：`Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令。  
+> 
 > 🔍 **机器可读索引**: `ai-document-index.yaml`  
 > 📖 **发现机制**: `AI_DISCOVERY.md`  
 > 📚 **详细文档**: `docs/ai-guide/` 目录
@@ -24,21 +28,95 @@ cat .mycodemap/AI_MAP.md
 
 ---
 
+## 🎯 产品定位速查
+
+| 维度 | 结论 |
+|------|------|
+| 产品定位 | `CodeMap` 是一个 AI-first 代码地图工具 |
+| 主要消费者 | AI/Agent |
+| 人类角色 | 配置、维护、按需阅读输出 |
+| 当前机器输出入口 | 多数命令显式使用 `--json`；`analyze` 支持 `--output-mode machine` |
+| 当前人类输出入口 | `analyze --output-mode human`，其他命令大多保留现有文本输出 |
+| 命名边界 | `Server Layer` ≠ 公共 `mycodemap server` 命令 |
+| 文件发现契约 | 扫描类命令共享 `.gitignore` 感知排除模块；无 `.gitignore` 时回退到默认 `exclude` |
+
+---
+
 ## 📋 命令选择速查表
 
 | 用户意图 | 推荐命令 |
 |---------|---------|
 | "项目结构是什么" | `generate` → 读 `AI_MAP.md` |
 | "XXX 在哪里定义" | `query -s "XXX"` |
-| "修改 XXX 会影响什么" | `analyze -i impact -t "XXX" --json` |
-| "XXX 模块依赖什么" | `analyze -i dependency -t "XXX" --json` |
-| "代码质量如何" | `analyze -i complexity -t "src/" --json` |
-| "查找与 XXX 相关的代码" | `analyze -i search -k "XXX" --json` |
+| "修改 XXX 会影响什么" | `impact -f "XXX" -t -j` |
+| "XXX 模块依赖什么" | `deps -m "XXX" -j` |
+| "代码质量如何" | `complexity -f "src/file.ts" -j` |
+| "查找与 XXX 相关的代码" | `query -S "XXX" -j` |
 | "这个改动安全吗" | `ci assess-risk` |
-| "需要重构建议" | `analyze -i refactor -t "src/" --json` |
-| "一键触发 GitHub Workflow 发布 npm 包" | `ship` 或 `ship --dry-run` |
+| "发布前是否满足门禁" | `ci check-working-tree → ci check-branch → ci check-scripts` |
+| "需要验证文档/契约是否同步" | `ci check-docs-sync` |
+| "需要导出结构化结果" | `export json -o ./output.json` |
+| "需要插件诊断/扩展结果" | `generate` → 读 `AI_MAP.md` 的 `Plugin Summary` 或解析 `codemap.json.pluginReport` |
+| "需要切换/排查图存储后端" | 编辑 `mycodemap.config.json.storage` → 运行 `generate` / `export` |
 
 **完整决策树**: 见 [docs/ai-guide/QUICKSTART.md](./docs/ai-guide/QUICKSTART.md)
+
+---
+
+## 🔌 插件扩展点速查
+
+```jsonc
+{
+  "plugins": {
+    "builtInPlugins": false,
+    "pluginDir": "./codemap-plugins",
+    "plugins": ["complexity-analyzer", "my-local-plugin"],
+    "debug": true
+  }
+}
+```
+
+- 只有显式存在 `plugins` 段时，`generate` 才会进入插件 runtime；没有该段的旧项目保持 v1.0 行为。
+- 运行结果会同时写入 `AI_MAP.md` 的 `Plugin Summary` 与 `codemap.json` 的 `pluginReport`。
+- `pluginReport.diagnostics[]` 用统一结构暴露 `load / initialize / analyze / generate` 四个阶段的 warning / error。
+
+---
+
+## 🗄️ 图存储后端速查
+
+```jsonc
+{
+  "storage": {
+    "type": "filesystem",
+    "outputPath": ".codemap/storage"
+  }
+}
+```
+
+```jsonc
+{
+  "storage": {
+    "type": "kuzudb",
+    "databasePath": ".codemap/kuzu"
+  }
+}
+```
+
+```jsonc
+{
+  "storage": {
+    "type": "neo4j",
+    "uri": "bolt://localhost:7687",
+    "username": "neo4j",
+    "password": "secret"
+  }
+}
+```
+
+- `generate` 会写入配置的图存储后端；`export` 与内部 `Server Layer` handler 会读取同一份后端数据。
+- 缺少 `kuzu` / `neo4j-driver`，或 Neo4j 连接失败时，会暴露显式错误，不会静默 fallback。
+- `storage.type = "auto"` 当前仍保守选择 `filesystem`；阈值字段是契约，不是已验证的自动切换承诺。
+- 图存储后端是存储面收口，不是重新开放公共 HTTP API 产品面。
 
 ---
 
@@ -78,29 +156,35 @@ CLI Layer → Server Layer → Domain Layer → Infrastructure Layer → Interfa
 | Infrastructure | `src/infrastructure/` | `storage/`, `parser/` |
 | Interface | `src/interface/` | `types/`, `config/` |
 
+> `Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令；后者已从 public CLI 移除，CLI 只保留显式迁移提示。
+
 ---
 
 ## 💡 提示词模板速用
 
 ### 模板 1: 理解项目
+<!-- BEGIN GENERATED: analyze-ai-guide-project-template -->
 ```markdown
 我需要理解这个 TypeScript 项目的结构。
 请执行：
 1. `node dist/cli/index.js generate`
 2. 阅读 `.mycodemap/AI_MAP.md`
-3. 使用 `analyze -i overview -t "src/" --json`
+3. 使用 `analyze -i show -t "src/" --json`
 4. 输出项目结构分析
 ```
+<!-- END GENERATED: analyze-ai-guide-project-template -->
 
 ### 模板 2: 变更影响分析
+<!-- BEGIN GENERATED: analyze-ai-guide-impact-template -->
 ```markdown
 我需要修改 {{FILE}}，请分析影响范围。
 请执行：
-1. `node dist/cli/index.js analyze -i impact -t "{{FILE}}" --transitive --json`
+1. `node dist/cli/index.js analyze -i read -t "{{FILE}}" --scope transitive --json`
 2. 分析直接依赖和传递依赖
 3. 评估风险等级
 4. 给出修改建议
 ```
+<!-- END GENERATED: analyze-ai-guide-impact-template -->
 
 **更多模板**: 见 [docs/ai-guide/PROMPTS.md](./docs/ai-guide/PROMPTS.md)
 
@@ -112,14 +196,31 @@ CLI Layer → Server Layer → Domain Layer → Infrastructure Layer → Interfa
 // analyze 输出结构
 interface AnalyzeOutput {
   schemaVersion: "v1.0.0";
-  intent: string;
+  intent: "find" | "read" | "link" | "show";
   tool: string;
   confidence: { score: number; level: "high" | "medium" | "low"; };
+  warnings?: Array<{
+    code: "deprecated-intent";
+    replacementIntent: "find" | "read" | "link" | "show";
+  }>;
+  analysis?: unknown;
   results: Array<{
     file: string;
     location?: { file: string; line: number; column: number; };
     content?: string;
     relevance: number;
+  }>;
+}
+
+interface PluginExecutionReport {
+  loadedPlugins: string[];
+  generatedFiles: string[];
+  metrics: Record<string, unknown>;
+  diagnostics: Array<{
+    plugin?: string;
+    stage: "load" | "initialize" | "analyze" | "generate";
+    level: "warning" | "error";
+    message: string;
   }>;
 }
 ```
@@ -135,14 +236,14 @@ interface AnalyzeOutput {
 generate → 读 AI_MAP.md → query -m "src/core"
 ```
 
-### 模式 B: 实现新功能
+### 模式 B: 分析并落地新功能
 ```bash
-analyze -i search -k "关键词" → analyze -i impact -t "文件" → 实现 → ci check-headers
+query -S "关键词" -j → impact -f "文件" -t -j → 实现 → ci check-headers
 ```
 
 ### 模式 C: 重构代码
 ```bash
-cycles → analyze -i complexity → analyze -i impact --transitive → analyze -i refactor
+cycles → analyze -i read -t "src/core/analyzer.ts" --scope transitive → analyze -i link -t "src/core/analyzer.ts"
 ```
 
 **完整模式**: 见 [docs/ai-guide/PATTERNS.md](./docs/ai-guide/PATTERNS.md)
@@ -155,6 +256,7 @@ cycles → analyze -i complexity → analyze -i impact --transitive → analyze 
 |------|------|
 | 代码地图不存在 | 先执行 `generate` |
 | 符号未找到 | 使用 `query -S` 模糊搜索 |
+| 需要结构化结果 | 多数命令显式加 `--json`；`analyze` 也可用 `--output-mode machine` |
 | tree-sitter 错误 | 安装 `build-essential` (Linux) 或 Xcode (macOS) |
 | 提交格式错误 | 使用 `[TAG] scope: message` 格式 |
 

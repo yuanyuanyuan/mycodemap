@@ -4,6 +4,7 @@
 import chalk from 'chalk';
 import fs from 'fs/promises';
 import path from 'path';
+import { createDefaultCodemapConfigFile } from '../config-loader.js';
 
 const NEW_CONFIG_NAME = 'mycodemap.config.json';
 const LEGACY_CONFIG_NAME = 'codemap.config.json';
@@ -36,19 +37,7 @@ export async function initCommand(_options: { yes?: boolean }) {
   }
 
   // 创建默认配置
-  const defaultConfig = {
-    $schema: 'https://codemap.dev/schema.json',
-    mode: 'fast',
-    include: ['src/**/*.ts'],
-    exclude: [
-      'node_modules/**',
-      'dist/**',
-      'build/**',
-      '*.test.ts',
-      '*.spec.ts'
-    ],
-    output: '.mycodemap'
-  };
+  const defaultConfig = createDefaultCodemapConfigFile();
 
   await fs.writeFile(newConfigPath, JSON.stringify(defaultConfig, null, 2));
 

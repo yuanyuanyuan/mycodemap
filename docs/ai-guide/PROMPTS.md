@@ -23,7 +23,7 @@
 
 3. **获取详细信息**
    ```bash
-   node dist/cli/index.js analyze -i overview -t "src/" --json
+   node dist/cli/index.js analyze -i show -t "src/" --json
    ```
 
 4. **回答以下问题**
@@ -53,7 +53,7 @@
 
 1. **影响分析**
    ```bash
-   node dist/cli/index.js analyze -i impact -t "{{FILE_PATH}}" --transitive --include-tests --json
+   node dist/cli/index.js analyze -i read -t "{{FILE_PATH}}" --scope transitive --include-tests --json
    ```
 
 2. **分析结果**
@@ -103,7 +103,7 @@
 
 3. **如果仍不足，使用统一搜索**
    ```bash
-   node dist/cli/index.js analyze -i search -k "{{KEYWORD}}" --topK 15 --json
+   node dist/cli/index.js analyze -i find -k "{{KEYWORD}}" --topK 15 --json
    ```
 
 4. **汇总结果**
@@ -137,17 +137,17 @@
 1. **检测现有问题**
    ```bash
    node dist/cli/index.js cycles -j
-   node dist/cli/index.js analyze -i complexity -t "{{MODULE_PATH}}" --json
+   node dist/cli/index.js analyze -i read -t "{{MODULE_PATH}}" --json
    ```
 
-2. **获取重构建议**
+2. **补充模块上下文**
    ```bash
-   node dist/cli/index.js analyze -i refactor -t "{{MODULE_PATH}}" --json
+   node dist/cli/index.js analyze -i link -t "{{MODULE_PATH}}" --json
    ```
 
 3. **评估影响范围**
    ```bash
-   node dist/cli/index.js analyze -i impact -t "{{MODULE_PATH}}" --scope transitive --json
+   node dist/cli/index.js analyze -i read -t "{{MODULE_PATH}}" --scope transitive --json
    ```
 
 4. **生成评估报告**
@@ -253,7 +253,7 @@
 
 1. **依赖分析**
    ```bash
-   node dist/cli/index.js analyze -i dependency -t "{{MODULE_PATH}}" --json
+   node dist/cli/index.js analyze -i link -t "{{MODULE_PATH}}" --json
    ```
 
 2. **循环依赖检测**
@@ -301,7 +301,7 @@
 
 1. **整体复杂度分析**
    ```bash
-   node dist/cli/index.js analyze -i complexity -t "src/" --json
+   node dist/cli/index.js analyze -i read -t "src/" --json
    ```
 
 2. **函数级复杂度**（针对复杂文件）
@@ -342,7 +342,7 @@
 
 1. **相关代码搜索**
    ```bash
-   node dist/cli/index.js analyze -i search -k "{{RELATED_KEYWORD}}" --topK 10 --json
+   node dist/cli/index.js analyze -i find -k "{{RELATED_KEYWORD}}" --topK 10 --json
    ```
 
 2. **参考现有实现**
@@ -350,13 +350,13 @@
 
 3. **确定实现位置**
    ```bash
-   node dist/cli/index.js analyze -i complexity -t "候选目录" --json
+   node dist/cli/index.js analyze -i read -t "候选目录" --json
    ```
    选择复杂度最低的模块
 
 4. **影响分析**（如果需要修改现有代码）
    ```bash
-   node dist/cli/index.js analyze -i impact -t "目标文件" --json
+   node dist/cli/index.js analyze -i read -t "目标文件" --json
    ```
 
 5. **实现步骤**

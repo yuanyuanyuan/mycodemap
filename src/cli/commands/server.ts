@@ -3,9 +3,9 @@
 // ============================================
 
 import chalk from 'chalk';
-import { storageFactory } from '../../infrastructure/storage/StorageFactory.js';
 import { CodeGraphBuilder } from '../../domain/services/CodeGraphBuilder.js';
 import { CodeMapServer } from '../../server/CodeMapServer.js';
+import { createConfiguredStorage } from '../storage-runtime.js';
 
 interface ServerOptions {
   port?: string;
@@ -22,13 +22,7 @@ export async function serverCommand(options: ServerOptions): Promise<void> {
     console.log(chalk.blue('🔧 初始化 CodeMap 服务器...\n'));
 
     // 创建存储实例
-    const storage = await storageFactory.createForProject(
-      process.cwd(),
-      {
-        type: 'filesystem',
-        outputPath: '.codemap/storage',
-      }
-    );
+    const { storage } = await createConfiguredStorage(process.cwd());
 
     // 创建代码图构建器
     const builder = CodeGraphBuilder.create({

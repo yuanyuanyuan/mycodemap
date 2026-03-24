@@ -1,26 +1,31 @@
 # CodeMap
 
-> TypeScript 代码地图工具 - 为 AI 辅助开发提供结构化上下文
+> AI-first 代码地图工具 - 为 AI/Agent 提供结构化、可预测的代码上下文
 
-CodeMap 是一个专为 TypeScript/JavaScript/Go 项目设计的代码分析工具。它通过静态分析自动生成项目的结构化代码地图，帮助 AI 编程助手（如 Claude、Copilot）快速理解项目架构、模块关系和代码上下文。
+CodeMap 是一个面向 TypeScript/JavaScript/Go 项目的 AI-first 代码地图工具。它通过静态分析生成稳定的项目地图、依赖关系和结构化结果，帮助 AI/Agent 更快理解代码结构、定位影响范围，并把分析结果交给人类开发者继续判断与维护。
 
 ## 特性
 
-- **分层架构 (MVP3)** - 清晰的分层设计：Interface → Infrastructure → Domain → Server → CLI
-- **双层解析模式** - 提供 `fast`（快速正则）和 `smart`（TypeScript AST）两种解析模式，按需平衡速度与精度
+- **AI-first 代码地图** - 生成 `AI_MAP.md`、`CONTEXT.md`、`codemap.json` 等 AI/Agent 可直接消费的上下文
+- **核心分析命令** - 提供 `generate`、`query`、`deps`、`impact`、`complexity`、`cycles`、`analyze`、`export`、`ci`
+- **机器可读优先** - 结构化输出是产品基线；当前 CLI 过渡期仍主要通过 `--json` 暴露机器可读结果
+- **分层架构 (MVP3)** - 保持 `Interface → Infrastructure → Domain → Server → CLI` 的明确边界
+- **双层解析模式** - 提供 `fast`（快速正则）和 `smart`（TypeScript AST）两种解析模式
 - **多语言支持** - 支持 TypeScript/JavaScript、Go、Python（可扩展架构）
-- **HTTP API 服务器** - 内置 REST API 服务器，支持查询、分析、导出
-- **多格式输出** - 自动生成 `AI_MAP.md`（全局概览）、`CONTEXT.md` + `context/`（模块上下文）、`codemap.json`（结构化数据）
-- **依赖图可视化** - 生成 Mermaid 格式的模块依赖关系图
-- **增量缓存** - 基于文件哈希的 LRU 缓存机制，仅重新分析变更文件
-- **Watch 模式** - 监听文件变更并自动增量更新代码地图，支持后台守护进程
-- **交互式查询** - 支持按符号、模块、依赖进行精确或模糊查询
-- **复杂度分析** - 计算圈复杂度、认知复杂度和可维护性指数
-- **调用图分析** - 分析函数/方法间的调用关系
-- **工作流编排** - v2.5 新增：6 阶段智能工作流 (reference → impact → risk → implementation → commit → ci)
-- **CI 门禁** - v2.5 新增：提交格式检查、风险评估、输出契约验证
-- **插件系统** - 可扩展的插件架构，支持自定义分析和输出
-- **存储抽象** - 支持文件系统、内存、KùzuDB、Neo4j 多种存储后端
+- **依赖/影响/复杂度分析** - 适合变更影响评估、重构盘点和架构回溯
+- **CI 门禁与文档护栏** - 提供提交格式、文件头、风险评估、文档/输出契约检查
+- **多格式导出与存储抽象** - 支持导出图数据，并保留文件系统/内存/图数据库后端接口
+
+## 产品定位
+
+| 维度 | 当前基线 |
+|------|----------|
+| 产品是谁 | `CodeMap` 是 AI-first 代码地图工具，而不是泛化的实现/发布/HTTP 工具箱 |
+| 主要消费者 | `AI/Agent 是主要消费者`；人类开发者负责配置、维护与按需阅读输出 |
+| 输出契约 | 目标是机器可读优先；`当前 CLI 现实` 是多数命令通过 `--json` 提供结构化结果，`analyze` 额外支持 `--output-mode machine|human` |
+| 架构边界 | `Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令 |
+
+当前公共 CLI 聚焦 `init`、`generate`、`query`、`deps`、`cycles`、`complexity`、`impact`、`analyze`、`ci`、`workflow`、`export`、`ship`；`server`、`watch`、`report`、`logs` 已从 public CLI 移除，并在调用时给出迁移提示。
 
 ## 安装
 
@@ -62,7 +67,15 @@ ls .mycodemap/
 # dependency-graph.md - Mermaid 依赖图
 ```
 
-生成后，将 `.mycodemap/AI_MAP.md` 的内容提供给 AI 助手即可让其快速理解你的项目结构。
+```bash
+# 4. 当前 CLI 过渡现实：给 AI/Agent 时优先请求机器可读结果
+mycodemap impact -f src/cli/index.ts -j
+
+# analyze 额外支持显式 machine/human 模式
+mycodemap analyze -i read -t src/cli/index.ts --output-mode human
+```
+
+生成后，将 `.mycodemap/AI_MAP.md` 的内容提供给 AI 助手即可让其快速理解你的项目结构；需要结构化结果继续处理时，优先使用 JSON / machine 模式。
 
 ## 文档导航
 
@@ -92,18 +105,20 @@ ls .mycodemap/
 | **[🛡️ AGENTS.md](AGENTS.md)** | 仓库级强约束、任务分级、代码红线 |
 | **[⚡ CLAUDE.md](CLAUDE.md)** | AI 执行手册、验收清单 |
 | **[🤖 docs/AI_ASSISTANT_SETUP.md](docs/AI_ASSISTANT_SETUP.md)** | AI 助手配置指引 |
-| **[🛠️ docs/rules/engineering-with-codex-openai.md](docs/rules/engineering-with-codex-openai.md) | 面向 agent 的工程约束 |
+| **[🛠️ docs/rules/engineering-with-codex-openai.md](docs/rules/engineering-with-codex-openai.md)** | 面向 agent 的工程约束 |
 
 **AI 快速入口**: `.cursorrules` | `.github/copilot-instructions.md`
 
 ## CLI 命令
+
+> 说明：以下章节记录当前公开的公共命令面。`workflow`、`ship` 仍是过渡能力；`server`、`watch`、`report`、`logs` 已从 public CLI 移除，并在调用时输出迁移提示。
 
 ### `mycodemap init`
 
 初始化项目的 CodeMap 配置文件。
 
 ```bash
-mycodemap init          # 交互式创建配置
+mycodemap init          # 创建默认配置文件
 mycodemap init -y       # 使用默认配置直接创建
 
 # 别名：codemap init 也可以使用
@@ -111,9 +126,9 @@ mycodemap init -y       # 使用默认配置直接创建
 
 | 选项 | 说明 |
 |------|------|
-| `-y, --yes` | 跳过交互，使用默认配置 |
+| `-y, --yes` | 使用默认配置 |
 
-执行后会在项目根目录生成 `codemap.config.json` 配置文件。
+执行后会在项目根目录生成 `mycodemap.config.json` 配置文件。
 
 ### `mycodemap generate`
 
@@ -140,26 +155,6 @@ mycodemap generate -o ./docs/codemap  # 指定输出目录
 | `fast` | 极快 | 基本结构 | 日常开发、大型项目快速预览 |
 | `smart` | 较慢 | 完整语义 | 深度分析、复杂度评估、类型推导 |
 | `hybrid` | 自动 | 自适应 | **推荐** - 文件数<50用fast，≥50用smart |
-
-### `mycodemap watch`
-
-监听文件变更并自动增量更新代码地图。
-
-```bash
-mycodemap watch                 # 前台运行
-mycodemap watch -d              # 以后台守护进程运行
-mycodemap watch -s              # 停止后台守护进程
-mycodemap watch -t              # 查看守护进程状态
-mycodemap watch -m smart        # 使用 smart 模式监听
-```
-
-| 选项 | 说明 | 默认值 |
-|------|------|--------|
-| `-m, --mode <mode>` | 分析模式 (fast/smart/hybrid) | `hybrid` |
-| `-o, --output <dir>` | 输出目录 | `.mycodemap` |
-| `-d, --detach` | 以后台守护进程方式运行 | - |
-| `-s, --stop` | 停止后台守护进程 | - |
-| `-t, --status` | 查看后台守护进程状态 | - |
 
 ### `mycodemap query`
 
@@ -239,80 +234,16 @@ mycodemap impact -f src/cli/index.ts -j     # JSON 格式输出
 | `-t, --transitive` | 包含传递依赖（间接影响） | - |
 | `-j, --json` | 以 JSON 格式输出 | - |
 
-### `mycodemap report`
+### 已移除的公共 CLI 命令
 
-生成代码地图分析报告，汇总分析结果和运行日志。
+以下命令已从 public CLI 移除；直接调用时，CLI 会显式失败并给出迁移提示，而不是继续执行旧功能。
 
-```bash
-mycodemap report                   # 生成最近 7 天的报告
-mycodemap report -d 14             # 生成最近 14 天的报告
-mycodemap report -o ./reports      # 指定输出目录
-mycodemap report -v                # 显示详细信息
-```
-
-| 选项 | 说明 | 默认值 |
-|------|------|------|
-| `-o, --output <dir>` | 输出目录 | `.mycodemap` |
-| `-d, --days <number>` | 报告覆盖的天数 | `7` |
-| `-j, --json` | JSON 格式输出 | - |
-| `-v, --verbose` | 显示详细信息 | - |
-
-### `mycodemap logs`
-
-管理代码地图运行时日志（列出、导出、清理）。
-
-```bash
-# 列出日志
-mycodemap logs list                # 列出最近 10 条日志
-mycodemap logs list -l 20          # 列出最近 20 条
-mycodemap logs list --level ERROR  # 仅列出错误日志
-mycodemap logs list -j             # JSON 格式输出
-
-# 导出日志
-mycodemap logs export              # 导出最近 7 天的日志
-mycodemap logs export -d 30        # 导出最近 30 天的日志
-mycodemap logs export -o ./logs.zip # 指定导出文件
-mycodemap logs export --format txt # 导出为文本格式
-
-# 清理日志
-mycodemap logs clear -d 30 --confirm  # 清理 30 天前的日志
-```
-
-| 选项 | 说明 | 默认值 |
-|------|------|------|
-| `-l, --limit <number>` | 限制显示数量 | `10` |
-| `--level <level>` | 按级别过滤 (`INFO`/`WARN`/`ERROR`/`DEBUG`) | - |
-| `-j, --json` | JSON 格式输出 | - |
-| `-o, --output <file>` | 导出文件路径 | - |
-| `-d, --days <number>` | 天数 | 视子命令而定 |
-| `--format <format>` | 导出格式 (`json`/`txt`) | `json` |
-| `-c, --confirm` | 确认清理操作 | - |
-
-### `mycodemap server` (MVP3)
-
-启动 CodeMap HTTP API 服务器。
-
-```bash
-mycodemap server                   # 启动服务器 (默认端口 3000)
-mycodemap server -p 8080           # 指定端口
-mycodemap server -p 3000 --open    # 自动打开浏览器
-mycodemap server --cors            # 启用 CORS
-```
-
-| 选项 | 说明 | 默认值 |
-|------|------|--------|
-| `-p, --port <number>` | 服务器端口 | `3000` |
-| `-h, --host <string>` | 服务器主机 | `0.0.0.0` |
-| `--cors` | 启用 CORS | `false` |
-| `--open` | 自动打开浏览器 | `false` |
-
-**API 端点：**
-- `GET /api/v1/health` - 健康检查
-- `GET /api/v1/stats` - 项目统计
-- `GET /api/v1/search/symbols?q=` - 符号搜索
-- `GET /api/v1/modules/:id` - 模块详情
-- `POST /api/v1/analysis/impact` - 影响分析
-- `GET /api/v1/export/:format` - 导出数据
+| 已移除命令 | 当前迁移方式 |
+|------------|--------------|
+| `watch` | 改用一次性的 `mycodemap generate` 刷新代码地图 |
+| `report` | 直接读取 `.mycodemap/AI_MAP.md`，或使用 `mycodemap export <format>` 导出结果 |
+| `logs` | 直接读取 `.mycodemap/logs/` 下的日志文件 |
+| `server` | 公共 CLI 已移除；`Server Layer` 仍是内部架构层，不等于公开 `mycodemap server` 命令 |
 
 ### `mycodemap export` (MVP3)
 
@@ -330,39 +261,35 @@ mycodemap export json -o ./out     # 指定输出路径
 |------|------|--------|
 | `-o, --output <path>` | 输出文件路径 | 自动根据格式生成 |
 
-## 工作流编排 (v2.5)
+## 工作流编排（分析型 workflow）
 
-CodeMap v2.5 引入智能工作流编排系统，将复杂任务分解为 6 个有序阶段，每个阶段自动分析并传递上下文。
+`workflow` 仍是公开的过渡能力，但它现在只编排分析阶段：`find → read → link → show`。  
+代码实现、commit 检查和 CI 运行不再属于 workflow phase；这些职责分别回到常规开发流程、`mycodemap ci` 与 `mycodemap ship`。
 
 ### 工作流阶段
 
 ```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│  reference  │ → │   impact    │ → │    risk     │
-│  参考搜索    │    │  影响分析    │    │  风险评估    │
-└─────────────┘    └─────────────┘    └─────────────┘
-                                              ↓
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│     ci      │ ← │   commit    │ ← │implementation│
-│  CI验证     │    │  提交验证    │    │  代码实现    │
-└─────────────┘    └─────────────┘    └─────────────┘
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│    find     │ → │    read     │ → │    link     │ → │    show     │
+│ 查找代码线索 │    │ 阅读影响范围 │    │ 关联依赖引用 │    │ 展示概览结果 │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
-| 阶段 | 说明 | 自动分析 | 交付物 |
-|------|------|----------|--------|
-| **reference** | 参考搜索：查找相关代码和文档 | 符号搜索、依赖分析 | 相关文件列表 |
-| **impact** | 影响分析：评估变更影响范围 | 依赖图分析、传递依赖 | 影响文件清单 |
-| **risk** | 风险评估：基于 Git 历史评估风险 | 文件热度、修改频率、风险评分 | 风险报告 |
-| **implementation** | 代码实现：执行具体修改 | - | 代码变更 |
-| **commit** | 提交验证：验证提交格式 | Commit 格式检查 | 验证报告 |
-| **ci** | CI验证：运行测试和检查 | 单元测试、类型检查、契约验证 | CI 报告 |
+| 阶段 | 对应意图 | 说明 | 典型产物 |
+|------|----------|------|----------|
+| **find** | `analyze --intent find` | 查找符号、关键词与候选文件 | 相关文件 / 符号列表 |
+| **read** | `analyze --intent read` | 阅读影响范围、复杂度与上下文 | 影响与复杂度摘要 |
+| **link** | `analyze --intent link` | 汇总依赖、引用与关联关系 | 依赖 / 引用结果 |
+| **show** | `analyze --intent show` | 生成模块概览与展示型摘要 | overview / summary 输出 |
+
+> 内置模板（`refactoring` / `bugfix` / `feature` / `hotfix`）共享同一 4 阶段顺序，只通过不同的阶段阈值和适用场景调整体验。
 
 ### 工作流 CLI 命令
 
 ```bash
 # 启动工作流
 mycodemap workflow start "实现用户认证模块"
-# 启动工作流并指定模板（会直接影响阶段推进顺序）
+# 启动工作流并指定模板（会保留 4 阶段顺序）
 mycodemap workflow start "修复登录接口 500" --template bugfix
 
 # 查看当前工作流状态
@@ -397,51 +324,35 @@ mycodemap workflow template recommend "紧急修复支付超时"
 ### 工作流使用示例
 
 ```bash
-# 示例：实现新功能
-$ mycodemap workflow start "添加缓存过期机制"
-🚀 启动工作流: 添加缓存过期机制
-📍 当前阶段: reference
+# 示例：围绕一个模块逐步收敛上下文
+$ mycodemap workflow start "梳理缓存模块上下文"
+[WORKFLOW STARTED]
+Task: 梳理缓存模块上下文
+Phase: find
 
-# 系统会自动分析相关代码，生成参考搜索结果
-# 确认后进入下一阶段
+# 查看当前分析阶段与进度
+$ mycodemap workflow status
+Phase: find
+
+# 可视化 4 阶段分析流水线
+$ mycodemap workflow visualize
+▶ 🔍 【Find】
+  ↓
+○ 📖 Read
+  ↓
+○ 🔗 Link
+  ↓
+○ 🧭 Show
+
+# 当前阶段完成后推进到下一阶段
 $ mycodemap workflow proceed
-📍 进入阶段: impact
-📊 影响范围: 3 个文件
-   - src/cache/lru-cache.ts
-   - src/cache/index.ts
-   - src/cli/commands/query.ts
+Next phase: read
 
-# 继续推进
-$ mycodemap workflow proceed
-📍 进入阶段: risk
-⚠️ 风险等级: medium
-   - src/cache/lru-cache.ts: 近期频繁修改 (5次/30天)
-
-# 实现代码后
-$ mycodemap workflow proceed
-📍 进入阶段: implementation
-✅ 代码实现完成
-
-# 提交前验证
-$ mycodemap workflow proceed
-📍 进入阶段: commit
-✅ Commit 格式验证通过
-
-# CI 验证
-$ mycodemap workflow proceed
-📍 进入阶段: ci
-✅ 所有检查通过
-🎉 工作流完成！
-
-# 示例：模板会改变阶段推进顺序
-$ mycodemap workflow start "修复线上缓存失效" --template bugfix
-$ mycodemap workflow proceed --force
-📍 下一阶段: implementation   # bugfix 模板: reference -> implementation
-
-# 示例：对当前活动工作流应用模板
+# 示例：对当前活动工作流应用模板（阶段顺序不变）
 $ mycodemap workflow template apply bugfix
 Applied template: bugfix
-Current phase: reference
+Phases: find → read → link → show
+Current phase: find
 ```
 
 ## CI 门禁 (v2.5)
@@ -470,15 +381,15 @@ mycodemap ci check-output-contract
 
 ## 配置说明
 
-通过 `codemap init` 生成的 `codemap.config.json` 配置文件支持以下选项：
+通过 `mycodemap init` 生成的 `mycodemap.config.json` 配置文件支持以下选项：
 
 ```jsonc
 {
   // JSON Schema（可选，提供编辑器智能提示）
-  "$schema": "https://codemap.dev/schema.json",
+  "$schema": "https://mycodemap.dev/schema/config.json",
 
-  // 分析模式："fast" 或 "smart"
-  "mode": "fast",
+  // 分析模式："fast"、"smart" 或 "hybrid"
+  "mode": "hybrid",
 
   // 包含的文件 glob 模式
   "include": [
@@ -490,21 +401,97 @@ mycodemap ci check-output-contract
     "node_modules/**",
     "dist/**",
     "build/**",
-    "*.test.ts",
-    "*.spec.ts"
+    "coverage/**",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/*.d.ts"
   ],
 
   // 输出目录
-  "output": ".mycodemap"
+  "output": ".mycodemap",
+
+  // 监听模式预留配置
+  "watch": false,
+
+  // 图存储后端配置
+  "storage": {
+    "type": "filesystem",
+    "outputPath": ".codemap/storage"
+  },
+
+  // 插件加载配置
+  "plugins": {
+    "builtInPlugins": true,
+    "plugins": [],
+    "debug": false
+  }
 }
 ```
 
 | 配置项 | 类型 | 说明 | 默认值 |
 |--------|------|------|--------|
-| `mode` | `"fast" \| "smart"` | 分析模式 | `"fast"` |
+| `mode` | `"fast" \| "smart" \| "hybrid"` | 分析模式 | `"hybrid"` |
 | `include` | `string[]` | 包含的文件 glob 模式 | `["src/**/*.ts"]` |
 | `exclude` | `string[]` | 排除的文件 glob 模式 | `["node_modules/**", "dist/**", ...]` |
 | `output` | `string` | 输出目录路径 | `".mycodemap"` |
+| `watch` | `boolean` | 监听模式预留配置 | `false` |
+| `storage.type` | `"filesystem" \| "kuzudb" \| "neo4j" \| "memory" \| "auto"` | 图存储后端类型 | `"filesystem"` |
+| `storage.outputPath` | `string` | 文件系统存储目录 | `".codemap/storage"` |
+| `storage.databasePath` | `string` | KùzuDB 数据目录（相对项目根目录） | - |
+| `storage.uri` | `string` | Neo4j 连接地址 | - |
+| `storage.username` | `string` | Neo4j 用户名 | - |
+| `storage.password` | `string` | Neo4j 密码 | - |
+| `storage.autoThresholds` | `object` | `auto` 后端选择阈值 | - |
+| `plugins.builtInPlugins` | `boolean` | 是否启用内置插件 | `true` |
+| `plugins.pluginDir` | `string` | 额外插件目录 | - |
+| `plugins.plugins` | `string[]` | 显式加载的插件名称列表 | `[]` |
+| `plugins.debug` | `boolean` | 是否输出插件调试日志 | `false` |
+
+### 图存储后端说明
+
+```jsonc
+{
+  "storage": {
+    "type": "kuzudb",
+    "databasePath": ".codemap/kuzu"
+  }
+}
+```
+
+```jsonc
+{
+  "storage": {
+    "type": "neo4j",
+    "uri": "bolt://localhost:7687",
+    "username": "neo4j",
+    "password": "secret"
+  }
+}
+```
+
+- `generate` 会把 CodeGraph 写入配置的 `storage` 后端，`export` 与内部 `Server Layer` handler 会读取同一份后端数据。
+- 缺少 `kuzu` / `neo4j-driver`，或 Neo4j 连接不可用时，会返回显式错误；不会静默 fallback 到 `filesystem`。
+- `storage.type = "auto"` 当前仍以 `filesystem` 为保守默认值；阈值字段先作为显式契约保留，不伪装成已完成的自动切换能力。
+- 图存储后端生产化不等于重新开放公共 HTTP API 产品面；`Server Layer` 仍是内部架构层。
+
+### 插件运行时说明
+
+```jsonc
+{
+  "plugins": {
+    "builtInPlugins": false,
+    "pluginDir": "./codemap-plugins",
+    "plugins": ["complexity-analyzer", "my-local-plugin"],
+    "debug": true
+  }
+}
+```
+
+- 只有**显式声明了** `plugins` 段时，`generate` 才会启用插件 runtime；没有该段的旧项目保持原有行为。
+- 插件加载结果、诊断信息和插件生成文件会写入 `AI_MAP.md` 的 `Plugin Summary` 与 `codemap.json` 的 `pluginReport`。
+- 非法插件配置、插件初始化失败、generate hook 失败都会被收口为结构化 diagnostics，而不是静默忽略。
+
+> 文件发现契约：`generate`、`analyze` 与 `ci check-headers -d` 等扫描类命令共享同一套 `.gitignore` 感知排除规则；若仓库没有 `.gitignore`，则回退到默认 `exclude`（即 `node_modules/dist/build/coverage/**` 与 `**/*.test.ts` / `**/*.spec.ts` / `**/*.d.ts`），并在 Git worktree 场景下避免误扫描 `.git` 目录。
 
 ## 输出文件说明
 
@@ -514,6 +501,7 @@ mycodemap ci check-output-contract
 
 项目全局概览文件，专为 AI 助手设计，包含：
 - 项目基本信息（文件数、代码行数、模块数等）
+- 已加载插件、插件生成文件数量与插件诊断摘要（仅当显式启用 plugins runtime）
 - 入口点列表
 - 模块组织表（导出数、依赖数、类型）
 - Mermaid 格式的依赖关系图
@@ -535,6 +523,7 @@ mycodemap ci check-output-contract
 - `summary` - 统计摘要
 - `modules` - 模块详情数组（符号、导入、导出、复杂度等）
 - `dependencies` - 依赖图（节点和边）
+- `pluginReport` - 插件运行摘要（`loadedPlugins`、`generatedFiles`、`metrics`、`diagnostics`）
 
 ### `dependency-graph.md`
 
@@ -548,7 +537,7 @@ CodeMap 采用清晰的分层架构设计（MVP3），各层职责明确：
 ┌─────────────────────────────────────────────────────────────┐
 │                        CLI Layer                            │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │
-│  │   server    │ │   export    │ │ 原有命令(generate..)│   │
+│  │workflow/ship│ │   export    │ │ 原有命令(generate..)│   │
 │  └─────────────┘ └─────────────┘ └─────────────────────┘   │
 ├─────────────────────────────────────────────────────────────┤
 │                      Server Layer                           │
@@ -574,12 +563,14 @@ CodeMap 采用清晰的分层架构设计（MVP3），各层职责明确：
 └─────────────────────────────────────────────────────────────┘
 ```
 
+> 命名边界：`Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令。
+
 ### 架构层说明
 
 | 层级 | 路径 | 职责 | 关键组件 |
 |------|------|------|----------|
-| **CLI** | `src/cli/` | 命令行接口 | `server`, `export`, `generate` 命令 |
-| **Server** | `src/server/` | HTTP API | `CodeMapServer`, `QueryHandler` |
+| **CLI** | `src/cli/` | 命令行接口（核心分析命令 + `workflow`/`ship` 过渡 surface） | `generate`, `query`, `impact`, `export` |
+| **Server** | `src/server/` | 内部 Server Layer / HTTP transport | `CodeMapServer`, `QueryHandler` |
 | **Domain** | `src/domain/` | 核心业务逻辑 | `Project`, `Module`, `CodeGraph` |
 | **Infrastructure** | `src/infrastructure/` | 技术实现 | `Storage`, `Parser`, `Repository` |
 | **Interface** | `src/interface/` | 类型契约 | `types/`, `config/` |
@@ -656,45 +647,41 @@ cp examples/codex/codemap-agent.md .agents/skills/codemap/SKILL.md
 
 ### `mycodemap analyze`
 
-统一分析入口，支持多意图路由和结构化输出：
+统一分析入口，当前公共契约只暴露四个 intent，并统一返回结构化输出：
 
+> 当前 public analyze contract 为 `find` / `read` / `link` / `show`；兼容期内 legacy intent 会在输出中通过 `warnings[]` 提示迁移，其中 `refactor` 已不再接受。
+
+<!-- BEGIN GENERATED: analyze-readme-examples -->
 ```bash
-# 影响分析（查看文件变更影响范围）
-mycodemap analyze -i impact -t src/cli/index.ts
-mycodemap analyze -i impact -t src/cli/index.ts --scope transitive
-mycodemap analyze -i impact -t src/cli/index.ts --include-tests
+# 查找符号 / 文本
+mycodemap analyze -i find -k SourceLocation
+mycodemap analyze -i find -t src/orchestrator -k IntentRouter --json
 
-# 依赖分析
-mycodemap analyze -i dependency -t src/cli/index.ts
+# 阅读文件（影响 + 复杂度聚合）
+mycodemap analyze -i read -t src/cli/index.ts
+mycodemap analyze -i read -t src/cli/index.ts --scope transitive
+mycodemap analyze -i read -t src/cli/index.ts --include-tests --json
 
-# 项目概览
-mycodemap analyze -i overview -t src/orchestrator
+# 关联关系（依赖 + 引用聚合）
+mycodemap analyze -i link -t src/cli/index.ts
+mycodemap analyze -i link -t src/interface/types.ts --json
 
-# 复杂度分析
-mycodemap analyze -i complexity -t src/domain
+# 展示模块概览 / 文档
+mycodemap analyze -i show -t src/orchestrator
+mycodemap analyze -i show -t src/domain/services --output-mode human
 
-# 搜索分析
-mycodemap analyze -i search -k UnifiedResult
-
-# 重构建议
-mycodemap analyze -i refactor -t src/cache
-
-# 引用查找
-mycodemap analyze -i reference -t src/interface/types
-
-# 文档生成
-mycodemap analyze -i documentation -t src/domain/services
-
-# 机器可读输出（JSON）
-mycodemap analyze -i impact -t src/index.ts --json
-mycodemap analyze -i impact -t src/index.ts --structured --json
+# 机器可读输出（JSON / structured）
+mycodemap analyze -i read -t src/index.ts --json
+mycodemap analyze -i link -t src/index.ts --structured --json
 ```
+<!-- END GENERATED: analyze-readme-examples -->
 
+<!-- BEGIN GENERATED: analyze-readme-options -->
 | 选项 | 说明 | 默认值 |
 |------|------|--------|
-| `-i, --intent <type>` | 分析类型：`impact`/`dependency`/`search`/`documentation`/`complexity`/`overview`/`refactor`/`reference` | `impact` |
-| `-t, --targets <paths...>` | 目标文件/模块路径（必填） | - |
-| `-k, --keywords <words...>` | 搜索关键词（用于 search/documentation 意图） | - |
+| `-i, --intent <type>` | 分析类型：`find`/`read`/`link`/`show`（必填） | - |
+| `-t, --targets <paths...>` | 目标路径（`read`/`link`/`show` 必填，`find` 可选） | - |
+| `-k, --keywords <words...>` | 搜索关键词（主要用于 `find`） | - |
 | `-s, --scope <scope>` | 范围：`direct`（直接）/`transitive`（传递） | `direct` |
 | `-n, --topK <number>` | 返回结果数量 | `8` |
 | `--include-tests` | 包含测试文件关联 | - |
@@ -702,12 +689,27 @@ mycodemap analyze -i impact -t src/index.ts --structured --json
 | `--json` | JSON 格式输出 | - |
 | `--structured` | 纯结构化输出（移除自然语言字段，配合 `--json` 使用） | - |
 | `--output-mode <mode>` | 输出模式：`machine`/`human` | `human` |
+<!-- END GENERATED: analyze-readme-options -->
+
+> 产品目标是机器可读优先；当前实现仍以显式 `--json` / `--output-mode` 作为主要入口。
+>
+> legacy 兼容映射：`search → find`、`impact/complexity → read`、`dependency/reference → link`、`overview/documentation → show`；`refactor` 会返回 `E0001_INVALID_INTENT`。
 
 ### `mycodemap ci`
 
 CI Gateway - 代码质量门禁工具：
 
 ```bash
+# 验证工作区是否干净（ship 的发布前检查也复用这条规则）
+mycodemap ci check-working-tree
+
+# 验证当前分支是否允许执行发布前检查
+mycodemap ci check-branch
+mycodemap ci check-branch --allow main,release/*
+
+# 运行发布前脚本集合（docs/typecheck/lint/test/build/pack）
+mycodemap ci check-scripts
+
 # 验证提交格式（[TAG] scope: message）
 mycodemap ci check-commits
 mycodemap ci check-commits -c 5
@@ -732,6 +734,9 @@ mycodemap ci check-output-contract
 mycodemap ci check-commit-size
 mycodemap ci check-commit-size -m 15
 ```
+
+> `mycodemap ship` 的 CHECK 阶段现在复用 `ci check-working-tree`、`ci check-branch`、`ci check-scripts` 作为 must-pass 事实源，而不是重复实现这些检查。
+> `mycodemap ci check-headers -d <dir>` 与 `generate` / `analyze` 共享同一套 `.gitignore` 感知排除模块；若仓库没有 `.gitignore`，则回退到默认 `exclude` 列表。
 
 支持的提交 TAG 类型：`[REFACTOR]`, `[TEST]`, `[DOCS]`, `[FEAT]`, `[FIX]`, `[CHORE]`, `[PERF]`, `[SECURITY]`, `[BREAKING]`, `[HOTFIX]`, `[MIGRATION]`, `[WIP]`
 

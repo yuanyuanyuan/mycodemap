@@ -3,7 +3,7 @@
  * [WHY] 提供 CI 门禁相关的子命令
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { Command } from 'commander';
@@ -22,6 +22,9 @@ export enum CIErrorCode {
   E0010_OUTPUT_CONTRACT_VIOLATION = 'E0010',
   E0011_COMMIT_TOO_LARGE = 'E0011',
   E0012_DOCS_GUARDRAIL_FAILED = 'E0012',
+  E0013_WORKING_TREE_DIRTY = 'E0013',
+  E0014_INVALID_BRANCH = 'E0014',
+  E0015_SCRIPT_CHECK_FAILED = 'E0015',
 }
 
 /**
@@ -34,12 +37,195 @@ export const CI_ERROR_MESSAGES: Record<CIErrorCode, string> = {
   [CIErrorCode.E0010_OUTPUT_CONTRACT_VIOLATION]: '输出契约校验失败',
   [CIErrorCode.E0011_COMMIT_TOO_LARGE]: 'Commit 包含文件数量超过限制',
   [CIErrorCode.E0012_DOCS_GUARDRAIL_FAILED]: '文档护栏校验失败',
+  [CIErrorCode.E0013_WORKING_TREE_DIRTY]: '工作区有未提交的变更',
+  [CIErrorCode.E0014_INVALID_BRANCH]: '当前分支不允许执行发布前检查',
+  [CIErrorCode.E0015_SCRIPT_CHECK_FAILED]: '发布前脚本检查失败',
 };
 
 /**
  * 单 commit 文件数量限制
  */
 const MAX_FILES_PER_COMMIT = 10;
+const COMMAND_MAX_BUFFER = 20 * 1024 * 1024;
+
+export const DEFAULT_RELEASE_BRANCHES = ['main', 'master'] as const;
+
+export const DEFAULT_RELEASE_SCRIPT_COMMANDS = [
+  { name: 'docs:check:pre-release', command: 'npm run docs:check:pre-release' },
+  { name: 'check:all', command: 'npm run check:all' },
+  { name: 'build', command: 'npm run build' },
+  { name: 'validate-pack', command: 'npm run validate-pack' }
+] as const;
+
+export interface CIGateCheckResult {
+  passed: boolean;
+  message?: string;
+  details?: string;
+  branch?: string;
+}
+
+function extractCommandError(error: unknown): string {
+  if (!error || typeof error !== 'object') {
+    return String(error);
+  }
+
+  const stderr = 'stderr' in error && typeof error.stderr === 'string'
+    ? error.stderr
+    : 'stderr' in error && Buffer.isBuffer(error.stderr)
+      ? error.stderr.toString('utf-8')
+      : '';
+
+  const stdout = 'stdout' in error && typeof error.stdout === 'string'
+    ? error.stdout
+    : 'stdout' in error && Buffer.isBuffer(error.stdout)
+      ? error.stdout.toString('utf-8')
+      : '';
+
+  const message = error instanceof Error ? error.message : String(error);
+  return [message, stderr.trim(), stdout.trim()].filter(Boolean).join('\n');
+}
+
+function escapeRegexPattern(source: string): string {
+  return source.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
+}
+
+function matchesBranchPattern(branch: string, pattern: string): boolean {
+  const regexPattern = pattern
+    .split('*')
+    .map((segment) => escapeRegexPattern(segment))
+    .join('.*');
+
+  return new RegExp(`^${regexPattern}$`).test(branch);
+}
+
+export function runWorkingTreeCheck(options: { projectRoot?: string } = {}): CIGateCheckResult {
+  const projectRoot = options.projectRoot ?? process.cwd();
+
+  try {
+    const status = execSync('git status --porcelain', {
+      encoding: 'utf-8',
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+
+    if (status === '') {
+      return { passed: true };
+    }
+
+    return {
+      passed: false,
+      message: CI_ERROR_MESSAGES[CIErrorCode.E0013_WORKING_TREE_DIRTY],
+      details: status,
+    };
+  } catch (error) {
+    return {
+      passed: false,
+      message: CI_ERROR_MESSAGES[CIErrorCode.E0013_WORKING_TREE_DIRTY],
+      details: extractCommandError(error),
+    };
+  }
+}
+
+export function getCurrentBranch(options: { projectRoot?: string } = {}): string {
+  const projectRoot = options.projectRoot ?? process.cwd();
+  const branch = execSync('git branch --show-current', {
+    encoding: 'utf-8',
+    cwd: projectRoot,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+
+  if (branch !== '') {
+    return branch;
+  }
+
+  const ciBranch = process.env.GITHUB_HEAD_REF?.trim() || process.env.GITHUB_REF_NAME?.trim();
+  if (ciBranch) {
+    return ciBranch;
+  }
+
+  throw new Error('Unable to determine current branch');
+}
+
+export function runBranchCheck(options: {
+  projectRoot?: string;
+  branch?: string;
+  allowedBranches?: readonly string[];
+} = {}): CIGateCheckResult {
+  const projectRoot = options.projectRoot ?? process.cwd();
+  const allowedBranches = options.allowedBranches ?? DEFAULT_RELEASE_BRANCHES;
+
+  try {
+    const branch = options.branch ?? getCurrentBranch({ projectRoot });
+    const isAllowed = allowedBranches.some((pattern) => matchesBranchPattern(branch, pattern));
+
+    if (isAllowed) {
+      return { passed: true, branch };
+    }
+
+    return {
+      passed: false,
+      message: `${CI_ERROR_MESSAGES[CIErrorCode.E0014_INVALID_BRANCH]}: ${branch}`,
+      details: `允许的分支: ${allowedBranches.join(', ')}`,
+      branch,
+    };
+  } catch (error) {
+    return {
+      passed: false,
+      message: CI_ERROR_MESSAGES[CIErrorCode.E0014_INVALID_BRANCH],
+      details: extractCommandError(error),
+    };
+  }
+}
+
+export function runScriptsCheck(options: {
+  projectRoot?: string;
+  commands?: ReadonlyArray<{ name: string; command: string }>;
+} = {}): CIGateCheckResult {
+  const projectRoot = options.projectRoot ?? process.cwd();
+  const commands = options.commands ?? DEFAULT_RELEASE_SCRIPT_COMMANDS;
+
+  if (process.env.SHIP_IN_CI === '1') {
+    return {
+      passed: true,
+      details: 'SHIP_IN_CI=1，跳过本地重复检查',
+    };
+  }
+
+  const failed: string[] = [];
+  const details: string[] = [];
+
+  for (const { name, command } of commands) {
+    try {
+      execSync(command, {
+        encoding: 'utf-8',
+        cwd: projectRoot,
+        stdio: 'pipe',
+        maxBuffer: COMMAND_MAX_BUFFER,
+      });
+    } catch (error) {
+      failed.push(name);
+      details.push(`[${name}]\n${extractCommandError(error)}`);
+    }
+  }
+
+  if (failed.length > 0) {
+    return {
+      passed: false,
+      message: `${CI_ERROR_MESSAGES[CIErrorCode.E0015_SCRIPT_CHECK_FAILED]}: ${failed.join(', ')}`,
+      details: details.join('\n\n'),
+    };
+  }
+
+  return { passed: true };
+}
+
+function exitOnFailedGateCheck(code: CIErrorCode, result: CIGateCheckResult): never {
+  console.error(`ERROR: [${code}] ${result.message ?? CI_ERROR_MESSAGES[code]}`);
+  if (result.details) {
+    console.error(result.details);
+  }
+  process.exit(1);
+}
 
 function parseGitDiffFiles(command: string): string[] {
   return command
@@ -123,6 +309,40 @@ async function checkDocsSyncAction(options: { root?: string }): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`ERROR: [${CIErrorCode.E0012_DOCS_GUARDRAIL_FAILED}] ${message}`);
     process.exit(1);
+  }
+}
+
+function checkWorkingTreeAction(): void {
+  const result = runWorkingTreeCheck();
+  if (!result.passed) {
+    exitOnFailedGateCheck(CIErrorCode.E0013_WORKING_TREE_DIRTY, result);
+  }
+
+  console.log('Working tree is clean.');
+}
+
+function checkBranchAction(options: { allow?: string }): void {
+  const allowedBranches = options.allow
+    ? options.allow.split(',').map((branch) => branch.trim()).filter(Boolean)
+    : [...DEFAULT_RELEASE_BRANCHES];
+
+  const result = runBranchCheck({ allowedBranches });
+  if (!result.passed) {
+    exitOnFailedGateCheck(CIErrorCode.E0014_INVALID_BRANCH, result);
+  }
+
+  console.log(`Current branch "${result.branch}" is allowed.`);
+}
+
+function checkScriptsAction(): void {
+  const result = runScriptsCheck();
+  if (!result.passed) {
+    exitOnFailedGateCheck(CIErrorCode.E0015_SCRIPT_CHECK_FAILED, result);
+  }
+
+  console.log('All release scripts passed.');
+  if (result.details) {
+    console.log(result.details);
   }
 }
 
@@ -563,6 +783,22 @@ export function createCICommand(): Command {
     .option('-d, --directory <path>', '扫描指定目录（全量）')
     .option('-f, --files <files>', '逗号分隔的文件列表（精确模式）')
     .action(checkHeadersAction);
+
+  ci
+    .command('check-working-tree')
+    .description('验证工作区是否干净（无未提交变更）')
+    .action(checkWorkingTreeAction);
+
+  ci
+    .command('check-branch')
+    .description('验证当前分支是否允许执行发布前检查')
+    .option('-a, --allow <branches>', '逗号分隔的允许分支列表', DEFAULT_RELEASE_BRANCHES.join(','))
+    .action(checkBranchAction);
+
+  ci
+    .command('check-scripts')
+    .description('运行发布前脚本集合（docs/typecheck/lint/test/build/pack）')
+    .action(checkScriptsAction);
 
   ci
     .command('assess-risk')

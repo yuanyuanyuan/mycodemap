@@ -6,7 +6,6 @@
 import { Command } from 'commander';
 import { generateCommand } from './commands/generate.js';
 import { initCommand } from './commands/init.js';
-import { watchCommand } from './commands/watch.js';
 import { queryCommand } from './commands/query.js';
 import { depsCommand } from './commands/deps.js';
 import { cyclesCommand } from './commands/cycles.js';
@@ -14,18 +13,23 @@ import { complexityCommand } from './commands/complexity.js';
 import { impactCommand } from './commands/impact.js';
 import { ciCommand } from './commands/ci.js';
 import { workflowCommand } from './commands/workflow.js';
-import { reportCommand } from './commands/report.js';
-import { logsCommand } from './commands/logs.js';
-import { serverCommand } from './commands/server.js';
 import { exportCommand } from './commands/export.js';
 import { shipCommand } from './commands/ship/index.js';
+import { ANALYZE_COMMAND_DESCRIPTION, configureAnalyzeCommand } from './commands/analyze-options.js';
 import { setupRuntimeLogging } from './runtime-logger.js';
 import { runFirstRunGuide } from './first-run-guide.js';
 import { printMigrationWarning } from './paths.js';
 import { validatePlatform } from './platform-check.js';
+import { formatRemovedCommandMessage, getRemovedTopLevelCommand } from './removed-commands.js';
 import { commandRequiresTreeSitter, validateTreeSitter } from './tree-sitter-check.js';
 
 const program = new Command();
+
+const removedCommand = getRemovedTopLevelCommand(process.argv.slice(2));
+if (removedCommand) {
+  console.error(formatRemovedCommandMessage(removedCommand));
+  process.exit(1);
+}
 
 // 检测并显示迁移提示（需要在 runtime-logging 之前执行，避免创建 .mycodemap 影响检测）
 printMigrationWarning();
@@ -82,17 +86,15 @@ program
   .option('-m, --mode <mode>', '分析模式 (fast|smart|hybrid)', 'hybrid')
   .option('-o, --output <dir>', '输出目录', '.mycodemap')
   .option('--ai-context', '为每个文件生成 AI 描述（需要 AI Provider）', false)
-  .action(generateCommand);
-
-program
-  .command('watch')
-  .description('监听文件变更并自动更新代码地图')
-  .option('-m, --mode <mode>', '分析模式 (fast|smart|hybrid)', 'hybrid')
-  .option('-o, --output <dir>', '输出目录', '.mycodemap')
-  .option('-d, --detach', '以后台守护进程方式运行')
-  .option('-s, --stop', '停止后台守护进程')
-  .option('-t, --status', '查看后台守护进程状态')
-  .action(watchCommand);
+  .action(async (options, command: Command) => {
+    await generateCommand({
+      ...options,
+      __optionSources: {
+        mode: command.getOptionValueSource('mode'),
+        output: command.getOptionValueSource('output'),
+      },
+    });
+  });
 
 program
   .command('query')
@@ -147,70 +149,21 @@ program
   .option('--structured', '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 使用）')
   .action(impactCommand);
 
-program
-  .command('analyze')
-  .description('统一分析入口 - 支持多种分析意图')
-  .option('-i, --intent <type>', '分析类型 (impact|dependency|search|documentation|complexity|overview|refactor|reference)')
-  .option('-t, --targets <paths...>', '目标文件/模块路径')
-  .option('-k, --keywords <words...>', '搜索关键词')
-  .option('-s, --scope <scope>', '范围 (direct|transitive)')
-  .option('-n, --topK <number>', '返回结果数量', '8')
-  .option('--include-tests', '包含测试文件')
-  .option('--include-git-history', '包含 Git 历史')
-  .option('--json', 'JSON 格式输出')
-  .option('--structured', '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 或 --output-mode=machine 使用）')
-  .option('--output-mode <mode>', '输出模式 (machine|human)')
-  .action(async () => {
-    const { analyzeCommand } = await import('./commands/analyze.js');
-    // 跳过 program name 和 command name
-    await analyzeCommand(process.argv.slice(2));
-  });
+configureAnalyzeCommand(
+  program
+    .command('analyze')
+    .description(ANALYZE_COMMAND_DESCRIPTION)
+).action(async () => {
+  const { analyzeCommand } = await import('./commands/analyze.js');
+  // 跳过 program name 和 command name
+  await analyzeCommand(process.argv.slice(2));
+});
 
 // CI Gateway 命令
 program.addCommand(ciCommand);
 
 // Workflow 命令
 program.addCommand(workflowCommand);
-
-// Report 命令
-program
-  .command('report')
-  .description('生成代码地图分析报告')
-  .option('-o, --output <dir>', '输出目录', '.mycodemap')
-  .option('-d, --days <number>', '报告覆盖的天数', '7')
-  .option('-j, --json', 'JSON 格式输出')
-  .option('-v, --verbose', '显示详细信息')
-  .action(reportCommand);
-
-// Logs 命令
-program
-  .command('logs')
-  .description('管理代码地图日志')
-  .argument('<subcommand>', '子命令 (list|export|clear)')
-  .option('-l, --limit <number>', '限制显示数量', '10')
-  .option('--level <level>', '按级别过滤 (INFO|WARN|ERROR|DEBUG)')
-  .option('-j, --json', 'JSON 格式输出')
-  .option('-o, --output <file>', '导出文件路径')
-  .option('-d, --days <number>', '天数')
-  .option('--format <format>', '导出格式 (json|txt)', 'json')
-  .option('-c, --confirm', '确认清理操作')
-  .action(async (subcommand: string, options: Record<string, unknown>) => {
-    await logsCommand(subcommand, options);
-  });
-
-// ============================================
-// MVP3 新架构命令
-// ============================================
-
-// Server 命令
-program
-  .command('server')
-  .description('启动 CodeMap HTTP API 服务器 (MVP3)')
-  .option('-p, --port <number>', '服务器端口', '3000')
-  .option('-h, --host <string>', '服务器主机', '0.0.0.0')
-  .option('--cors', '启用 CORS', false)
-  .option('--open', '自动打开浏览器', false)
-  .action(serverCommand);
 
 // Export 命令
 program

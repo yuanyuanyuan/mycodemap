@@ -52,6 +52,8 @@ MyCodeMap 可以与多种 AI 编程助手集成，让 AI 能够：
 - 修改 README、AI 助手提示、CLI 示例、测试事实后，先运行 `npm run docs:check`
 - 也可以通过 `mycodemap ci check-docs-sync` 走统一的 CI 子命令入口
 - 当前仓库的 agent 工程规则以 `docs/rules/engineering-with-codex-openai.md` 为准
+- 若文档或提示词仍把 `server`、`watch`、`report`、`logs` 当成当前 public CLI，必须同步改成 removed-command 迁移说明
+- 若项目启用了 `mycodemap.config.json.storage` 的 `kuzudb` / `neo4j`，先确认可选依赖与连接可用，再让 AI 判断 graph backend 失败原因
 
 ---
 
@@ -420,7 +422,7 @@ mycodemap impact -f "src/file.ts"
 
 ## 关键文件
 
-- `codemap.config.json` - CodeMap 配置文件
+- `mycodemap.config.json` - CodeMap 配置文件
 - `.mycodemap/AI_MAP.md` - 项目全局概览
 
 ## 开发规范

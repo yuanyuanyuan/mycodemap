@@ -6,11 +6,10 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { open } from 'node:fs/promises';
 
-import { storageFactory } from '../../infrastructure/storage/StorageFactory.js';
 import { CodeGraphBuilder } from '../../domain/services/CodeGraphBuilder.js';
 import { CodeMapServer } from '../../server/CodeMapServer.js';
+import { createConfiguredStorage } from '../../cli/storage-runtime.js';
 import type { ServerOptions } from '../types/index.js';
 
 /**
@@ -41,14 +40,7 @@ export function createServerCommand(): Command {
         console.log(chalk.blue('🔧 初始化 CodeMap 服务器...\n'));
 
         // 创建存储实例
-        const storageConfig = {
-          type: 'filesystem' as const,
-          outputPath: '.codemap/storage',
-        };
-        const storage = await storageFactory.createForProject(
-          process.cwd(),
-          storageConfig
-        );
+        const { storage } = await createConfiguredStorage(process.cwd());
 
         // 创建代码图构建器
         const builder = CodeGraphBuilder.create({

@@ -1,5 +1,5 @@
 // [META] since:2026-03-02 | owner:orchestrator-team | stable:true
-// [WHY] Workflow CLI commands for managing refactoring workflows with error code support
+// [WHY] Workflow CLI commands for managing analysis-only workflows with error code support
 
 /**
  * Workflow CLI 命令
@@ -49,13 +49,13 @@ function createError(code: WorkflowErrorCode, message?: string): Error {
 }
 
 const workflow = new Command('workflow');
-workflow.description('Workflow management - manage development workflow across multiple phases');
+workflow.description('Workflow management - analysis-only workflow across find/read/link/show');
 
 /**
  * 启动新工作流
  */
 workflow.command('start')
-  .description('Start a new development workflow')
+  .description('Start a new analysis workflow')
   .argument('<task>', 'Task description')
   .option('-t, --template <name>', 'Use workflow template (refactoring|bugfix|feature|hotfix)')
   .action(async (task: string, options: { template?: string }) => {
@@ -105,7 +105,7 @@ Phase: ${context.currentPhase}${templateNote}
 Next steps:
   1. codemap workflow status        # 查看当前状态
   2. codemap workflow visualize     # 可视化工作流
-  3. codemap analyze --intent reference --keywords ...
+  3. codemap analyze --intent find --keywords ...
   4. codemap workflow proceed       # 进入下一阶段
 `);
     } catch (error) {

@@ -102,14 +102,27 @@ mycodemap init -y
 {
   "$schema": "https://mycodemap.dev/schema/config.json",
   "mode": "hybrid",
-  "include": ["src/**/*"],
+  "include": ["src/**/*.ts"],
   "exclude": [
     "node_modules/**",
     "dist/**",
+    "build/**",
+    "coverage/**",
     "**/*.test.ts",
-    "**/*.spec.ts"
+    "**/*.spec.ts",
+    "**/*.d.ts"
   ],
-  "output": ".mycodemap"
+  "output": ".mycodemap",
+  "watch": false,
+  "storage": {
+    "type": "filesystem",
+    "outputPath": ".codemap/storage"
+  },
+  "plugins": {
+    "builtInPlugins": true,
+    "plugins": [],
+    "debug": false
+  }
 }
 ```
 
@@ -118,9 +131,27 @@ mycodemap init -y
 | 配置项 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `mode` | string | `"hybrid"` | 分析模式：`fast`（快速正则）、`smart`（AST深度分析）、`hybrid`（自动选择） |
-| `include` | string[] | `["src/**/*"]` | 包含的文件 glob 模式 |
+| `include` | string[] | `["src/**/*.ts"]` | 包含的文件 glob 模式 |
 | `exclude` | string[] | 见上 | 排除的文件 glob 模式 |
 | `output` | string | `".mycodemap"` | 输出目录路径 |
+| `watch` | boolean | `false` | 监听模式预留配置 |
+| `storage.type` | string | `"filesystem"` | 图存储后端类型：`filesystem` / `kuzudb` / `neo4j` / `memory` / `auto` |
+| `storage.outputPath` | string | `".codemap/storage"` | 文件系统存储目录 |
+| `storage.databasePath` | string | - | KùzuDB 数据目录（相对项目根目录） |
+| `storage.uri` | string | - | Neo4j 连接地址 |
+| `storage.username` | string | - | Neo4j 用户名 |
+| `storage.password` | string | - | Neo4j 密码 |
+| `plugins.builtInPlugins` | boolean | `true` | 是否启用内置插件 |
+| `plugins.pluginDir` | string | - | 额外插件目录 |
+| `plugins.plugins` | string[] | `[]` | 显式加载的插件名称列表 |
+| `plugins.debug` | boolean | `false` | 是否输出插件调试日志 |
+
+### 图存储后端配置
+
+- `generate` 会把 CodeGraph 写入 `storage` 指定的后端；`export json|graphml|dot` 会从同一后端读取。
+- 选择 `kuzudb` 前先安装 `npm install kuzu`；选择 `neo4j` 前先安装 `npm install neo4j-driver` 并准备可访问的 Neo4j 实例。
+- 缺少依赖或连接失败时会返回显式错误，不会静默 fallback 到 `filesystem`。
+- `storage.type = "auto"` 当前仍保守使用 `filesystem`，阈值字段先作为配置契约保留。
 
 ---
 
@@ -243,21 +274,16 @@ mycodemap ci check-output-contract
 mycodemap ci check-commit-size
 ```
 
-### 监听模式
+### 已移除的公共 CLI 命令
 
-```bash
-# 前台监听
-mycodemap watch
+以下命令已从 public CLI 移除；如果旧脚本仍在调用，请按下表迁移：
 
-# 后台守护进程
-mycodemap watch -d
-
-# 查看状态
-mycodemap watch -t
-
-# 停止守护进程
-mycodemap watch -s
-```
+| 已移除命令 | 迁移方式 |
+|------------|----------|
+| `watch` | 改用一次性的 `mycodemap generate` 刷新代码地图 |
+| `report` | 直接读取 `.mycodemap/AI_MAP.md`，或使用 `mycodemap export <format>` |
+| `logs` | 直接读取 `.mycodemap/logs/` 下的日志文件 |
+| `server` | 公共 CLI 已移除；`Server Layer` 仍是内部架构层，不等于公开 `mycodemap server` 命令 |
 
 ---
 
