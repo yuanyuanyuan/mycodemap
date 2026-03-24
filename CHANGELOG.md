@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.2] - 2026-03-25 - Test Infrastructure Fix
+
+### 🐛 Bug Fixes
+
+- **test**: 修复 validate-docs 测试缺少 product-specs 文件的问题
+
+### 📚 Documentation
+
+- **docs**: 同步 MVP3 产品规格文档基线
+- **docs**: 完成 v1.3 milestone 归档
+
 ## [0.4.1] - 2026-03-23 - Ship Workflow Fixes
 
 ### 🐛 Bug Fixes
