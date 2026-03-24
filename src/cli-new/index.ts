@@ -8,7 +8,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 
-import { createServerCommand } from './commands/server.js';
 import { createExportCommand } from './commands/export.js';
 import { createQueryCommand } from './commands/query.js';
 
@@ -39,7 +38,6 @@ export function createCLI(): Command {
     });
 
   // 添加命令
-  program.addCommand(createServerCommand());
   program.addCommand(createExportCommand());
   program.addCommand(createQueryCommand());
 

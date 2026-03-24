@@ -14,6 +14,7 @@ const mockDepsRunEnhanced = vi.fn<() => Promise<UnifiedResult[]>>();
 const mockComplexityRunEnhanced = vi.fn<() => Promise<UnifiedResult[]>>();
 const mockResolveTestFile = vi.fn<() => Promise<string | null>>();
 const mockExecuteWithFallback = vi.fn();
+const mockAstGrepExecute = vi.fn();
 
 vi.mock('chalk', () => ({
   default: {
@@ -72,7 +73,7 @@ vi.mock('../../../orchestrator/adapters/codemap-adapter.js', () => ({
 
 vi.mock('../../../orchestrator/adapters/ast-grep-adapter.js', () => ({
   AstGrepAdapter: vi.fn(() => ({
-    execute: vi.fn(),
+    execute: (...args: unknown[]) => mockAstGrepExecute(...args),
   })),
 }));
 
@@ -161,6 +162,7 @@ function createCodeMap(modules: ModuleInfo[]): CodeMap {
 describe('Analyze CLI Command', () => {
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
   let processExitSpy: ReturnType<typeof vi.spyOn>;
   let mockExitCode: number | undefined;
   let originalArgv: string[];
@@ -169,6 +171,7 @@ describe('Analyze CLI Command', () => {
     vi.clearAllMocks();
     consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockExitCode = undefined;
     originalArgv = [...process.argv];
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number | string | null) => {
@@ -180,6 +183,17 @@ describe('Analyze CLI Command', () => {
     mockDepsRunEnhanced.mockResolvedValue([]);
     mockComplexityRunEnhanced.mockResolvedValue([]);
     mockResolveTestFile.mockResolvedValue(null);
+    mockAstGrepExecute.mockResolvedValue([
+      createResult({
+        id: 'ast-grep-1',
+        source: 'ast-grep',
+        type: 'symbol',
+        file: 'src/interface/types.ts',
+        line: 21,
+        content: 'AstGrep fallback 结果',
+        keywords: ['SourceLocation'],
+      }),
+    ]);
     mockExecuteWithFallback.mockResolvedValue({
       results: [
         createResult({
@@ -203,6 +217,7 @@ describe('Analyze CLI Command', () => {
   afterEach(() => {
     consoleLogSpy.mockRestore();
     consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
     processExitSpy.mockRestore();
     process.argv = originalArgv;
   });
@@ -261,6 +276,22 @@ describe('Analyze CLI Command', () => {
       line: 18,
       column: 1,
     });
+  });
+
+  it('在 orchestrator 不可用时回退到 AstGrep find', async () => {
+    mockExecuteWithFallback.mockRejectedValueOnce(new Error('orchestrator down'));
+
+    const output = await new AnalyzeCommand({
+      intent: 'find',
+      keywords: ['SourceLocation'],
+    }).execute() as CodemapOutput;
+
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[Analyze] Orchestrator not available, falling back to AstGrep search'
+    );
+    expect(output.intent).toBe('find');
+    expect(output.tool).toBe('ast-grep-find');
+    expect(output.results[0]?.file).toBe('src/interface/types.ts');
   });
 
   it('覆盖 public read intent', async () => {

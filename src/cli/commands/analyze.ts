@@ -172,51 +172,27 @@ export class AnalyzeCommand {
       case 'show':
         return this.executeShow(intentObj, topK);
       case 'find':
-        break;
+        return this.executeFindWithFallback(intentObj, topK);
       default:
         throw this.createError(
           AnalyzeErrorCode.E0001_INVALID_INTENT,
           `无效的 intent: ${intentObj.intent}`
         );
     }
+  }
 
-    // 尝试使用 ToolOrchestrator 和 ResultFusion
+  /**
+   * `find` 优先走 orchestrator，失败时回退到 AstGrep 搜索
+   */
+  private async executeFindWithFallback(intentObj: CodemapIntent, topK: number): Promise<CodemapOutput> {
     try {
       return this.withCompatibility(
         await this.executeWithOrchestrator(intentObj, topK),
         intentObj.compatibility
       );
-    } catch (error) {
-      // 回退到原有实现
-      console.warn('[Analyze] Orchestrator not available, falling back to legacy mode');
-    }
-
-    const executionIntent = intentObj.executionIntent ?? intentObj.intent;
-
-    // 根据 executionIntent 路由 (legacy fallback)
-    switch (executionIntent) {
-      case 'search':
-        return this.executeFind(intentObj, topK);
-      case 'impact':
-        return this.withCompatibility(
-          this.relabelIntent(await this.executeImpact(scope, topK), intentObj.intent),
-          intentObj.compatibility
-        );
-      case 'dependency':
-        return this.withCompatibility(
-          this.relabelIntent(await this.executeDeps(topK), intentObj.intent),
-          intentObj.compatibility
-        );
-      case 'complexity':
-        return this.withCompatibility(
-          this.relabelIntent(await this.executeComplexity(topK), intentObj.intent),
-          intentObj.compatibility
-        );
-      default:
-        throw this.createError(
-          AnalyzeErrorCode.E0005_EXECUTION_FAILED,
-          `当前 intent 暂不支持 legacy fallback: ${executionIntent}`
-        );
+    } catch {
+      console.warn('[Analyze] Orchestrator not available, falling back to AstGrep search');
+      return this.executeFind(intentObj, topK);
     }
   }
 
@@ -856,16 +832,6 @@ export class AnalyzeCommand {
       }
     }
     return false;
-  }
-
-  /**
-   * 用 public intent 重写 legacy fallback 的输出壳
-   */
-  private relabelIntent(output: CodemapOutput, intent: IntentType): CodemapOutput {
-    return {
-      ...output,
-      intent
-    };
   }
 
   /**
