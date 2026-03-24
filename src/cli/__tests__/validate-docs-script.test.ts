@@ -11,12 +11,22 @@ const repoRoot = path.resolve(__dirname, '../../..');
 const REQUIRED_FIXTURE_FILES = [
   'package.json',
   'README.md',
+  'AI_GUIDE.md',
+  'CLAUDE.md',
+  'ARCHITECTURE.md',
+  'mycodemap.config.schema.json',
   'docs/AI_ASSISTANT_SETUP.md',
   'docs/SETUP_GUIDE.md',
+  'docs/ai-guide/README.md',
+  'docs/ai-guide/COMMANDS.md',
+  'docs/ai-guide/OUTPUT.md',
+  'docs/ai-guide/QUICKSTART.md',
+  'docs/ai-guide/INTEGRATION.md',
   'docs/rules/testing.md',
   'docs/rules/validation.md',
   'docs/rules/engineering-with-codex-openai.md',
   'src/cli/index.ts',
+  'src/cli/commands/analyze-options.ts',
   'vitest.config.ts',
   'vitest.benchmark.config.ts',
   '.github/workflows/ci-gateway.yml',
@@ -57,16 +67,122 @@ describe('validate-docs.js', () => {
     }).not.toThrow();
   });
 
-  it('fails when README reintroduces outdated analyze syntax', () => {
+  it('fails when README reintroduces legacy analyze intents', () => {
     const fixtureRoot = createFixtureRoot();
     tempRoots.push(fixtureRoot);
 
     const readmePath = path.join(fixtureRoot, 'README.md');
     const updatedReadme = readFileSync(readmePath, 'utf8').replace(
-      'mycodemap analyze -i impact -t src/cli/index.ts --include-tests',
-      'mycodemap analyze --intent impact --file src/cli/index.ts'
+      'mycodemap analyze -i read -t src/cli/index.ts --include-tests --json',
+      'mycodemap analyze -i impact -t src/cli/index.ts --include-tests'
     );
     writeFileSync(readmePath, updatedReadme);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/documentation guardrails failed/);
+  });
+
+  it('fails when analyze generated block drifts without changing legacy keywords', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const readmePath = path.join(fixtureRoot, 'README.md');
+    const updatedReadme = readFileSync(readmePath, 'utf8').replace(
+      'mycodemap analyze -i show -t src/domain/services --output-mode human',
+      'mycodemap analyze -i show -t src/domain/services --json'
+    );
+    writeFileSync(readmePath, updatedReadme);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/documentation guardrails failed/);
+  });
+
+  it('sync script restores analyze generated blocks', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const readmePath = path.join(fixtureRoot, 'README.md');
+    const updatedReadme = readFileSync(readmePath, 'utf8').replace(
+      'mycodemap analyze -i show -t src/domain/services --output-mode human',
+      'mycodemap analyze -i show -t src/domain/services --json'
+    );
+    writeFileSync(readmePath, updatedReadme);
+
+    expect(() => {
+      execFileSync('node', ['scripts/sync-analyze-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).not.toThrow();
+
+    expect(() => {
+      execFileSync('node', ['scripts/sync-analyze-docs.js', '--root', fixtureRoot, '--check'], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).not.toThrow();
+
+    expect(readFileSync(readmePath, 'utf8')).toContain(
+      'mycodemap analyze -i show -t src/domain/services --output-mode human'
+    );
+  });
+
+  it('fails when analyze generated option table drifts from cli metadata', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const commandsPath = path.join(fixtureRoot, 'docs/ai-guide/COMMANDS.md');
+    const updatedCommands = readFileSync(commandsPath, 'utf8').replace(
+      '输出模式：`machine`/`human`',
+      '输出模式: machine/human'
+    );
+    writeFileSync(commandsPath, updatedCommands);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/documentation guardrails failed/);
+  });
+
+  it('fails when AI_GUIDE analyze template block drifts from generated source', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const aiGuidePath = path.join(fixtureRoot, 'AI_GUIDE.md');
+    const updatedGuide = readFileSync(aiGuidePath, 'utf8').replace(
+      '1. `node dist/cli/index.js analyze -i read -t "{{FILE}}" --scope transitive --json`',
+      '1. `node dist/cli/index.js analyze -i read -t "{{FILE}}" --json`'
+    );
+    writeFileSync(aiGuidePath, updatedGuide);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/documentation guardrails failed/);
+  });
+
+  it('fails when OUTPUT guide reintroduces legacy analyze schema', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const outputPath = path.join(fixtureRoot, 'docs/ai-guide/OUTPUT.md');
+    const updatedOutput = readFileSync(outputPath, 'utf8').replace(
+      'type AnalyzeIntent = "find" | "read" | "link" | "show";',
+      'intent: "impact" | "dependency" | "search" | "documentation" | "complexity" | "overview" | "refactor" | "reference";'
+    );
+    writeFileSync(outputPath, updatedOutput);
 
     expect(() => {
       execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
@@ -86,6 +202,120 @@ describe('validate-docs.js', () => {
       'mycodemap ci check-docs'
     );
     writeFileSync(readmePath, updatedReadme);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/documentation guardrails failed/);
+  });
+
+  it('fails when README reintroduces non-recursive default exclude patterns', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const readmePath = path.join(fixtureRoot, 'README.md');
+    const updatedReadme = readFileSync(readmePath, 'utf8').replace(
+      '"**/*.test.ts"',
+      '"*.test.ts"'
+    );
+    writeFileSync(readmePath, updatedReadme);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/documentation guardrails failed/);
+  });
+
+  it('fails when README reintroduces the legacy config filename', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const readmePath = path.join(fixtureRoot, 'README.md');
+    const updatedReadme = readFileSync(readmePath, 'utf8').replace(
+      'mycodemap.config.json',
+      'codemap.config.json'
+    );
+    writeFileSync(readmePath, updatedReadme);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/documentation guardrails failed/);
+  });
+
+  it('fails when README drops the graph storage config contract', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const readmePath = path.join(fixtureRoot, 'README.md');
+    const updatedReadme = readFileSync(readmePath, 'utf8').replace(
+      '| `storage.type` | `"filesystem" \\| "kuzudb" \\| "neo4j" \\| "memory" \\| "auto"` | 图存储后端类型 | `"filesystem"` |',
+      '| `storage.kind` | `string` | 存储类型 | `"filesystem"` |'
+    );
+    writeFileSync(readmePath, updatedReadme);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/documentation guardrails failed/);
+  });
+
+  it('fails when OUTPUT guide drops the pluginReport contract', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const outputPath = path.join(fixtureRoot, 'docs/ai-guide/OUTPUT.md');
+    const updatedOutput = readFileSync(outputPath, 'utf8').replace(
+      'pluginReport?: PluginExecutionReport;',
+      'pluginResults?: PluginExecutionReport;'
+    );
+    writeFileSync(outputPath, updatedOutput);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/documentation guardrails failed/);
+  });
+
+  it('fails when AI commands guide reintroduces a removed public command', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const commandsPath = path.join(fixtureRoot, 'docs/ai-guide/COMMANDS.md');
+    const updatedCommands = readFileSync(commandsPath, 'utf8').replace(
+      '## 已移除的公共命令',
+      '## server - HTTP 服务器（当前过渡能力）'
+    );
+    writeFileSync(commandsPath, updatedCommands);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/documentation guardrails failed/);
+  });
+
+  it('fails when AI commands guide drops the workflow four-phase boundary', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const commandsPath = path.join(fixtureRoot, 'docs/ai-guide/COMMANDS.md');
+    const updatedCommands = readFileSync(commandsPath, 'utf8').replace(
+      '`workflow` 只保留 `find → read → link → show` 四个分析阶段；代码实现、commit 检查与 CI 运行不再作为 workflow phase 建模。',
+      '`workflow` 同时包含 analyze、实现、CI、ship 等多个阶段。'
+    );
+    writeFileSync(commandsPath, updatedCommands);
 
     expect(() => {
       execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {

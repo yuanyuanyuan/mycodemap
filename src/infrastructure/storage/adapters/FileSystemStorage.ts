@@ -19,6 +19,19 @@ import type {
   Dependency,
 } from '../../../interface/types/index.js';
 import { StorageBase, StorageError } from '../interfaces/StorageBase.js';
+import {
+  calculateImpactInGraph,
+  cloneCodeGraph,
+  createEmptyCodeGraph,
+  deleteModuleFromGraph,
+  detectCyclesInGraph,
+  findCalleesInGraph,
+  findCallersInGraph,
+  findDependenciesInGraph,
+  findDependentsInGraph,
+  getProjectStatisticsFromGraph,
+  upsertModuleInGraph,
+} from '../graph-helpers.js';
 
 /**
  * 文件系统存储适配器
@@ -87,7 +100,7 @@ export class FileSystemStorage extends StorageBase {
 
   async saveCodeGraph(graph: CodeGraph): Promise<void> {
     this.ensureInitialized();
-    this.cachedGraph = graph;
+    this.cachedGraph = cloneCodeGraph(graph);
     this.cacheDirty = true;
     await this.persistGraph();
   }
@@ -97,16 +110,28 @@ export class FileSystemStorage extends StorageBase {
 
     // 优先使用缓存
     if (this.cachedGraph) {
-      return this.cachedGraph;
+      return cloneCodeGraph(this.cachedGraph);
     }
 
     // 尝试从文件加载
     try {
-      const data = await readFile(this.dataFilePath!, 'utf-8');
+      if (!this.dataFilePath) {
+        throw new StorageError(
+          'Storage data file path not initialized',
+          'DATA_FILE_PATH_NOT_SET'
+        );
+      }
+
+      const data = await readFile(this.dataFilePath, 'utf-8');
       this.cachedGraph = JSON.parse(data) as CodeGraph;
-      return this.cachedGraph;
+      return cloneCodeGraph(this.cachedGraph);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
         // 文件不存在，返回空图
         return this.createEmptyGraph();
       }
@@ -122,7 +147,14 @@ export class FileSystemStorage extends StorageBase {
     this.ensureInitialized();
 
     try {
-      await rm(this.storageDir!, { recursive: true, force: true });
+      if (!this.storageDir) {
+        throw new StorageError(
+          'Storage directory path not initialized',
+          'STORAGE_DIR_NOT_SET'
+        );
+      }
+
+      await rm(this.storageDir, { recursive: true, force: true });
       this.cachedGraph = null;
       this.cacheDirty = false;
     } catch (error) {
@@ -140,34 +172,14 @@ export class FileSystemStorage extends StorageBase {
 
   async updateModule(module: Module): Promise<void> {
     this.ensureInitialized();
-
-    const graph = await this.loadCodeGraph();
-    const index = graph.modules.findIndex(m => m.id === module.id);
-
-    if (index >= 0) {
-      graph.modules[index] = module;
-    } else {
-      graph.modules.push(module);
-    }
-
-    this.cachedGraph = graph;
+    this.cachedGraph = upsertModuleInGraph(await this.loadCodeGraph(), module);
     this.cacheDirty = true;
     await this.persistGraph();
   }
 
   async deleteModule(moduleId: string): Promise<void> {
     this.ensureInitialized();
-
-    const graph = await this.loadCodeGraph();
-    graph.modules = graph.modules.filter(m => m.id !== moduleId);
-
-    // 同时清理相关的符号和依赖关系
-    graph.symbols = graph.symbols.filter(s => s.moduleId !== moduleId);
-    graph.dependencies = graph.dependencies.filter(
-      d => d.sourceId !== moduleId && d.targetId !== moduleId
-    );
-
-    this.cachedGraph = graph;
+    this.cachedGraph = deleteModuleFromGraph(await this.loadCodeGraph(), moduleId);
     this.cacheDirty = true;
     await this.persistGraph();
   }
@@ -202,56 +214,22 @@ export class FileSystemStorage extends StorageBase {
 
   async findDependencies(moduleId: string): Promise<Dependency[]> {
     this.ensureInitialized();
-    const graph = await this.loadCodeGraph();
-    return graph.dependencies.filter(d => d.sourceId === moduleId);
+    return findDependenciesInGraph(await this.loadCodeGraph(), moduleId);
   }
 
   async findDependents(moduleId: string): Promise<Dependency[]> {
     this.ensureInitialized();
-    const graph = await this.loadCodeGraph();
-    return graph.dependencies.filter(d => d.targetId === moduleId);
+    return findDependentsInGraph(await this.loadCodeGraph(), moduleId);
   }
 
   async findCallers(functionId: string): Promise<Symbol[]> {
     this.ensureInitialized();
-    const graph = await this.loadCodeGraph();
-
-    // 查找从该函数出发的调用依赖
-    const callerIds = new Set<string>();
-    for (const dep of graph.dependencies) {
-      if (dep.targetId === functionId && dep.type === 'call') {
-        callerIds.add(dep.sourceId);
-      }
-    }
-
-    // 返回对应的符号
-    const results: Symbol[] = [];
-    for (const id of callerIds) {
-      const symbol = graph.symbols.find(s => s.id === id);
-      if (symbol) results.push(symbol);
-    }
-
-    return results;
+    return findCallersInGraph(await this.loadCodeGraph(), functionId);
   }
 
   async findCallees(functionId: string): Promise<Symbol[]> {
     this.ensureInitialized();
-    const graph = await this.loadCodeGraph();
-
-    const calleeIds = new Set<string>();
-    for (const dep of graph.dependencies) {
-      if (dep.sourceId === functionId && dep.type === 'call') {
-        calleeIds.add(dep.targetId);
-      }
-    }
-
-    const results: Symbol[] = [];
-    for (const id of calleeIds) {
-      const symbol = graph.symbols.find(s => s.id === id);
-      if (symbol) results.push(symbol);
-    }
-
-    return results;
+    return findCalleesInGraph(await this.loadCodeGraph(), functionId);
   }
 
   // ============================================
@@ -260,102 +238,17 @@ export class FileSystemStorage extends StorageBase {
 
   async detectCycles(): Promise<Cycle[]> {
     this.ensureInitialized();
-    const graph = await this.loadCodeGraph();
-
-    // 使用 DFS 检测循环依赖
-    const cycles: Cycle[] = [];
-    const visited = new Set<string>();
-    const inStack = new Set<string>();
-
-    const dfs = (nodeId: string, path: string[]): void => {
-      if (inStack.has(nodeId)) {
-        // 发现循环
-        const cycleStart = path.indexOf(nodeId);
-        const cycleModules = path.slice(cycleStart);
-        cycles.push({
-          modules: cycleModules,
-          length: cycleModules.length,
-        });
-        return;
-      }
-
-      if (visited.has(nodeId)) {
-        return;
-      }
-
-      visited.add(nodeId);
-      inStack.add(nodeId);
-
-      // 遍历模块间的依赖
-      for (const dep of graph.dependencies) {
-        if (dep.sourceId === nodeId) {
-          dfs(dep.targetId, [...path, nodeId]);
-        }
-      }
-
-      inStack.delete(nodeId);
-    };
-
-    for (const module of graph.modules) {
-      if (!visited.has(module.id)) {
-        dfs(module.id, []);
-      }
-    }
-
-    return cycles;
+    return detectCyclesInGraph(await this.loadCodeGraph());
   }
 
   async calculateImpact(moduleId: string, depth: number): Promise<ImpactResult> {
     this.ensureInitialized();
-    const graph = await this.loadCodeGraph();
-
-    const affectedModules: Module[] = [];
-    const visited = new Set<string>();
-    const queue: Array<{ id: string; level: number }> = [{ id: moduleId, level: 0 }];
-
-    while (queue.length > 0) {
-      const { id, level } = queue.shift()!;
-
-      if (visited.has(id) || level > depth) {
-        continue;
-      }
-      visited.add(id);
-
-      if (level > 0) {
-        const module = graph.modules.find(m => m.id === id);
-        if (module) {
-          affectedModules.push(module);
-        }
-      }
-
-      // 查找依赖此模块的其他模块
-      for (const dep of graph.dependencies) {
-        if (dep.targetId === id && !visited.has(dep.sourceId)) {
-          queue.push({ id: dep.sourceId, level: level + 1 });
-        }
-      }
-    }
-
-    return {
-      rootModule: moduleId,
-      affectedModules,
-      depth,
-    };
+    return calculateImpactInGraph(await this.loadCodeGraph(), moduleId, depth);
   }
 
   async getStatistics(): Promise<ProjectStatistics> {
     this.ensureInitialized();
-    const graph = await this.loadCodeGraph();
-
-    const totalLines = graph.modules.reduce((sum, m) => sum + m.stats.lines, 0);
-
-    return {
-      totalModules: graph.modules.length,
-      totalSymbols: graph.symbols.length,
-      totalDependencies: graph.dependencies.length,
-      totalLines,
-      averageComplexity: 0, // MVP 阶段暂不计算
-    };
+    return getProjectStatisticsFromGraph(await this.loadCodeGraph());
   }
 
   // ============================================
@@ -387,17 +280,6 @@ export class FileSystemStorage extends StorageBase {
    * 创建空代码图
    */
   private createEmptyGraph(): CodeGraph {
-    return {
-      project: {
-        id: '',
-        name: '',
-        rootPath: this.projectPath ?? '',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      modules: [],
-      symbols: [],
-      dependencies: [],
-    };
+    return createEmptyCodeGraph(this.projectPath ?? '');
   }
 }

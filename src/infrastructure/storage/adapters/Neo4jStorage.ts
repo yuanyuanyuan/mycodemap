@@ -17,6 +17,64 @@ import type {
   Dependency,
 } from '../../../interface/types/index.js';
 import { StorageBase, StorageError } from '../interfaces/StorageBase.js';
+import {
+  calculateImpactInGraph,
+  createEmptyCodeGraph,
+  deleteModuleFromGraph,
+  deserializeCodeGraphSnapshot,
+  detectCyclesInGraph,
+  findCalleesInGraph,
+  findCallersInGraph,
+  findDependenciesInGraph,
+  findDependentsInGraph,
+  getProjectStatisticsFromGraph,
+  serializeCodeGraphSnapshot,
+  upsertModuleInGraph,
+} from '../graph-helpers.js';
+
+interface Neo4jRecordLike {
+  get: (key: string) => unknown;
+}
+
+interface Neo4jResultLike {
+  records: Neo4jRecordLike[];
+}
+
+interface Neo4jSessionLike {
+  run: (query: string, params?: Record<string, unknown>) => Promise<Neo4jResultLike>;
+  close: () => Promise<void>;
+}
+
+interface Neo4jDriverLike {
+  verifyConnectivity: () => Promise<void>;
+  session: () => Neo4jSessionLike;
+  close: () => Promise<void>;
+}
+
+interface Neo4jModuleLike {
+  driver: (uri: string, authToken: unknown) => Neo4jDriverLike;
+  auth: {
+    basic: (username: string, password: string) => unknown;
+  };
+}
+
+async function loadNeo4jModule(): Promise<Neo4jModuleLike> {
+  const moduleName = 'neo4j-driver';
+  return await import(moduleName) as unknown as Neo4jModuleLike;
+}
+
+function normalizeNeo4jValue<T>(value: T): T | number {
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'toNumber' in value &&
+    typeof value.toNumber === 'function'
+  ) {
+    return value.toNumber();
+  }
+
+  return value;
+}
 
 /**
  * Neo4j 存储适配器（可选依赖）
@@ -24,271 +82,184 @@ import { StorageBase, StorageError } from '../interfaces/StorageBase.js';
  * 安装：npm install neo4j-driver
  *
  * 特点：
- * - 企业级图数据库
- * - Cypher 查询语言
- * - 分布式部署支持
- * - 适合团队协作场景
- *
- * TODO-DEBT [L1] [日期:2026-03-17] [作者:AI] [原因:MVP阶段暂不实现完整功能]
- * 问题：目前使用内存 fallback 实现
- * 风险：无法连接真实 Neo4j 实例
- * 偿还计划：V1.0 实现完整 Neo4j 集成
+ * - 连接远程/本地 Neo4j 实例
+ * - 用 snapshot 节点持久化完整 CodeGraph
+ * - 查询/分析接口与共享 storage contract 保持一致
+ * - 错误语义显式暴露，不再静默 fallback
  */
 export class Neo4jStorage extends StorageBase {
   readonly type = 'neo4j' as const;
 
-  /** Neo4j 驱动 */
-  private driver: unknown = null;
-
-  /** 内存 fallback */
-  private memoryGraph: CodeGraph = this.createEmptyGraph();
-
-  /** 存储配置 */
-  private dbConfig: StorageConfig;
+  private driver: Neo4jDriverLike | null = null;
+  private readonly dbConfig: StorageConfig;
 
   constructor(config: StorageConfig) {
     super();
     this.dbConfig = config;
   }
 
-  // ============================================
-  // 生命周期管理
-  // ============================================
-
   protected async doInitialize(): Promise<void> {
     try {
-      // 动态导入 neo4j-driver
-      // @ts-expect-error neo4j-driver is optional dependency
-      const neo4j = await import('neo4j-driver');
-
+      const neo4j = await loadNeo4jModule();
       const uri = this.dbConfig.uri ?? 'bolt://localhost:7687';
       const username = this.dbConfig.username ?? 'neo4j';
       const password = this.dbConfig.password ?? 'password';
 
       this.driver = neo4j.driver(uri, neo4j.auth.basic(username, password));
-
-      // 验证连接
-      const session = (this.driver as { session: () => unknown }).session();
-      await (session as { run: (query: string) => Promise<unknown> }).run('RETURN 1');
-      await (session as { close: () => Promise<void> }).close();
-    } catch {
-      // eslint-disable-next-line no-console
-      console.warn('Neo4j not available, falling back to memory mode');
-      this.memoryGraph = this.createEmptyGraph();
+      await this.driver.verifyConnectivity();
+    } catch (error) {
+      throw new StorageError(
+        'Failed to initialize Neo4j storage',
+        'NEO4J_INIT_FAILED',
+        error
+      );
     }
   }
 
   protected async doClose(): Promise<void> {
-    if (this.driver && typeof (this.driver as { close: () => Promise<void> }).close === 'function') {
-      await (this.driver as { close: () => Promise<void> }).close();
+    if (this.driver) {
+      await this.driver.close();
     }
+
     this.driver = null;
   }
-
-  // ============================================
-  // 项目级别操作
-  // ============================================
 
   async saveCodeGraph(graph: CodeGraph): Promise<void> {
     this.ensureInitialized();
 
-    if (!this.driver) {
-      this.memoryGraph = {
-        project: { ...graph.project },
-        modules: [...graph.modules],
-        symbols: [...graph.symbols],
-        dependencies: [...graph.dependencies],
-      };
-      return;
-    }
-
-    // TODO: 实现 Neo4j 持久化
-    throw new StorageError(
-      'Neo4j persistence not yet implemented',
-      'NOT_IMPLEMENTED'
+    await this.runStatement('MATCH (s:CodeMapSnapshot) DETACH DELETE s');
+    await this.runStatement(
+      'CREATE (s:CodeMapSnapshot {id: $id, projectId: $projectId, graph: $graph, updatedAt: $updatedAt})',
+      {
+        id: 'codemap-snapshot',
+        projectId: graph.project.id,
+        graph: serializeCodeGraphSnapshot(graph),
+        updatedAt: new Date().toISOString(),
+      }
     );
   }
 
   async loadCodeGraph(): Promise<CodeGraph> {
     this.ensureInitialized();
 
-    if (!this.driver) {
-      return {
-        project: { ...this.memoryGraph.project },
-        modules: [...this.memoryGraph.modules],
-        symbols: [...this.memoryGraph.symbols],
-        dependencies: [...this.memoryGraph.dependencies],
-      };
+    const result = await this.runStatement(
+      'MATCH (s:CodeMapSnapshot) RETURN s.graph AS graph LIMIT 1'
+    );
+    const record = result.records[0];
+    const snapshot = typeof record?.get === 'function'
+      ? normalizeNeo4jValue(record.get('graph'))
+      : null;
+
+    if (typeof snapshot !== 'string') {
+      return createEmptyCodeGraph(this.projectPath ?? '');
     }
 
-    // TODO: 实现从 Neo4j 加载
-    throw new StorageError(
-      'Neo4j loading not yet implemented',
-      'NOT_IMPLEMENTED'
-    );
+    return deserializeCodeGraphSnapshot(snapshot, this.projectPath ?? '');
   }
 
   async deleteProject(): Promise<void> {
     this.ensureInitialized();
-    this.memoryGraph = this.createEmptyGraph();
-    // TODO: 删除 Neo4j 数据
+    await this.runStatement('MATCH (s:CodeMapSnapshot) DETACH DELETE s');
   }
-
-  // ============================================
-  // 增量更新
-  // ============================================
 
   async updateModule(module: Module): Promise<void> {
     this.ensureInitialized();
-
-    if (!this.driver) {
-      const index = this.memoryGraph.modules.findIndex(m => m.id === module.id);
-      if (index >= 0) {
-        this.memoryGraph.modules[index] = { ...module };
-      } else {
-        this.memoryGraph.modules.push({ ...module });
-      }
-      return;
-    }
-
-    // TODO: 实现 Neo4j 更新
+    const graph = await this.loadCodeGraph();
+    await this.saveCodeGraph(upsertModuleInGraph(graph, module));
   }
 
   async deleteModule(moduleId: string): Promise<void> {
     this.ensureInitialized();
-
-    if (!this.driver) {
-      this.memoryGraph.modules = this.memoryGraph.modules.filter(m => m.id !== moduleId);
-      this.memoryGraph.symbols = this.memoryGraph.symbols.filter(s => s.moduleId !== moduleId);
-      this.memoryGraph.dependencies = this.memoryGraph.dependencies.filter(
-        d => d.sourceId !== moduleId && d.targetId !== moduleId
-      );
-      return;
-    }
-
-    // TODO: 实现 Neo4j 删除
+    const graph = await this.loadCodeGraph();
+    await this.saveCodeGraph(deleteModuleFromGraph(graph, moduleId));
   }
-
-  // ============================================
-  // 查询操作
-  // ============================================
 
   async findModuleById(id: string): Promise<Module | null> {
     this.ensureInitialized();
-
-    if (!this.driver) {
-      return this.memoryGraph.modules.find(m => m.id === id) ?? null;
-    }
-
-    return null;
+    const graph = await this.loadCodeGraph();
+    return graph.modules.find(module => module.id === id) ?? null;
   }
 
   async findModulesByPath(path: string): Promise<Module[]> {
     this.ensureInitialized();
-
-    if (!this.driver) {
-      return this.memoryGraph.modules.filter(m => m.path.includes(path));
-    }
-
-    return [];
+    const graph = await this.loadCodeGraph();
+    return graph.modules.filter(module => module.path.includes(path));
   }
 
   async findSymbolByName(name: string): Promise<Symbol[]> {
     this.ensureInitialized();
-
-    if (!this.driver) {
-      return this.memoryGraph.symbols.filter(s => s.name.includes(name));
-    }
-
-    return [];
+    const graph = await this.loadCodeGraph();
+    return graph.symbols.filter(symbol => symbol.name.includes(name));
   }
 
   async findSymbolById(id: string): Promise<Symbol | null> {
     this.ensureInitialized();
-
-    if (!this.driver) {
-      return this.memoryGraph.symbols.find(s => s.id === id) ?? null;
-    }
-
-    return null;
+    const graph = await this.loadCodeGraph();
+    return graph.symbols.find(symbol => symbol.id === id) ?? null;
   }
 
   async findDependencies(moduleId: string): Promise<Dependency[]> {
     this.ensureInitialized();
-
-    if (!this.driver) {
-      return this.memoryGraph.dependencies.filter(d => d.sourceId === moduleId);
-    }
-
-    return [];
+    return findDependenciesInGraph(await this.loadCodeGraph(), moduleId);
   }
 
   async findDependents(moduleId: string): Promise<Dependency[]> {
     this.ensureInitialized();
-
-    if (!this.driver) {
-      return this.memoryGraph.dependencies.filter(d => d.targetId === moduleId);
-    }
-
-    return [];
+    return findDependentsInGraph(await this.loadCodeGraph(), moduleId);
   }
 
-  async findCallers(_functionId: string): Promise<Symbol[]> {
+  async findCallers(functionId: string): Promise<Symbol[]> {
     this.ensureInitialized();
-    return []; // TODO
+    return findCallersInGraph(await this.loadCodeGraph(), functionId);
   }
 
-  async findCallees(_functionId: string): Promise<Symbol[]> {
+  async findCallees(functionId: string): Promise<Symbol[]> {
     this.ensureInitialized();
-    return []; // TODO
+    return findCalleesInGraph(await this.loadCodeGraph(), functionId);
   }
-
-  // ============================================
-  // 分析操作
-  // ============================================
 
   async detectCycles(): Promise<Cycle[]> {
     this.ensureInitialized();
-    return []; // TODO
+    return detectCyclesInGraph(await this.loadCodeGraph());
   }
 
   async calculateImpact(moduleId: string, depth: number): Promise<ImpactResult> {
     this.ensureInitialized();
-    return {
-      rootModule: moduleId,
-      affectedModules: [],
-      depth,
-    };
+    return calculateImpactInGraph(await this.loadCodeGraph(), moduleId, depth);
   }
 
   async getStatistics(): Promise<ProjectStatistics> {
     this.ensureInitialized();
-
-    return {
-      totalModules: this.memoryGraph.modules.length,
-      totalSymbols: this.memoryGraph.symbols.length,
-      totalDependencies: this.memoryGraph.dependencies.length,
-      totalLines: this.memoryGraph.modules.reduce((sum, m) => sum + m.stats.lines, 0),
-      averageComplexity: 0,
-    };
+    return getProjectStatisticsFromGraph(await this.loadCodeGraph());
   }
 
-  // ============================================
-  // 私有方法
-  // ============================================
+  private getDriver(): Neo4jDriverLike {
+    if (!this.driver) {
+      throw new StorageError(
+        'Neo4j driver not initialized',
+        'NEO4J_DRIVER_NOT_READY'
+      );
+    }
 
-  private createEmptyGraph(): CodeGraph {
-    return {
-      project: {
-        id: '',
-        name: '',
-        rootPath: this.projectPath ?? '',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      modules: [],
-      symbols: [],
-      dependencies: [],
-    };
+    return this.driver;
+  }
+
+  private async runStatement(
+    query: string,
+    params?: Record<string, unknown>
+  ): Promise<Neo4jResultLike> {
+    const session = this.getDriver().session();
+
+    try {
+      return await session.run(query, params);
+    } catch (error) {
+      throw new StorageError(
+        'Failed to execute Neo4j query',
+        'NEO4J_QUERY_FAILED',
+        error
+      );
+    } finally {
+      await session.close();
+    }
   }
 }
