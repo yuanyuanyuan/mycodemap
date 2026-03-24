@@ -1,3 +1,5 @@
+// [META] since:2026-03 | owner:plugin-team | stable:true
+// [WHY] Plugin module exports the public runtime surface for CodeMap plugins
 // ============================================
 // CodeMap 插件系统入口
 // ============================================
@@ -30,7 +32,7 @@ export { default as callGraphPlugin } from './built-in/call-graph.js';
 
 // 插件系统主类
 import type { PluginLoadOptions } from './types.js';
-import type { CodemapConfig, ModuleInfo, CodeMap, DependencyEdge } from '../types/index.js';
+import type { CodemapConfig, ModuleInfo, CodeMap, DependencyEdge, PluginDiagnostic } from '../types/index.js';
 import { PluginLoader } from './plugin-loader.js';
 import type { AnalysisResult as BaseAnalysisResult, GeneratedOutput as BaseGeneratedOutput } from './types.js';
 
@@ -43,9 +45,9 @@ export class PluginSystem {
   }
 
   // 初始化插件系统
-  async initialize(options: PluginLoadOptions = {}): Promise<void> {
+  async initialize(options: PluginLoadOptions = {}): Promise<PluginDiagnostic[]> {
     this.loader = new PluginLoader(this.config, undefined, options.debug);
-    await this.loader.load(options);
+    return this.loader.load(options);
   }
 
   // 获取注册表
@@ -62,17 +64,20 @@ export class PluginSystem {
     mergedMetrics: Record<string, unknown>;
     additionalEdges: DependencyEdge[];
     warnings: string[];
+    diagnostics: PluginDiagnostic[];
   }> {
     if (!this.loader) {
       throw new Error('Plugin system not initialized');
     }
 
-    const results = await this.loader.getRegistry().runAnalyze(modules);
+    const run = await this.loader.getRegistry().runAnalyze(modules);
+    const results = run.results;
 
     // 合并结果
     const mergedMetrics: Record<string, unknown> = {};
     const additionalEdges: DependencyEdge[] = [];
     const warnings: string[] = [];
+    const diagnostics = [...run.diagnostics];
 
     for (const [name, result] of results) {
       if (result.metrics) {
@@ -93,22 +98,32 @@ export class PluginSystem {
 
       if (result.warnings) {
         warnings.push(...result.warnings);
+        diagnostics.push(
+          ...result.warnings.map((message) => ({
+            plugin: name,
+            stage: 'analyze' as const,
+            level: 'warning' as const,
+            message,
+          }))
+        );
       }
     }
 
-    return { results, mergedMetrics, additionalEdges, warnings };
+    return { results, mergedMetrics, additionalEdges, warnings, diagnostics };
   }
 
   // 运行生成钩子
   async runGenerate(codeMap: CodeMap): Promise<{
     results: Map<string, BaseGeneratedOutput>;
     allFiles: Array<{ path: string; content: string }>;
+    diagnostics: PluginDiagnostic[];
   }> {
     if (!this.loader) {
       throw new Error('Plugin system not initialized');
     }
 
-    const results = await this.loader.getRegistry().runGenerate(codeMap);
+    const run = await this.loader.getRegistry().runGenerate(codeMap);
+    const results = run.results;
 
     // 收集所有生成的文件
     const allFiles: Array<{ path: string; content: string }> = [];
@@ -119,7 +134,7 @@ export class PluginSystem {
       }
     }
 
-    return { results, allFiles };
+    return { results, allFiles, diagnostics: run.diagnostics };
   }
 
   // 检查插件是否已加载
@@ -131,7 +146,7 @@ export class PluginSystem {
   // 获取已加载插件列表
   getLoadedPlugins(): string[] {
     if (!this.loader) return [];
-    return this.loader.getRegistry().getAllNames();
+    return this.loader.getRegistry().getInitialized();
   }
 
   // 销毁插件系统
@@ -144,8 +159,8 @@ export class PluginSystem {
 }
 
 // 创建插件系统便捷函数
-export function createPluginSystem(config: CodemapConfig, options?: PluginLoadOptions): PluginSystem {
+export async function createPluginSystem(config: CodemapConfig, options?: PluginLoadOptions): Promise<PluginSystem> {
   const system = new PluginSystem(config);
-  system.initialize(options);
+  await system.initialize(options);
   return system;
 }

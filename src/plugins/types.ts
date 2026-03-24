@@ -1,8 +1,11 @@
+// [META] since:2026-03 | owner:plugin-team | stable:true
+// [WHY] Plugin types define the stable contract shared by plugin runtime and user plugins
 // ============================================
 // CodeMap 插件类型定义
 // ============================================
 
-import type { CodemapConfig, ModuleInfo, CodeMap } from '../types/index.js';
+import type { CodemapConfig, ModuleInfo, CodeMap, PluginDiagnostic } from '../types/index.js';
+import type { CodemapPluginConfig } from '../interface/config/index.js';
 
 // 插件日志接口
 export interface PluginLogger {
@@ -94,15 +97,21 @@ export interface CodeMapPlugin {
 }
 
 // 插件加载选项
-export interface PluginLoadOptions {
-  // 插件目录
-  pluginDir?: string;
-  // 启用内置插件
-  builtInPlugins?: boolean;
-  // 额外的插件名称列表
-  plugins?: string[];
-  // 是否启用调试
-  debug?: boolean;
+export interface PluginLoadOptions extends CodemapPluginConfig {}
+
+export interface PluginLoadAttempt {
+  diagnostics: PluginDiagnostic[];
+  loaded: boolean;
+}
+
+export interface PluginAnalysisRun {
+  results: Map<string, AnalysisResult>;
+  diagnostics: PluginDiagnostic[];
+}
+
+export interface PluginGenerateRun {
+  results: Map<string, GeneratedOutput>;
+  diagnostics: PluginDiagnostic[];
 }
 
 // 插件状态

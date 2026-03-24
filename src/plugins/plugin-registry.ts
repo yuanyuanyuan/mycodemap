@@ -1,10 +1,22 @@
+// [META] since:2026-03 | owner:plugin-team | stable:true
+// [WHY] Plugin registry tracks loaded plugins and coordinates analyze/generate hooks
 // ============================================
 // CodeMap 插件注册表
 // 管理已加载的插件
 // ============================================
 
-import type { CodeMapPlugin, PluginInstance, PluginContext, PluginStatus, AnalysisResult, GeneratedOutput } from './types.js';
+import type {
+  CodeMapPlugin,
+  PluginInstance,
+  PluginContext,
+  PluginStatus,
+  AnalysisResult,
+  GeneratedOutput,
+  PluginAnalysisRun,
+  PluginGenerateRun,
+} from './types.js';
 import type { ModuleInfo, CodeMap } from '../types/index.js';
+import type { PluginDiagnostic } from '../types/index.js';
 
 export class PluginRegistry {
   private plugins: Map<string, PluginInstance> = new Map();
@@ -35,10 +47,12 @@ export class PluginRegistry {
   }
 
   // 初始化所有插件
-  async initializeAll(): Promise<void> {
+  async initializeAll(): Promise<PluginDiagnostic[]> {
     if (!this.context) {
       throw new Error('Plugin context not set');
     }
+
+    const diagnostics: PluginDiagnostic[] = [];
 
     for (const [name, instance] of this.plugins) {
       try {
@@ -50,14 +64,22 @@ export class PluginRegistry {
         instance.status = 'error';
         instance.error = error instanceof Error ? error : new Error(String(error));
         this.context.logger.error(`Failed to initialize plugin "${name}": ${instance.error.message}`);
-        throw error;
+        diagnostics.push({
+          plugin: name,
+          stage: 'initialize',
+          level: 'error',
+          message: instance.error.message,
+        });
       }
     }
+
+    return diagnostics;
   }
 
   // 运行所有插件的分析钩子
-  async runAnalyze(modules: ModuleInfo[]): Promise<Map<string, AnalysisResult>> {
+  async runAnalyze(modules: ModuleInfo[]): Promise<PluginAnalysisRun> {
     const results = new Map<string, AnalysisResult>();
+    const diagnostics: PluginDiagnostic[] = [];
 
     for (const [name, instance] of this.plugins) {
       if (instance.status !== 'initialized' || !instance.plugin.analyze) {
@@ -71,16 +93,25 @@ export class PluginRegistry {
         instance.status = 'running';
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
+        instance.status = 'error';
+        instance.error = err;
         this.context?.logger.error(`Plugin "${name}" analyze hook failed: ${err.message}`);
+        diagnostics.push({
+          plugin: name,
+          stage: 'analyze',
+          level: 'error',
+          message: err.message,
+        });
       }
     }
 
-    return results;
+    return { results, diagnostics };
   }
 
   // 运行所有插件的生成钩子
-  async runGenerate(codeMap: CodeMap): Promise<Map<string, GeneratedOutput>> {
+  async runGenerate(codeMap: CodeMap): Promise<PluginGenerateRun> {
     const results = new Map<string, GeneratedOutput>();
+    const diagnostics: PluginDiagnostic[] = [];
 
     for (const [name, instance] of this.plugins) {
       if (instance.status !== 'running' && instance.status !== 'initialized') {
@@ -97,11 +128,19 @@ export class PluginRegistry {
         results.set(name, result);
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
+        instance.status = 'error';
+        instance.error = err;
         this.context?.logger.error(`Plugin "${name}" generate hook failed: ${err.message}`);
+        diagnostics.push({
+          plugin: name,
+          stage: 'generate',
+          level: 'error',
+          message: err.message,
+        });
       }
     }
 
-    return results;
+    return { results, diagnostics };
   }
 
   // 获取插件实例

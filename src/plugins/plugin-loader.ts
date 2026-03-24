@@ -1,3 +1,5 @@
+// [META] since:2026-03 | owner:plugin-team | stable:true
+// [WHY] Plugin loader resolves configured plugins and manages runtime loading lifecycle
 // ============================================
 // CodeMap 插件加载器
 // 负责动态加载插件
@@ -5,17 +7,24 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import type { CodeMapPlugin, PluginLoadOptions, PluginContext, PluginLogger, PluginCache } from './types.js';
+import type {
+  CodeMapPlugin,
+  PluginLoadOptions,
+  PluginContext,
+  PluginLogger,
+  PluginCache,
+  PluginLoadAttempt,
+} from './types.js';
 import { PluginRegistry } from './plugin-registry.js';
 import type { CodemapConfig } from '../types/index.js';
+import type { PluginDiagnostic } from '../types/index.js';
 
-// 获取当前文件目录
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+type PluginExport = CodeMapPlugin | (() => Promise<CodeMapPlugin> | CodeMapPlugin);
 
-// 默认插件目录
-const DEFAULT_PLUGIN_DIR = path.join(__dirname, 'built-in');
+const BUILT_IN_PLUGIN_LOADERS: Record<string, () => Promise<{ default?: PluginExport; plugin?: PluginExport }>> = {
+  'complexity-analyzer': () => import('./built-in/complexity-analyzer.js'),
+  'call-graph': () => import('./built-in/call-graph.js'),
+};
 
 // 简单内存缓存实现
 class SimpleCache implements PluginCache {
@@ -90,6 +99,58 @@ export class PluginLoader {
     this.registry = new PluginRegistry();
   }
 
+  private createDiagnostic(
+    level: PluginDiagnostic['level'],
+    stage: PluginDiagnostic['stage'],
+    message: string,
+    plugin?: string
+  ): PluginDiagnostic {
+    return {
+      plugin,
+      stage,
+      level,
+      message,
+    };
+  }
+
+  private resolvePluginExport(module: { default?: PluginExport; plugin?: PluginExport }): PluginExport | undefined {
+    return module.default || module.plugin;
+  }
+
+  private async instantiatePlugin(plugin: PluginExport): Promise<CodeMapPlugin> {
+    return typeof plugin === 'function' ? plugin() : plugin;
+  }
+
+  private async loadBuiltInPluginByName(pluginName: string): Promise<PluginLoadAttempt> {
+    const diagnostics: PluginDiagnostic[] = [];
+    const loadModule = BUILT_IN_PLUGIN_LOADERS[pluginName];
+
+    if (!loadModule) {
+      return { diagnostics, loaded: false };
+    }
+
+    try {
+      const pluginModule = await loadModule();
+      const plugin = this.resolvePluginExport(pluginModule);
+
+      if (!plugin) {
+        diagnostics.push(
+          this.createDiagnostic('warning', 'load', `内置插件 "${pluginName}" 未导出默认插件实例`, pluginName)
+        );
+        return { diagnostics, loaded: false };
+      }
+
+      await this.registry.register(await this.instantiatePlugin(plugin));
+      return { diagnostics, loaded: true };
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      diagnostics.push(
+        this.createDiagnostic('error', 'load', `加载内置插件失败: ${reason}`, pluginName)
+      );
+      return { diagnostics, loaded: false };
+    }
+  }
+
   // 获取插件上下文
   private createContext(): PluginContext {
     return {
@@ -105,30 +166,22 @@ export class PluginLoader {
   }
 
   // 加载内置插件
-  async loadBuiltInPlugins(): Promise<void> {
+  async loadBuiltInPlugins(): Promise<PluginDiagnostic[]> {
     this.logger.info('Loading built-in plugins...');
+    const diagnostics: PluginDiagnostic[] = [];
 
-    // 动态导入内置插件
-    const builtInPlugins: Array<{ name: string; plugin: CodeMapPlugin }> = [
-      { name: 'complexity-analyzer', plugin: (await import('./built-in/complexity-analyzer.js')).default },
-      { name: 'call-graph', plugin: (await import('./built-in/call-graph.js')).default },
-    ];
-
-    for (const { name, plugin } of builtInPlugins) {
-      try {
-        if (plugin && plugin.metadata) {
-          await this.registry.register(plugin);
-        }
-      } catch (error) {
-        // 忽略加载失败的内置插件
-        this.logger.debug(`Built-in plugin load skipped: ${error}`);
-      }
+    for (const name of Object.keys(BUILT_IN_PLUGIN_LOADERS)) {
+      const result = await this.loadBuiltInPluginByName(name);
+      diagnostics.push(...result.diagnostics);
     }
+
+    return diagnostics;
   }
 
   // 从目录加载插件
-  async loadFromDirectory(pluginDir: string): Promise<void> {
+  async loadFromDirectory(pluginDir: string): Promise<PluginDiagnostic[]> {
     this.logger.info(`Loading plugins from directory: ${pluginDir}`);
+    const diagnostics: PluginDiagnostic[] = [];
 
     try {
       const entries = await fs.readdir(pluginDir, { withFileTypes: true });
@@ -139,57 +192,100 @@ export class PluginLoader {
         }
 
         const pluginPath = path.join(pluginDir, entry.name);
-        await this.loadPluginFile(pluginPath);
+        const result = await this.loadPluginFile(pluginPath);
+        diagnostics.push(...result.diagnostics);
       }
     } catch (error) {
-      this.logger.warn(`Failed to load plugins from directory: ${error}`);
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Failed to load plugins from directory: ${reason}`);
+      diagnostics.push(
+        this.createDiagnostic('warning', 'load', `插件目录不可读: ${reason}`)
+      );
     }
+
+    return diagnostics;
   }
 
   // 从文件加载单个插件
-  async loadPluginFile(pluginPath: string): Promise<void> {
+  async loadPluginFile(pluginPath: string): Promise<PluginLoadAttempt> {
+    const diagnostics: PluginDiagnostic[] = [];
+
     try {
       this.logger.debug(`Loading plugin from: ${pluginPath}`);
 
       const module = await import(pluginPath);
-      const plugin = module.default || module.plugin;
+      const plugin = this.resolvePluginExport(module);
 
       if (!plugin) {
         this.logger.warn(`No plugin export found in: ${pluginPath}`);
-        return;
+        diagnostics.push(
+          this.createDiagnostic('warning', 'load', `插件文件未导出默认插件实例: ${pluginPath}`)
+        );
+        return { diagnostics, loaded: false };
       }
 
-      const pluginInstance = typeof plugin === 'function' ? await plugin() : plugin;
-      await this.registry.register(pluginInstance);
+      await this.registry.register(await this.instantiatePlugin(plugin));
+      return { diagnostics, loaded: true };
     } catch (error) {
-      this.logger.error(`Failed to load plugin from ${pluginPath}: ${error}`);
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to load plugin from ${pluginPath}: ${reason}`);
+      diagnostics.push(
+        this.createDiagnostic('error', 'load', `加载插件文件失败: ${reason}`)
+      );
+      return { diagnostics, loaded: false };
     }
   }
 
   // 加载指定名称的插件
-  async loadPluginByName(pluginName: string, pluginDir: string): Promise<void> {
-    const pluginPath = path.join(pluginDir, `${pluginName}.js`);
+  async loadPluginByName(pluginName: string, pluginDir?: string): Promise<PluginDiagnostic[]> {
+    const diagnostics: PluginDiagnostic[] = [];
 
-    try {
-      await this.loadPluginFile(pluginPath);
-    } catch (error) {
-      // 尝试作为 Node.js 模块加载
-      try {
-        const module = await import(pluginName);
-        const plugin = module.default || module.plugin;
-        if (plugin) {
-          const pluginInstance = typeof plugin === 'function' ? await plugin() : plugin;
-          await this.registry.register(pluginInstance);
-        }
-      } catch {
-        this.logger.warn(`Plugin "${pluginName}" not found`);
+    if (this.registry.has(pluginName)) {
+      return diagnostics;
+    }
+
+    const builtInResult = await this.loadBuiltInPluginByName(pluginName);
+    diagnostics.push(...builtInResult.diagnostics);
+    if (builtInResult.loaded) {
+      return diagnostics;
+    }
+
+    if (pluginDir) {
+      const pluginPath = path.join(pluginDir, `${pluginName}.js`);
+      const fileResult = await this.loadPluginFile(pluginPath);
+      diagnostics.push(...fileResult.diagnostics);
+      if (fileResult.loaded) {
+        return diagnostics;
       }
     }
+
+    try {
+      const module = await import(pluginName);
+      const plugin = this.resolvePluginExport(module);
+
+      if (!plugin) {
+        diagnostics.push(
+          this.createDiagnostic('warning', 'load', `插件模块 "${pluginName}" 未导出默认插件实例`, pluginName)
+        );
+        return diagnostics;
+      }
+
+      await this.registry.register(await this.instantiatePlugin(plugin));
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Plugin "${pluginName}" not found: ${reason}`);
+      diagnostics.push(
+        this.createDiagnostic('warning', 'load', `未找到插件 "${pluginName}": ${reason}`, pluginName)
+      );
+    }
+
+    return diagnostics;
   }
 
   // 加载所有插件
-  async load(options: PluginLoadOptions = {}): Promise<void> {
-    const { builtInPlugins = true, pluginDir = DEFAULT_PLUGIN_DIR, plugins = [] } = options;
+  async load(options: PluginLoadOptions = {}): Promise<PluginDiagnostic[]> {
+    const { builtInPlugins = true, pluginDir, plugins = [] } = options;
+    const diagnostics: PluginDiagnostic[] = [];
 
     // 设置插件上下文
     const context = this.createContext();
@@ -197,23 +293,24 @@ export class PluginLoader {
 
     // 加载内置插件
     if (builtInPlugins) {
-      await this.loadBuiltInPlugins();
+      diagnostics.push(...await this.loadBuiltInPlugins());
     }
 
     // 从目录加载
     if (pluginDir) {
-      await this.loadFromDirectory(pluginDir);
+      diagnostics.push(...await this.loadFromDirectory(pluginDir));
     }
 
     // 加载指定插件
     for (const pluginName of plugins) {
-      await this.loadPluginByName(pluginName, pluginDir);
+      diagnostics.push(...await this.loadPluginByName(pluginName, pluginDir));
     }
 
     // 初始化所有插件
-    await this.registry.initializeAll();
+    diagnostics.push(...await this.registry.initializeAll());
 
     this.logger.info(`Loaded ${this.registry.size()} plugin(s)`);
+    return diagnostics;
   }
 
   // 重新加载插件

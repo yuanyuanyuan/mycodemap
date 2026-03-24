@@ -3,11 +3,15 @@
 // ============================================
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs/promises';
 import { analyze } from '../../core/analyzer.js';
 import { generateAIMap, generateJSON, generateContext, generateMermaidGraph } from '../../generator/index.js';
+
+const mockLoadCodemapConfig = vi.fn();
+const mockCreateForProject = vi.fn();
+const mockStorageSaveCodeGraph = vi.fn();
+const mockStorageClose = vi.fn();
 
 // Mock dependencies
 vi.mock('../../core/analyzer.js', () => ({
@@ -35,11 +39,52 @@ vi.mock('../../generator/index.js', () => ({
   generateMermaidGraph: vi.fn().mockResolvedValue(undefined)
 }));
 
+vi.mock('../config-loader.js', () => ({
+  loadCodemapConfig: (...args: unknown[]) => mockLoadCodemapConfig(...args),
+}));
+
+vi.mock('../../infrastructure/storage/StorageFactory.js', () => ({
+  storageFactory: {
+    createForProject: (...args: unknown[]) => mockCreateForProject(...args),
+  },
+}));
+
 describe('generate command', () => {
   const testDir = path.join(process.cwd(), 'test-output');
   const outputDir = path.join(testDir, '.mycodemap');
 
   beforeEach(async () => {
+    vi.clearAllMocks();
+    mockLoadCodemapConfig.mockResolvedValue({
+      config: {
+        mode: 'hybrid',
+        include: ['src/**/*.ts'],
+        exclude: ['node_modules/**', 'dist/**', 'build/**', 'coverage/**', '**/*.test.ts', '**/*.spec.ts', '**/*.d.ts'],
+        output: '.mycodemap',
+        watch: false,
+        storage: {
+          type: 'filesystem',
+          outputPath: '.codemap/storage',
+        },
+        plugins: {
+          builtInPlugins: true,
+          plugins: [],
+          debug: false,
+        },
+      },
+      configPath: '/test/mycodemap.config.json',
+      exists: false,
+      isLegacy: false,
+      hasExplicitPluginConfig: false,
+    });
+    mockStorageSaveCodeGraph.mockResolvedValue(undefined);
+    mockStorageClose.mockResolvedValue(undefined);
+    mockCreateForProject.mockResolvedValue({
+      type: 'filesystem',
+      saveCodeGraph: mockStorageSaveCodeGraph,
+      close: mockStorageClose,
+    });
+
     // Clean up test directories
     try {
       await fs.rm(testDir, { recursive: true, force: true });
@@ -81,6 +126,41 @@ describe('generate command', () => {
     expect(analyze).toHaveBeenCalledWith(
       expect.objectContaining({
         mode: 'hybrid'
+      })
+    );
+  });
+
+  it('should read mode and output from normalized config when flags are omitted', async () => {
+    const { generateCommand } = await import('../commands/generate.js');
+    mockLoadCodemapConfig.mockResolvedValue({
+      config: {
+        mode: 'smart',
+        include: ['src/**/*.ts'],
+        exclude: ['node_modules/**'],
+        output: '.configured-output',
+        watch: false,
+        storage: {
+          type: 'filesystem',
+          outputPath: '.codemap/storage',
+        },
+        plugins: {
+          builtInPlugins: true,
+          plugins: [],
+          debug: false,
+        },
+      },
+      configPath: '/test/mycodemap.config.json',
+      exists: true,
+      isLegacy: false,
+      hasExplicitPluginConfig: false,
+    });
+
+    await generateCommand({});
+
+    expect(analyze).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'smart',
+        output: '.configured-output',
       })
     );
   });

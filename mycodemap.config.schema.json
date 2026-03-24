@@ -5,18 +5,22 @@
   "description": "Configuration schema for MyCodeMap CLI tool",
   "type": "object",
   "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference for editor tooling"
+    },
     "mode": {
       "type": "string",
-      "enum": ["fast", "smart"],
-      "default": "fast",
-      "description": "Parsing mode: fast (regex-based) or smart (TypeScript AST)"
+      "enum": ["fast", "smart", "hybrid"],
+      "default": "hybrid",
+      "description": "Parsing mode: fast (regex-based), smart (TypeScript AST), or hybrid (auto-select)"
     },
     "include": {
       "type": "array",
       "items": {
         "type": "string"
       },
-      "default": ["src/**/*"],
+      "default": ["src/**/*.ts"],
       "description": "Glob patterns to include"
     },
     "exclude": {
@@ -24,7 +28,7 @@
       "items": {
         "type": "string"
       },
-      "default": ["node_modules/**", "dist/**", "**/*.test.ts", "**/*.spec.ts"],
+      "default": ["node_modules/**", "dist/**", "build/**", "coverage/**", "**/*.test.ts", "**/*.spec.ts", "**/*.d.ts"],
       "description": "Glob patterns to exclude"
     },
     "output": {
@@ -36,6 +40,85 @@
       "type": "boolean",
       "default": false,
       "description": "Enable watch mode for file changes"
+    },
+    "storage": {
+      "type": "object",
+      "description": "Graph storage backend configuration",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["filesystem", "kuzudb", "neo4j", "memory", "auto"],
+          "default": "filesystem",
+          "description": "Storage backend type"
+        },
+        "outputPath": {
+          "type": "string",
+          "default": ".codemap/storage",
+          "description": "Filesystem storage directory"
+        },
+        "databasePath": {
+          "type": "string",
+          "description": "KùzuDB database directory relative to project root"
+        },
+        "uri": {
+          "type": "string",
+          "description": "Neo4j connection URI"
+        },
+        "username": {
+          "type": "string",
+          "description": "Neo4j username"
+        },
+        "password": {
+          "type": "string",
+          "description": "Neo4j password"
+        },
+        "autoThresholds": {
+          "type": "object",
+          "description": "Thresholds for auto backend selection",
+          "properties": {
+            "useGraphDBWhenFileCount": {
+              "type": "number",
+              "description": "Prefer graph DB when file count reaches this threshold"
+            },
+            "useGraphDBWhenNodeCount": {
+              "type": "number",
+              "description": "Prefer graph DB when graph node count reaches this threshold"
+            }
+          },
+          "required": ["useGraphDBWhenFileCount", "useGraphDBWhenNodeCount"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "plugins": {
+      "type": "object",
+      "description": "Plugin loading options",
+      "properties": {
+        "builtInPlugins": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable built-in plugins"
+        },
+        "pluginDir": {
+          "type": "string",
+          "description": "Additional plugin directory"
+        },
+        "plugins": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Named plugins to load explicitly"
+        },
+        "debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable plugin debug logging"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false
