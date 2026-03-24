@@ -48,7 +48,7 @@ src/
 │   │   ├── implementations/
 │   │   │   ├── FileSystemStorage.ts
 │   │   │   ├── KuzuDBStorage.ts
-│   │   │   └── Neo4jStorage.ts
+│   │   │   └── MemoryStorage.ts
 │   │   ├── StorageFactory.ts
 │   │   └── index.ts
 │   │
@@ -200,7 +200,7 @@ export interface IStorage {
 }
 
 /** 存储类型 */
-export type StorageType = 'filesystem' | 'kuzudb' | 'neo4j' | 'memory';
+export type StorageType = 'filesystem' | 'kuzudb' | 'memory';
 
 /** 搜索选项 */
 export interface SearchOptions {
@@ -219,11 +219,6 @@ export interface StorageConfig {
   
   // KùzuDB 配置
   databasePath?: string;
-  
-  // Neo4j 配置
-  uri?: string;
-  username?: string;
-  password?: string;
   
   // 自动选择配置
   autoThresholds?: {
@@ -620,8 +615,6 @@ export class StorageFactory implements IStorageFactory {
         return new FileSystemStorage();
       case 'kuzudb':
         return new KuzuDBStorage();
-      case 'neo4j':
-        return new Neo4jStorage();
       default:
         throw new Error(`Unknown storage type: ${type}`);
     }
@@ -1337,7 +1330,6 @@ export { ParserRegistry } from './infrastructure/parser/ParserRegistry.js';
 {
   "dependencies": {
     "kuzu": "^0.8.0",
-    "neo4j-driver": "^5.28.0",
     "tree-sitter": "^0.22.0",
     "tree-sitter-python": "^0.23.0",
     "tree-sitter-java": "^0.23.0",

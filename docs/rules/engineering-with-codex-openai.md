@@ -51,7 +51,7 @@
   - 若涉及机器输出，`--json` 与 `--structured --json` 仍保持纯 JSON 契约。
 - 修改 `README.md`、`AI_GUIDE.md`、`docs/ai-guide/OUTPUT.md`、`ARCHITECTURE.md` 这类入口文档时，必须明确区分“目标产品基线”和“当前 CLI 现实”，尤其是 `Server Layer` / `mycodemap server` 的命名边界。
 - 若改动会影响 agent 执行手册、README 示例、测试事实或入口路由，先执行 `npm run docs:check`。
-- 若希望通过统一 CLI 护栏入口执行同一检查，使用 `node dist/cli/index.js ci check-docs-sync`。
+- 若希望通过统一 CLI 护栏入口执行同一检查，使用 `node dist/cli/index.js ci check-docs-sync`；该命令会同时执行 docs guardrail 与 `sync-analyze-docs.js --check`。
 - `ci check-branch --allow` 支持 `*` 通配；在 CI / PR 环境中，分支识别会回退到 `GITHUB_HEAD_REF` / `GITHUB_REF_NAME`。
 - `generate`、`analyze` 与 `ci check-headers -d` 共享 `.gitignore` 感知文件发现模块；没有 `.gitignore` 时回退到统一默认 `exclude`。
 - 涉及发布边界时，再补 `npm run build` 与 `npm run validate-pack`；不要把本地临时产物当成发布事实。
@@ -63,7 +63,7 @@
   - 当变更涉及 README、`docs/`、CLI 入口、测试配置或 CI 配置时，`.githooks/pre-commit` 还会执行 `npm run docs:check`。
   - `.githooks/commit-msg` 会校验 `[TAG] scope: message` 格式与单次 commit 文件数量。
 - 服务端护栏：
-  - `.github/workflows/ci-gateway.yml` 会执行 `npm run docs:check`、`npm run typecheck`、`npm test`、`npm run build`，并通过 `node dist/cli/index.js ci ...` 执行 `check-docs-sync`、`check-commits`、`check-commit-size`、`check-headers`、`assess-risk`、`check-output-contract` 与 AI feed 同步检查。
+  - `.github/workflows/ci-gateway.yml` 会执行 `npm run docs:check`、`npm run typecheck`、`npm test`、`npm run build`，并通过 `node dist/cli/index.js ci ...` 执行 `check-docs-sync`（含 docs guardrail + analyze generated block）、`check-commits`、`check-commit-size`、`check-headers`、`assess-risk`、`check-output-contract` 与 AI feed 同步检查。
   - `check-working-tree`、`check-branch`、`check-scripts` 作为共享发布前 gate checks，由本地 `ci` 命令提供，`ship` 的 CHECK 阶段直接复用它们。
   - `.github/workflows/publish.yml` 会在发布前执行 `npm test` 与 `npm run build`。
 - 仓库协议仍然禁止通过 `--no-verify`、关闭 hook、放宽阈值、删除检查项来"修复"问题。
@@ -105,7 +105,7 @@ AI 生成代码时，以下模式触发**硬性阻断**：
 ├─────────────────────────────────────────────────────────────┤
 │                   Infrastructure Layer                      │
 │  src/infrastructure/ - 技术实现细节                          │
-│  - storage/: FileSystemStorage, MemoryStorage, KuzuDBStorage, Neo4jStorage
+│  - storage/: FileSystemStorage, MemoryStorage, KuzuDBStorage
 │  - parser/: TypeScriptParser, GoParser, PythonParser, ParserRegistry
 │  - repositories/: CodeGraphRepositoryImpl                   │
 ├─────────────────────────────────────────────────────────────┤

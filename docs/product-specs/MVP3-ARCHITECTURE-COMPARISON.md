@@ -108,7 +108,7 @@
 │  │  │              │  │              │  │              │   │   │
 │  │  │ • FileSystem │  │ • TypeScript │  │ • LRU        │   │   │
 │  │  │ • KùzuDB ⭐  │  │ • Python ⭐  │  │ • File       │   │   │
-│  │  │ • Neo4j ⭐   │  │ • Java ⭐    │  │ • Incremental│   │   │
+│  │  │ • KùzuDB ⭐  │  │ • Java ⭐    │  │ • Incremental│   │   │
 │  │  └──────────────┘  └──────────────┘  └──────────────┘   │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                              │                                  │
@@ -123,7 +123,7 @@
 │                                                                 │
 │  ✅ 优势:                                                       │
 │  - 依赖方向清晰: Interface → Infrastructure → Domain → Server → CLI │
-│  - 存储可插拔: 支持文件系统、KùzuDB、Neo4j                      │
+│  - 存储可插拔: 支持文件系统、KùzuDB                              │
 │  - 语言易扩展: 实现 ILanguageParser 即可添加新语言               │
 │  - 业务内聚: Server Layer 统一管理用例                          │
 │  - 可测试性: 每层可独立单元测试                                  │
@@ -481,7 +481,7 @@ it('should generate code map', async () => {
 │     - 依赖方向明确，内层不依赖外层                                 │
 │                                                                 │
 │  🔌 可扩展性                                                      │
-│     - 存储可插拔: 文件系统 / KùzuDB / Neo4j                       │
+│     - 存储可插拔: 文件系统 / KùzuDB                               │
 │     - 语言可扩展: 14 种语言支持                                   │
 │     - 可视化可扩展: CLI / TUI / Web                               │
 │                                                                 │

@@ -711,7 +711,7 @@ mycodemap ci check-headers -f "src/index.ts,src/cli/index.ts"
 mycodemap ci assess-risk
 mycodemap ci assess-risk -t 0.5
 
-# 验证文档同步
+# 验证文档同步（含 analyze generated block 校验）
 mycodemap ci check-docs-sync
 
 # 验证输出契约
@@ -754,6 +754,7 @@ npm run test:all          # 功能 + 基准（串联执行）
 
 # 文档 / CLI 示例护栏
 npm run docs:check
+# `ci check-docs-sync` 会额外校验 analyze generated block
 node dist/cli/index.js ci check-docs-sync
 
 # 类型检查

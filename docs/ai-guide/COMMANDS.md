@@ -248,6 +248,8 @@ mycodemap ci assess-risk -f "changed.ts"
 mycodemap ci check-docs-sync
 mycodemap ci check-docs-sync --root "/path"
 
+> `ci check-docs-sync` 会串联 `scripts/validate-docs.js` 与 `scripts/sync-analyze-docs.js --check`，同时校验文档护栏和 analyze generated block。
+
 # 验证输出契约
 mycodemap ci check-output-contract
 mycodemap ci check-output-contract -s v1.0.0 -k 8 -t 160

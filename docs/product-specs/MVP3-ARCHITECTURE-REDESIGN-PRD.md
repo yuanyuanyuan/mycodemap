@@ -118,8 +118,7 @@
 // 用户配置示例
 type StorageConfig = 
   | { type: 'filesystem'; path: string }
-  | { type: 'kuzudb'; path: string }
-  | { type: 'neo4j'; uri: string; username: string; password: string };
+  | { type: 'kuzudb'; path: string };
 
 // 自动选择策略
 interface AutoStorageConfig {
@@ -137,7 +136,7 @@ interface AutoStorageConfig {
 |---------|----------|--------|----------|
 | SA-01 | 文件系统存储 (默认) | P0 | 与现有 JSON/Md 输出完全兼容 |
 | SA-02 | KùzuDB 嵌入式存储 | P1 | 查询性能比文件系统快 10x |
-| SA-03 | Neo4j 远程存储 | P2 | 支持企业级部署 |
+| SA-03 | 历史 `neo4j` 配置迁移诊断 | P1 | 旧配置返回显式错误，不静默 fallback |
 | SA-04 | 自动选择策略 | P1 | 根据项目规模自动选择后端 |
 | SA-05 | 存储迁移工具 | P2 | FS ↔ GraphDB 双向迁移 |
 
@@ -286,7 +285,7 @@ interface AutoStorageConfig {
 │  └── 正式发布                                                    │
 │                                                                 │
 │  v3.1.0+                                                        │
-│  └── 剩余 6 种语言 + Neo4j 后端                                  │
+│  └── 剩余 6 种语言 + Kùzu-only storage polish                    │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```

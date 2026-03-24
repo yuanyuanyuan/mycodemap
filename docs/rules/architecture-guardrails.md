@@ -35,7 +35,7 @@ CodeMap 采用 **MVP3 分层架构**，各层职责如下：
 ├─────────────────────────────────────────────────────────────┤
 │                   Infrastructure Layer                      │
 │  src/infrastructure/ - 技术实现细节                          │
-│  - storage/: FileSystemStorage, MemoryStorage, KuzuDBStorage, Neo4jStorage
+│  - storage/: FileSystemStorage, MemoryStorage, KuzuDBStorage
 │  - parser/: TypeScriptParser, GoParser, PythonParser, ParserRegistry
 │  - repositories/: CodeGraphRepositoryImpl（仓库接口实现）     │
 ├─────────────────────────────────────────────────────────────┤
@@ -180,7 +180,6 @@ src/
       FileSystemStorage.ts
       MemoryStorage.ts
       KuzuDBStorage.ts
-      Neo4jStorage.ts
       StorageFactory.ts
     parser/                # 解析器
       interfaces/

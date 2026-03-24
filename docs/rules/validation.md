@@ -4,8 +4,8 @@
 
 1. 先验证与你改动最相关的命令、测试或模块。
 2. 若改动影响 agent 路由、CLI 示例、规则文档或测试事实，先执行 `npm run docs:check`。
-3. 若改动同时影响 CLI 护栏入口，再补 `node dist/cli/index.js ci check-docs-sync`。
-4. 若改动涉及 `analyze` canonical 示例、选项表或 `AI_GUIDE.md` 速查模板，确认 `README.md`、`docs/ai-guide/COMMANDS.md` 与 `AI_GUIDE.md` 的 generated block 仍能通过 `node scripts/sync-analyze-docs.js --check`。
+3. 若改动同时影响 CLI 护栏入口，再补 `node dist/cli/index.js ci check-docs-sync`；该命令会串联 docs guardrail 与 analyze generated block 校验。
+4. 若改动涉及 `analyze` canonical 示例、选项表或 `AI_GUIDE.md` 速查模板，优先用 `node scripts/sync-analyze-docs.js --check` 直接定位 generated block 漂移。
 5. 若改动涉及产品定位、输出契约、共享文件发现规则或 `Server Layer` / `mycodemap server` 边界，确认 README、AI 文档、架构文档和 guardrail 脚本使用同一套措辞。
 6. 若改动涉及 `mycodemap.config.json.storage` 或图数据库适配器，至少补跑对应 storage adapter 定点测试，并确认 `README.md`、`AI_GUIDE.md`、`docs/ai-guide/COMMANDS.md`、`docs/SETUP_GUIDE.md`、`mycodemap.config.schema.json` 与 guardrail 脚本同步。
 7. 再扩大到 `npm run typecheck`、`npm run lint`、`npm test`。
@@ -21,6 +21,8 @@ CI Gateway 已集成以下自动检查（按执行顺序）：
 4. `npm test` - 单元测试
 5. `npm run build` - 构建验证
 6. CLI 相关检查（当前 CI Gateway 直接执行 `check-docs-sync`、commit 格式、文件头、risk、output contract；`ship` 的本地 CHECK 阶段复用 `check-working-tree`、`check-branch`、`check-scripts`）
+
+> 当前 `check-docs-sync` 会串联 docs guardrail 与 analyze generated block 校验。
 
 ## 强约束
 

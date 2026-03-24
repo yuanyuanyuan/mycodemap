@@ -54,7 +54,7 @@ cat .mycodemap/AI_MAP.md
 | "查找与 XXX 相关的代码" | `query -S "XXX" -j` |
 | "这个改动安全吗" | `ci assess-risk` |
 | "发布前是否满足门禁" | `ci check-working-tree → ci check-branch → ci check-scripts` |
-| "需要验证文档/契约是否同步" | `ci check-docs-sync` |
+| "需要验证文档/契约是否同步" | `ci check-docs-sync`（含 analyze generated block 校验） |
 | "需要导出结构化结果" | `export json -o ./output.json` |
 | "需要插件诊断/扩展结果" | `generate` → 读 `AI_MAP.md` 的 `Plugin Summary` 或解析 `codemap.json.pluginReport` |
 | "需要切换/排查图存储后端" | 编辑 `mycodemap.config.json.storage` → 运行 `generate` / `export` |

@@ -41,7 +41,7 @@ jobs:
       - name: Build CLI
         run: npm run build
 
-      - name: Check docs sync via CLI
+      - name: Check docs sync via CLI (guardrail + analyze blocks)
         run: node dist/cli/index.js ci check-docs-sync
 
       - name: Check commit format
