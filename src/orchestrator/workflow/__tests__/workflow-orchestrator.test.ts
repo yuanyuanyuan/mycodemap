@@ -31,7 +31,7 @@ vi.mock('../tool-orchestrator.js', () => ({
 vi.mock('../intent-router.js', () => ({
   IntentRouter: vi.fn().mockImplementation(() => ({
     route: vi.fn().mockReturnValue({
-      intent: 'reference',
+      intent: 'find',
       targets: ['src/'],
       keywords: ['test'],
       scope: 'direct',
@@ -99,7 +99,7 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
       expect(context).toBeDefined();
       expect(context.id).toMatch(/^wf-\d+-/);
       expect(context.task).toBe('test task');
-      expect(context.currentPhase).toBe('reference');
+      expect(context.currentPhase).toBe('find');
       expect(context.phaseStatus).toBe('pending');
     });
 
@@ -124,10 +124,10 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
       const context = await orchestrator.start('bugfix task', { template: 'bugfix' });
 
       expect(context.templateName).toBe('bugfix');
-      expect(context.currentPhase).toBe('reference');
+      expect(context.currentPhase).toBe('find');
 
       const nextPhase = await orchestrator.proceedToNextPhase(true);
-      expect(nextPhase).toBe('implementation');
+      expect(nextPhase).toBe('read');
     });
   });
 
@@ -155,7 +155,7 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
       
       const result = await orchestrator.executeCurrentPhase({ targets: ['src/'] } as AnalyzeArgs);
 
-      expect(result.artifacts.phase).toBe('reference');
+      expect(result.artifacts.phase).toBe('find');
       expect(result.artifacts.createdAt).toBeInstanceOf(Date);
       // Confidence is calculated from mocked calculateConfidence
       expect(result.confidence.score).toBeDefined();
@@ -167,7 +167,7 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
       await orchestrator.executeCurrentPhase({ targets: ['src/'] } as AnalyzeArgs);
 
       const context = orchestrator.getContext();
-      expect(context?.artifacts.has('reference')).toBe(true);
+      expect(context?.artifacts.has('find')).toBe(true);
     });
 
     it('should update context status to completed', async () => {
@@ -186,9 +186,9 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
       // Complete current phase
       await orchestrator.executeCurrentPhase({ targets: ['src/'] } as AnalyzeArgs);
       
-      // Should proceed to impact
+      // Should proceed to read
       const nextPhase = await orchestrator.proceedToNextPhase();
-      expect(nextPhase).toBe('impact');
+      expect(nextPhase).toBe('read');
     });
 
     it('should throw error when no active workflow', async () => {
@@ -209,7 +209,7 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
       // Don't execute phase
       
       const nextPhase = await orchestrator.proceedToNextPhase(true);
-      expect(nextPhase).toBe('impact');
+      expect(nextPhase).toBe('read');
     });
 
     it('should update phase status correctly', async () => {
@@ -219,22 +219,20 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
       await orchestrator.proceedToNextPhase();
       
       const context = orchestrator.getContext();
-      expect(context?.currentPhase).toBe('impact');
+      expect(context?.currentPhase).toBe('read');
       expect(context?.phaseStatus).toBe('pending');
     });
 
     it('should throw error when no next phase available', async () => {
       await orchestrator.start('test task');
       
-      // Navigate to last phase (ci)
+      // Navigate to last phase (show)
       await orchestrator.executeCurrentPhase({ targets: ['src/'] } as AnalyzeArgs);
-      await orchestrator.proceedToNextPhase(true); // reference -> impact
-      await orchestrator.proceedToNextPhase(true); // impact -> risk
-      await orchestrator.proceedToNextPhase(true); // risk -> implementation
-      await orchestrator.proceedToNextPhase(true); // implementation -> commit
-      await orchestrator.proceedToNextPhase(true); // commit -> ci
+      await orchestrator.proceedToNextPhase(true); // find -> read
+      await orchestrator.proceedToNextPhase(true); // read -> link
+      await orchestrator.proceedToNextPhase(true); // link -> show
       
-      // ci has no nextPhase
+      // show has no nextPhase
       await expect(orchestrator.proceedToNextPhase(true)).rejects.toThrow('No next phase available');
     });
   });
@@ -254,7 +252,7 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
       
       expect(status.active).toBe(true);
       expect(status.task).toBe('test task');
-      expect(status.currentPhase).toBe('reference');
+      expect(status.currentPhase).toBe('find');
       expect(status.phaseStatus).toBe('pending');
       expect(typeof status.progress).toBe('number');
     });
@@ -265,7 +263,7 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
       
       const status = await orchestrator.getStatus();
       
-      expect(status.artifacts).toContain('reference');
+      expect(status.artifacts).toContain('find');
     });
 
     it('should calculate progress correctly', async () => {
@@ -286,7 +284,7 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
       const workflowData = {
         id: 'wf-resume-001',
         task: 'resumed task',
-        currentPhase: 'impact',
+        currentPhase: 'read',
         phaseStatus: 'completed',
         artifacts: [],
         cachedResults: {},
@@ -309,14 +307,14 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
       expect(result).not.toBeNull();
       expect(result?.id).toBe('wf-resume-001');
       expect(result?.task).toBe('resumed task');
-      expect(result?.currentPhase).toBe('impact');
+      expect(result?.currentPhase).toBe('read');
     });
 
     it('should set context on orchestrator', async () => {
       const workflowData = {
         id: 'wf-resume-002',
         task: 'resumed task',
-        currentPhase: 'reference',
+        currentPhase: 'find',
         phaseStatus: 'pending',
         artifacts: [],
         cachedResults: {},
@@ -355,7 +353,7 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
         id: 'wf-active-001',
         task: 'template task',
         templateName: 'bugfix',
-        currentPhase: 'reference',
+        currentPhase: 'find',
         phaseStatus: 'pending',
         artifacts: [],
         cachedResults: {},
@@ -375,7 +373,7 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
       const resumed = await testOrchestrator.resumeActive();
 
       expect(resumed?.templateName).toBe('bugfix');
-      expect(testOrchestrator.getPhaseDefinition('reference')?.nextPhase).toBe('implementation');
+      expect(testOrchestrator.getPhaseDefinition('find')?.nextPhase).toBe('read');
     });
   });
 
@@ -387,7 +385,7 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
       const nextPhase = await orchestrator.proceedToNextPhase(true);
 
       expect(updated.templateName).toBe('bugfix');
-      expect(nextPhase).toBe('implementation');
+      expect(nextPhase).toBe('read');
     });
   });
 
@@ -413,7 +411,7 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
   describe('getGuidance()', () => {
     it('should suggest auto-proceed for high confidence', () => {
       const confidence: ConfidenceResult = { score: 0.85, level: 'high', reasons: [] };
-      const guidance = orchestrator.getGuidance(confidence, 'reference');
+      const guidance = orchestrator.getGuidance(confidence, 'find');
       
       expect(guidance.action).toBe('auto-proceed');
       expect(guidance.message).toContain('High confidence');
@@ -422,7 +420,7 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
 
     it('should suggest confirm-proceed for medium confidence', () => {
       const confidence: ConfidenceResult = { score: 0.55, level: 'medium', reasons: [] };
-      const guidance = orchestrator.getGuidance(confidence, 'reference');
+      const guidance = orchestrator.getGuidance(confidence, 'find');
       
       expect(guidance.action).toBe('confirm-proceed');
       expect(guidance.message).toContain('Medium confidence');
@@ -435,7 +433,7 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
         level: 'low', 
         reasons: ['insufficient data', 'low coverage'] 
       };
-      const guidance = orchestrator.getGuidance(confidence, 'reference');
+      const guidance = orchestrator.getGuidance(confidence, 'find');
       
       expect(guidance.action).toBe('hold');
       expect(guidance.message).toContain('Low confidence');
@@ -445,42 +443,36 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
   });
 
   describe('phase definitions', () => {
-    it('should have all 6 phases defined', () => {
+    it('should have all 4 analysis phases defined', () => {
       const definitions = orchestrator.getAllPhaseDefinitions();
       
-      expect(definitions).toHaveLength(6);
+      expect(definitions).toHaveLength(4);
       
       const phaseNames = definitions.map(d => d.name);
-      expect(phaseNames).toContain('reference');
-      expect(phaseNames).toContain('impact');
-      expect(phaseNames).toContain('risk');
-      expect(phaseNames).toContain('implementation');
-      expect(phaseNames).toContain('commit');
-      expect(phaseNames).toContain('ci');
+      expect(phaseNames).toContain('find');
+      expect(phaseNames).toContain('read');
+      expect(phaseNames).toContain('link');
+      expect(phaseNames).toContain('show');
     });
 
     it('should have correct phase chain', () => {
-      const reference = orchestrator.getPhaseDefinition('reference');
-      const impact = orchestrator.getPhaseDefinition('impact');
-      const risk = orchestrator.getPhaseDefinition('risk');
-      const implementation = orchestrator.getPhaseDefinition('implementation');
-      const commit = orchestrator.getPhaseDefinition('commit');
-      const ci = orchestrator.getPhaseDefinition('ci');
+      const find = orchestrator.getPhaseDefinition('find');
+      const read = orchestrator.getPhaseDefinition('read');
+      const link = orchestrator.getPhaseDefinition('link');
+      const show = orchestrator.getPhaseDefinition('show');
       
-      expect(reference?.nextPhase).toBe('impact');
-      expect(impact?.nextPhase).toBe('risk');
-      expect(risk?.nextPhase).toBe('implementation');
-      expect(implementation?.nextPhase).toBe('commit');
-      expect(commit?.nextPhase).toBe('ci');
-      expect(ci?.nextPhase).toBeUndefined();
+      expect(find?.nextPhase).toBe('read');
+      expect(read?.nextPhase).toBe('link');
+      expect(link?.nextPhase).toBe('show');
+      expect(show?.nextPhase).toBeUndefined();
     });
 
     it('should get specific phase definition', () => {
-      const reference = orchestrator.getPhaseDefinition('reference');
+      const find = orchestrator.getPhaseDefinition('find');
       
-      expect(reference).toBeDefined();
-      expect(reference?.name).toBe('reference');
-      expect(reference?.action).toBe('analyze');
+      expect(find).toBeDefined();
+      expect(find?.name).toBe('find');
+      expect(find?.action).toBe('analyze');
     });
 
     it('should return undefined for unknown phase', () => {
@@ -490,13 +482,13 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
     });
 
     it('should have correct action types for each phase', () => {
-      const reference = orchestrator.getPhaseDefinition('reference');
-      const risk = orchestrator.getPhaseDefinition('risk');
-      const implementation = orchestrator.getPhaseDefinition('implementation');
+      const find = orchestrator.getPhaseDefinition('find');
+      const link = orchestrator.getPhaseDefinition('link');
+      const show = orchestrator.getPhaseDefinition('show');
       
-      expect(reference?.action).toBe('analyze');
-      expect(risk?.action).toBe('ci');
-      expect(implementation?.action).toBe('manual');
+      expect(find?.action).toBe('analyze');
+      expect(link?.action).toBe('analyze');
+      expect(show?.action).toBe('analyze');
     });
   });
 
@@ -506,7 +498,7 @@ describe('PHASE 5: WorkflowOrchestrator Tests', () => {
       const workflowData = {
         id: 'wf-001',
         task: 'task 1',
-        currentPhase: 'reference',
+        currentPhase: 'find',
         phaseStatus: 'pending',
         startedAt: '2025-01-20T10:00:00Z',
         updatedAt: '2025-01-20T10:30:00Z'

@@ -34,7 +34,7 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
 
       const definition: PhaseDefinition = {
-        name: 'reference',
+        name: 'find',
         action: 'analyze',
         entryCondition: {},
         deliverables: [
@@ -44,11 +44,11 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
       };
 
       const artifacts: PhaseArtifacts = {
-        phase: 'reference',
+        phase: 'find',
         createdAt: new Date()
       };
 
-      const result = await checkpoint.validate('reference', artifacts, definition);
+      const result = await checkpoint.validate('find', artifacts, definition);
 
       expect(result.passed).toBe(true);
       expect(result.items).toHaveLength(1);
@@ -63,7 +63,7 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
       vi.mocked(fs.access).mockRejectedValue(error);
 
       const definition: PhaseDefinition = {
-        name: 'reference',
+        name: 'find',
         action: 'analyze',
         entryCondition: {},
         deliverables: [
@@ -73,11 +73,11 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
       };
 
       const artifacts: PhaseArtifacts = {
-        phase: 'reference',
+        phase: 'find',
         createdAt: new Date()
       };
 
-      const result = await checkpoint.validate('reference', artifacts, definition);
+      const result = await checkpoint.validate('find', artifacts, definition);
 
       expect(result.passed).toBe(false);
       expect(result.items[0].exists).toBe(false);
@@ -89,7 +89,7 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
 
       const definition: PhaseDefinition = {
-        name: 'reference',
+        name: 'find',
         action: 'analyze',
         entryCondition: {},
         deliverables: [
@@ -99,11 +99,11 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
       };
 
       const artifacts: PhaseArtifacts = {
-        phase: 'reference',
+        phase: 'find',
         createdAt: new Date()
       };
 
-      const result = await checkpoint.validate('reference', artifacts, definition);
+      const result = await checkpoint.validate('find', artifacts, definition);
 
       expect(result.passed).toBe(false);
       expect(result.items[0].exists).toBe(true);
@@ -117,7 +117,7 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
         .mockRejectedValueOnce(new Error('ENOENT'));
 
       const definition: PhaseDefinition = {
-        name: 'reference',
+        name: 'find',
         action: 'analyze',
         entryCondition: {},
         deliverables: [
@@ -128,11 +128,11 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
       };
 
       const artifacts: PhaseArtifacts = {
-        phase: 'reference',
+        phase: 'find',
         createdAt: new Date()
       };
 
-      const result = await checkpoint.validate('reference', artifacts, definition);
+      const result = await checkpoint.validate('find', artifacts, definition);
 
       expect(result.passed).toBe(false);
       expect(result.items).toHaveLength(2);
@@ -142,7 +142,7 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
 
     it('should pass with empty deliverables array', async () => {
       const definition: PhaseDefinition = {
-        name: 'reference',
+        name: 'find',
         action: 'analyze',
         entryCondition: {},
         deliverables: [],
@@ -150,11 +150,11 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
       };
 
       const artifacts: PhaseArtifacts = {
-        phase: 'reference',
+        phase: 'find',
         createdAt: new Date()
       };
 
-      const result = await checkpoint.validate('reference', artifacts, definition);
+      const result = await checkpoint.validate('find', artifacts, definition);
 
       expect(result.passed).toBe(true);
       expect(result.items).toHaveLength(0);
@@ -166,23 +166,23 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
 
       const phases = new Map<WorkflowPhase, PhaseArtifacts>([
-        ['reference', { phase: 'reference', createdAt: new Date() }],
-        ['impact', { phase: 'impact', createdAt: new Date() }]
+        ['find', { phase: 'find', createdAt: new Date() }],
+        ['read', { phase: 'read', createdAt: new Date() }]
       ]);
 
       const definitions = new Map<WorkflowPhase, PhaseDefinition>([
-        ['reference', {
-          name: 'reference',
+        ['find', {
+          name: 'find',
           action: 'analyze',
           entryCondition: {},
-          deliverables: [{ name: 'ref', path: '/ref.json', validator: () => true }],
+          deliverables: [{ name: 'find-results', path: '/find.json', validator: () => true }],
           commands: []
         }],
-        ['impact', {
-          name: 'impact',
+        ['read', {
+          name: 'read',
           action: 'analyze',
           entryCondition: {},
-          deliverables: [{ name: 'imp', path: '/imp.json', validator: () => true }],
+          deliverables: [{ name: 'read-results', path: '/read.json', validator: () => true }],
           commands: []
         }]
       ]);
@@ -190,8 +190,8 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
       const results = await checkpoint.validateAll(phases, definitions);
 
       expect(results).toHaveLength(2);
-      expect(results[0].phase).toBe('reference');
-      expect(results[1].phase).toBe('impact');
+      expect(results[0].phase).toBe('find');
+      expect(results[1].phase).toBe('read');
       expect(results[0].result.passed).toBe(true);
       expect(results[1].result.passed).toBe(true);
     });
@@ -200,13 +200,13 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
 
       const phases = new Map<WorkflowPhase, PhaseArtifacts>([
-        ['reference', { phase: 'reference', createdAt: new Date() }],
+        ['find', { phase: 'find', createdAt: new Date() }],
         ['unknown', { phase: 'unknown' as WorkflowPhase, createdAt: new Date() }]
       ]);
 
       const definitions = new Map<WorkflowPhase, PhaseDefinition>([
-        ['reference', {
-          name: 'reference',
+        ['find', {
+          name: 'find',
           action: 'analyze',
           entryCondition: {},
           deliverables: [],
@@ -217,7 +217,7 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
       const results = await checkpoint.validateAll(phases, definitions);
 
       expect(results).toHaveLength(1);
-      expect(results[0].phase).toBe('reference');
+      expect(results[0].phase).toBe('find');
     });
 
     it('should handle empty phases map', async () => {
@@ -233,9 +233,9 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
   describe('getSummary()', () => {
     it('should calculate correct summary statistics', () => {
       const results = [
-        { phase: 'reference' as WorkflowPhase, result: { passed: true, items: [] } },
-        { phase: 'impact' as WorkflowPhase, result: { passed: true, items: [] } },
-        { phase: 'risk' as WorkflowPhase, result: { passed: false, items: [] } }
+        { phase: 'find' as WorkflowPhase, result: { passed: true, items: [] } },
+        { phase: 'read' as WorkflowPhase, result: { passed: true, items: [] } },
+        { phase: 'link' as WorkflowPhase, result: { passed: false, items: [] } }
       ];
 
       const summary = checkpoint.getSummary(results);
@@ -247,14 +247,14 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
 
     it('should record phases with boolean values', () => {
       const results = [
-        { phase: 'reference' as WorkflowPhase, result: { passed: true, items: [] } },
-        { phase: 'impact' as WorkflowPhase, result: { passed: false, items: [] } }
+        { phase: 'find' as WorkflowPhase, result: { passed: true, items: [] } },
+        { phase: 'read' as WorkflowPhase, result: { passed: false, items: [] } }
       ];
 
       const summary = checkpoint.getSummary(results);
 
-      expect(summary.phases.reference).toBe(true);
-      expect(summary.phases.impact).toBe(false);
+      expect(summary.phases.find).toBe(true);
+      expect(summary.phases.read).toBe(false);
     });
 
     it('should handle empty results array', () => {
@@ -268,8 +268,8 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
 
     it('should handle all passed results', () => {
       const results = [
-        { phase: 'reference' as WorkflowPhase, result: { passed: true, items: [] } },
-        { phase: 'impact' as WorkflowPhase, result: { passed: true, items: [] } }
+        { phase: 'find' as WorkflowPhase, result: { passed: true, items: [] } },
+        { phase: 'read' as WorkflowPhase, result: { passed: true, items: [] } }
       ];
 
       const summary = checkpoint.getSummary(results);
@@ -281,8 +281,8 @@ describe('PHASE 3: PhaseCheckpoint Tests', () => {
 
     it('should handle all failed results', () => {
       const results = [
-        { phase: 'reference' as WorkflowPhase, result: { passed: false, items: [] } },
-        { phase: 'impact' as WorkflowPhase, result: { passed: false, items: [] } }
+        { phase: 'find' as WorkflowPhase, result: { passed: false, items: [] } },
+        { phase: 'read' as WorkflowPhase, result: { passed: false, items: [] } }
       ];
 
       const summary = checkpoint.getSummary(results);

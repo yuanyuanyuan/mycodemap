@@ -40,19 +40,19 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
     return {
       id: 'wf-test-001',
       task: 'test task',
-      currentPhase: 'reference' as WorkflowPhase,
+      currentPhase: 'find' as WorkflowPhase,
       phaseStatus: 'pending',
       artifacts: new Map<WorkflowPhase, PhaseArtifacts>([
-        ['reference', {
-          phase: 'reference',
+        ['find', {
+          phase: 'find',
           results: [{ id: '1', source: 'test' }],
           confidence: { score: 0.8, level: 'high', reasons: ['good'] },
           metadata: { key: 'value' },
           createdAt: new Date('2025-01-20T10:00:00Z')
         }]
       ]),
-      cachedResults: { reference: [] },
-      userConfirmed: new Set<WorkflowPhase>(['reference']),
+      cachedResults: { find: [] },
+      userConfirmed: new Set<WorkflowPhase>(['find']),
       startedAt: new Date('2025-01-20T10:00:00Z'),
       updatedAt: new Date('2025-01-20T10:30:00Z')
     };
@@ -73,7 +73,7 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
       // Map should be serialized to array of entries
       expect(Array.isArray(savedData.artifacts)).toBe(true);
       expect(savedData.artifacts).toHaveLength(1);
-      expect(savedData.artifacts[0][0]).toBe('reference');
+      expect(savedData.artifacts[0][0]).toBe('find');
     });
 
     it('should serialize Set userConfirmed to array', async () => {
@@ -86,7 +86,7 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
       
       // Set should be serialized to array
       expect(Array.isArray(savedData.userConfirmed)).toBe(true);
-      expect(savedData.userConfirmed).toContain('reference');
+      expect(savedData.userConfirmed).toContain('find');
     });
 
     it('should serialize Date objects to ISO strings', async () => {
@@ -154,10 +154,10 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
       const serializedData = {
         id: 'wf-test-001',
         task: 'test task',
-        currentPhase: 'reference',
+        currentPhase: 'find',
         phaseStatus: 'pending',
-        artifacts: [['reference', {
-          phase: 'reference',
+        artifacts: [['find', {
+          phase: 'find',
           createdAt: '2025-01-20T10:00:00Z'
         }]],
         cachedResults: {},
@@ -172,18 +172,18 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
 
       expect(result).not.toBeNull();
       expect(result!.artifacts).toBeInstanceOf(Map);
-      expect(result!.artifacts.has('reference')).toBe(true);
+      expect(result!.artifacts.has('find')).toBe(true);
     });
 
     it('should deserialize and restore Set userConfirmed', async () => {
       const serializedData = {
         id: 'wf-test-001',
         task: 'test task',
-        currentPhase: 'reference',
+        currentPhase: 'find',
         phaseStatus: 'pending',
         artifacts: [],
         cachedResults: {},
-        userConfirmed: ['reference', 'impact'],
+        userConfirmed: ['find', 'read'],
         startedAt: '2025-01-20T10:00:00Z',
         updatedAt: '2025-01-20T10:30:00Z'
       };
@@ -194,15 +194,15 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
 
       expect(result).not.toBeNull();
       expect(result!.userConfirmed).toBeInstanceOf(Set);
-      expect(result!.userConfirmed.has('reference')).toBe(true);
-      expect(result!.userConfirmed.has('impact')).toBe(true);
+      expect(result!.userConfirmed.has('find')).toBe(true);
+      expect(result!.userConfirmed.has('read')).toBe(true);
     });
 
     it('should deserialize and restore Date objects', async () => {
       const serializedData = {
         id: 'wf-test-001',
         task: 'test task',
-        currentPhase: 'reference',
+        currentPhase: 'find',
         phaseStatus: 'pending',
         artifacts: [],
         cachedResults: {},
@@ -225,10 +225,10 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
       const serializedData = {
         id: 'wf-test-001',
         task: 'test task',
-        currentPhase: 'reference',
+        currentPhase: 'find',
         phaseStatus: 'pending',
-        artifacts: [['reference', {
-          phase: 'reference',
+        artifacts: [['find', {
+          phase: 'find',
           createdAt: '2025-01-20T10:00:00Z'
         }]],
         cachedResults: {},
@@ -241,7 +241,7 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
 
       const result = await persistence.load('wf-test-001');
 
-      const artifact = result!.artifacts.get('reference');
+      const artifact = result!.artifacts.get('find');
       expect(artifact!.createdAt).toBeInstanceOf(Date);
     });
 
@@ -270,7 +270,7 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
       const workflowData = {
         id: 'wf-active-001',
         task: 'active task',
-        currentPhase: 'reference',
+        currentPhase: 'find',
         phaseStatus: 'running',
         artifacts: [],
         cachedResults: {},
@@ -314,7 +314,7 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
       const workflow1 = {
         id: 'wf-001',
         task: 'task 1',
-        currentPhase: 'reference',
+        currentPhase: 'find',
         phaseStatus: 'pending',
         startedAt: '2025-01-20T10:00:00Z',
         updatedAt: '2025-01-20T10:30:00Z'
@@ -322,7 +322,7 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
       const workflow2 = {
         id: 'wf-002',
         task: 'task 2',
-        currentPhase: 'impact',
+        currentPhase: 'read',
         phaseStatus: 'completed',
         startedAt: '2025-01-20T11:00:00Z',
         updatedAt: '2025-01-20T11:30:00Z'
@@ -347,7 +347,7 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
       const workflow1 = {
         id: 'wf-001',
         task: 'task 1',
-        currentPhase: 'reference',
+        currentPhase: 'find',
         phaseStatus: 'pending',
         startedAt: '2025-01-20T10:00:00Z',
         updatedAt: '2025-01-20T10:30:00Z'
@@ -389,7 +389,7 @@ describe('PHASE 4: WorkflowPersistence Tests', () => {
       const workflow = {
         id: 'wf-001',
         task: 'task',
-        currentPhase: 'reference',
+        currentPhase: 'find',
         phaseStatus: 'pending',
         startedAt: '2025-01-20T10:00:00Z',
         updatedAt: '2025-01-20T10:30:00Z'

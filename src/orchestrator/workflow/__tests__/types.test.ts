@@ -30,26 +30,22 @@ import type {
 
 describe('PHASE 1: Type Definitions', () => {
   describe('WorkflowPhase union type', () => {
-    it('should have WorkflowPhase with 6 phases', () => {
+    it('should have WorkflowPhase with 4 analysis phases', () => {
       const validPhases: WorkflowPhase[] = [
-        'reference',
-        'impact',
-        'risk',
-        'implementation',
-        'commit',
-        'ci'
+        'find',
+        'read',
+        'link',
+        'show'
       ];
-      expect(validPhases).toHaveLength(6);
+      expect(validPhases).toHaveLength(4);
     });
 
     it('should accept all valid phase values', () => {
-      const phase1: WorkflowPhase = 'reference';
-      const phase2: WorkflowPhase = 'impact';
-      const phase3: WorkflowPhase = 'risk';
-      const phase4: WorkflowPhase = 'implementation';
-      const phase5: WorkflowPhase = 'commit';
-      const phase6: WorkflowPhase = 'ci';
-      expect([phase1, phase2, phase3, phase4, phase5, phase6]).toHaveLength(6);
+      const phase1: WorkflowPhase = 'find';
+      const phase2: WorkflowPhase = 'read';
+      const phase3: WorkflowPhase = 'link';
+      const phase4: WorkflowPhase = 'show';
+      expect([phase1, phase2, phase3, phase4]).toHaveLength(4);
     });
   });
 
@@ -110,32 +106,32 @@ describe('PHASE 1: Type Definitions', () => {
   describe('PhaseDefinition interface', () => {
     it('should define PhaseDefinition interface with all required fields', () => {
       const definition: PhaseDefinition = {
-        name: 'reference',
+        name: 'find',
         action: 'analyze',
-        analyzeIntent: 'reference',
+        analyzeIntent: 'find',
         entryCondition: { minConfidence: 0.3 },
         deliverables: [],
-        nextPhase: 'impact',
-        commands: ['codemap analyze']
+        nextPhase: 'read',
+        commands: ['codemap analyze --intent find']
       };
-      expect(definition.name).toBe('reference');
+      expect(definition.name).toBe('find');
       expect(definition.action).toBe('analyze');
       expect(definition.entryCondition).toBeDefined();
       expect(definition.deliverables).toEqual([]);
-      expect(definition.commands).toContain('codemap analyze');
+      expect(definition.commands).toContain('codemap analyze --intent find');
     });
   });
 
   describe('PhaseArtifacts interface', () => {
     it('should define PhaseArtifacts interface with createdAt Date', () => {
       const artifacts: PhaseArtifacts = {
-        phase: 'reference',
+        phase: 'find',
         results: [],
         confidence: { score: 0.8, level: 'high', reasons: [] },
         metadata: { key: 'value' },
         createdAt: new Date()
       };
-      expect(artifacts.phase).toBe('reference');
+      expect(artifacts.phase).toBe('find');
       expect(artifacts.createdAt).toBeInstanceOf(Date);
       expect(artifacts.metadata).toEqual({ key: 'value' });
     });
@@ -144,11 +140,11 @@ describe('PHASE 1: Type Definitions', () => {
   describe('CachedResults interface', () => {
     it('should define CachedResults interface with optional fields', () => {
       const cached: CachedResults = {
-        reference: [],
-        impact: []
+        find: [],
+        read: []
       };
-      expect(cached.reference).toEqual([]);
-      expect(cached.impact).toEqual([]);
+      expect(cached.find).toEqual([]);
+      expect(cached.read).toEqual([]);
     });
   });
 
@@ -170,7 +166,7 @@ describe('PHASE 1: Type Definitions', () => {
       const context: WorkflowContext = {
         id: 'wf-test-001',
         task: 'test task',
-        currentPhase: 'reference',
+        currentPhase: 'find',
         phaseStatus: 'pending',
         artifacts: new Map(),
         cachedResults: {},
@@ -190,10 +186,10 @@ describe('PHASE 1: Type Definitions', () => {
       const status: WorkflowStatus = {
         active: true,
         task: 'test',
-        currentPhase: 'reference',
+        currentPhase: 'find',
         phaseStatus: 'running',
         progress: 50,
-        artifacts: ['reference']
+        artifacts: ['find']
       };
       expect(status.active).toBe(true);
       expect(status.progress).toBe(50);
@@ -209,14 +205,14 @@ describe('PHASE 1: Type Definitions', () => {
     it('should define PhaseResult interface with required fields', () => {
       const result: PhaseResult = {
         artifacts: {
-          phase: 'reference',
+          phase: 'find',
           createdAt: new Date()
         },
         confidence: { score: 0.8, level: 'high', reasons: [] },
         canProceed: true
       };
       expect(result.canProceed).toBe(true);
-      expect(result.artifacts.phase).toBe('reference');
+      expect(result.artifacts.phase).toBe('find');
     });
   });
 
@@ -225,7 +221,7 @@ describe('PHASE 1: Type Definitions', () => {
       const summary: WorkflowSummary = {
         id: 'wf-001',
         task: 'test',
-        currentPhase: 'reference',
+        currentPhase: 'find',
         phaseStatus: 'pending',
         updatedAt: new Date().toISOString()
       };

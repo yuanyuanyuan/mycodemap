@@ -19,7 +19,7 @@ describe('PHASE 2: WorkflowContext Tests', () => {
         
         expect(context.id).toMatch(/^wf-\d+-[a-z0-9]+$/);
         expect(context.task).toBe('test task');
-        expect(context.currentPhase).toBe('reference');
+        expect(context.currentPhase).toBe('find');
         expect(context.phaseStatus).toBe('pending');
       });
 
@@ -132,10 +132,10 @@ describe('PHASE 2: WorkflowContext Tests', () => {
     describe('createPhaseArtifacts()', () => {
       it('should create phase artifacts with createdAt timestamp', () => {
         const before = new Date();
-        const artifacts = WorkflowContextFactory.createPhaseArtifacts('reference');
+        const artifacts = WorkflowContextFactory.createPhaseArtifacts('find');
         const after = new Date();
         
-        expect(artifacts.phase).toBe('reference');
+        expect(artifacts.phase).toBe('find');
         expect(artifacts.createdAt).toBeInstanceOf(Date);
         expect(artifacts.createdAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
         expect(artifacts.createdAt.getTime()).toBeLessThanOrEqual(after.getTime());
@@ -143,21 +143,21 @@ describe('PHASE 2: WorkflowContext Tests', () => {
 
       it('should create artifacts with optional results', () => {
         const results = [{ id: '1', source: 'test' }];
-        const artifacts = WorkflowContextFactory.createPhaseArtifacts('reference', results);
+        const artifacts = WorkflowContextFactory.createPhaseArtifacts('find', results);
         
         expect(artifacts.results).toEqual(results);
       });
 
       it('should create artifacts with optional confidence', () => {
         const confidence = { score: 0.8, level: 'high', reasons: ['good'] };
-        const artifacts = WorkflowContextFactory.createPhaseArtifacts('reference', [], confidence);
+        const artifacts = WorkflowContextFactory.createPhaseArtifacts('find', [], confidence);
         
         expect(artifacts.confidence).toEqual(confidence);
       });
 
       it('should create artifacts with optional metadata', () => {
         const metadata = { key: 'value', count: 42 };
-        const artifacts = WorkflowContextFactory.createPhaseArtifacts('reference', [], undefined, metadata);
+        const artifacts = WorkflowContextFactory.createPhaseArtifacts('find', [], undefined, metadata);
         
         expect(artifacts.metadata).toEqual(metadata);
       });
@@ -167,9 +167,9 @@ describe('PHASE 2: WorkflowContext Tests', () => {
         const confidence = { score: 0.9, level: 'high', reasons: [] };
         const metadata = { extra: 'data' };
         
-        const artifacts = WorkflowContextFactory.createPhaseArtifacts('impact', results, confidence, metadata);
+        const artifacts = WorkflowContextFactory.createPhaseArtifacts('read', results, confidence, metadata);
         
-        expect(artifacts.phase).toBe('impact');
+        expect(artifacts.phase).toBe('read');
         expect(artifacts.results).toEqual(results);
         expect(artifacts.confidence).toEqual(confidence);
         expect(artifacts.metadata).toEqual(metadata);
@@ -187,8 +187,8 @@ describe('PHASE 2: WorkflowContext Tests', () => {
     describe('canProceed()', () => {
       it('should allow proceeding when phase is completed and has artifacts', () => {
         baseContext.phaseStatus = 'completed';
-        baseContext.artifacts.set('reference', {
-          phase: 'reference',
+        baseContext.artifacts.set('find', {
+          phase: 'find',
           createdAt: new Date()
         });
         
@@ -200,8 +200,8 @@ describe('PHASE 2: WorkflowContext Tests', () => {
 
       it('should allow proceeding when phase is verified', () => {
         baseContext.phaseStatus = 'verified';
-        baseContext.artifacts.set('reference', {
-          phase: 'reference',
+        baseContext.artifacts.set('find', {
+          phase: 'find',
           createdAt: new Date()
         });
         

@@ -90,14 +90,12 @@ describe('PHASE 1: Configuration Constants', () => {
       expect(CONFIDENCE_REQUIREMENTS.phaseThresholds).toBeDefined();
     });
 
-    it('should have phase thresholds for all 6 phases', () => {
+    it('should have phase thresholds for all 4 analysis phases', () => {
       const { phaseThresholds } = CONFIDENCE_REQUIREMENTS;
-      expect(phaseThresholds.reference).toEqual({ min: 0.3, high: 0.6 });
-      expect(phaseThresholds.impact).toEqual({ min: 0.4, high: 0.7 });
-      expect(phaseThresholds.risk).toEqual({ min: 0, high: 0 });
-      expect(phaseThresholds.implementation).toEqual({ min: 0, high: 0 });
-      expect(phaseThresholds.commit).toEqual({ min: 0, high: 0 });
-      expect(phaseThresholds.ci).toEqual({ min: 0, high: 0 });
+      expect(phaseThresholds.find).toEqual({ min: 0.3, high: 0.6 });
+      expect(phaseThresholds.read).toEqual({ min: 0.4, high: 0.7 });
+      expect(phaseThresholds.link).toEqual({ min: 0.35, high: 0.65 });
+      expect(phaseThresholds.show).toEqual({ min: 0.2, high: 0.5 });
     });
 
     it('should have autoProceedThreshold of 0.7', () => {

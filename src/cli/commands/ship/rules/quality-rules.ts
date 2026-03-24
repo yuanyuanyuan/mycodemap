@@ -1,16 +1,15 @@
 // [META] since:2026-03 | owner:cli-team | stable:false
 // [WHY] 定义质量检查规则，包括 mustPass 和 shouldPass 检查项
 
-import { execSync } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
 import { CommitAnalysis, VersionType } from './version-rules.js';
+import { runWorkingTreeCheck, runBranchCheck, runScriptsCheck } from '../../ci.js';
 
 export interface CheckContext {
   commits: CommitAnalysis[];
   changedFiles: string[];
   currentVersion: string;
-  branch: string;
   versionType: VersionType;
 }
 
@@ -25,71 +24,6 @@ export interface QualityRule {
   check: (ctx: CheckContext) => CheckResult | Promise<CheckResult>;
   message: string;
   blocking: boolean;
-}
-
-const LOCAL_RELEASE_COMMANDS = [
-  { name: 'docs:check:pre-release', command: 'npm run docs:check:pre-release' },
-  { name: 'check:all', command: 'npm run check:all' },
-  { name: 'build', command: 'npm run build' },
-  { name: 'validate-pack', command: 'npm run validate-pack' }
-] as const;
-const COMMAND_MAX_BUFFER = 20 * 1024 * 1024;
-
-function extractCommandError(error: unknown): string {
-  if (!error || typeof error !== 'object') {
-    return String(error);
-  }
-
-  const stderr = 'stderr' in error && typeof error.stderr === 'string'
-    ? error.stderr
-    : 'stderr' in error && Buffer.isBuffer(error.stderr)
-      ? error.stderr.toString('utf-8')
-      : '';
-
-  const stdout = 'stdout' in error && typeof error.stdout === 'string'
-    ? error.stdout
-    : 'stdout' in error && Buffer.isBuffer(error.stdout)
-      ? error.stdout.toString('utf-8')
-      : '';
-
-  const message = error instanceof Error ? error.message : String(error);
-  return [message, stderr.trim(), stdout.trim()].filter(Boolean).join('\n');
-}
-
-async function runLocalReleaseChecks(): Promise<CheckResult> {
-  if (process.env.SHIP_IN_CI === '1') {
-    return {
-      passed: true,
-      message: undefined,
-      details: 'SHIP_IN_CI=1，跳过本地重复检查'
-    };
-  }
-
-  const failed: string[] = [];
-  const details: string[] = [];
-
-  for (const { name, command } of LOCAL_RELEASE_COMMANDS) {
-    try {
-      execSync(command, {
-        encoding: 'utf-8',
-        stdio: 'pipe',
-        maxBuffer: COMMAND_MAX_BUFFER
-      });
-    } catch (error) {
-      failed.push(name);
-      details.push(`[${name}]\n${extractCommandError(error)}`);
-    }
-  }
-
-  if (failed.length > 0) {
-    return {
-      passed: false,
-      message: `检查未全部通过: ${failed.join(', ')}`,
-      details: details.join('\n\n')
-    };
-  }
-
-  return { passed: true };
 }
 
 async function readCoveragePercentage(): Promise<number | null> {
@@ -127,35 +61,19 @@ export const mustPassRules: QualityRule[] = [
     name: 'workingTreeClean',
     message: '工作区有未提交的变更',
     blocking: true,
-    check: () => {
-      const status = execSync('git status --porcelain', { encoding: 'utf-8' }).trim();
-      const isClean = status === '';
-      return {
-        passed: isClean,
-        message: isClean ? undefined : '工作区有未提交的变更',
-        details: isClean ? undefined : status
-      };
-    }
+    check: () => runWorkingTreeCheck()
   },
   {
     name: 'correctBranch',
     message: '只能在 main/master 分支发布',
     blocking: true,
-    check: (ctx) => {
-      const allowedBranches = ['main', 'master'];
-      const isCorrect = allowedBranches.includes(ctx.branch);
-      return {
-        passed: isCorrect,
-        message: isCorrect ? undefined : `当前分支 "${ctx.branch}" 不能发布`,
-        details: isCorrect ? undefined : `允许的分支: ${allowedBranches.join(', ')}`
-      };
-    }
+    check: () => runBranchCheck()
   },
   {
     name: 'allChecksPass',
     message: '发布前检查必须全部通过',
     blocking: true,
-    check: async () => runLocalReleaseChecks()
+    check: () => runScriptsCheck()
   },
   {
     name: 'noBreakingWithoutMajor',
