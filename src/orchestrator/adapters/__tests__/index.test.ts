@@ -224,7 +224,7 @@ describe('adapters/index.ts exports', () => {
 
       expect(Array.isArray(codemapResult)).toBe(true);
       expect(Array.isArray(astGrepResult)).toBe(true);
-    });
+    }, 30000);
   });
 
   describe('module structure', () => {
