@@ -65,6 +65,28 @@ AI 接受任务时，必须输出以下分析框架：
 - 先决定最小验证方案，再开始编辑。
 - 只读取当前任务需要的事实，避免无边界探索。
 
+## 2.5 GSD 工具强制规则
+
+**当使用 `/gsd:*` 命令或运行 GSD agent 时，代码检索必须优先使用当前项目的 CodeMap CLI：**
+
+| 场景 | 必须使用 | 禁止使用 |
+|------|---------|---------|
+| 查找符号定义 | `node dist/cli/index.js query -s "<symbol>"` | `Glob` + `Read` 遍历文件 |
+| 查找模块依赖 | `node dist/cli/index.js deps -m "<module>"` | `Grep` 搜索 import |
+| 分析文件影响 | `node dist/cli/index.js impact -f "<file>"` | 手动追溯依赖链 |
+| 代码库侦察 | `node dist/cli/index.js analyze -i find` | 全文件读取后分析 |
+| 架构映射 | `node dist/cli/index.js analyze -i link` | 逐层 `Read` 推断关系 |
+
+**为什么这很重要：**
+- **避免上下文爆炸**: CodeMap CLI 返回结构化摘要，而非完整文件内容
+- **吃自己的狗粮**: 用 CodeMap 分析 CodeMap，验证产品价值
+- **精确性**: 符号级查询比文本搜索更准确
+
+**执行检查点：**
+- GSD researcher agent 在侦察代码库前，必须先运行 `npm run build` 确保 CLI 可用
+- 若 CodeMap CLI 返回结果不足，记录原因后再使用 fallback 工具
+- 禁止在 GSD workflow 中直接使用 `Read` 读取大文件（>100行）进行侦察
+
 ## 3. 验收清单（Task Completion Checklist - Harness 规范）
 
 AI 完成任务前必须自检并勾选：
