@@ -6,7 +6,11 @@ echo "Running pre-commit checks..."
 # 1. 运行与变更相关的测试（失败即阻断）
 # 使用 --changed 只运行与上次提交相比有变化的文件相关的测试
 echo "Running tests for changed files..."
-npx vitest run --changed
+if [ -f "node_modules/vitest/vitest.mjs" ]; then
+    node node_modules/vitest/vitest.mjs run --changed
+else
+    npx vitest run --changed
+fi
 if [ $? -ne 0 ]; then
     echo "ERROR: Tests failed, commit rejected"
     exit 1
