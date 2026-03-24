@@ -102,6 +102,7 @@ export interface PluginLoadOptions extends CodemapPluginConfig {}
 export interface PluginLoadAttempt {
   diagnostics: PluginDiagnostic[];
   loaded: boolean;
+  name?: string;
 }
 
 export interface PluginAnalysisRun {

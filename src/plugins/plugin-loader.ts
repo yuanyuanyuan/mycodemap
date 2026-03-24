@@ -7,6 +7,8 @@
 
 import fs from 'fs/promises';
 import path from 'path';
+import { createRequire } from 'module';
+import { pathToFileURL } from 'url';
 import type {
   CodeMapPlugin,
   PluginLoadOptions,
@@ -20,11 +22,18 @@ import type { CodemapConfig } from '../types/index.js';
 import type { PluginDiagnostic } from '../types/index.js';
 
 type PluginExport = CodeMapPlugin | (() => Promise<CodeMapPlugin> | CodeMapPlugin);
+type PluginModule = { default?: PluginExport; plugin?: PluginExport };
+type PluginLoadContext = { bustCache?: boolean };
+type LoadedPluginSource =
+  | { kind: 'builtin'; pluginName: string }
+  | { kind: 'file'; pluginPath: string }
+  | { kind: 'module'; pluginName: string; pluginDir?: string };
 
-const BUILT_IN_PLUGIN_LOADERS: Record<string, () => Promise<{ default?: PluginExport; plugin?: PluginExport }>> = {
-  'complexity-analyzer': () => import('./built-in/complexity-analyzer.js'),
-  'call-graph': () => import('./built-in/call-graph.js'),
+const BUILT_IN_PLUGIN_MODULES: Record<string, URL> = {
+  'complexity-analyzer': new URL('./built-in/complexity-analyzer.js', import.meta.url),
+  'call-graph': new URL('./built-in/call-graph.js', import.meta.url),
 };
+const require = createRequire(import.meta.url);
 
 // 简单内存缓存实现
 class SimpleCache implements PluginCache {
@@ -91,6 +100,7 @@ export class PluginLoader {
   private logger: PluginLogger;
   private cache: PluginCache;
   private config: CodemapConfig;
+  private loadedSources = new Map<string, LoadedPluginSource>();
 
   constructor(config: CodemapConfig, logger?: PluginLogger, debug = false) {
     this.config = config;
@@ -121,27 +131,82 @@ export class PluginLoader {
     return typeof plugin === 'function' ? plugin() : plugin;
   }
 
-  private async loadBuiltInPluginByName(pluginName: string): Promise<PluginLoadAttempt> {
-    const diagnostics: PluginDiagnostic[] = [];
-    const loadModule = BUILT_IN_PLUGIN_LOADERS[pluginName];
+  private async importModuleFromUrl(moduleUrl: URL, bustCache = false): Promise<PluginModule> {
+    const resolvedUrl = new URL(moduleUrl.href);
+    if (bustCache) {
+      resolvedUrl.searchParams.set('codemap-reload', `${Date.now()}`);
+    }
+    return import(resolvedUrl.href) as Promise<PluginModule>;
+  }
 
-    if (!loadModule) {
+  private async importModuleFromFile(pluginPath: string, bustCache = false): Promise<PluginModule> {
+    const moduleUrl = pathToFileURL(path.resolve(pluginPath));
+    if (bustCache) {
+      moduleUrl.searchParams.set('codemap-reload', `${Date.now()}`);
+    }
+    return import(moduleUrl.href) as Promise<PluginModule>;
+  }
+
+  private resolveModulePath(pluginName: string, pluginDir?: string): string {
+    if (pluginDir) {
+      return require.resolve(pluginName, { paths: [pluginDir, process.cwd()] });
+    }
+
+    return require.resolve(pluginName);
+  }
+
+  private async importModuleByName(
+    pluginName: string,
+    pluginDir?: string,
+    bustCache = false
+  ): Promise<PluginModule> {
+    const resolvedPath = this.resolveModulePath(pluginName, pluginDir);
+    return this.importModuleFromFile(resolvedPath, bustCache);
+  }
+
+  private async registerLoadedPlugin(
+    module: PluginModule,
+    source: LoadedPluginSource,
+    missingMessage: string,
+    pluginName?: string
+  ): Promise<PluginLoadAttempt> {
+    const diagnostics: PluginDiagnostic[] = [];
+
+    const plugin = this.resolvePluginExport(module);
+    if (!plugin) {
+      diagnostics.push(this.createDiagnostic('warning', 'load', missingMessage, pluginName));
+      return { diagnostics, loaded: false };
+    }
+
+    const instance = await this.instantiatePlugin(plugin);
+    await this.registry.register(instance);
+    this.loadedSources.set(instance.metadata.name, source);
+    return {
+      diagnostics,
+      loaded: true,
+      name: instance.metadata.name,
+    };
+  }
+
+  private async loadBuiltInPluginByName(
+    pluginName: string,
+    context: PluginLoadContext = {}
+  ): Promise<PluginLoadAttempt> {
+    const diagnostics: PluginDiagnostic[] = [];
+    const moduleUrl = BUILT_IN_PLUGIN_MODULES[pluginName];
+
+    if (!moduleUrl) {
       return { diagnostics, loaded: false };
     }
 
     try {
-      const pluginModule = await loadModule();
-      const plugin = this.resolvePluginExport(pluginModule);
-
-      if (!plugin) {
-        diagnostics.push(
-          this.createDiagnostic('warning', 'load', `内置插件 "${pluginName}" 未导出默认插件实例`, pluginName)
-        );
-        return { diagnostics, loaded: false };
-      }
-
-      await this.registry.register(await this.instantiatePlugin(plugin));
-      return { diagnostics, loaded: true };
+      const pluginModule = await this.importModuleFromUrl(moduleUrl, context.bustCache);
+      return this.registerLoadedPlugin(
+        pluginModule,
+        { kind: 'builtin', pluginName },
+        `内置插件 "${pluginName}" 未导出默认插件实例`,
+        pluginName
+      );
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       diagnostics.push(
@@ -170,7 +235,7 @@ export class PluginLoader {
     this.logger.info('Loading built-in plugins...');
     const diagnostics: PluginDiagnostic[] = [];
 
-    for (const name of Object.keys(BUILT_IN_PLUGIN_LOADERS)) {
+    for (const name of Object.keys(BUILT_IN_PLUGIN_MODULES)) {
       const result = await this.loadBuiltInPluginByName(name);
       diagnostics.push(...result.diagnostics);
     }
@@ -207,30 +272,51 @@ export class PluginLoader {
   }
 
   // 从文件加载单个插件
-  async loadPluginFile(pluginPath: string): Promise<PluginLoadAttempt> {
+  async loadPluginFile(
+    pluginPath: string,
+    context: PluginLoadContext = {}
+  ): Promise<PluginLoadAttempt> {
     const diagnostics: PluginDiagnostic[] = [];
 
     try {
       this.logger.debug(`Loading plugin from: ${pluginPath}`);
 
-      const module = await import(pluginPath);
-      const plugin = this.resolvePluginExport(module);
-
-      if (!plugin) {
-        this.logger.warn(`No plugin export found in: ${pluginPath}`);
-        diagnostics.push(
-          this.createDiagnostic('warning', 'load', `插件文件未导出默认插件实例: ${pluginPath}`)
-        );
-        return { diagnostics, loaded: false };
-      }
-
-      await this.registry.register(await this.instantiatePlugin(plugin));
-      return { diagnostics, loaded: true };
+      const module = await this.importModuleFromFile(pluginPath, context.bustCache);
+      return this.registerLoadedPlugin(
+        module,
+        { kind: 'file', pluginPath },
+        `插件文件未导出默认插件实例: ${pluginPath}`
+      );
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to load plugin from ${pluginPath}: ${reason}`);
       diagnostics.push(
         this.createDiagnostic('error', 'load', `加载插件文件失败: ${reason}`)
+      );
+      return { diagnostics, loaded: false };
+    }
+  }
+
+  private async loadPluginModuleByName(
+    pluginName: string,
+    pluginDir?: string,
+    context: PluginLoadContext = {}
+  ): Promise<PluginLoadAttempt> {
+    const diagnostics: PluginDiagnostic[] = [];
+
+    try {
+      const module = await this.importModuleByName(pluginName, pluginDir, context.bustCache);
+      return this.registerLoadedPlugin(
+        module,
+        { kind: 'module', pluginName, pluginDir },
+        `插件模块 "${pluginName}" 未导出默认插件实例`,
+        pluginName
+      );
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Plugin "${pluginName}" not found: ${reason}`);
+      diagnostics.push(
+        this.createDiagnostic('warning', 'load', `未找到插件 "${pluginName}": ${reason}`, pluginName)
       );
       return { diagnostics, loaded: false };
     }
@@ -259,25 +345,8 @@ export class PluginLoader {
       }
     }
 
-    try {
-      const module = await import(pluginName);
-      const plugin = this.resolvePluginExport(module);
-
-      if (!plugin) {
-        diagnostics.push(
-          this.createDiagnostic('warning', 'load', `插件模块 "${pluginName}" 未导出默认插件实例`, pluginName)
-        );
-        return diagnostics;
-      }
-
-      await this.registry.register(await this.instantiatePlugin(plugin));
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`Plugin "${pluginName}" not found: ${reason}`);
-      diagnostics.push(
-        this.createDiagnostic('warning', 'load', `未找到插件 "${pluginName}": ${reason}`, pluginName)
-      );
-    }
+    const moduleResult = await this.loadPluginModuleByName(pluginName, pluginDir);
+    diagnostics.push(...moduleResult.diagnostics);
 
     return diagnostics;
   }
@@ -315,14 +384,53 @@ export class PluginLoader {
 
   // 重新加载插件
   async reload(name: string): Promise<void> {
+    const source = this.loadedSources.get(name);
+    if (!source) {
+      throw new Error(`Plugin "${name}" is not loaded, cannot reload`);
+    }
+
     await this.registry.unregister(name);
-    // TODO: 实现真正的热重载
+    this.loadedSources.delete(name);
+
+    let result: PluginLoadAttempt;
+
+    switch (source.kind) {
+      case 'builtin':
+        result = await this.loadBuiltInPluginByName(source.pluginName, { bustCache: true });
+        break;
+      case 'file':
+        result = await this.loadPluginFile(source.pluginPath, { bustCache: true });
+        break;
+      case 'module':
+        result = await this.loadPluginModuleByName(source.pluginName, source.pluginDir, { bustCache: true });
+        break;
+    }
+
+    if (!result.loaded) {
+      const message = result.diagnostics.map((diagnostic) => diagnostic.message).join('; ');
+      throw new Error(message || `Plugin "${name}" reload failed`);
+    }
+
+    const reloadedName = result.name ?? name;
+    if (reloadedName !== name) {
+      await this.registry.unregister(reloadedName);
+      this.loadedSources.delete(reloadedName);
+      throw new Error(`Plugin "${name}" reload changed metadata name to "${reloadedName}"`);
+    }
+
+    const diagnostics = await this.registry.initializeByName(reloadedName);
+    const fatalDiagnostic = diagnostics.find((diagnostic) => diagnostic.level === 'error');
+    if (fatalDiagnostic) {
+      throw new Error(fatalDiagnostic.message);
+    }
+
     this.logger.info(`Plugin "${name}" reloaded`);
   }
 
   // 销毁
   async dispose(): Promise<void> {
     await this.registry.disposeAll();
+    this.loadedSources.clear();
     this.logger.info('Plugin loader disposed');
   }
 }

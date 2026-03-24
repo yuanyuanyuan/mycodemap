@@ -22,6 +22,34 @@ export class PluginRegistry {
   private plugins: Map<string, PluginInstance> = new Map();
   private context: PluginContext | null = null;
 
+  private async initializeInstance(name: string, instance: PluginInstance): Promise<PluginDiagnostic[]> {
+    if (!this.context) {
+      throw new Error('Plugin context not set');
+    }
+
+    const diagnostics: PluginDiagnostic[] = [];
+
+    try {
+      this.context.logger.info(`Initializing plugin "${name}"...`);
+      await instance.plugin.initialize(this.context);
+      instance.status = 'initialized';
+      instance.error = undefined;
+      this.context.logger.info(`Plugin "${name}" initialized successfully`);
+    } catch (error) {
+      instance.status = 'error';
+      instance.error = error instanceof Error ? error : new Error(String(error));
+      this.context.logger.error(`Failed to initialize plugin "${name}": ${instance.error.message}`);
+      diagnostics.push({
+        plugin: name,
+        stage: 'initialize',
+        level: 'error',
+        message: instance.error.message,
+      });
+    }
+
+    return diagnostics;
+  }
+
   // 设置插件上下文
   setContext(context: PluginContext): void {
     this.context = context;
@@ -55,25 +83,24 @@ export class PluginRegistry {
     const diagnostics: PluginDiagnostic[] = [];
 
     for (const [name, instance] of this.plugins) {
-      try {
-        this.context.logger.info(`Initializing plugin "${name}"...`);
-        await instance.plugin.initialize(this.context);
-        instance.status = 'initialized';
-        this.context.logger.info(`Plugin "${name}" initialized successfully`);
-      } catch (error) {
-        instance.status = 'error';
-        instance.error = error instanceof Error ? error : new Error(String(error));
-        this.context.logger.error(`Failed to initialize plugin "${name}": ${instance.error.message}`);
-        diagnostics.push({
-          plugin: name,
-          stage: 'initialize',
-          level: 'error',
-          message: instance.error.message,
-        });
-      }
+      diagnostics.push(...await this.initializeInstance(name, instance));
     }
 
     return diagnostics;
+  }
+
+  async initializeByName(name: string): Promise<PluginDiagnostic[]> {
+    const instance = this.plugins.get(name);
+    if (!instance) {
+      return [{
+        plugin: name,
+        stage: 'initialize',
+        level: 'error',
+        message: `Plugin "${name}" is not registered`,
+      }];
+    }
+
+    return this.initializeInstance(name, instance);
   }
 
   // 运行所有插件的分析钩子
