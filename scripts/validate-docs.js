@@ -671,7 +671,7 @@ function validateWorkflowAndDiscoveryDocs(rootDir, failures) {
       readme,
       'README.md workflow/discovery boundary',
       [
-        '`workflow` 仍是公开的过渡能力，但它现在只编排分析阶段：`find → read → link → show`。',
+        '`workflow` 是公开的 analysis-only 工作流能力，只编排分析阶段：`find → read → link → show`。',
         '共享同一套 `.gitignore` 感知排除规则',
         '"coverage/**"',
         '"**/*.test.ts"',

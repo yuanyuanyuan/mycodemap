@@ -111,7 +111,7 @@ mycodemap analyze -i read -t src/cli/index.ts --output-mode human
 
 ## CLI 命令
 
-> 说明：以下章节记录当前公开的公共命令面。`workflow`、`ship` 仍是过渡能力；`server`、`watch`、`report`、`logs` 已从 public CLI 移除，并在调用时输出迁移提示。
+> 说明：以下章节记录当前公开的公共命令面。`workflow` 是公开的 analysis-only 工作流能力，`ship` 仍是过渡能力；`server`、`watch`、`report`、`logs` 已从 public CLI 移除，并在调用时输出迁移提示。
 
 ### `mycodemap init`
 
@@ -263,7 +263,7 @@ mycodemap export json -o ./out     # 指定输出路径
 
 ## 工作流编排（分析型 workflow）
 
-`workflow` 仍是公开的过渡能力，但它现在只编排分析阶段：`find → read → link → show`。  
+`workflow` 是公开的 analysis-only 工作流能力，只编排分析阶段：`find → read → link → show`。  
 代码实现、commit 检查和 CI 运行不再属于 workflow phase；这些职责分别回到常规开发流程、`mycodemap ci` 与 `mycodemap ship`。
 
 ### 工作流阶段
@@ -556,7 +556,7 @@ CodeMap 采用清晰的分层架构设计（MVP3），各层职责明确：
 
 | 层级 | 路径 | 职责 | 关键组件 |
 |------|------|------|----------|
-| **CLI** | `src/cli/` | 命令行接口（核心分析命令 + `workflow`/`ship` 过渡 surface） | `generate`, `query`, `impact`, `export` |
+| **CLI** | `src/cli/` | 命令行接口（核心分析命令 + `workflow` / `ship` 扩展 surface） | `generate`, `query`, `impact`, `export` |
 | **Server** | `src/server/` | 内部 Server Layer / HTTP transport | `CodeMapServer`, `QueryHandler` |
 | **Domain** | `src/domain/` | 核心业务逻辑 | `Project`, `Module`, `CodeGraph` |
 | **Infrastructure** | `src/infrastructure/` | 技术实现 | `Storage`, `Parser`, `Repository` |

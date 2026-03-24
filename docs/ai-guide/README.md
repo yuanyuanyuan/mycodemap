@@ -4,7 +4,7 @@
 >
 > CodeMap 是一个 AI-first 代码地图工具；AI/Agent 是主要消费者。  
 > 入口层优先聚焦 `generate`、`query`、`deps`、`impact`、`complexity`、`export`、`ci` 等核心分析能力。  
-> `workflow`、`ship` 仍是当前公开的过渡能力；`server`、`watch`、`report`、`logs` 已从 public CLI 移除，并在调用时给出迁移提示。
+> `workflow` 是当前公开的 analysis-only 工作流能力，`ship` 仍是公开的过渡能力；`server`、`watch`、`report`、`logs` 已从 public CLI 移除，并在调用时给出迁移提示。
 
 ---
 

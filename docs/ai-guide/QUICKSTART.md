@@ -55,7 +55,7 @@ cat .mycodemap/AI_MAP.md
     ├── 是 → mycodemap query -S "keyword" -j
     ↓ 否
 需要执行复杂的多步骤分析？
-    ├── 是 → mycodemap workflow start "任务描述"  (当前过渡能力)
+    ├── 是 → mycodemap workflow start "任务描述"
     ↓ 否
 需要验证代码是否符合规范？
         └── 是 → mycodemap ci check-docs-sync / ci check-headers
@@ -118,7 +118,7 @@ cat .mycodemap/AI_MAP.md
 | 统一分析 | `analyze` | 多意图智能路由 |
 | 结果导出 | `export` | 导出 JSON / GraphML / Mermaid |
 | CI 门禁 | `ci` | 代码质量检查 |
-| 工作流编排（当前过渡能力） | `workflow` | 复杂分析任务管理 |
+| 工作流编排（analysis-only） | `workflow` | 复杂分析任务管理 |
 
 ---
 
@@ -127,4 +127,4 @@ cat .mycodemap/AI_MAP.md
 - 需要完整命令参数？查看 [COMMANDS.md](./COMMANDS.md)
 - 需要解析 JSON 输出？查看 [OUTPUT.md](./OUTPUT.md)
 - 需要即用型提示词？查看 [PROMPTS.md](./PROMPTS.md)
-- 需要理解哪些命令仍属过渡 surface？查看 [COMMANDS.md](./COMMANDS.md) 中的边界说明
+- 需要理解哪些命令仍属边界/兼容 surface？查看 [COMMANDS.md](./COMMANDS.md) 中的边界说明

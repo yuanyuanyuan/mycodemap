@@ -2,7 +2,7 @@
 
 > 标准工作流模式和输出处理最佳实践
 >
-> CodeMap 的首屏产品面是代码地图与代码分析。`workflow` 仍然是当前公开的过渡能力，本文件会明确区分核心分析模式与过渡 workflow 模式。
+> CodeMap 的首屏产品面是代码地图与代码分析。`workflow` 是当前公开的 analysis-only 工作流能力，本文件会明确区分核心分析模式与 workflow 编排模式。
 
 ---
 
@@ -11,7 +11,7 @@
 | 类别 | 说明 |
 |------|------|
 | 核心模式 | `generate`、`query`、`deps`、`impact`、`complexity`、`cycles`、`export`、`ci` |
-| 过渡模式 | `workflow` 仍公开，但不是 AI-first 首次接触项目的主入口 |
+| 工作流模式 | `workflow` 仍公开，但不是 AI-first 首次接触项目的主入口 |
 | 输出契约 | 当前多数命令显式加 `--json` 获取机器可读结果；`analyze` 可切换 `--output-mode machine|human` |
 
 ---
@@ -182,7 +182,7 @@ npm test
 
 ---
 
-### 模式 F: 复杂分析任务（当前过渡工作流）
+### 模式 F: 复杂分析任务（analysis-only workflow）
 
 **适用场景**: 需要多步骤完成的复杂开发任务
 
@@ -209,11 +209,11 @@ node dist/cli/index.js workflow checkpoint
 # Step 7: 重复直到完成
 ```
 
-**当前工作流阶段（过渡态）**:
-1. `reference` - 参考搜索
-2. `impact` - 影响分析
-3. `risk` - 风险评估
-4. `implementation` - 代码实现
+**当前工作流阶段**:
+1. `find` - 查找候选符号、文件与关键词线索
+2. `read` - 阅读影响范围、复杂度与上下文
+3. `link` - 汇总依赖、引用与关联关系
+4. `show` - 生成概览、摘要与展示型结果
 5. `commit` - 提交验证
 6. `ci` - CI 验证
 
