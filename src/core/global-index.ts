@@ -1,9 +1,12 @@
+// [META] since:2026-03 | owner:core-team | stable:true
+// [WHY] Global symbol index resolves cross-file references using indexed exports and tsconfig-aware import resolution
 // ============================================
 // Global Symbol Index - 全局符号索引
 // 支持跨文件调用链分析
 // ============================================
 
 import * as path from 'path';
+import ts from 'typescript';
 import type {
   GlobalSymbolIndex,
   FileSymbolIndex,
@@ -31,6 +34,7 @@ import type { ParseResult } from '../parser/interfaces/IParser.js';
 export class GlobalSymbolIndexBuilder {
   private index: GlobalSymbolIndex;
   private rootDir: string;
+  private compilerOptions?: ts.CompilerOptions;
 
   constructor(rootDir: string) {
     this.rootDir = rootDir;
@@ -185,7 +189,7 @@ export class GlobalSymbolIndexBuilder {
       
       if (isDefaultImport && calleeName === alias) {
         // 查找导入来源的导出符号
-        const targetFile = this.findFileByImport(imp.source);
+        const targetFile = this.findFileByImport(imp.source, fileIndex.filePath);
         if (targetFile) {
           const targetIndex = this.index.files.get(targetFile);
           if (targetIndex) {
@@ -207,13 +211,12 @@ export class GlobalSymbolIndexBuilder {
       // 检查命名导入
       for (const spec of imp.specifiers) {
         if (spec.name === calleeName || spec.alias === calleeName) {
-          const searchName = spec.alias || spec.name;
-          const targetFile = this.findFileByImport(imp.source);
+          const targetFile = this.findFileByImport(imp.source, fileIndex.filePath);
           if (targetFile) {
             const targetIndex = this.index.files.get(targetFile);
             if (targetIndex) {
-              const targetSymbol = targetIndex.exports.get(searchName) ||
-                                   targetIndex.localSymbols.get(searchName);
+              const targetSymbol = targetIndex.exports.get(spec.name) ||
+                                   targetIndex.localSymbols.get(spec.name);
               if (targetSymbol) {
                 return {
                   location: {
@@ -238,7 +241,7 @@ export class GlobalSymbolIndexBuilder {
 
       for (const [alias, imp] of fileIndex.imports) {
         if (alias === namespace) {
-          const targetFile = this.findFileByImport(imp.source);
+          const targetFile = this.findFileByImport(imp.source, fileIndex.filePath);
           if (targetFile) {
             const targetIndex = this.index.files.get(targetFile);
             if (targetIndex) {
@@ -266,27 +269,95 @@ export class GlobalSymbolIndexBuilder {
   /**
    * 根据导入路径查找文件
    */
-  private findFileByImport(importPath: string): string | null {
-    // 处理相对路径
-    if (importPath.startsWith('./') || importPath.startsWith('../')) {
-      // 尝试直接匹配
-      for (const filePath of this.index.files.keys()) {
-        // 移除 .ts 扩展名进行比较
-        const normalizedFile = filePath.replace(/\.ts$/, '');
-        const normalizedImport = importPath.replace(/\.ts$/, '');
-        
-        if (normalizedFile.endsWith(normalizedImport) ||
-            normalizedFile.includes('/' + normalizedImport) ||
-            normalizedFile === normalizedImport) {
-          return filePath;
-        }
+  private findFileByImport(importPath: string, importingFilePath?: string): string | null {
+    const resolvedPath = this.resolveImportPath(importPath, importingFilePath);
+    if (resolvedPath) {
+      const matchedFile = this.matchIndexedFile(resolvedPath);
+      if (matchedFile) {
+        return matchedFile;
       }
     }
 
-    // 处理路径别名（简化版，实际应该解析 tsconfig paths）
-    // TODO: 从 tsconfig.json 解析路径映射
+    if (!importPath.startsWith('./') && !importPath.startsWith('../')) {
+      return null;
+    }
+
+    const importerDir = importingFilePath ? path.dirname(importingFilePath) : '';
+    const relativeCandidate = path.resolve(this.rootDir, importerDir, importPath);
+    return this.matchIndexedFile(relativeCandidate);
+  }
+
+  private getCompilerOptions(): ts.CompilerOptions {
+    if (this.compilerOptions) {
+      return this.compilerOptions;
+    }
+
+    const fallbackOptions: ts.CompilerOptions = {
+      baseUrl: this.rootDir,
+      module: ts.ModuleKind.ESNext,
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
+      target: ts.ScriptTarget.ES2022,
+    };
+
+    const configPath = ts.findConfigFile(this.rootDir, ts.sys.fileExists);
+    if (!configPath) {
+      this.compilerOptions = fallbackOptions;
+      return this.compilerOptions;
+    }
+
+    const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
+    if (configFile.error) {
+      this.compilerOptions = fallbackOptions;
+      return this.compilerOptions;
+    }
+
+    const parsedConfig = ts.parseJsonConfigFileContent(
+      configFile.config,
+      ts.sys,
+      path.dirname(configPath)
+    );
+
+    this.compilerOptions = {
+      ...fallbackOptions,
+      ...parsedConfig.options,
+    };
+    return this.compilerOptions;
+  }
+
+  private resolveImportPath(importPath: string, importingFilePath?: string): string | null {
+    const containingFile = path.resolve(this.rootDir, importingFilePath ?? 'index.ts');
+    const resolvedModule = ts.resolveModuleName(
+      importPath,
+      containingFile,
+      this.getCompilerOptions(),
+      ts.sys
+    ).resolvedModule;
+
+    if (!resolvedModule || resolvedModule.isExternalLibraryImport) {
+      return null;
+    }
+
+    return resolvedModule.resolvedFileName;
+  }
+
+  private matchIndexedFile(candidatePath: string): string | null {
+    const normalizedCandidate = this.normalizeFileKey(candidatePath);
+
+    for (const filePath of this.index.files.keys()) {
+      const absolutePath = path.resolve(this.rootDir, filePath);
+      if (this.normalizeFileKey(absolutePath) === normalizedCandidate) {
+        return filePath;
+      }
+    }
 
     return null;
+  }
+
+  private normalizeFileKey(filePath: string): string {
+    return path.normalize(filePath)
+      .replace(/\\/g, '/')
+      .replace(/\.(d\.)?(ts|tsx|js|jsx|mts|cts|mjs|cjs)$/, '')
+      .replace(/\/index$/, '');
   }
 
   /**

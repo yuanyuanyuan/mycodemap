@@ -24,11 +24,7 @@ import { ParserBase, ParseError } from '../interfaces/ParserBase.js';
  * - import/from 导入语句
  * - class/function 定义
  * - 模块级变量
- *
- * TODO-DEBT [L1] [日期:2026-03-17] [作者:AI] [原因:MVP阶段简化实现]
- * 问题：使用正则而非 AST 解析
- * 风险：复杂语法可能解析不准确
- * 偿还计划：V1.0 集成 Tree-sitter 实现完整解析
+ * - 面向 CLI 快速分析场景的轻量实现
  */
 export class PythonParser extends ParserBase {
   readonly languageId = 'python' as const;

@@ -1,3 +1,5 @@
+// [META] since:2026-03 | owner:core-team | stable:true
+// [WHY] Legacy parser entry keeps fast/smart parser factory and compatibility helpers for existing callers
 // ============================================
 // Parser Module - 解析器工厂和入口
 // ============================================
@@ -71,9 +73,6 @@ export async function parseFile(filePath: string): Promise<ModuleInfo> {
   const imports = extractImports(sourceFile);
   const exports = extractExports(sourceFile);
   const symbols = extractSymbols(sourceFile);
-
-  // TODO: 使用 symbols 进行更详细的分析
-  void symbols;
 
   return {
     id: generateId(filePath),

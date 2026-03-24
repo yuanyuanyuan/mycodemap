@@ -20,11 +20,8 @@ import { ParserBase, ParseError } from '../interfaces/ParserBase.js';
 
 /**
  * Go 语言解析器
- *
- * TODO-DEBT [L1] [日期:2026-03-17] [作者:AI] [原因:MVP阶段仅实现框架]
- * 问题：目前仅返回空结果
- * 风险：无法实际解析 Go 代码
- * 偿还计划：V1.0 实现完整 Go 解析器
+ * 当前实现覆盖 import / type / func 等常见模式，
+ * 用于 CLI 的轻量级跨语言索引与依赖提取。
  */
 export class GoParser extends ParserBase {
   readonly languageId = 'go' as const;

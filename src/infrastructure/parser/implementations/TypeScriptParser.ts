@@ -29,11 +29,7 @@ import { ParserBase, ParseError } from '../interfaces/ParserBase.js';
  * - 快速扫描项目结构
  * - 提取导入/导出信息
  * - 识别符号定义
- *
- * TODO-DEBT [L1] [日期:2026-03-17] [作者:AI] [原因:MVP阶段使用简化实现]
- * 问题：使用正则而非完整 AST 解析
- * 风险：复杂语法可能解析不准确
- * 偿还计划：V1.0 集成 Tree-sitter 实现完整解析
+ * - 为 CLI 的轻量分析链路提供稳定、低依赖的默认实现
  */
 export class TypeScriptParser extends ParserBase {
   readonly languageId = 'typescript' as const;
