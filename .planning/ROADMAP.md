@@ -6,85 +6,114 @@
 - ✅ **v1.1 插件扩展点产品化** — Phases 7-9 (shipped 2026-03-24)
 - ✅ **v1.2 图数据库后端生产化** — Phases 10-12 (shipped 2026-03-24)
 - ✅ **v1.3 Kùzu-only 收敛与高信号债务清理** — Phases 13-16 (shipped 2026-03-24)
+- 🟡 **v1.4 设计契约与 Agent Handoff** — Phases 17-20 (planned 2026-03-25)
 
 ## Overview
 
-`v1.3` 已把 v1.2 遗留的产品面漂移、unfinished 实现和 docs/validation debt 收口完成。执行顺序按 roadmap 落地：先移除 `neo4j` 正式支持并补迁移诊断 → 再把 `analyze/workflow/server` 边界彻底收口 → 清偿核心技术债 → 最后把文档同步自动化接进 CI / must-pass 验证链路。
+`v1.4` 选择“人类设计 → AI 执行”的桥接主线，而不是立即打开 HTTP API、Kùzu 性能优化或泛化 workflow 编排。执行顺序按风险从高到低收敛：先定义 design contract 输入面并修复已观察到的 workflow docs drift → 再建立 design-to-code scope mapping → 再生成稳定的 handoff package 与人类审批边界 → 最后把 design drift verification 与 docs/CI guardrail 固定下来。
 
 ## Phases
 
-- [x] **Phase 13: Kùzu-only Storage Surface & Migration** - 移除 `neo4j` 正式支持并固定迁移错误语义
-- [x] **Phase 14: Public Surface Closure** - 收口 `analyze` / `workflow` / `server` 的边界 unfinished
-- [x] **Phase 15: Core Debt Paydown** - 清偿 plugin/parser/index/server handler 等高信号 debt
-- [x] **Phase 16: Docs Guardrail & Validation Automation** - 同步 AI 文档、规则与 CI/验证链路
+- [ ] **Phase 17: Design Contract Surface** - 定义设计输入契约、loader/diagnostics，并修复 workflow docs drift 入口问题
+- [ ] **Phase 18: Design-to-Code Mapping** - 将 design contract 映射到代码范围、依赖、测试与风险
+- [ ] **Phase 19: Handoff Package & Human Gates** - 生成 agent handoff 产物并保留人类审批边界
+- [ ] **Phase 20: Design Drift Verification & Docs Sync** - 固化设计验收映射、漂移检测与文档/CI 护栏
 
 ## Phase Details
 
-### Phase 13: Kùzu-only Storage Surface & Migration
-**Goal**: 把正式 graph storage 产品面从 “Kùzu + Neo4j 并存” 收回到 “Kùzu-only + filesystem/memory/auto”，同时确保历史 `neo4j` 配置不会静默失败  
-**Depends on**: Phase 12 (v1.2 shipped)  
-**Requirements**: STG-01, STG-02, STG-03  
+### Phase 17: Design Contract Surface
+**Goal**: 建立一个清晰、可验证、可被 AI 直接消费的 design contract 输入面，并先修复会污染新能力信任度的 workflow docs drift
+**Depends on**: Phase 16 (v1.3 shipped)
+**Requirements**: DES-01, DES-02, DES-03
 **Success Criteria** (what must be TRUE):
-  1. 用户和 AI 从 schema / 配置 / 帮助 / 文档里只能看到受支持的四种 backend，而不是继续把 `neo4j` 当正式选项
-  2. runtime 读到 `neo4j` 配置时，会给出清晰迁移诊断，而不是隐式 fallback 或残留半可用代码路径
-  3. `neo4j` adapter / tests / docs guardrail 不再污染正式验证基线
+  1. 人类可以用明确文件格式表达目标、约束、验收标准和非目标，而不是只靠自由提示词
+  2. design contract 缺字段、字段歧义或结构错误时，CLI 返回结构化 diagnostics，而不是隐式猜测
+  3. `README.md` / `AI_GUIDE.md` / `docs/ai-guide/PATTERNS.md` 与 workflow / new surface 的真实语义保持一致
 **Plans**: 3 plans
 
 Plans:
-- [x] 13-01: 收口 schema / types / config loader 的 storage surface
-- [x] 13-02: 清理 runtime factory / adapter / tests 的 `neo4j` 主路径
-- [x] 13-03: 加入迁移诊断并同步第一批文档基线
+- [ ] 17-01: 定义 design contract schema、类型与产物路径约定
+- [ ] 17-02: 实现 loader / validator / diagnostics baseline
+- [ ] 17-03: 同步 README / AI docs / rules / guardrails，并修复 workflow docs drift
 
-### Phase 14: Public Surface Closure
-**Goal**: 把 “文档说已收口、源码仍像过渡态” 的 public surface 漂移彻底清掉  
-**Depends on**: Phase 13  
-**Requirements**: SUR-01, SUR-02, SUR-03  
+### Phase 18: Design-to-Code Mapping
+**Goal**: 让 CodeMap 能把设计意图映射到真实代码范围，而不是只返回分散的搜索结果
+**Depends on**: Phase 17
+**Requirements**: MAP-01, MAP-02, MAP-03
 **Success Criteria** (what must be TRUE):
-  1. `analyze find` 主路径不再依赖不完整 legacy fallback，Intent Router 与执行实现一致
-  2. `workflow` 命令与文档/帮助/测试都明确为 analysis-only 正式能力，不再保留“过渡能力”措辞
-  3. `server` 命令的残留实现不再让维护者误判为公开能力；边界要么删除要么显式 internal-only
+  1. design contract 能解析出 candidate files / modules / symbols，并给出原因链
+  2. 输出同时包含 dependencies、test impact、risk、confidence 与 unknowns，足以支持人类 review
+  3. 无匹配、过宽命中或高风险范围会被显式阻断并要求人类补充设计
 **Plans**: 3 plans
 
 Plans:
-- [x] 14-01: 修正 `analyze` find 路由与 fallback 漂移
-- [x] 14-02: 收口 `workflow` 与 `server` 的实现/帮助/测试边界
-- [x] 14-03: 用 CLI/docs tests 固定新的 public surface
+- [ ] 18-01: 基于现有 `query` / `analyze` / `impact` 组合构建 scope resolver
+- [ ] 18-02: 丰富映射结果的 dependency / test / risk / unknowns 元数据
+- [ ] 18-03: 固定 no-match / over-broad / high-risk 失败语义与测试夹具
 
-### Phase 15: Core Debt Paydown
-**Goal**: 清偿当前仍留在主路径中的高信号 TODO / TODO-DEBT，避免 roadmap 与代码现实继续脱节  
-**Depends on**: Phase 14  
-**Requirements**: DEBT-01, DEBT-02, DEBT-03, DEBT-04  
+### Phase 19: Handoff Package & Human Gates
+**Goal**: 产出一份既能给人类审核，也能给 AI agent 直接执行的 handoff package，同时不破坏现有 public contract
+**Depends on**: Phase 18
+**Requirements**: HOF-01, HOF-02, HOF-03, HOF-04
 **Success Criteria** (what must be TRUE):
-  1. `plugin-loader` 热重载与输出边界不再停留在 TODO，路径/状态语义可验证
-  2. `global-index`、`parser/index` 与 parser implementations 的 debt 已实现、替换或转入正式文档化策略
-  3. `AnalysisHandler` 不再以误导性 TODO 呈现半成品能力
+  1. handoff package 同时提供 human-readable summary 与 machine-readable JSON
+  2. approvals、assumptions、open questions 在 handoff artifact 中持久可追踪
+  3. 新能力不通过给 `analyze` 增加新 intent 或给 `workflow` 恢复 `commit` / `ci` phase 来偷渡实现
 **Plans**: 3 plans
 
 Plans:
-- [x] 15-01: 清偿 `plugin-loader` debt 并补齐验证
-- [x] 15-02: 实现 `global-index` / `parser/index` / parser implementations 收口
-- [x] 15-03: 收口 `AnalysisHandler` 内部契约并更新相关测试
+- [ ] 19-01: 定义 handoff artifact schema、summary 模板与输出路径
+- [ ] 19-02: 实现 handoff generation 与 approval / assumption / open-question 追踪
+- [ ] 19-03: 在不破坏 `workflow` 四阶段语义的前提下集成 handoff 入口
 
-### Phase 16: Docs Guardrail & Validation Automation
-**Goal**: 把 Kùzu-only 边界和 debt 收口结果固定进文档、guardrail、CI 与最终验证，防止回归  
-**Depends on**: Phase 15  
-**Requirements**: DOC-06, VAL-03  
+### Phase 20: Design Drift Verification & Docs Sync
+**Goal**: 把 design contract 的验收标准真正接入验证链路，并用 docs / CI guardrail 固定新的协作模式
+**Depends on**: Phase 19
+**Requirements**: VAL-04, DOC-07, VAL-05
 **Success Criteria** (what must be TRUE):
-  1. README / AI_GUIDE / docs/ai-guide / rules / setup / schema 与实现边界一致
-  2. docs sync 自动检查进入 CI 或 must-pass 验证链路，不能再只靠手动运行发现问题
-  3. `docs:check` / `typecheck` / `vitest` / `build` 全部通过，并有至少一个失败模式被显式验证
+  1. design contract 的 acceptance criteria 能映射为实现后验证清单和 drift 报告
+  2. README / AI docs / rules / guardrail tests 与 new handoff surface 完整同步
+  3. 至少一个 end-to-end 示例证明“人类设计 → handoff → AI 执行准备 → drift 验证”闭环，并覆盖失败预演
 **Plans**: 3 plans
 
 Plans:
-- [x] 16-01: 同步 README / AI docs / rules / setup / schema
-- [x] 16-02: 将 docs sync 自动检查接入 CI / must-pass 验证
-- [x] 16-03: 执行完整验证、失败预演与 milestone audit
+- [ ] 20-01: 实现 design-vs-implementation drift 检查与 acceptance checklist
+- [ ] 20-02: 将 design docs / handoff docs sync 校验接入 CI / must-pass 验证
+- [ ] 20-03: 编写端到端示例、失败预演与 milestone audit 证据
+
+## Progress
+
+## Backlog
+
+### Phase 999.1: KùzuDB 作为主要存储，文件系统作为保底选择 (PLANNED)
+
+**Goal**: 完全使用图数据库 (KùzuDB) 作为主力存储，文件系统作为兜底/迁移选项
+**Context**: 当前 v1.2 已实现图数据库后端，但采用双存储并行模式。本项将 KùzuDB 提升为唯一真实源，同时保留文件系统作为降级兜底。
+**Key Decisions**:
+  - DEC-01: KùzuDB 成为 `auto` 和默认配置的首选存储
+  - DEC-02: 迁移到原生图模型（节点/边表 + Cypher 查询）
+  - DEC-03: KùzuDB 初始化失败时 fallback 到文件系统
+  - DEC-04: 现有文件系统用户自动无缝迁移
+  - DEC-05: 不需要基准测试，但需要风险评估
+**Requirements**: DEC-01, DEC-02, DEC-03, DEC-04, DEC-05
+**Plans**: 4 plans in 4 waves
+
+Plans:
+- [ ] 999.1-01: Storage Strategy & Fallback — 修改 StorageFactory 优先选择 KùzuDB，实现降级机制
+- [ ] 999.1-02: Native Graph Model — 重构 KuzuDBStorage 使用原生节点/关系表 + Cypher 查询
+- [ ] 999.1-03: Migration & Configuration — 实现文件系统到 KùzuDB 的自动迁移
+- [ ] 999.1-04: Risk Assessment & Documentation — 创建风险评估文档、替代方案评估、更新配置文档
+
+**Risk Note**: KùzuDB 已于 2025-10-10 归档。Phase 999.1-04 包含完整的风险评估和替代方案评估（FalkorDB、DuckPGQ）。
+
+---
 
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 13. Kùzu-only Storage Surface & Migration | v1.3 | 3/3 | Completed | 2026-03-24 |
-| 14. Public Surface Closure | v1.3 | 3/3 | Completed | 2026-03-24 |
-| 15. Core Debt Paydown | v1.3 | 3/3 | Completed | 2026-03-24 |
-| 16. Docs Guardrail & Validation Automation | v1.3 | 3/3 | Completed | 2026-03-24 |
+| 17. Design Contract Surface | v1.4 | 0/3 | Planned | — |
+| 18. Design-to-Code Mapping | v1.4 | 0/3 | Planned | — |
+| 19. Handoff Package & Human Gates | v1.4 | 0/3 | Planned | — |
+| 20. Design Drift Verification & Docs Sync | v1.4 | 0/3 | Planned | — |
+| 999.1. KùzuDB Primary Storage | Backlog | 0/4 | Planned | — |
