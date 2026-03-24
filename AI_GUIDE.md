@@ -281,6 +281,38 @@ git push origin main --tags
 
 **注意**: 当前 `--yes` 选项仅在置信度 60-75 且终端可交互时有效。非 TTY 环境需要手动执行上述步骤。
 
+### 发布前检查清单（必做）
+
+**关键教训**: v0.4.2 发布曾因版本号不一致失败多次。发布前务必执行：
+
+```bash
+# 1. 运行预发布检查（必做）
+npm run docs:check:pre-release
+
+# 2. 确保所有版本文件已同步
+# 以下文件必须包含相同版本号：
+# - package.json
+# - package-lock.json
+# - llms.txt
+# - ai-document-index.yaml
+# - AI_GUIDE.md
+# - AI_DISCOVERY.md
+
+# 3. 本地测试通过
+npm run check:all
+
+# 4. 创建 tag 并推送
+git tag -a "vX.Y.Z" -m "Release vX.Y.Z"
+git push origin main --tags
+```
+
+**失败回滚**: 如果 GitHub Actions 失败，需要删除远程 tag 后重新创建：
+```bash
+git push origin :refs/tags/vX.Y.Z   # 删除远程 tag
+git tag -d vX.Y.Z                    # 删除本地 tag
+# 修复问题后重新创建 tag
+```
+
 ---
 
 ## ❓ 常见问题
