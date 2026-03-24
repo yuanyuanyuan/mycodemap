@@ -3,7 +3,7 @@
 
 project:
   name: CodeMap
-  version: "0.4.1"
+  version: "0.4.2"
   description: "TypeScript 代码地图生成与分析工具，为 AI 辅助开发提供结构化上下文"
   repository: "https://github.com/mycodemap/mycodemap"
   license: "MIT"
