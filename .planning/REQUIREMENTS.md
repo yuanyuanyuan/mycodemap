@@ -1,72 +1,74 @@
-# Requirements: v1.2 图数据库后端生产化
+# Requirements: v1.3 Kùzu-only 收敛与高信号债务清理
 
 **Defined:** 2026-03-24  
-**Core Value:** AI 能以稳定、机器可读的方式获得代码上下文，而不是被混杂的实现型工作流和不清晰的命令边界干扰。
+**Core Value:** AI 能以稳定、机器可读的方式获得代码上下文，而不是被混杂的实现型工作流和不清晰的命令边界干扰。  
 **Latest Shipped Milestone:** `v1.2 图数据库后端生产化`
 
-## v1.2 Requirements
+## v1.3 Requirements
 
-### Storage Surface
+### Storage Surface Simplification
 
-- [x] **GST-01**: 用户可以通过正式配置/运行时入口选择 `filesystem`、`kuzudb`、`neo4j` 或 `auto` 存储后端，而不是被 `generate` 硬编码到文件系统
-- [x] **GST-02**: `generate` / repository 主路径会把 CodeGraph 保存到所选后端，并保持对未安装可选依赖的清晰诊断
-- [x] **GST-03**: 图数据库后端复用共享 storage contract/helper，而不是继续各自维护占位逻辑和分叉行为
+- [ ] **STG-01**: `mycodemap.config.json` / schema / README / AI docs / setup 文档只暴露 `filesystem`、`memory`、`kuzudb`、`auto` 四种正式存储选项，不再把 `neo4j` 当作受支持 backend
+- [ ] **STG-02**: runtime storage factory、`generate`、`export` 与相关 diagnostics 不再尝试创建 `neo4j` backend；当读到旧 `neo4j` 配置时返回清晰迁移错误，而不是静默 fallback
+- [ ] **STG-03**: `neo4j` 相关 adapter、测试、验证与 guardrail 从正式主路径中移除或降级到明确内部归档，不再让未支持能力继续污染产品面
 
-### KùzuDB Backend
+### Public Surface Closure
 
-- [x] **KUZ-01**: 当用户选择 `kuzudb` 且安装依赖后，完整 CodeGraph 能持久化到真实 KùzuDB schema
-- [x] **KUZ-02**: KùzuDB 后端可以加载、更新、删除并查询模块/符号/依赖数据，满足 `IStorage` 合同
-- [x] **KUZ-03**: KùzuDB 后端可以提供 callers/callees/cycles/impact/statistics 等最小分析闭环，而不是继续返回空结果或 `NOT_IMPLEMENTED`
+- [ ] **SUR-01**: `analyze` 的 `find` intent 执行路径与 Intent Router 契约一致，不再依赖不完整 legacy fallback 才能完成主流程
+- [ ] **SUR-02**: `workflow` 命令、帮助文案、AI 文档与测试都明确为 analysis-only 四阶段正式能力，不再保留“过渡能力/仍在开发”的歧义
+- [ ] **SUR-03**: 与公共 CLI 无关的 `server` command 实现从运行路径、源码死角和文档暗示中清理或显式 internal-only 化，不再形成“命令已删除但仍像正式产品功能”的误导
 
-### Neo4j Backend
+### Technical Debt Paydown
 
-- [x] **NEO-01**: 当用户选择 `neo4j` 且连接信息有效时，完整 CodeGraph 能持久化到真实 Neo4j 实例并重新加载
-- [x] **NEO-02**: Neo4j 后端可以更新、删除并查询模块/符号/依赖数据，满足与 KùzuDB 一致的 `IStorage` 合同
-- [x] **NEO-03**: Neo4j 后端可以提供 callers/callees/cycles/impact/statistics 的兼容实现，并在认证/连接失败时返回清晰错误
+- [ ] **DEBT-01**: `plugin-loader` 的热重载、diagnostics 与输出文件写入边界 debt 收口，避免插件迭代时 runtime state 和路径安全语义继续模糊
+- [ ] **DEBT-02**: `global-index` 支持 `tsconfig.json` 路径映射，`parser/index` 不再停留在“更详细分析 TODO”的主路径状态
+- [ ] **DEBT-03**: `TypeScriptParser`、`PythonParser`、`GoParser` 的 TODO-DEBT 被实现、替换或正式文档化，不再裸留在主实现文件顶部
+- [ ] **DEBT-04**: `AnalysisHandler` 的 mock TODO 收口为真实内部能力或显式 not-supported contract，避免 `Server Layer` 继续呈现“看起来可用、实际上未完成”的歧义
 
-### Documentation & Validation
+### Documentation & Validation Automation
 
-- [x] **DOC-05**: `README.md`、`AI_GUIDE.md`、`docs/ai-guide/*`、相关 setup/rules 文档明确说明存储配置、可选依赖、边界和失败语义
-- [x] **VAL-02**: 自动化验证覆盖至少一条后端成功路径与一条失败路径，证明图数据库产品面不是“代码里存在但主流程不可达”
+- [ ] **DOC-06**: `README.md`、`AI_GUIDE.md`、`docs/ai-guide/*`、`docs/rules/*`、schema 与 docs guardrail 同步反映 Kùzu-only 与真实命令边界
+- [ ] **VAL-03**: `docs:check`、`typecheck`、`vitest`、`build` 全部通过，且 docs sync 自动检查进入 CI 或 must-pass 验证链路，避免只能靠手动执行发现漂移
 
 ## v2 Requirements
 
 ### Deferred
 
-- **API-01**: 在图数据库后端稳定后，再单独评估是否需要独立 HTTP API 产品面
-- **OPT-01**: 基于 DB-native 图查询进一步优化 callers/cycles/impact 的性能与查询计划
-- **VAL-03**: 补齐 Phase 01 / 02 的 Nyquist 历史工件与更广文档 guardrail 扩围
+- **API-01**: 在内部 `Server Layer` debt 收口后，再单独评估是否需要独立 HTTP API 产品面
+- **OPT-01**: 基于 Kùzu-native 图查询进一步优化 callers/cycles/impact 的性能与查询计划
+- **WKF-01**: 若后续需要多角色/多阶段的完整工程工作流编排，再单独开 milestone 设计新的 workflow 产品面
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| 重新公开 `mycodemap server` / HTTP API 产品面 | `Server Layer` 边界已稳定，且 `AnalysisHandler` 仍是 mock 级骨架，本 milestone 不重开产品面 |
-| 插件 marketplace / 远程安装生态 | 与图数据库后端主线无关，会重演 scope 漂移 |
-| 一次性引入云端/集群化图数据库部署方案 | 当前目标是本地/单实例后端生产化，不是新的运维产品 |
-| 仅为历史 Nyquist 债务扩围单开多条战线 | 违背单线程收敛原则，本轮只保留与图数据库闭环直接相关的验证 |
+| 恢复 `neo4j` 正式支持 | 用户已明确当前不需要，继续保留只会增加产品面和维护成本 |
+| 重新公开 `mycodemap server` / HTTP API 产品面 | `Server Layer` 仍是内部层，本 milestone 先消除 unfinished 歧义而不是重开产品面 |
+| 一次性引入新的图数据库后端或集群部署方案 | 当前目标是收敛，不是扩面 |
+| 插件 marketplace / 远程安装生态 | 与当前 debt / guardrail 收口目标无关 |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GST-01 | Phase 10 | Satisfied |
-| GST-02 | Phase 10 | Satisfied |
-| GST-03 | Phase 10 | Satisfied |
-| KUZ-01 | Phase 11 | Satisfied |
-| KUZ-02 | Phase 11 | Satisfied |
-| KUZ-03 | Phase 11 | Satisfied |
-| NEO-01 | Phase 12 | Satisfied |
-| NEO-02 | Phase 12 | Satisfied |
-| NEO-03 | Phase 12 | Satisfied |
-| DOC-05 | Phase 12 | Satisfied |
-| VAL-02 | Phase 12 | Satisfied |
+| STG-01 | Phase 13 | Pending |
+| STG-02 | Phase 13 | Pending |
+| STG-03 | Phase 13 | Pending |
+| SUR-01 | Phase 14 | Pending |
+| SUR-02 | Phase 14 | Pending |
+| SUR-03 | Phase 14 | Pending |
+| DEBT-01 | Phase 15 | Pending |
+| DEBT-02 | Phase 15 | Pending |
+| DEBT-03 | Phase 15 | Pending |
+| DEBT-04 | Phase 15 | Pending |
+| DOC-06 | Phase 16 | Pending |
+| VAL-03 | Phase 16 | Pending |
 
 **Coverage:**
-- v1.2 requirements: 11 total
-- Mapped to phases: 11
+- v1.3 requirements: 12 total
+- Mapped to phases: 12
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-24*
-*Last updated: 2026-03-24 after completing v1.2 milestone*
+*Last updated: 2026-03-24 after starting v1.3 milestone*

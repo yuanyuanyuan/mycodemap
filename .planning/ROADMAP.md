@@ -5,68 +5,86 @@
 - ✅ **v1.0 AI-first 重构** — Phases 1-6 (shipped 2026-03-24)
 - ✅ **v1.1 插件扩展点产品化** — Phases 7-9 (shipped 2026-03-24)
 - ✅ **v1.2 图数据库后端生产化** — Phases 10-12 (shipped 2026-03-24)
+- 🚧 **v1.3 Kùzu-only 收敛与高信号债务清理** — Phases 13-16
 
 ## Overview
 
-`v1.2` 已把既有图数据库存储抽象推进为用户真正可到达、可持久化、可验证的产品能力。执行顺序按 roadmap 收口完成：先打通 storage activation / contract → 再完成 KùzuDB 主链路 → 最后补齐 Neo4j、文档与验证闭环。
+`v1.3` 不再扩图数据库能力，而是先把 v1.2 遗留的产品面漂移、unfinished 实现和 docs/validation debt 收干净。执行顺序按“先收面、再清债、最后锁文档和验证”推进：先移除 `neo4j` 正式支持并给出迁移诊断 → 再把 `analyze/workflow/server` 边界彻底收口 → 清偿核心技术债 → 最后把文档同步自动化接进自动验证。
 
 ## Phases
 
-- [x] **Phase 10: Storage Activation & Contract** - 收口存储选择入口、主路径接入和共享 contract
-- [x] **Phase 11: KùzuDB Persistence & Query Parity** - 让 KùzuDB 达到真实持久化与查询闭环
-- [x] **Phase 12: Neo4j Compatibility, Docs & Validation** - 补齐 Neo4j、文档、guardrail 与失败验证
+- [ ] **Phase 13: Kùzu-only Storage Surface & Migration** - 移除 `neo4j` 正式支持并固定迁移错误语义
+- [ ] **Phase 14: Public Surface Closure** - 收口 `analyze` / `workflow` / `server` 的边界 unfinished
+- [ ] **Phase 15: Core Debt Paydown** - 清偿 plugin/parser/index/server handler 等高信号 debt
+- [ ] **Phase 16: Docs Guardrail & Validation Automation** - 同步 AI 文档、规则与 CI/验证链路
 
 ## Phase Details
 
-### Phase 10: Storage Activation & Contract
-**Goal**: 把图数据库后端从“代码里存在”推进到“主流程可选可达”，并建立共享 storage contract，避免后续继续复制 fallback/TODO 逻辑  
-**Depends on**: Phase 9 (v1.1 shipped)  
-**Requirements**: GST-01, GST-02, GST-03  
+### Phase 13: Kùzu-only Storage Surface & Migration
+**Goal**: 把正式 graph storage 产品面从 “Kùzu + Neo4j 并存” 收回到 “Kùzu-only + filesystem/memory/auto”，同时确保历史 `neo4j` 配置不会静默失败  
+**Depends on**: Phase 12 (v1.2 shipped)  
+**Requirements**: STG-01, STG-02, STG-03  
 **Success Criteria** (what must be TRUE):
-  1. 用户可以通过正式配置/运行时入口选择存储后端，而不是被 `generate` 固定到 `filesystem`
-  2. 缺少 `kuzu` / `neo4j-driver` 或配置错误时，CLI 会暴露清晰诊断，而不是静默 fallback 掩盖问题
-  3. 共享 helper / contract tests 固定 callers/callees/cycles/impact/statistics 的最小一致行为
+  1. 用户和 AI 从 schema / 配置 / 帮助 / 文档里只能看到受支持的四种 backend，而不是继续把 `neo4j` 当正式选项
+  2. runtime 读到 `neo4j` 配置时，会给出清晰迁移诊断，而不是隐式 fallback 或残留半可用代码路径
+  3. `neo4j` adapter / tests / docs guardrail 不再污染正式验证基线
 **Plans**: 3 plans
 
 Plans:
-- [x] 10-01: 收口 storage config / backend selection / diagnostics surface
-- [x] 10-02: 让 `generate` / repository 主路径接入可选 backend
-- [x] 10-03: 抽取共享 graph query / analysis helpers 与 contract tests
+- [ ] 13-01: 收口 schema / types / config loader 的 storage surface
+- [ ] 13-02: 清理 runtime factory / adapter / tests 的 `neo4j` 主路径
+- [ ] 13-03: 加入迁移诊断并同步第一批文档基线
 
-### Phase 11: KùzuDB Persistence & Query Parity
-**Goal**: 让 KùzuDB 从内存 fallback 占位实现升级为真实 schema、持久化、查询和分析后端  
-**Depends on**: Phase 10  
-**Requirements**: KUZ-01, KUZ-02, KUZ-03  
+### Phase 14: Public Surface Closure
+**Goal**: 把 “文档说已收口、源码仍像过渡态” 的 public surface 漂移彻底清掉  
+**Depends on**: Phase 13  
+**Requirements**: SUR-01, SUR-02, SUR-03  
 **Success Criteria** (what must be TRUE):
-  1. 选择 `kuzudb` 且安装依赖后，CodeGraph 会写入真实 KùzuDB schema，并能重新加载
-  2. `updateModule` / `deleteModule` / 查询接口不再停留在 TODO 或空结果
-  3. callers/callees/cycles/impact/statistics 至少达到与共享 contract 一致的可验证行为
+  1. `analyze find` 主路径不再依赖不完整 legacy fallback，Intent Router 与执行实现一致
+  2. `workflow` 命令与文档/帮助/测试都明确为 analysis-only 正式能力，不再保留“过渡能力”措辞
+  3. `server` 命令的残留实现不再让维护者误判为公开能力；边界要么删除要么显式 internal-only
 **Plans**: 3 plans
 
 Plans:
-- [x] 11-01: 实现 KùzuDB schema 与 full-graph persist/load
-- [x] 11-02: 补齐 KùzuDB 增量更新、查询与分析接口
-- [x] 11-03: 为 KùzuDB 增加契约测试与失败验证
+- [ ] 14-01: 修正 `analyze` find 路由与 fallback 漂移
+- [ ] 14-02: 收口 `workflow` 与 `server` 的实现/帮助/测试边界
+- [ ] 14-03: 用 CLI/docs tests 固定新的 public surface
 
-### Phase 12: Neo4j Compatibility, Docs & Validation
-**Goal**: 让 Neo4j 达到相同 storage contract，并把配置、边界、失败语义写进文档/guardrail/验证  
-**Depends on**: Phase 11  
-**Requirements**: NEO-01, NEO-02, NEO-03, DOC-05, VAL-02  
+### Phase 15: Core Debt Paydown
+**Goal**: 清偿当前仍留在主路径中的高信号 TODO / TODO-DEBT，避免 roadmap 与代码现实继续脱节  
+**Depends on**: Phase 14  
+**Requirements**: DEBT-01, DEBT-02, DEBT-03, DEBT-04  
 **Success Criteria** (what must be TRUE):
-  1. 选择 `neo4j` 且连接有效时，CodeGraph 可以写入、读取、更新、删除并查询真实 Neo4j 数据
-  2. 文档、AI guide、setup/rules 与实现同步说明后端配置、可选依赖和边界，不把 `Server Layer` 误写成公共 API 扩面
-  3. 自动化验证至少覆盖一条成功路径和一条失败路径，证明图数据库产品面已闭环
+  1. `plugin-loader` 热重载与输出边界不再停留在 TODO，路径/状态语义可验证
+  2. `global-index`、`parser/index` 与 parser implementations 的 debt 已实现、替换或转入正式文档化策略
+  3. `AnalysisHandler` 不再以误导性 TODO 呈现半成品能力
 **Plans**: 3 plans
 
 Plans:
-- [x] 12-01: 实现 Neo4j 持久化、查询契约与连接错误语义
-- [x] 12-02: 同步 README / AI docs / setup / rules 的 graph storage 文档
-- [x] 12-03: 补齐 backend contract / failure validation 与 milestone verification
+- [ ] 15-01: 清偿 `plugin-loader` debt 并补齐验证
+- [ ] 15-02: 实现 `global-index` / `parser/index` / parser implementations 收口
+- [ ] 15-03: 收口 `AnalysisHandler` 内部契约并更新相关测试
+
+### Phase 16: Docs Guardrail & Validation Automation
+**Goal**: 把 Kùzu-only 边界和 debt 收口结果固定进文档、guardrail、CI 与最终验证，防止回归  
+**Depends on**: Phase 15  
+**Requirements**: DOC-06, VAL-03  
+**Success Criteria** (what must be TRUE):
+  1. README / AI_GUIDE / docs/ai-guide / rules / setup / schema 与实现边界一致
+  2. docs sync 自动检查进入 CI 或 must-pass 验证链路，不能再只靠手动运行发现问题
+  3. `docs:check` / `typecheck` / `vitest` / `build` 全部通过，并有至少一个失败模式被显式验证
+**Plans**: 3 plans
+
+Plans:
+- [ ] 16-01: 同步 README / AI docs / rules / setup / schema
+- [ ] 16-02: 将 docs sync 自动检查接入 CI / must-pass 验证
+- [ ] 16-03: 执行完整验证、失败预演与 milestone audit
 
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 10. Storage Activation & Contract | v1.2 | 3/3 | Completed | 2026-03-24 |
-| 11. KùzuDB Persistence & Query Parity | v1.2 | 3/3 | Completed | 2026-03-24 |
-| 12. Neo4j Compatibility, Docs & Validation | v1.2 | 3/3 | Completed | 2026-03-24 |
+| 13. Kùzu-only Storage Surface & Migration | v1.3 | 0/3 | Pending | — |
+| 14. Public Surface Closure | v1.3 | 0/3 | Pending | — |
+| 15. Core Debt Paydown | v1.3 | 0/3 | Pending | — |
+| 16. Docs Guardrail & Validation Automation | v1.3 | 0/3 | Pending | — |

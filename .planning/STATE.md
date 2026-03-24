@@ -1,19 +1,19 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: 图数据库后端生产化
-current_phase: 12
-current_phase_name: Neo4j Compatibility, Docs & Validation
+milestone: v1.3
+milestone_name: Kùzu-only 收敛与高信号债务清理
+current_phase: 13
+current_phase_name: Kùzu-only Storage Surface & Migration
 current_plan: none
-status: completed
-last_updated: "2026-03-24T12:10:00Z"
+status: ready
+last_updated: "2026-03-24T15:58:11Z"
 last_activity: 2026-03-24
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
-  percent: 100
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 12
+  completed_plans: 0
+  percent: 0
 ---
 
 # Session State
@@ -23,20 +23,20 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-03-24)
 
 **Core Value:** AI 能以稳定、机器可读的方式获得代码上下文，而不是被混杂的实现型工作流和不清晰的命令边界干扰。
-**Current Focus:** `v1.2` 已完成 —— Phase 10-12 全部收口，等待下一轮 milestone 定义
+**Current Focus:** `v1.3` 已定义 —— 先移除 `neo4j` 正式支持，再收口 unfinished / debt / docs automation
 
 ## Position
 
-**Milestone:** v1.2 图数据库后端生产化
-**Current Phase:** 12
-**Current Phase Name:** Neo4j Compatibility, Docs & Validation
+**Milestone:** v1.3 Kùzu-only 收敛与高信号债务清理
+**Current Phase:** 13
+**Current Phase Name:** Kùzu-only Storage Surface & Migration
 **Current Plan:** None
-**Total Phases:** 3
+**Total Phases:** 4
 **Total Plans in Phase:** 3
-**Status:** Completed
-**Progress:** 100%
+**Status:** Ready
+**Progress:** 0%
 **Last Activity:** 2026-03-24
-**Last Activity Description:** Completed v1.2 milestone, including storage activation, KùzuDB / Neo4j contract parity, docs guardrail, failure validation and milestone audit
+**Last Activity Description:** Started v1.3 milestone after cleanly committing v1.2 worktree; next up is Phase 13 storage surface reduction
 
 ## Decisions
 
@@ -63,6 +63,10 @@ See: `.planning/PROJECT.md` (updated 2026-03-24)
 - 2026-03-24: 选择 `v1.2 图数据库后端生产化` 作为单一主线，优先解决 storage activation path，再推进 KùzuDB/Neo4j 契约闭环。
 - 2026-03-24: `v1.2` 延续 Phase 10-12 编号，避免重置 phase traceability。
 - 2026-03-24: `v1.2` 明确排除独立 HTTP API 产品面，避免 `Server Layer` 边界再次漂移。
+- 2026-03-24: 旧里程碑的代码与规划改动已先独立 commit 封账，再开启新 milestone，避免新旧范围混淆。
+- 2026-03-24: `v1.3` 选择“Kùzu-only 收敛与高信号债务清理”作为下一轮主线，不再支持 `neo4j` 正式产品面。
+- 2026-03-24: `v1.3` 继续沿用 Phase 13-16 编号，保持跨 milestone traceability。
+- 2026-03-24: 因本轮不是新能力研究而是 brownfield 收口，跳过 research fan-out，直接进入 requirements/roadmap。
 
 ## Blockers
 
@@ -99,11 +103,10 @@ See: `.planning/PROJECT.md` (updated 2026-03-24)
 
 ### Risks To Watch
 
-- 如果下个 milestone 同时混入 DB-native 优化、HTTP API 与验证债务三条线，scope 会再次失控
-- `OPT-01` 仍未覆盖 DB-native callers/cycles/impact 查询优化，后续若直接扩 scope 容易破坏本轮收口边界
-- 历史 archive / setup 文档仍可能存在未纳入当前 guardrail 的旧措辞
-- Phase 01 / 02 的 Nyquist 工件完整性仍有非阻断债务
-- 由于本次遵守运行约束，未执行 git commit / git tag / push
+- 如果移除 `neo4j` 时没有提供显式迁移诊断，历史配置会以更隐蔽的方式失败
+- 如果 `workflow` / `server` 只改文档不改源码，public surface 漂移会继续存在
+- 如果 docs sync 自动检查仍然只靠手动执行，后续任意 phase 都可能再次引入文档漂移
+- parser / handler debt 若只转移注释、不形成真实 contract，会继续污染后续 roadmap 可信度
 
 ## Session Log
 
@@ -146,3 +149,5 @@ See: `.planning/PROJECT.md` (updated 2026-03-24)
 - 2026-03-24: 完成 Phase 12，Neo4j contract、graph storage 文档 / guardrail 与成功/失败路径验证全部闭环
 - 2026-03-24: 创建 `.planning/v1.2-MILESTONE-AUDIT.md`，确认 `11/11` requirements、`3/3` phases、`3/3` integration paths、`3/3` flows 满足
 - 2026-03-24: 归档 `v1.2` roadmap/requirements/phases 到 `.planning/milestones/`，并清空 `.planning/phases/` 等待下个 milestone
+- 2026-03-24: 修复 `.githooks/commit-msg` 与 `.githooks/pre-commit` 的真实阻断问题，并完成旧里程碑封账提交
+- 2026-03-24: 启动 `v1.3 Kùzu-only 收敛与高信号债务清理`，重写 `PROJECT.md` / `REQUIREMENTS.md` / `ROADMAP.md` / `STATE.md`
