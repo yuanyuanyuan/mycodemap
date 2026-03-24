@@ -15,9 +15,8 @@ export { FileSystemStorage } from './adapters/FileSystemStorage.js';
 export { MemoryStorage } from './adapters/MemoryStorage.js';
 
 // 可选适配器（动态导入避免依赖问题）
-// KuzuDBStorage 和 Neo4jStorage 需要动态导入
+// KuzuDBStorage 需要动态导入
 // import('./adapters/KuzuDBStorage.js').then(m => m.KuzuDBStorage)
-// import('./adapters/Neo4jStorage.js').then(m => m.Neo4jStorage)
 
 // 重新导出 Interface Layer 的类型
 export type {

@@ -46,7 +46,6 @@ const VALID_MODES = new Set<NormalizedCodemapConfig['mode']>(['fast', 'smart', '
 const VALID_STORAGE_TYPES = new Set<NormalizedStorageConfig['type']>([
   'filesystem',
   'kuzudb',
-  'neo4j',
   'memory',
   'auto',
 ]);
@@ -56,9 +55,6 @@ const ALLOWED_STORAGE_KEYS = new Set([
   'type',
   'outputPath',
   'databasePath',
-  'uri',
-  'username',
-  'password',
   'autoThresholds',
 ]);
 const ALLOWED_AUTO_THRESHOLD_KEYS = new Set([
@@ -141,10 +137,23 @@ function normalizeStorageType(value: unknown): NormalizedStorageConfig['type'] {
   const storageType = normalizeString(value, 'storage.type') as NormalizedStorageConfig['type'];
 
   if (!VALID_STORAGE_TYPES.has(storageType)) {
-    throw new Error('配置文件中的 "storage.type" 仅支持 filesystem、kuzudb、neo4j、memory、auto');
+    throw new Error('配置文件中的 "storage.type" 仅支持 filesystem、kuzudb、memory、auto');
   }
 
   return storageType;
+}
+
+function assertNoDeprecatedNeo4jConfig(rawStorageConfig: Record<string, unknown>): void {
+  const containsLegacyNeo4jFields = rawStorageConfig.type === 'neo4j'
+    || rawStorageConfig.uri !== undefined
+    || rawStorageConfig.username !== undefined
+    || rawStorageConfig.password !== undefined;
+
+  if (containsLegacyNeo4jFields) {
+    throw new Error(
+      '配置文件中的 Neo4j storage 已不再受支持；请改用 filesystem、kuzudb、memory 或 auto，并移除 storage.uri / storage.username / storage.password'
+    );
+  }
 }
 
 function createDefaultPluginConfig(): NormalizedPluginConfig {
@@ -216,6 +225,7 @@ function normalizeStorageConfig(value: unknown): NormalizedStorageConfig {
 
   const defaults = createDefaultStorageConfig();
   const rawStorageConfig = assertConfigObject(value, 'storage');
+  assertNoDeprecatedNeo4jConfig(rawStorageConfig);
   assertAllowedKeys(rawStorageConfig, ALLOWED_STORAGE_KEYS, 'storage');
 
   return {
@@ -228,18 +238,6 @@ function normalizeStorageConfig(value: unknown): NormalizedStorageConfig {
       rawStorageConfig.databasePath === undefined
         ? undefined
         : normalizeString(rawStorageConfig.databasePath, 'storage.databasePath'),
-    uri:
-      rawStorageConfig.uri === undefined
-        ? undefined
-        : normalizeString(rawStorageConfig.uri, 'storage.uri'),
-    username:
-      rawStorageConfig.username === undefined
-        ? undefined
-        : normalizeString(rawStorageConfig.username, 'storage.username'),
-    password:
-      rawStorageConfig.password === undefined
-        ? undefined
-        : normalizeString(rawStorageConfig.password, 'storage.password'),
     autoThresholds:
       rawStorageConfig.autoThresholds === undefined
         ? undefined

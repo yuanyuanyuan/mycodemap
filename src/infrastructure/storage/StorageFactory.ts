@@ -16,7 +16,6 @@ import { MemoryStorage } from './adapters/MemoryStorage.js';
 
 // 延迟加载可选依赖
 let KuzuDBStorage: typeof import('./adapters/KuzuDBStorage.js').KuzuDBStorage | null = null;
-let Neo4jStorage: typeof import('./adapters/Neo4jStorage.js').Neo4jStorage | null = null;
 
 /**
  * 异步加载 KùzuDB 存储适配器
@@ -30,24 +29,12 @@ async function loadKuzuDBStorage(): Promise<typeof KuzuDBStorage> {
 }
 
 /**
- * 异步加载 Neo4j 存储适配器
- */
-async function loadNeo4jStorage(): Promise<typeof Neo4jStorage> {
-  if (!Neo4jStorage) {
-    const module = await import('./adapters/Neo4jStorage.js');
-    Neo4jStorage = module.Neo4jStorage;
-  }
-  return Neo4jStorage;
-}
-
-/**
  * 存储工厂实现
  * 
  * 根据配置自动选择合适的存储后端：
  * - filesystem: 文件系统存储（默认，无需额外依赖）
  * - memory: 内存存储（用于测试）
  * - kuzudb: KùzuDB 图数据库
- * - neo4j: Neo4j 图数据库
  * - auto: 根据项目规模自动选择
  */
 export class StorageFactory implements IStorageFactory {
@@ -78,19 +65,14 @@ export class StorageFactory implements IStorageFactory {
         }
         return new KuzuStorage(config);
       }
-      
-      case 'neo4j': {
-        const Neo4jStorageClass = await loadNeo4jStorage();
-        if (!Neo4jStorageClass) {
+
+      default:
+        if (String(storageType) === 'neo4j') {
           throw new StorageError(
-            'Neo4j storage adapter not available. Install with: npm install neo4j-driver',
-            'ADAPTER_NOT_AVAILABLE'
+            'Neo4j backend is no longer supported. Use filesystem, kuzudb, memory, or auto instead.',
+            'UNSUPPORTED_STORAGE_TYPE'
           );
         }
-        return new Neo4jStorageClass(config);
-      }
-      
-      default:
         throw new StorageError(
           `Unknown storage type: ${String(storageType)}`,
           'UNKNOWN_STORAGE_TYPE'
@@ -149,14 +131,6 @@ export class StorageFactory implements IStorageFactory {
         } catch {
           return false;
         }
-      case 'neo4j':
-        // 检查 neo4j-driver 包是否可用
-        try {
-          require.resolve('neo4j-driver');
-          return true;
-        } catch {
-          return false;
-        }
       default:
         return false;
     }
@@ -167,7 +141,7 @@ export class StorageFactory implements IStorageFactory {
    * @returns 可用存储类型数组
    */
   static getAvailableStorageTypes(): StorageType[] {
-    const allTypes: StorageType[] = ['filesystem', 'memory', 'kuzudb', 'neo4j'];
+    const allTypes: StorageType[] = ['filesystem', 'memory', 'kuzudb'];
     return allTypes.filter(type => StorageFactory.isStorageTypeAvailable(type));
   }
 }

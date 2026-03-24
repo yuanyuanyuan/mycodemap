@@ -103,16 +103,14 @@ describe('config-loader', () => {
     });
   });
 
-  it('normalizes storage config with explicit backend fields', async () => {
+  it('normalizes storage config with explicit supported backend fields', async () => {
     const rootDir = createTempRoot();
     tempRoots.push(rootDir);
 
     writeJson(rootDir, 'mycodemap.config.json', {
       storage: {
-        type: 'neo4j',
-        uri: 'bolt://localhost:7687',
-        username: 'neo4j',
-        password: 'secret',
+        type: 'kuzudb',
+        databasePath: '.codemap/graph.kuzu',
         autoThresholds: {
           useGraphDBWhenFileCount: 200,
           useGraphDBWhenNodeCount: 5000,
@@ -123,11 +121,9 @@ describe('config-loader', () => {
     const result = await loadCodemapConfig(rootDir);
 
     expect(result.config.storage).toEqual({
-      type: 'neo4j',
+      type: 'kuzudb',
       outputPath: '.codemap/storage',
-      uri: 'bolt://localhost:7687',
-      username: 'neo4j',
-      password: 'secret',
+      databasePath: '.codemap/graph.kuzu',
       autoThresholds: {
         useGraphDBWhenFileCount: 200,
         useGraphDBWhenNodeCount: 5000,
@@ -171,5 +167,21 @@ describe('config-loader', () => {
     });
 
     await expect(loadCodemapConfig(rootDir)).rejects.toThrow('"storage.location" 不是受支持的字段');
+  });
+
+  it('rejects deprecated neo4j storage configs with a migration error', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+
+    writeJson(rootDir, 'mycodemap.config.json', {
+      storage: {
+        type: 'neo4j',
+        uri: 'bolt://localhost:7687',
+        username: 'neo4j',
+        password: 'secret',
+      },
+    });
+
+    await expect(loadCodemapConfig(rootDir)).rejects.toThrow('Neo4j storage 已不再受支持');
   });
 });

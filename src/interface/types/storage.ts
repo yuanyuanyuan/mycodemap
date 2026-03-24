@@ -11,7 +11,7 @@ import type { CodeGraph, Module, Symbol, Dependency } from './index.js';
 // ============================================
 
 /** 存储后端类型 */
-export type StorageType = 'filesystem' | 'kuzudb' | 'neo4j' | 'memory';
+export type StorageType = 'filesystem' | 'kuzudb' | 'memory';
 
 // ============================================
 // Section 2: 搜索选项
@@ -73,11 +73,6 @@ export interface StorageConfig {
   
   // KùzuDB 配置
   databasePath?: string;
-  
-  // Neo4j 配置
-  uri?: string;
-  username?: string;
-  password?: string;
   
   // 自动选择配置
   autoThresholds?: {
