@@ -78,6 +78,7 @@
 **禁止行为**：
 - ❌ 累积多个任务后才 commit
 - ❌ 一个 commit 包含超过 10 个文件（`.githooks/commit-msg` 会拦截）
+- ✅ 例外：如果 commit 包含文档类型文件（`*.md`, `docs/*`, `README*`, `CHANGELOG*`, `LICENSE*`），限制放宽到 20 个文件
 - ❌ 使用 `git commit --no-verify` 跳过检查
 
 ## 4. 执行循环

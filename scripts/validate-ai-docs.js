@@ -6,7 +6,23 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.resolve(__dirname, '..');
+const defaultRootDir = path.resolve(__dirname, '..');
+let rootDir = defaultRootDir;
+
+function parseRootDir(argv) {
+  const rootFlagIndex = argv.indexOf('--root');
+  if (rootFlagIndex === -1) {
+    return defaultRootDir;
+  }
+
+  const rootValue = argv[rootFlagIndex + 1];
+  if (!rootValue) {
+    console.error('ERROR: --root requires a directory path');
+    process.exit(1);
+  }
+
+  return path.resolve(rootValue);
+}
 
 // AI 文档清单
 const requiredAIDocs = [
@@ -263,6 +279,41 @@ function checkDecisionTrees(failures) {
   }
 }
 
+function checkAnalyzeContractConsistency(failures) {
+  console.log('\nChecking analyze public contract consistency...\n');
+
+  const outdatedIntents = ['overview', 'impact', 'dependency', 'search', 'complexity', 'refactor'];
+  const outdatedAnalyzeRegex = new RegExp(`analyze.*-i.*\\b(${outdatedIntents.join('|')})\\b`);
+
+  for (const { file } of requiredAIDocs) {
+    const content = readText(file);
+    if (!content) {
+      continue;
+    }
+
+    const offendingLines = content
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => {
+        if (!line.includes('analyze') || !line.includes('-i')) {
+          return false;
+        }
+
+        return outdatedAnalyzeRegex.test(line);
+      });
+
+    if (offendingLines.length > 0) {
+      const uniqueMatches = [...new Set(offendingLines)];
+      failures.push(`${file} contains outdated analyze intents: ${uniqueMatches.join(' | ')}`);
+      console.log(`  ❌ ${file}`);
+      uniqueMatches.forEach(match => console.log(`      - outdated: ${match}`));
+      continue;
+    }
+
+    console.log(`  ✅ ${file}`);
+  }
+}
+
 function validateAIDocs() {
   console.log('========================================');
   console.log('AI Documentation Guardrails Check');
@@ -275,6 +326,7 @@ function validateAIDocs() {
   checkCrossReferences(failures);
   checkPromptsLibrary(failures);
   checkDecisionTrees(failures);
+  checkAnalyzeContractConsistency(failures);
   
   console.log('\n========================================');
   
@@ -291,4 +343,5 @@ function validateAIDocs() {
   console.log('========================================');
 }
 
+rootDir = parseRootDir(process.argv.slice(2));
 validateAIDocs();

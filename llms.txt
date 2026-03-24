@@ -44,10 +44,10 @@ node dist/cli/index.js generate
 node dist/cli/index.js query -s "symbolName"
 
 # 分析影响范围
-node dist/cli/index.js analyze -i impact -t "file.ts" --json
+node dist/cli/index.js analyze -i read -t "file.ts" --scope transitive --json
 
 # 检查代码质量
-node dist/cli/index.js analyze -i complexity -t "src/" --json
+node dist/cli/index.js analyze -i read -t "src/" --json
 ```
 
 ## 可选

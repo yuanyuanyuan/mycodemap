@@ -5,10 +5,11 @@
 
 ## 1. 系统定位
 
-CodeMap 是一个面向 TypeScript / JavaScript / Go 项目的静态分析工具，提供两种使用形态：
+CodeMap 是一个面向 TypeScript / JavaScript / Go 项目的 AI-first 代码地图工具，目标是为 AI/Agent 提供结构化、可预测、可机器消费的代码上下文。当前仓库仍处于 brownfield 过渡期：legacy CLI / workflow / release surfaces 与 MVP3 分层架构并存。
 
-- 作为 CLI：通过 `codemap` / `mycodemap` 命令执行初始化、生成、查询、依赖分析、影响评估、CI 门禁与工作流编排。
+- 作为 CLI：以代码地图生成、查询、依赖/影响/复杂度分析、导出、CI 护栏为主要产品面。
 - 作为库：通过 `dist/index.js` 暴露分析、解析与生成能力。
+- 当前公共 CLI 聚焦核心分析命令、`workflow`、`export` 与 `ship`；`server`、`watch`、`report`、`logs` 已从 public CLI 移除，但相关实现仍留在仓库中。
 
 当前运行时与构建事实：
 
@@ -16,6 +17,7 @@ CodeMap 是一个面向 TypeScript / JavaScript / Go 项目的静态分析工具
 - 编译输出：`dist/`
 - CLI 入口：`dist/cli/index.js`
 - 目标环境：Node.js >= 18
+- 命名边界：`Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令。
 
 ## 2. 分层原则
 
@@ -51,6 +53,10 @@ CodeMap 已完成 MVP3 架构重构，采用清晰的分层设计：
 - 禁止跨层依赖（如 Domain 层不得导入 CLI 模块）
 - 同层内可以相互依赖
 
+**命名边界提醒：**
+- `Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令。
+- 本文件描述的是分层事实，不为某个公开 CLI 命令是否保留背书。
+
 ### 2.2 原有分层（逐步迁移中）
 
 - 入口层只负责接收用户意图与参数，不承载深层分析逻辑。
@@ -83,7 +89,7 @@ src/cli/index.ts
                                    │
                      ┌─────────────┴─────────────┐
                      ▼                           ▼
-              .mycodemap/*                CLI 屏幕输出 / 报告
+              .mycodemap/*                CLI 屏幕输出 / 导出产物
 ```
 
 ## 4. 顶层模块职责
@@ -99,8 +105,8 @@ src/cli/index.ts
 | `src/domain/entities` | Domain | 领域实体：Project, Module, Symbol, Dependency | `src/domain/entities/` |
 | `src/domain/services` | Domain | 领域服务：CodeGraphBuilder | `src/domain/services/` |
 | `src/domain/repositories` | Domain | 仓库接口定义 | `src/domain/repositories/` |
-| `src/server` | Server | HTTP API 服务器，Query/Analysis Handler | `src/server/CodeMapServer.ts` |
-| `src/cli-new` | CLI | 新架构 CLI 命令（server, export, query） | `src/cli-new/index.ts` |
+| `src/server` | Server | 内部 Server Layer / HTTP transport | `src/server/CodeMapServer.ts` |
+| `src/cli-new` | CLI | 过渡 CLI surface（含 server/export/query） | `src/cli-new/index.ts` |
 
 ### 4.2 原有模块（逐步迁移中）
 
@@ -130,7 +136,7 @@ src/cli/index.ts
 
 ### 5.2 查询流
 
-1. CLI 命令层接收 `query` / `deps` / `impact` / `complexity` / `cycles` / `report`。
+1. CLI 命令层接收 `query` / `deps` / `impact` / `complexity` / `cycles` / `export`。
 2. 命令层读取 CodeMap 输出或直接分析源码。
 3. 返回结构化结果给用户、脚本或上层 agent。
 

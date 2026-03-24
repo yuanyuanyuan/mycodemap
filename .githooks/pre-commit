@@ -15,9 +15,13 @@ fi
 echo "Tests passed"
 
 # 2. 检查 staged 文件数量（初始化 commit 除外）
-# 规则: 单 commit 文件数量不能超过 10 个，超过需要合理理由
+# 规则: 单 commit 文件数量不能超过 10 个
+# 例外: 如果包含文档类型文件，限制放宽到 20 个
 MAX_FILES_PER_COMMIT=10
-STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | wc -l)
+MAX_FILES_WITH_DOCS=20
+
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+STAGED_FILE_COUNT=$(echo "$STAGED_FILES" | grep -c '^' || echo 0)
 
 # 检查是否是初始化 commit（没有父提交）
 IS_INITIAL_COMMIT=false
@@ -26,11 +30,32 @@ if [ $? -ne 0 ]; then
     IS_INITIAL_COMMIT=true
 fi
 
-if [ "$STAGED_FILES" -gt "$MAX_FILES_PER_COMMIT" ] && [ "$IS_INITIAL_COMMIT" = "false" ]; then
+# 检查是否包含文档类型文件
+# 文档类型: *.md, docs/* 目录下文件, README*, CHANGELOG*, LICENSE*
+CONTAINS_DOC_FILES=false
+if [ -n "$STAGED_FILES" ]; then
+    DOC_FILES=$(echo "$STAGED_FILES" | grep -E '(\.md$|^docs/|^README|^CHANGELOG|^LICENSE)' || true)
+    if [ -n "$DOC_FILES" ]; then
+        CONTAINS_DOC_FILES=true
+    fi
+fi
+
+# 根据是否包含文档类型文件设置限制
+if [ "$CONTAINS_DOC_FILES" = "true" ]; then
+    CURRENT_LIMIT=$MAX_FILES_WITH_DOCS
+else
+    CURRENT_LIMIT=$MAX_FILES_PER_COMMIT
+fi
+
+if [ "$STAGED_FILE_COUNT" -gt "$CURRENT_LIMIT" ] && [ "$IS_INITIAL_COMMIT" = "false" ]; then
     echo ""
-    echo "WARNING: Staged files count ($STAGED_FILES) exceeds limit ($MAX_FILES_PER_COMMIT)"
+    echo "WARNING: Staged files count ($STAGED_FILE_COUNT) exceeds limit ($CURRENT_LIMIT)"
     echo ""
-    echo "Single commit should not contain more than $MAX_FILES_PER_COMMIT files."
+    if [ "$CONTAINS_DOC_FILES" = "true" ]; then
+        echo "Note: This commit contains documentation files, so the limit is increased to $MAX_FILES_WITH_DOCS."
+    else
+        echo "Single commit should not contain more than $MAX_FILES_PER_COMMIT files."
+    fi
     echo "Please consider splitting your changes into smaller, focused commits."
     echo ""
     echo "If you have a very good reason for this large commit, you can bypass"

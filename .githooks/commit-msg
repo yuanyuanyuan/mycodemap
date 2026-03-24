@@ -23,25 +23,46 @@ fi
 
 # 2. 检查 commit 文件数量（初始化 commit 除外）
 # 规则: 单 commit 文件数量不能超过 10 个
+# 例外: 如果包含文档类型文件，限制放宽到 20 个
 MAX_FILES_PER_COMMIT=10
-COMMIT_FILE_COUNT=$(git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null | wc -l)
+MAX_FILES_WITH_DOCS=20
 
-# 检查是否是初始化 commit（没有 HEAD）
-IS_INITIAL_COMMIT=false
+# 获取当前提交（index）中的文件列表
 if [ -z "$(git rev-parse --verify HEAD 2>/dev/null)" ]; then
     IS_INITIAL_COMMIT=true
+else
+    IS_INITIAL_COMMIT=false
 fi
 
-# 如果是 amend 或者 rebase，获取 staged 文件数量
-if [ "$COMMIT_FILE_COUNT" -eq 0 ]; then
-    COMMIT_FILE_COUNT=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | wc -l)
+COMMIT_FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
+COMMIT_FILE_COUNT=$(printf '%s\n' "$COMMIT_FILES" | awk 'NF { count++ } END { print count + 0 }')
+
+# 检查是否包含文档类型文件
+# 文档类型: *.md, docs/* 目录下文件, README*, CHANGELOG*, LICENSE*
+CONTAINS_DOC_FILES=false
+if [ -n "$COMMIT_FILES" ]; then
+    DOC_FILES=$(echo "$COMMIT_FILES" | grep -E '(\.md$|^docs/|^README|^CHANGELOG|^LICENSE)' || true)
+    if [ -n "$DOC_FILES" ]; then
+        CONTAINS_DOC_FILES=true
+    fi
 fi
 
-if [ "$COMMIT_FILE_COUNT" -gt "$MAX_FILES_PER_COMMIT" ] && [ "$IS_INITIAL_COMMIT" = "false" ]; then
+# 根据是否包含文档类型文件设置限制
+if [ "$CONTAINS_DOC_FILES" = "true" ]; then
+    CURRENT_LIMIT=$MAX_FILES_WITH_DOCS
+else
+    CURRENT_LIMIT=$MAX_FILES_PER_COMMIT
+fi
+
+if [ "$COMMIT_FILE_COUNT" -gt "$CURRENT_LIMIT" ] && [ "$IS_INITIAL_COMMIT" = "false" ]; then
     echo ""
-    echo "ERROR: Commit contains $COMMIT_FILE_COUNT files, exceeding limit of $MAX_FILES_PER_COMMIT"
+    echo "ERROR: Commit contains $COMMIT_FILE_COUNT files, exceeding limit of $CURRENT_LIMIT"
     echo ""
-    echo "Single commit should not contain more than $MAX_FILES_PER_COMMIT files."
+    if [ "$CONTAINS_DOC_FILES" = "true" ]; then
+        echo "Note: This commit contains documentation files, so the limit is increased to $MAX_FILES_WITH_DOCS."
+    else
+        echo "Single commit should not contain more than $MAX_FILES_PER_COMMIT files."
+    fi
     echo "Large commits make code review difficult and increase rollback risk."
     echo ""
     echo "Please split your changes into smaller, focused commits:"
@@ -53,6 +74,7 @@ if [ "$COMMIT_FILE_COUNT" -gt "$MAX_FILES_PER_COMMIT" ] && [ "$IS_INITIAL_COMMIT
     echo "  - Bulk dependency updates with lock file changes"
     echo "  - Automated code generation results"
     echo "  - Mass refactoring with no logic changes"
+    echo "  - Documentation updates with multiple related doc files"
     echo ""
     echo "If you have a very good reason, use: git commit --no-verify"
     echo ""

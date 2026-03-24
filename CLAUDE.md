@@ -107,7 +107,7 @@ AI 完成任务前必须自检并勾选：
 - 首选：`node dist/cli/index.js query -m "<module>"`
 - 首选：`node dist/cli/index.js deps -m "<module>"`
 - 首选：`node dist/cli/index.js impact -f "<file>"`
-- 首选：`node dist/cli/index.js analyze <intent>`
+- 首选：`node dist/cli/index.js analyze -i <find|read|link|show>`
 
 ### 4.2 MVP3 架构层检索（按层次查找）
 - **Interface 层**：`src/interface/types/`, `src/interface/config/`
