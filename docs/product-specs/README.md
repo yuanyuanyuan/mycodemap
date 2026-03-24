@@ -5,7 +5,14 @@
 ## 当前状态
 
 - 截至 2026-03-15，历史重构需求草稿已归档到 `docs/archive/product-specs/`。
-- 当前活跃产品规格暂为空；若后续需要新规格，请基于当前实现事实重新整理。
+
+## 当前有效规格
+
+- `MVP3-ARCHITECTURE-COMPARISON.md`：把历史设计目标与 `v1.3` 已落地基线并列，防止把愿景误写成现实。
+- `MVP3-ARCHITECTURE-REDESIGN-PRD.md`：记录当前产品边界、Deferred 范围与用户价值。
+- `MVP3-ARCHITECTURE-REDESIGN-TECH-PRD.md`：记录当前技术基线、目录现实、护栏与迁移语义。
+
+> 以上 3 份规格目前都属于“已交付基线同步版”，不是新的待实施 roadmap。
 
 ## 应放内容
 

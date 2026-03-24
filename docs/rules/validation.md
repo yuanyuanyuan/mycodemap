@@ -7,9 +7,10 @@
 3. 若改动同时影响 CLI 护栏入口，再补 `node dist/cli/index.js ci check-docs-sync`；该命令会串联 docs guardrail 与 analyze generated block 校验。
 4. 若改动涉及 `analyze` canonical 示例、选项表或 `AI_GUIDE.md` 速查模板，优先用 `node scripts/sync-analyze-docs.js --check` 直接定位 generated block 漂移。
 5. 若改动涉及产品定位、输出契约、共享文件发现规则或 `Server Layer` / `mycodemap server` 边界，确认 README、AI 文档、架构文档和 guardrail 脚本使用同一套措辞。
-6. 若改动涉及 `mycodemap.config.json.storage` 或图数据库适配器，至少补跑对应 storage adapter 定点测试，并确认 `README.md`、`AI_GUIDE.md`、`docs/ai-guide/COMMANDS.md`、`docs/SETUP_GUIDE.md`、`mycodemap.config.schema.json` 与 guardrail 脚本同步。
-7. 再扩大到 `npm run typecheck`、`npm run lint`、`npm test`。
-8. 涉及发布或打包时，再执行 `npm run build` 与 `npm run validate-pack`。
+6. 若改动涉及 `docs/product-specs/*` 的现行规格，确认 `docs/product-specs/README.md`、相关规格文档与 `scripts/validate-docs.js` 同步；当前 docs guardrail 会显式校验 MVP3 三份架构规格的 shipped baseline 表述。
+7. 若改动涉及 `mycodemap.config.json.storage` 或图数据库适配器，至少补跑对应 storage adapter 定点测试，并确认 `README.md`、`AI_GUIDE.md`、`docs/ai-guide/COMMANDS.md`、`docs/SETUP_GUIDE.md`、`mycodemap.config.schema.json` 与 guardrail 脚本同步。
+8. 再扩大到 `npm run typecheck`、`npm run lint`、`npm test`。
+9. 涉及发布或打包时，再执行 `npm run build` 与 `npm run validate-pack`。
 
 ## CI Gateway 验证流程
 
@@ -38,6 +39,8 @@ CI Gateway 已集成以下自动检查（按执行顺序）：
 - 手改 `README.md`、`docs/ai-guide/COMMANDS.md` 或 `AI_GUIDE.md` 的 `analyze` canonical 代码块 / 选项表 / 速查模板，却没同步 generated block → `node scripts/sync-analyze-docs.js --check` 失败。
 - 文档声称扫描类命令会尊重 `.gitignore`，但实现仍保留手写跳过规则 → `analyze` 与 `check-headers -d` 的文件集合漂移。
 - 把 `workflow` 重新扩回非分析阶段，却没同步 README / AI 命令文档 / guardrail 脚本 → `npm run docs:check` 失败。
+- `docs/product-specs/README.md` 仍写“当前活跃产品规格暂为空”，但目录里已经有现行规格 → 目录索引与规格正文自相矛盾。
+- MVP3 规格文档继续把历史设计愿景写成当前现实（例如把 `neo4j`、14 种语言或公共 `server` 产品面写回去）→ `npm run docs:check` 失败。
 - `config-loader` 已支持 `storage`，但 schema / README / AI 文档没同步 → 用户能写配置，编辑器和 guardrail 却仍把它当非法字段。
 - 旧的 `neo4j` 配置已经不受支持，但文档还把它写成正式 backend，或缺少 `kuzu` 时却被文档写成会自动 fallback → 现场排障方向错误，误判为实现 bug。
 

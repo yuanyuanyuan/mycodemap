@@ -50,6 +50,7 @@
   - 若文档保留 legacy alias 说明，真实输出仍会返回 `warnings[]`；
   - 若涉及机器输出，`--json` 与 `--structured --json` 仍保持纯 JSON 契约。
 - 修改 `README.md`、`AI_GUIDE.md`、`docs/ai-guide/OUTPUT.md`、`ARCHITECTURE.md` 这类入口文档时，必须明确区分“目标产品基线”和“当前 CLI 现实”，尤其是 `Server Layer` / `mycodemap server` 的命名边界。
+- 修改 `docs/product-specs/*` 现行规格时，必须同步 `docs/product-specs/README.md` 与 `scripts/validate-docs.js` 的高信号断言，避免规格正文和目录索引分叉。
 - 若改动会影响 agent 执行手册、README 示例、测试事实或入口路由，先执行 `npm run docs:check`。
 - 若希望通过统一 CLI 护栏入口执行同一检查，使用 `node dist/cli/index.js ci check-docs-sync`；该命令会同时执行 docs guardrail 与 `sync-analyze-docs.js --check`。
 - `ci check-branch --allow` 支持 `*` 通配；在 CI / PR 环境中，分支识别会回退到 `GITHUB_HEAD_REF` / `GITHUB_REF_NAME`。

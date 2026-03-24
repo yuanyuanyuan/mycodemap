@@ -1,321 +1,230 @@
-# CodeMap MVP3 架构重构产品需求文档 (PRD)
+# CodeMap MVP3 架构重构产品需求文档（PRD，v1.3 同步版）
 
-> **版本**: v1.0.0  
-> **状态**: Draft  
-> **日期**: 2026-03-17  
+> **版本**: v1.3-sync  
+> **状态**: Shipped baseline / archived design synced  
+> **日期**: 2026-03-25  
 > **负责人**: Architecture Team
 
 ---
 
-## 1. 背景与目标
+## 1. 文档目的
 
-### 1.1 现状痛点
+本文档不再把早期 MVP3 设计稿中的所有目标都视为“当前已实现”，而是明确区分：
 
-| 痛点 | 影响 | 示例 |
+- **已交付基线**：当前仓库在 `v1.3` 已落地的架构与产品边界
+- **Deferred**：仍保留为未来候选、但尚未成为当前产品事实的内容
+
+---
+
+## 2. 背景
+
+MVP3 重构的原始目的，是把 CodeMap 从“CLI 直接拼接分析逻辑的 brownfield 工具”收敛为：
+
+1. 有清晰层次边界的 AI-first 代码地图工具
+2. 有稳定存储契约的分析系统
+3. 有可扩展 parser 注册机制的多语言基础设施
+4. 有统一文档和验证护栏的可维护产品面
+
+---
+
+## 3. 当前已交付基线（`v1.3`）
+
+### 3.1 架构边界
+
+当前仓库已经形成如下稳定层次：
+
+| 层级 | 路径 | 当前职责 |
+|------|------|----------|
+| Interface | `src/interface/` | 类型定义、配置契约 |
+| Infrastructure | `src/infrastructure/` | storage、parser、repositories 等技术实现 |
+| Domain | `src/domain/` | 实体、领域服务、仓储接口 |
+| Server | `src/server/` | **内部** transport / handler 层 |
+| CLI | `src/cli/` | 公共命令面、参数解析、输出编排 |
+
+**边界要求**：
+
+- `Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令
+- 公共 CLI 不再暴露 `server`、`watch`、`report`、`logs`
+
+### 3.2 存储产品面
+
+当前正式存储 surface 为：
+
+| 类型 | 状态 | 说明 |
 |------|------|------|
-| 层间耦合度高 | `cli/` 直接依赖 `core/analyzer`，难以测试 | CLI 命令难以 mock 分析器 |
-| 存储层硬编码 | 输出只能是 JSON/Markdown，无法扩展 | 无法支持图数据库查询 |
-| 语言支持受限 | 仅支持 TS/JS/Go，错失 Python/Java 用户 | 用户流失到 CodeGraphContext |
-| 缺少服务层 | 业务逻辑分散在 CLI 命令中 | 难以复用核心能力 |
+| `filesystem` | shipped | 默认、最稳定 |
+| `memory` | shipped | 测试/内存场景 |
+| `kuzudb` | shipped | 当前图存储主线 |
+| `auto` | shipped surface | 配置面存在，但当前仍保守落到 `filesystem` |
+| `neo4j` | removed | 不再是正式支持 backend；旧配置返回显式迁移错误 |
 
-### 1.2 目标
+### 3.3 解析器能力
 
+当前已落地的 parser 实现为：
+
+| 语言族 | 当前实现 |
+|--------|----------|
+| TypeScript / JavaScript | `TypeScriptParser` |
+| Go | `GoParser` |
+| Python | `PythonParser` |
+
+说明：
+
+- `LanguageId` 仍保留未来扩展空间
+- 但当前文档不再把 Java / Rust / C/C++ / 14 种语言描述成已交付事实
+
+### 3.4 公共 CLI 面
+
+当前公共命令面聚焦于代码地图与代码分析：
+
+```text
+init / generate / query / deps / cycles / complexity / impact
+analyze / ci / workflow / export / ship
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                       MVP3 核心目标                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ✅ 架构清晰分层: 5 层架构，每层职责单一，接口隔离                 │
-│  ✅ 存储可插拔: 文件系统(默认) + 图数据库(可选)                    │
-│  ✅ 语言扩展: 从 3 种扩展到 14 种主流语言                         │
-│  ✅ CLI 增强: 基础可视化 + 交互式查询                             │
-│  ✅ 向后兼容: 现有用户零成本迁移                                  │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+其中：
+
+- `analyze` 的公共契约固定为 `find` / `read` / `link` / `show`
+- `workflow` 是 **analysis-only** 能力，只编排 `find → read → link → show`
+- `ship` 仍是公开的过渡能力，但 must-pass 检查已复用 `ci`
+
+### 3.5 文档与验证护栏
+
+当前已交付的验证基线：
+
+- `npm run docs:check`
+- `npm run typecheck`
+- `npm run lint`（当前允许 warning baseline，只阻断 error）
+- `npm test`
+- `npm run build`
+- `node dist/cli/index.js ci check-docs-sync`
 
 ---
 
-## 2. 用户故事
+## 4. 产品需求状态
 
-### 2.1 开发者 persona: 小李 (Python 后端工程师)
+### 4.1 已满足
 
-> "我是 Python 开发者，想用 CodeMap 分析我的 Django 项目，但发现不支持 Python，只能用 CodeGraphContext。"
+| 需求 | 当前状态 |
+|------|----------|
+| 五层架构与命名边界稳定 | 已满足 |
+| Kùzu-only 图存储主线 | 已满足 |
+| 历史 `neo4j` 配置迁移诊断 | 已满足 |
+| 解析器注册机制与 3 类实现 | 已满足 |
+| `analyze` / `workflow` / `server` 边界收口 | 已满足 |
+| docs/CI guardrail 自动化 | 已满足 |
 
-**需求**: 
-- 支持 Python 代码分析
-- 能看到 Django 项目的依赖关系
-- 能检测循环依赖
+### 4.2 Deferred
 
-### 2.2 架构师 persona: 老王 (大型系统架构师)
+| 候选项 | 当前状态 |
+|--------|----------|
+| 更丰富的 auto heuristic 存储切换 | Deferred |
+| Java / Rust / C/C++ 等更多 parser 实现 | Deferred |
+| `viz` / `tui` / 更丰富 CLI 可视化 | Deferred |
+| 公共 HTTP API / `mycodemap server` 产品面 | Deferred |
+| 更深的 Kùzu-native 查询优化 | Deferred |
 
-> "我的项目有 5000+ 文件，JSON 文件太大了，查询很慢，希望能用图数据库加速查询。"
+### 4.3 明确不在当前基线内
 
-**需求**:
-- 可选图数据库存储后端
-- 复杂查询性能 < 100ms
-- 支持跨语言调用链分析
-
-### 2.3 CLI 用户 persona: 小张 (命令行爱好者)
-
-> "我喜欢在终端工作，希望能有漂亮的 CLI 可视化，比如树形目录、依赖图字符画。"
-
-**需求**:
-- CLI 字符画可视化
-- 交互式命令补全
-- 进度条和颜色输出
-
----
-
-## 3. 功能需求
-
-### 3.1 分层架构 (Server 层引入)
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              MVP3 分层架构                                   │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  Layer 5: CLI Layer                                                  │   │
-│  │  - 命令解析、参数校验、输出格式化                                       │   │
-│  │  - 仅处理 stdin/stdout/stderr                                        │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                    │                                        │
-│                                    ▼                                        │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  Layer 4: Server Layer  ⭐ 新增                                       │   │
-│  │  - 业务逻辑编排、用例实现                                              │   │
-│  │  - 协调 Domain 和 Infrastructure 层                                   │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                    │                                        │
-│                                    ▼                                        │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  Layer 3: Domain Layer                                               │   │
-│  │  - 核心业务逻辑、实体、值对象                                          │   │
-│  │  - 分析器、依赖图构建、符号索引                                         │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                    │                                        │
-│                                    ▼                                        │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  Layer 2: Infrastructure Layer                                       │   │
-│  │  - 存储抽象、解析器、缓存、文件系统                                     │   │
-│  │  - 技术实现细节                                                       │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                    │                                        │
-│                                    ▼                                        │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  Layer 1: Interface Layer                                            │   │
-│  │  - 类型定义、配置接口、外部 API 抽象                                    │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### 3.2 存储抽象层 (Storage Abstraction)
-
-```typescript
-// 用户配置示例
-type StorageConfig = 
-  | { type: 'filesystem'; path: string }
-  | { type: 'kuzudb'; path: string };
-
-// 自动选择策略
-interface AutoStorageConfig {
-  type: 'auto';
-  thresholds: {
-    useGraphDBWhenFileCount: number;  // 默认 500
-    useGraphDBWhenNodeCount: number;  // 默认 10000
-  };
-}
-```
-
-**功能需求**:
-
-| 需求 ID | 需求描述 | 优先级 | 验收标准 |
-|---------|----------|--------|----------|
-| SA-01 | 文件系统存储 (默认) | P0 | 与现有 JSON/Md 输出完全兼容 |
-| SA-02 | KùzuDB 嵌入式存储 | P1 | 查询性能比文件系统快 10x |
-| SA-03 | 历史 `neo4j` 配置迁移诊断 | P1 | 旧配置返回显式错误，不静默 fallback |
-| SA-04 | 自动选择策略 | P1 | 根据项目规模自动选择后端 |
-| SA-05 | 存储迁移工具 | P2 | FS ↔ GraphDB 双向迁移 |
-
-### 3.3 多语言支持 (14 种语言)
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      语言支持路线图                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Phase 1 (P0): 当前已支持                                        │
-│  ├── TypeScript ⭐                                               │
-│  ├── JavaScript                                                  │
-│  └── Go                                                          │
-│                                                                 │
-│  Phase 2 (P1): 扩展语言 (MVP3 目标)                               │
-│  ├── Python 🐍  (最高优先级)                                      │
-│  ├── Java ☕                                                     │
-│  ├── Rust 🦀                                                     │
-│  └── C/C++                                                       │
-│                                                                 │
-│  Phase 3 (P2): 后续扩展                                          │
-│  ├── C#                                                          │
-│  ├── Ruby                                                        │
-│  ├── PHP                                                         │
-│  ├── Swift                                                       │
-│  ├── Kotlin                                                      │
-│  ├── Dart                                                        │
-│  └── Perl                                                        │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**语言实现策略**:
-
-| 语言 | 解析器 | 复杂度 | 优先级 |
-|------|--------|--------|--------|
-| Python | Tree-sitter | 中 | P0 |
-| Java | Tree-sitter | 中 | P1 |
-| Rust | Tree-sitter | 中 | P1 |
-| C/C++ | Tree-sitter | 高 | P1 |
-| C# | Tree-sitter | 中 | P2 |
-| Ruby | Tree-sitter | 低 | P2 |
-| PHP | Tree-sitter | 低 | P2 |
-| Swift | Tree-sitter | 中 | P2 |
-| Kotlin | Tree-sitter | 中 | P2 |
-| Dart | Tree-sitter | 低 | P2 |
-| Perl | Tree-sitter | 低 | P2 |
-
-### 3.4 CLI 可视化增强
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    CLI 可视化功能                                │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. 树形目录可视化 (tree view)                                   │
-│     $ mycodemap viz tree --depth 3                              │
-│     📁 src/                                                     │
-│     ├── 📁 cli/                                                 │
-│     │   ├── 📄 index.ts                                         │
-│     │   └── 📄 commands/                                        │
-│     └── 📁 core/                                                │
-│         └── 📄 analyzer.ts                                      │
-│                                                                 │
-│  2. 依赖图字符画 (ascii graph)                                   │
-│     $ mycodemap viz deps --format ascii                         │
-│     src/index.ts                                                │
-│     ├── src/cli/index.ts                                        │
-│     ├── src/core/analyzer.ts                                    │
-│     └── src/parser/index.ts                                     │
-│                                                                 │
-│  3. 热力图 (heatmap)                                            │
-│     $ mycodemap viz heatmap --metric complexity                 │
-│     🔴 src/orchestrator/workflow.ts  (复杂度: 45)                │
-│     🟡 src/cli/commands/query.ts   (复杂度: 28)                │
-│     🟢 src/cache/lru-cache.ts      (复杂度: 12)                │
-│                                                                 │
-│  4. 进度条和 Spinner                                             │
-│     $ mycodemap generate                                        │
-│     [████████████████████] 85% | 正在分析 src/core/analyzer.ts  │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**CLI 可视化需求**:
-
-| 需求 ID | 功能 | 优先级 | 说明 |
-|---------|------|--------|------|
-| VIZ-01 | 树形目录视图 | P1 | `--viz tree` |
-| VIZ-02 | ASCII 依赖图 | P1 | `--viz deps` |
-| VIZ-03 | 复杂度热力图 | P2 | `--viz heatmap` |
-| VIZ-04 | 进度条/Spinner | P0 | 所有耗时命令 |
-| VIZ-05 | 颜色主题 | P2 | `--theme dark/light` |
-| VIZ-06 | 交互式 TUI | P2 | `mycodemap tui` |
+| 项目 | 处理原则 |
+|------|----------|
+| 恢复 `neo4j` 正式支持 | 不在当前范围 |
+| 把 `Server Layer` 重新包装成公共产品面 | 不在当前范围 |
+| 把 workflow 扩回实现/提交/CI 编排 | 不在当前范围 |
 
 ---
 
-## 4. 非功能需求
+## 5. 用户价值
 
-### 4.1 性能目标
+### 5.1 AI / Agent 用户
 
-| 指标 | 当前 | MVP3 目标 | 测试场景 |
-|------|------|-----------|----------|
-| 首次索引 (1000 文件) | ~30s | < 20s | Fast 模式 |
-| 查询响应时间 | ~500ms | < 100ms (GraphDB) | 符号查询 |
-| 内存占用 | ~500MB | < 1GB | 5000 文件项目 |
-| 增量更新 | ~5s | < 3s | 修改 1 个文件 |
+需求：
 
-### 4.2 兼容性
+- 拿到稳定、机器可读、边界清晰的代码上下文
+- 不被不稳定的命令面和文档漂移误导
 
-- **向后兼容**: 现有 `codemap.config.json` 无需修改
-- **输出兼容**: `AI_MAP.md` / `CONTEXT.md` 格式保持不变
-- **CLI 兼容**: 所有现有命令和参数保持不变
+当前交付：
 
-### 4.3 可扩展性
+- 公共命令面已收口
+- 输出契约已固定
+- docs guardrail 与 CI 能阻止高信号漂移
 
-- **新存储后端**: 实现 `StorageAdapter` 接口即可添加
-- **新语言**: 实现 `LanguageParser` 接口即可添加
-- **新可视化**: 实现 `Visualizer` 接口即可添加
+### 5.2 Python / Go / TypeScript 团队
 
----
+需求：
 
-## 5. 发布计划
+- 能在当前主流仓库里复用统一代码地图能力
+- 不需要等到“14 种语言全部完成”才使用 MVP3
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      MVP3 发布路线图                             │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  v3.0.0-alpha (4 周)                                            │
-│  ├── 架构重构: Server 层 + 分层隔离                              │
-│  └── 存储抽象层基础接口                                          │
-│                                                                 │
-│  v3.0.0-beta (4 周)                                             │
-│  ├── Python 语言支持                                             │
-│  ├── KùzuDB 存储后端                                             │
-│  └── CLI 可视化基础功能                                          │
-│                                                                 │
-│  v3.0.0-rc (2 周)                                               │
-│  ├── Java/Rust/C/C++ 语言支持                                    │
-│  ├── 自动存储选择策略                                            │
-│  └── 性能优化                                                    │
-│                                                                 │
-│  v3.0.0-stable                                                  │
-│  └── 正式发布                                                    │
-│                                                                 │
-│  v3.1.0+                                                        │
-│  └── 剩余 6 种语言 + Kùzu-only storage polish                    │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+当前交付：
+
+- TypeScript/JavaScript、Go、Python 已有 parser 实现
+- 解析器接口保留未来扩展余地
+
+### 5.3 大仓库维护者
+
+需求：
+
+- 能切换到图存储后端
+- 遇到旧配置时有清晰迁移语义
+
+当前交付：
+
+- `filesystem` / `memory` / `kuzudb` / `auto` 为正式配置面
+- 旧 `neo4j` 配置会显式报错，不再静默 fallback
 
 ---
 
-## 6. 风险与缓解
+## 6. 非功能基线
 
-| 风险 | 概率 | 影响 | 缓解措施 |
-|------|------|------|----------|
-| Tree-sitter 性能瓶颈 | 中 | 高 | 预编译 grammar，Worker 线程解析 |
-| KùzuDB 稳定性 | 低 | 高 | 保留文件系统作为 fallback |
-| 向后兼容性破坏 | 低 | 高 | 完整集成测试，灰度发布 |
-| 开发周期延期 | 中 | 中 | 分阶段发布，先核心后扩展 |
+### 6.1 兼容性
+
+- 当前正式配置文件名为 `mycodemap.config.json`
+- 对旧 `codemap.config.json` 保留兼容读取与迁移提示
+- 输出仍围绕 `AI_MAP.md`、`codemap.json` 及相关导出格式组织
+
+### 6.2 可维护性
+
+- 文档、实现、测试、CI 必须使用同一套边界措辞
+- 架构文档必须持续区分“内部 Server Layer”与“公共 CLI surface”
+
+### 6.3 性能表述
+
+当前文档不再把早期草案中的 `<100ms` GraphDB 指标写成现成 SLA。
+
+更准确的当前表达是：
+
+- Kùzu 路径已接入正式产品面
+- 更激进的 DB-native 查询优化属于后续候选项，而非 `v1.3` 既成事实
 
 ---
 
-## 7. 附录
+## 7. 发布历史（按已交付里程碑）
 
-### 7.1 术语表
+| 里程碑 | 交付重点 |
+|--------|----------|
+| `v1.0` | AI-first 定位、公共 CLI 收口、analyze/workflow/ship/docs guardrail 基线 |
+| `v1.1` | 插件扩展点产品化 |
+| `v1.2` | 图数据库后端生产化 |
+| `v1.3` | Kùzu-only 收敛、高信号 debt 清偿、docs/CI 自动验证闭环 |
 
-| 术语 | 定义 |
-|------|------|
-| Server Layer | 业务逻辑层，协调 Domain 和 Infrastructure |
-| Storage Abstraction | 存储抽象接口，支持多种后端实现 |
-| Tree-sitter | 增量解析库，支持多语言 |
-| KùzuDB | 高性能嵌入式图数据库 |
+---
 
-### 7.2 参考文档
+## 8. 风险与缓解
 
-- [MVP3 Tech-PRD](./MVP3-ARCHITECTURE-REDESIGN-TECH-PRD.md)
-- [Storage Abstraction Design](../design-docs/storage-abstraction.md)
-- [Multi-Language Support Plan](../design-docs/multi-language-support.md)
+| 风险 | 当前状态 | 缓解策略 |
+|------|----------|----------|
+| 文档继续把历史设计写成当前现实 | 高信号风险 | 持续运行 `docs:check` 与 `ci check-docs-sync` |
+| `Server Layer` 与公共 `server` 命令再次混淆 | 高信号风险 | 在 README / AI docs / 架构文档统一措辞 |
+| `auto` 被误读为“已完成智能切换” | 中 | 文档明确写明当前仍保守落到 `filesystem` |
+| repo-wide lint warnings 演变成阻断项 | 中 | 单独开新 milestone 清理 warning baseline |
+
+---
+
+## 9. 参考文档
+
+- `docs/product-specs/MVP3-ARCHITECTURE-COMPARISON.md`
+- `docs/product-specs/MVP3-ARCHITECTURE-REDESIGN-TECH-PRD.md`
+- `.planning/PROJECT.md`
+- `.planning/REQUIREMENTS.md`
+- `.planning/v1.3-MILESTONE-AUDIT.md`

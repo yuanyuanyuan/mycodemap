@@ -1,504 +1,229 @@
-# MVP3 架构对比：Before vs After
+# MVP3 架构对比：历史设计目标 vs v1.3 已落地基线
 
-> 本文档对比展示 CodeMap MVP3 架构重构前后的差异
-
----
-
-## 1. 架构总览对比
-
-### Before (当前架构)
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        当前架构 (v2.5)                           │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                      CLI Layer                          │   │
-│  │   (命令解析 + 业务逻辑 + 输出格式化 混合在一起)            │   │
-│  │                                                         │   │
-│  │   cli/commands/generate.ts ──────┐                      │   │
-│  │   cli/commands/query.ts  ────────┼── 直接调用核心        │   │
-│  │   cli/commands/impact.ts ────────┘                      │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                              │                                  │
-│                              ▼                                  │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                      Core Layer                         │   │
-│  │   (分析器 + 依赖图构建 混合在一起)                        │   │
-│  │                                                         │   │
-│  │   core/analyzer.ts ────── 直接操作文件系统               │   │
-│  │   core/global-index.ts                                    │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                              │                                  │
-│                              ▼                                  │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                     Parser Layer                        │   │
-│  │   (仅支持 TS/JS/Go，扩展困难)                            │   │
-│  │                                                         │   │
-│  │   parser/index.ts ──────── 硬编码 TypeScript 逻辑        │   │
-│  │   parser/smart-parser.ts                                  │   │
-│  │   parser/fast-parser.ts                                   │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                              │                                  │
-│                              ▼                                  │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                   Generator Layer                       │   │
-│  │   (直接输出 JSON/Markdown，无抽象)                       │   │
-│  │                                                         │   │
-│  │   generator/index.ts ──── 硬编码文件输出                 │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                                                                 │
-│  ❌ 问题:                                                       │
-│  - CLI 直接依赖 Core，难以测试                                  │
-│  - 存储硬编码，无法切换图数据库                                   │
-│  - 语言解析器扩展困难                                           │
-│  - 业务逻辑分散在各命令中                                        │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### After (MVP3 架构)
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        MVP3 架构 (v3.0)                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  Layer 5: CLI Layer                                      │   │
-│  │  - 仅负责: 命令解析、参数校验、格式化输出                   │   │
-│  │  - 通过 Server Layer 执行业务                              │   │
-│  │                                                          │   │
-│  │   cli/commands/generate.ts ──────┐                       │   │
-│  │   cli/commands/query.ts  ────────┼── 调用 Server 用例    │   │
-│  │   cli/commands/viz.ts  ──────────┘                       │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                              │                                  │
-│                              ▼                                  │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  Layer 4: Server Layer ⭐ 新增                            │   │
-│  │  - 用例编排: GenerateCodeMap, QuerySymbol, etc.           │   │
-│  │  - 应用服务: CodeMapService, QueryService                 │   │
-│  │  - DTO 转换: Request/Response 映射                        │   │
-│  │                                                          │   │
-│  │   server/usecases/GenerateCodeMap.ts                     │   │
-│  │   server/services/CodeMapService.ts                      │   │
-│  │   server/dto/GenerateRequest.ts                          │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                              │                                  │
-│                              ▼                                  │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  Layer 3: Domain Layer                                   │   │
-│  │  - 核心实体: Project, Module, Symbol, Dependency          │   │
-│  │  - 领域服务: AnalysisService (纯业务逻辑)                 │   │
-│  │  - 仓储接口: ICodeGraphRepository                         │   │
-│  │                                                          │   │
-│  │   domain/entities/*.ts                                   │   │
-│  │   domain/services/AnalysisService.ts                     │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                              │                                  │
-│                              ▼                                  │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  Layer 2: Infrastructure Layer                           │   │
-│  │                                                          │   │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │   │
-│  │  │   Storage    │  │   Parser     │  │    Cache     │   │   │
-│  │  │  (可插拔)    │  │ (14 种语言)  │  │   (多层)     │   │   │
-│  │  │              │  │              │  │              │   │   │
-│  │  │ • FileSystem │  │ • TypeScript │  │ • LRU        │   │   │
-│  │  │ • KùzuDB ⭐  │  │ • Python ⭐  │  │ • File       │   │   │
-│  │  │ • KùzuDB ⭐  │  │ • Java ⭐    │  │ • Incremental│   │   │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘   │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                              │                                  │
-│                              ▼                                  │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  Layer 1: Interface Layer                                │   │
-│  │  - 类型定义、接口契约、配置类型                            │   │
-│  │                                                          │   │
-│  │   interface/types/*.ts                                   │   │
-│  │   interface/config/*.ts                                  │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                                                                 │
-│  ✅ 优势:                                                       │
-│  - 依赖方向清晰: Interface → Infrastructure → Domain → Server → CLI │
-│  - 存储可插拔: 支持文件系统、KùzuDB                              │
-│  - 语言易扩展: 实现 ILanguageParser 即可添加新语言               │
-│  - 业务内聚: Server Layer 统一管理用例                          │
-│  - 可测试性: 每层可独立单元测试                                  │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+> **状态**: Synced with v1.3 shipped reality  
+> **最后同步**: 2026-03-25  
+> **适用范围**: 用于区分“历史设计目标”和“当前仓库已落地事实”
 
 ---
 
-## 2. 存储层对比
+## 1. 阅读说明
 
-### Before: 硬编码文件系统
+本文档不再把早期 MVP3 设计稿里的所有目标都当成“当前已实现”。
 
-```typescript
-// ❌ 问题: 直接操作文件系统，无法扩展
-
-// src/core/analyzer.ts
-export async function analyze(options: AnalysisOptions): Promise<CodeMap> {
-  // ... 分析逻辑
-  
-  // 直接写 JSON 文件
-  await fs.writeFile(
-    path.join(outputDir, 'codemap.json'),
-    JSON.stringify(codeMap)
-  );
-  
-  // 直接写 Markdown
-  await fs.writeFile(
-    path.join(outputDir, 'AI_MAP.md'),
-    generateAIMap(codeMap)
-  );
-  
-  return codeMap;
-}
-
-// ❌ 查询时重新读取文件
-export async function querySymbol(name: string) {
-  const codeMap = JSON.parse(
-    await fs.readFile('codemap.json', 'utf-8')
-  );
-  // 线性扫描
-  return codeMap.modules.flatMap(m => m.symbols).filter(s => s.name === name);
-}
-```
-
-### After: 存储抽象接口
-
-```typescript
-// ✅ 通过接口抽象，支持多种后端
-
-// src/infrastructure/storage/interfaces/IStorage.ts
-export interface IStorage {
-  saveCodeGraph(graph: CodeGraph): Promise<void>;
-  loadCodeGraph(): Promise<CodeMap>;
-  findSymbolByName(name: string): Promise<Symbol[]>;
-  findCallers(functionId: string): Promise<Symbol[]>;
-  calculateImpact(moduleId: string, depth: number): Promise<ImpactResult>;
-  detectCycles(): Promise<Cycle[]>;
-  // ...
-}
-
-// 使用方代码
-export class CodeMapService {
-  constructor(private storage: IStorage) {}
-  
-  async generate(request: GenerateRequest) {
-    const codeGraph = await this.buildCodeGraph(request);
-    await this.storage.saveCodeGraph(codeGraph); // 不关心具体存储
-    return codeGraph;
-  }
-  
-  async querySymbol(name: string) {
-    return this.storage.findSymbolByName(name); // 可能走图数据库查询
-  }
-}
-
-// 存储选择
-const storage = await storageFactory.create({
-  type: 'auto',  // 根据项目规模自动选择
-  autoThresholds: {
-    useGraphDBWhenFileCount: 500
-  }
-});
-// < 500 文件: FileSystemStorage
-// >= 500 文件: KuzuDBStorage
-```
+- **Before**: 指 MVP3 重构前的 legacy 形态
+- **After**: 指 `v1.3` 收口后的当前仓库基线
+- **Deferred**: 指仍保留为未来候选、但尚未作为当前产品事实交付的能力
 
 ---
 
-## 3. 语言支持对比
+## 2. 总览对比
 
-### Before: 硬编码 TypeScript
-
-```typescript
-// ❌ 问题: 解析逻辑硬编码，难以扩展新语言
-
-// src/parser/index.ts
-export async function parseFile(filePath: string): Promise<ModuleInfo> {
-  const content = await readFileContent(filePath);
-  
-  // 只能解析 TypeScript
-  const sourceFile = ts.createSourceFile(
-    path.basename(filePath),
-    content,
-    ts.ScriptTarget.ES2022,
-    true
-  );
-  
-  const imports = extractImports(sourceFile); // TS 专用逻辑
-  const exports = extractExports(sourceFile); // TS 专用逻辑
-  
-  return { imports, exports, ... };
-}
-```
-
-### After: 可插拔语言解析器
-
-```typescript
-// ✅ 通过注册表管理，支持 14 种语言
-
-// src/infrastructure/parser/interfaces/ILanguageParser.ts
-export interface ILanguageParser {
-  readonly languageId: LanguageId;
-  readonly fileExtensions: string[];
-  parseFile(filePath: string, content: string): Promise<ParseResult>;
-  extractImports(content: string): Promise<Import[]>;
-  extractSymbols(content: string): Promise<Symbol[]>;
-}
-
-// 使用方代码
-export class AnalysisService {
-  constructor(private parserRegistry: IParserRegistry) {}
-  
-  async analyzeFile(filePath: string, content: string) {
-    // 自动根据扩展名选择解析器
-    const parser = this.parserRegistry.getParserByFile(filePath);
-    if (!parser) {
-      throw new Error(`No parser for ${filePath}`);
-    }
-    
-    return parser.parseFile(filePath, content);
-  }
-}
-
-// 注册新语言只需一行
-parserRegistry.register(new PythonParser());
-parserRegistry.register(new JavaParser());
-parserRegistry.register(new RustParser());
-// ... 共 14 种语言
-```
+| 维度 | Before | After (`v1.3`) |
+|------|--------|----------------|
+| CLI | 多个命令直接碰核心实现 | 公共 CLI 收口为分析优先的命令面，命名边界清晰 |
+| Server Layer | 设计概念模糊，易与公共 `server` 命令混淆 | `src/server/` 保留为**内部架构层**；公共 `server` 命令已移除 |
+| Storage | 以文件输出为中心，图存储路径不稳定 | `filesystem` / `memory` / `kuzudb` / `auto` 为正式 surface；`neo4j` 已退出正式支持 |
+| Parser | 以 TypeScript 逻辑为主，扩展能力弱 | `ParserRegistry` + `TypeScript/JavaScript`、`Go`、`Python` 三类已落地实现 |
+| Workflow | 设计上曾试图扩到更多工程阶段 | 当前公开能力仅保留 analysis-only：`find → read → link → show` |
+| Docs / CI | 文档与实现容易漂移 | `docs:check` + `ci check-docs-sync` + CI gateway 固定当前契约 |
 
 ---
 
-## 4. CLI 对比
+## 3. 架构总览对比
 
-### Before: 功能有限
+### Before（重构前）
+
+```text
+CLI commands
+  ├─ 直接调用 analyzer / parser / generator
+  ├─ 命令职责与业务逻辑混杂
+  └─ 命名边界不稳定
+
+core/*
+  ├─ 分析、索引、依赖图构建耦合
+  └─ 测试与替换实现成本高
+
+parser/*
+  ├─ 以 TypeScript 逻辑为中心
+  └─ 新语言扩展成本高
+```
+
+### After（`v1.3` 当前基线）
+
+```text
+CLI Layer (`src/cli/`)
+  ├─ 公共命令面：init / generate / query / deps / cycles
+  ├─ analyze / ci / workflow / export / ship
+  └─ public `server` / `watch` / `report` / `logs` 已移除
+
+Server Layer (`src/server/`)
+  ├─ `CodeMapServer.ts`
+  ├─ `handlers/QueryHandler.ts`
+  ├─ `handlers/AnalysisHandler.ts`
+  ├─ `routes/api.ts`
+  └─ internal-only transport / handler boundary
+
+Domain Layer (`src/domain/`)
+  ├─ 实体、仓储接口、领域服务
+  └─ 面向业务模型，不直接暴露 CLI 细节
+
+Infrastructure Layer (`src/infrastructure/`)
+  ├─ storage: FileSystem / Memory / KùzuDB
+  ├─ parser: TypeScript(JS) / Go / Python
+  └─ repositories / shared graph helpers
+
+Interface Layer (`src/interface/`)
+  ├─ 类型定义
+  └─ 配置与接口契约
+```
+
+### 当前架构要点
+
+- `Server Layer` 是内部架构层，不等于公共 `mycodemap server`
+- 图存储正式产品面已收敛为 Kùzu-only 主线，不再把 `neo4j` 当成受支持 backend
+- `workflow` 是公开能力，但仅编排分析阶段，不再混入实现/提交/CI 阶段
+
+---
+
+## 4. 存储层对比
+
+### Before：以文件输出为主
+
+```typescript
+await fs.writeFile(path.join(outputDir, 'codemap.json'), json);
+await fs.writeFile(path.join(outputDir, 'AI_MAP.md'), markdown);
+```
+
+特点：
+
+- 文件输出是唯一稳定路径
+- 查询能力依赖重新读取本地文件
+- 图存储能力即使存在，也没有稳定产品面
+
+### After：存储契约已稳定，但产品面已收敛
+
+```typescript
+export type StorageType = 'filesystem' | 'kuzudb' | 'memory';
+
+export interface StorageConfig {
+  type: StorageType | 'auto';
+  outputPath?: string;
+  databasePath?: string;
+  autoThresholds?: {
+    useGraphDBWhenFileCount: number;
+    useGraphDBWhenNodeCount: number;
+  };
+}
+```
+
+当前事实：
+
+- **正式支持**：`filesystem`、`memory`、`kuzudb`、`auto`
+- **不再正式支持**：`neo4j`
+- **迁移语义**：旧 `neo4j` 配置会返回显式错误，不会静默 fallback
+- **`auto` 现状**：配置面存在，但当前仍保守落到 `filesystem`；阈值字段是契约，不代表已完成智能切换
+
+---
+
+## 5. 语言支持对比
+
+### Before：TypeScript 中心化实现
+
+- 解析路径主要围绕 TypeScript/JavaScript 展开
+- Go 能力存在，但注册与扩展策略不统一
+- Python/更多语言更多停留在设计愿景
+
+### After：可扩展契约已建立，当前落地 3 类实现
+
+```typescript
+export function createDefaultParserRegistry(): ParserRegistry {
+  const registry = new ParserRegistry();
+  registry.register(new TypeScriptParser()); // ts/tsx/js/jsx/mjs/cjs
+  registry.register(new GoParser());         // go
+  registry.register(new PythonParser());     // py
+  return registry;
+}
+```
+
+当前事实：
+
+- **当前已落地实现**：TypeScript/JavaScript、Go、Python
+- **接口仍预留未来语言 ID**：Java、Rust、C/C++ 等仍属于未来扩展空间
+- **当前文档不再把“14 种语言”描述为已交付事实**
+
+---
+
+## 6. CLI 对比
+
+### Before：命令面宽、边界混
 
 ```bash
-# 基础命令
-$ mycodemap generate
-$ mycodemap query -s "symbolName"
-$ mycodemap deps
-
-# 输出: 静态文本文件
-# - AI_MAP.md
-# - CONTEXT.md
-# - codemap.json
+mycodemap generate
+mycodemap query
+mycodemap deps
 ```
 
-### After: 丰富的 CLI 可视化
+问题：
+
+- CLI 直接携带业务逻辑
+- 命令与内部能力命名边界不稳定
+- 容易把工具误解成 watcher / report / server 工具箱
+
+### After：分析优先的公共 CLI
 
 ```bash
-# 树形视图
-$ mycodemap viz tree --depth 3
-📁 src/
-├── 📁 cli/
-│   ├── 📄 index.ts
-│   └── 📁 commands/
-└── 📁 core/
-    └── 📄 analyzer.ts
-
-# ASCII 依赖图
-$ mycodemap viz deps --module src/core/analyzer.ts
-src/core/analyzer.ts
-├── src/parser/index.ts
-├── src/cache/index.ts
-└── src/types/index.ts
-
-# 复杂度热力图
-$ mycodemap viz heatmap --metric complexity
-🔴 src/orchestrator/workflow.ts     ████████████████ 45
-🟡 src/cli/commands/query.ts        ██████████ 28
-🟢 src/cache/lru-cache.ts           ████ 12
-
-# 带进度条的生成
-$ mycodemap generate
-[████████████████████] 85% | 正在分析 src/core/analyzer.ts
+mycodemap generate
+mycodemap analyze find --keywords storage
+mycodemap workflow start "trace auth dependency"
+mycodemap export json
+mycodemap ci check-docs-sync
 ```
+
+当前事实：
+
+- `workflow` 是**analysis-only** 工作流能力，只保留 `find → read → link → show`
+- `server`、`watch`、`report`、`logs` 已从 public CLI 移除，并提供迁移提示
+- 文档不再把 `viz`、`tui` 等未落地命令写成当前产品事实
 
 ---
 
-## 5. 依赖关系对比
+## 7. 测试与验证对比
 
-### Before: 混乱的依赖
+### Before
 
-```
-cli/commands/generate.ts ─────┬─────▶ core/analyzer.ts
-                              │
-cli/commands/query.ts ────────┤─────▶ core/analyzer.ts (重复依赖)
-                              │
-cli/commands/impact.ts ───────┘─────▶ core/analyzer.ts (重复依赖)
+- 很多能力只能通过端到端地操作真实文件验证
+- 文档与实现边界更容易漂移
 
-                              ↓
-                    难以测试，难以替换实现
-```
+### After
 
-### After: 清晰的依赖
-
-```
-┌──────────────────────────────────────────────────────────┐
-│  CLI Layer                                               │
-│   ↓                                                      │
-│   依赖: Server Layer 接口                                 │
-└──────────────────────────────────────────────────────────┘
-                           │
-                           ▼
-┌──────────────────────────────────────────────────────────┐
-│  Server Layer                                            │
-│   ↓                                                      │
-│   依赖: Domain Layer 接口                                 │
-└──────────────────────────────────────────────────────────┘
-                           │
-                           ▼
-┌──────────────────────────────────────────────────────────┐
-│  Domain Layer                                            │
-│   ↓                                                      │
-│   依赖: Interface Layer (类型定义)                        │
-└──────────────────────────────────────────────────────────┘
-                           │
-                           ▼
-┌──────────────────────────────────────────────────────────┐
-│  Infrastructure Layer                                    │
-│   ↓                                                      │
-│   依赖: Interface Layer (实现接口)                        │
-└──────────────────────────────────────────────────────────┘
-                           │
-                           ▼
-┌──────────────────────────────────────────────────────────┐
-│  Interface Layer (无依赖，纯类型定义)                      │
-└──────────────────────────────────────────────────────────┘
-```
+- `StorageFactory`、parser、plugin loader、server handlers/routes 都有定点测试
+- `docs:check` 与 `ci check-docs-sync` 进入 must-pass / CI 路径
+- `v1.3` 里程碑审计确认：`12/12` requirements、`4/4` phases、`4/4` integration、`4/4` flows
 
 ---
 
-## 6. 测试对比
+## 8. 当前未交付 / Deferred
 
-### Before: 难以测试
+以下能力属于历史设计目标或未来候选，不应再被理解为当前产品事实：
 
-```typescript
-// ❌ 直接依赖文件系统，难以 mock
-// cli/commands/generate.test.ts
-
-it('should generate code map', async () => {
-  // 无法隔离测试，必须操作真实文件
-  await generateCommand({ output: '/tmp/test' });
-  
-  // 验证文件存在
-  expect(fs.existsSync('/tmp/test/AI_MAP.md')).toBe(true);
-});
-// 测试慢，依赖外部环境
-```
-
-### After: 易于测试
-
-```typescript
-// ✅ 通过接口注入依赖，易于 mock
-// server/usecases/GenerateCodeMap.test.ts
-
-it('should generate code map', async () => {
-  // Mock 存储
-  const mockStorage = {
-    saveCodeGraph: vi.fn(),
-    loadCodeGraph: vi.fn()
-  };
-  
-  // Mock 解析器
-  const mockParser = {
-    parseFile: vi.fn().mockResolvedValue({ ... })
-  };
-  
-  // 注入依赖
-  const useCase = new GenerateCodeMapUseCase(
-    mockStorage,
-    mockParser
-  );
-  
-  // 执行
-  const result = await useCase.execute({
-    projectPath: '/tmp/test',
-    mode: 'fast'
-  });
-  
-  // 验证
-  expect(mockStorage.saveCodeGraph).toHaveBeenCalled();
-  expect(result.success).toBe(true);
-});
-// 测试快，完全隔离
-```
-
----
-
-## 7. 性能对比
-
-| 指标 | Before | After | 提升 |
-|------|--------|-------|------|
-| 首次索引 (1000 文件) | ~30s | < 20s | 33% |
-| 符号查询 | ~500ms | < 10ms (GraphDB) | 50x |
-| 循环依赖检测 | ~3s | < 100ms (GraphDB) | 30x |
-| 影响分析 | ~2s | < 50ms (GraphDB) | 40x |
-| 内存占用 | ~500MB | ~400MB | 20% |
-
----
-
-## 8. 扩展性对比
-
-### 添加新存储后端
-
-| 步骤 | Before | After |
-|------|--------|-------|
-| 1 | 修改多处代码 | 实现 `IStorage` 接口 |
-| 2 | 处理兼容性问题 | 注册到 `StorageFactory` |
-| 3 | 测试回归 | 复用现有测试套件 |
-| **工作量** | **2-3 天** | **2-3 小时** |
-
-### 添加新语言支持
-
-| 步骤 | Before | After |
-|------|--------|-------|
-| 1 | 创建新文件，复制粘贴修改 | 实现 `ILanguageParser` |
-| 2 | 修改 parser/index.ts | 注册到 `ParserRegistry` |
-| 3 | 修改 cli 命令 | 自动识别文件扩展名 |
-| **工作量** | **1-2 天** | **4-8 小时** |
+| 能力 | 当前状态 |
+|------|----------|
+| `neo4j` 正式支持 | 已移除出正式产品面 |
+| 更丰富的自动后端切换启发式 | 仍 deferred；`auto` 当前保守落到 `filesystem` |
+| Java / Rust / C/C++ 等更多 parser 实现 | 接口预留，未作为当前 shipped reality |
+| `viz` / `tui` / CLI 可视化套件 | 未作为当前 public CLI 基线交付 |
+| 公共 HTTP API / `mycodemap server` 产品面 | 未开放；`Server Layer` 仍是 internal-only |
 
 ---
 
 ## 9. 总结
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     MVP3 架构重构价值                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  🎯 架构清晰性                                                    │
-│     - 5 层架构，每层职责单一                                      │
-│     - 依赖方向明确，内层不依赖外层                                 │
-│                                                                 │
-│  🔌 可扩展性                                                      │
-│     - 存储可插拔: 文件系统 / KùzuDB                               │
-│     - 语言可扩展: 14 种语言支持                                   │
-│     - 可视化可扩展: CLI / TUI / Web                               │
-│                                                                 │
-│  🧪 可测试性                                                      │
-│     - 每层可独立单元测试                                          │
-│     - 依赖注入，易于 mock                                         │
-│     - 测试覆盖率提升至 > 80%                                      │
-│                                                                 │
-│  🚀 性能提升                                                      │
-│     - 图数据库加速复杂查询 (10-50x)                                │
-│     - Worker 线程并行解析                                         │
-│     - 智能存储选择策略                                            │
-│                                                                 │
-│  👥 开发者体验                                                    │
-│     - 丰富的 CLI 可视化                                           │
-│     - 进度条和实时反馈                                            │
-│     - 向后兼容，零成本迁移                                        │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+`MVP3` 的核心价值已经从“理想化设计图”收口成了当前可验证的产品基线：
+
+- 5 层架构已在目录结构与职责边界上落地
+- 存储面已稳定为 Kùzu-only 主线
+- 解析器已具备可扩展注册机制，并落地 3 类实现
+- 公共 CLI 已回到分析优先的可维护命令面
+- 文档、测试与 CI 已能共同约束这些边界
+
+后续若要重新打开更多语言、公共 API、可视化或更激进的自动切换逻辑，应以**新 milestone** 的形式推进，而不是继续把设计愿景伪装成当前现实。

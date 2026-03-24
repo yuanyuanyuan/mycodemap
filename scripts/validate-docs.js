@@ -764,6 +764,88 @@ function validateWorkflowAndDiscoveryDocs(rootDir, failures) {
   }
 }
 
+function validateProductSpecsDocs(rootDir, failures) {
+  const productSpecsReadme = readText(rootDir, 'docs/product-specs/README.md', failures);
+  const comparison = readText(rootDir, 'docs/product-specs/MVP3-ARCHITECTURE-COMPARISON.md', failures);
+  const prd = readText(rootDir, 'docs/product-specs/MVP3-ARCHITECTURE-REDESIGN-PRD.md', failures);
+  const techPrd = readText(rootDir, 'docs/product-specs/MVP3-ARCHITECTURE-REDESIGN-TECH-PRD.md', failures);
+
+  if (productSpecsReadme) {
+    validateSnippets(
+      productSpecsReadme,
+      'docs/product-specs/README.md active specs index',
+      [
+        '## 当前有效规格',
+        '`MVP3-ARCHITECTURE-COMPARISON.md`',
+        '`MVP3-ARCHITECTURE-REDESIGN-PRD.md`',
+        '`MVP3-ARCHITECTURE-REDESIGN-TECH-PRD.md`'
+      ],
+      [
+        '当前活跃产品规格暂为空'
+      ],
+      failures
+    );
+  }
+
+  if (comparison) {
+    validateSnippets(
+      comparison,
+      'docs/product-specs/MVP3-ARCHITECTURE-COMPARISON.md baseline',
+      [
+        '# MVP3 架构对比：历史设计目标 vs v1.3 已落地基线',
+        '`src/server/` 保留为**内部架构层**；公共 `server` 命令已移除',
+        '`filesystem` / `memory` / `kuzudb` / `auto` 为正式 surface；`neo4j` 已退出正式支持',
+        '当前公开能力仅保留 analysis-only：`find → read → link → show`',
+        'Java / Rust / C/C++ 等更多 parser 实现 | 接口预留，未作为当前 shipped reality |'
+      ],
+      [
+        '# MVP3 架构对比：Before vs After',
+        'cli/commands/viz.ts',
+        '支持 14 种语言'
+      ],
+      failures
+    );
+  }
+
+  if (prd) {
+    validateSnippets(
+      prd,
+      'docs/product-specs/MVP3-ARCHITECTURE-REDESIGN-PRD.md shipped baseline',
+      [
+        '# CodeMap MVP3 架构重构产品需求文档（PRD，v1.3 同步版）',
+        '公共 CLI 不再暴露 `server`、`watch`、`report`、`logs`',
+        '| `neo4j` | removed | 不再是正式支持 backend；旧配置返回显式迁移错误 |',
+        '`workflow` 是 **analysis-only** 能力，只编排 `find → read → link → show`',
+        '| 公共 HTTP API / `mycodemap server` 产品面 | Deferred |'
+      ],
+      [
+        '支持 14 种语言',
+        'neo4j | shipped'
+      ],
+      failures
+    );
+  }
+
+  if (techPrd) {
+    validateSnippets(
+      techPrd,
+      'docs/product-specs/MVP3-ARCHITECTURE-REDESIGN-TECH-PRD.md technical baseline',
+      [
+        '# CodeMap MVP3 架构重构技术需求文档（Tech-PRD，v1.3 同步版）',
+        '`neo4j` 已不再是正式支持 backend。',
+        '`auto` 是稳定配置面',
+        '但“按规模自动切到图数据库”的更强启发式仍是未来候选，而不是当前完成能力',
+        '| analyze / refresh / incremental update 作为公共能力 | 明确返回 `501` unsupported |',
+        '`workflow` 当前是 analysis-only 能力：'
+      ],
+      [
+        'TypeScriptParser, GoParser, PythonParser, ParserRegistry'
+      ],
+      failures
+    );
+  }
+}
+
 function validateGuardrailDocs(rootDir, failures) {
   const readme = readText(rootDir, 'README.md', failures);
   const engineeringRule = readText(rootDir, 'docs/rules/engineering-with-codex-openai.md', failures);
@@ -858,6 +940,7 @@ function validateDocs(rootDir) {
   validateAnalyzeDocs(rootDir, failures);
   validateTestingDocs(rootDir, failures);
   validateWorkflowAndDiscoveryDocs(rootDir, failures);
+  validateProductSpecsDocs(rootDir, failures);
   validateGuardrailDocs(rootDir, failures);
   validateAssistantDocs(rootDir, failures);
 
