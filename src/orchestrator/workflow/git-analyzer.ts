@@ -117,35 +117,25 @@ export interface GitAnalysisResult {
  * 工作流阶段与 Git 分析的映射
  */
 const PHASE_GIT_CONFIG: Record<WorkflowPhase, GitAnalysisConfig> = {
-  'reference': {
+  'find': {
     analysisType: 'find-similar-commits',
     maxCommits: 10,
     includeHistory: true,
     extractPatterns: ['*.ts'],
   },
-  'impact': {
+  'read': {
     analysisType: 'file-history',
     maxCommits: 20,
     includeHistory: true,
     extractPatterns: ['*.ts'],
   },
-  'risk': {
+  'link': {
     analysisType: 'heat-analysis',
     maxCommits: 30,
     includeHistory: true,
     timeWindow: '30d',
   },
-  'implementation': {
-    analysisType: 'none',
-    maxCommits: 0,
-    includeHistory: false,
-  },
-  'commit': {
-    analysisType: 'validate-commit',
-    maxCommits: 1,
-    includeHistory: false,
-  },
-  'ci': {
+  'show': {
     analysisType: 'full-analysis',
     maxCommits: 50,
     includeHistory: true,
@@ -199,7 +189,7 @@ export class WorkflowGitAnalyzer {
 
     // 从上下文获取历史结果（避免重复分析）
     const cachedHistory = this.getCachedHistory(context, phase);
-    if (cachedHistory && phase !== 'risk') {
+    if (cachedHistory && phase !== 'link') {
       return { type: config.analysisType, commits: cachedHistory };
     }
 
@@ -647,10 +637,10 @@ export class WorkflowGitAnalyzer {
     context: WorkflowContext,
     phase: WorkflowPhase
   ): CommitInfo[] | undefined {
-    // 尝试从 impact 阶段的产物获取
-    const impactArtifacts = context.artifacts.get('impact');
-    if (impactArtifacts?.metadata?.gitHistory) {
-      return impactArtifacts.metadata.gitHistory as CommitInfo[];
+    // 优先复用 read 阶段已经收集到的历史
+    const readArtifacts = context.artifacts.get('read');
+    if (readArtifacts?.metadata?.gitHistory) {
+      return readArtifacts.metadata.gitHistory as CommitInfo[];
     }
     return undefined;
   }

@@ -50,6 +50,58 @@ function wf(file: string): string {
   return join(resolveWorkflowDir(), file);
 }
 
+type AnalysisPhaseThresholds = Partial<Record<WorkflowPhase, number>>;
+
+export function createWorkflowAnalysisPhases(
+  thresholds: AnalysisPhaseThresholds = {}
+): PhaseDefinition[] {
+  return [
+    {
+      name: 'find',
+      action: 'analyze' as PhaseAction,
+      analyzeIntent: 'find',
+      entryCondition: { minConfidence: thresholds.find ?? 0.3 } as PhaseCondition,
+      deliverables: [
+        { name: 'find-results', path: wf('find.json'), validator: () => true }
+      ],
+      nextPhase: 'read',
+      commands: ['codemap analyze --intent find']
+    },
+    {
+      name: 'read',
+      action: 'analyze' as PhaseAction,
+      analyzeIntent: 'read',
+      entryCondition: { minConfidence: thresholds.read ?? 0.4 } as PhaseCondition,
+      deliverables: [
+        { name: 'read-results', path: wf('read.json'), validator: () => true }
+      ],
+      nextPhase: 'link',
+      commands: ['codemap analyze --intent read']
+    },
+    {
+      name: 'link',
+      action: 'analyze' as PhaseAction,
+      analyzeIntent: 'link',
+      entryCondition: { minConfidence: thresholds.link ?? 0.35 } as PhaseCondition,
+      deliverables: [
+        { name: 'link-results', path: wf('link.json'), validator: () => true }
+      ],
+      nextPhase: 'show',
+      commands: ['codemap analyze --intent link']
+    },
+    {
+      name: 'show',
+      action: 'analyze' as PhaseAction,
+      analyzeIntent: 'show',
+      entryCondition: { minConfidence: thresholds.show ?? 0.2 } as PhaseCondition,
+      deliverables: [
+        { name: 'show-results', path: wf('show.json'), validator: () => true }
+      ],
+      commands: ['codemap analyze --intent show']
+    }
+  ];
+}
+
 // ============================================
 // 模板类型定义
 // ============================================
@@ -110,69 +162,7 @@ export const REFACTORING_TEMPLATE: WorkflowTemplate = {
   ],
   version: '1.0.0',
   createdAt: new Date().toISOString(),
-  phases: [
-    {
-      name: 'reference',
-      action: 'analyze' as PhaseAction,
-      analyzeIntent: 'reference',
-      entryCondition: { minConfidence: 0.3 } as PhaseCondition,
-      deliverables: [
-        { name: 'reference-results', path: wf('reference.json'), validator: () => true }
-      ],
-      nextPhase: 'impact',
-      commands: ['codemap analyze --intent reference']
-    },
-    {
-      name: 'impact',
-      action: 'analyze' as PhaseAction,
-      analyzeIntent: 'impact',
-      entryCondition: { minConfidence: 0.4 } as PhaseCondition,
-      deliverables: [
-        { name: 'impact-report', path: wf('impact.json'), validator: () => true }
-      ],
-      nextPhase: 'risk',
-      commands: ['codemap analyze --intent impact']
-    },
-    {
-      name: 'risk',
-      action: 'ci' as PhaseAction,
-      ciCommand: 'codemap ci assess-risk --threshold 0.7',
-      entryCondition: {} as PhaseCondition,
-      deliverables: [
-        { name: 'risk-assessment', path: wf('risk.json'), validator: () => true }
-      ],
-      nextPhase: 'implementation',
-      commands: ['codemap ci assess-risk']
-    },
-    {
-      name: 'implementation',
-      action: 'manual' as PhaseAction,
-      entryCondition: {} as PhaseCondition,
-      deliverables: [
-        { name: 'refactored-code', path: 'src/', validator: () => true }
-      ],
-      nextPhase: 'commit',
-      commands: []
-    },
-    {
-      name: 'commit',
-      action: 'manual' as PhaseAction,
-      entryCondition: {} as PhaseCondition,
-      deliverables: [
-        { name: 'commit-message', path: '.git/COMMIT_EDITMSG', validator: () => true }
-      ],
-      nextPhase: 'ci',
-      commands: ['git commit']
-    },
-    {
-      name: 'ci',
-      action: 'ci' as PhaseAction,
-      ciCommand: 'npm test && codemap ci check-commits && codemap ci check-headers && codemap ci assess-risk --threshold 0.7',
-      entryCondition: {} as PhaseCondition,
-      deliverables: [],
-      commands: []
-    }
-  ]
+  phases: createWorkflowAnalysisPhases()
 };
 
 /** Bug 修复模板 - 用于快速修复生产环境问题 */
@@ -188,47 +178,7 @@ export const BUGFIX_TEMPLATE: WorkflowTemplate = {
   ],
   version: '1.0.0',
   createdAt: new Date().toISOString(),
-  phases: [
-    {
-      name: 'reference',
-      action: 'analyze' as PhaseAction,
-      analyzeIntent: 'reference',
-      entryCondition: { minConfidence: 0.2 } as PhaseCondition, // Lower threshold for speed
-      deliverables: [
-        { name: 'bug-location', path: wf('reference.json'), validator: () => true }
-      ],
-      nextPhase: 'implementation',
-      commands: ['codemap analyze --intent reference --priority speed']
-    },
-    {
-      name: 'implementation',
-      action: 'manual' as PhaseAction,
-      entryCondition: {} as PhaseCondition,
-      deliverables: [
-        { name: 'bug-fix', path: 'src/', validator: () => true }
-      ],
-      nextPhase: 'commit',
-      commands: []
-    },
-    {
-      name: 'commit',
-      action: 'manual' as PhaseAction,
-      entryCondition: {} as PhaseCondition,
-      deliverables: [
-        { name: 'commit-message', path: '.git/COMMIT_EDITMSG', validator: () => true }
-      ],
-      nextPhase: 'ci',
-      commands: ['git commit -m "fix: [BUG-XXX] description"']
-    },
-    {
-      name: 'ci',
-      action: 'ci' as PhaseAction,
-      ciCommand: 'npm test -- --run affected && codemap ci check-commits',
-      entryCondition: {} as PhaseCondition,
-      deliverables: [],
-      commands: []
-    }
-  ]
+  phases: createWorkflowAnalysisPhases({ find: 0.2, read: 0.3, link: 0.25, show: 0.15 })
 };
 
 /** 功能开发模板 - 用于新功能开发 */
@@ -244,70 +194,7 @@ export const FEATURE_TEMPLATE: WorkflowTemplate = {
   ],
   version: '1.0.0',
   createdAt: new Date().toISOString(),
-  phases: [
-    {
-      name: 'reference',
-      action: 'analyze' as PhaseAction,
-      analyzeIntent: 'reference',
-      entryCondition: { minConfidence: 0.4 } as PhaseCondition,
-      deliverables: [
-        { name: 'reference-results', path: wf('reference.json'), validator: () => true }
-      ],
-      nextPhase: 'impact',
-      commands: ['codemap analyze --intent reference']
-    },
-    {
-      name: 'impact',
-      action: 'analyze' as PhaseAction,
-      analyzeIntent: 'impact',
-      entryCondition: { minConfidence: 0.5 } as PhaseCondition,
-      deliverables: [
-        { name: 'impact-report', path: wf('impact.json'), validator: () => true }
-      ],
-      nextPhase: 'risk',
-      commands: ['codemap analyze --intent impact']
-    },
-    {
-      name: 'risk',
-      action: 'ci' as PhaseAction,
-      ciCommand: 'codemap ci assess-risk --threshold 0.6',
-      entryCondition: {} as PhaseCondition,
-      deliverables: [
-        { name: 'risk-assessment', path: wf('risk.json'), validator: () => true }
-      ],
-      nextPhase: 'implementation',
-      commands: ['codemap ci assess-risk']
-    },
-    {
-      name: 'implementation',
-      action: 'manual' as PhaseAction,
-      entryCondition: {} as PhaseCondition,
-      deliverables: [
-        { name: 'feature-code', path: 'src/', validator: () => true },
-        { name: 'tests', path: 'tests/', validator: () => true }
-      ],
-      nextPhase: 'commit',
-      commands: []
-    },
-    {
-      name: 'commit',
-      action: 'manual' as PhaseAction,
-      entryCondition: {} as PhaseCondition,
-      deliverables: [
-        { name: 'commit-message', path: '.git/COMMIT_EDITMSG', validator: () => true }
-      ],
-      nextPhase: 'ci',
-      commands: ['git commit']
-    },
-    {
-      name: 'ci',
-      action: 'ci' as PhaseAction,
-      ciCommand: 'npm test && codemap ci check-commits && codemap ci check-headers && codemap ci assess-risk --threshold 0.6 && codemap ci check-output-contract',
-      entryCondition: {} as PhaseCondition,
-      deliverables: [],
-      commands: []
-    }
-  ]
+  phases: createWorkflowAnalysisPhases({ find: 0.4, read: 0.5, link: 0.4, show: 0.25 })
 };
 
 /** 热修复模板 - 用于紧急生产修复 */
@@ -323,47 +210,7 @@ export const HOTFIX_TEMPLATE: WorkflowTemplate = {
   ],
   version: '1.0.0',
   createdAt: new Date().toISOString(),
-  phases: [
-    {
-      name: 'reference',
-      action: 'analyze' as PhaseAction,
-      analyzeIntent: 'reference',
-      entryCondition: { minConfidence: 0.1 } as PhaseCondition, // Minimal threshold
-      deliverables: [
-        { name: 'hotfix-location', path: wf('reference.json'), validator: () => true }
-      ],
-      nextPhase: 'implementation',
-      commands: ['codemap analyze --intent reference --quick']
-    },
-    {
-      name: 'implementation',
-      action: 'manual' as PhaseAction,
-      entryCondition: {} as PhaseCondition,
-      deliverables: [
-        { name: 'hotfix-code', path: 'src/', validator: () => true }
-      ],
-      nextPhase: 'commit',
-      commands: []
-    },
-    {
-      name: 'commit',
-      action: 'manual' as PhaseAction,
-      entryCondition: {} as PhaseCondition,
-      deliverables: [
-        { name: 'hotfix-commit', path: '.git/COMMIT_EDITMSG', validator: () => true }
-      ],
-      nextPhase: 'ci',
-      commands: ['git commit -m "hotfix: [HOTFIX] critical fix"']
-    },
-    {
-      name: 'ci',
-      action: 'ci' as PhaseAction,
-      ciCommand: 'npm run test:quick && codemap ci check-commits',
-      entryCondition: {} as PhaseCondition,
-      deliverables: [],
-      commands: []
-    }
-  ]
+  phases: createWorkflowAnalysisPhases({ find: 0.1, read: 0.2, link: 0.2, show: 0.1 })
 };
 
 /** 所有预定义模板 */

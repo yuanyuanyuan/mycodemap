@@ -25,12 +25,10 @@ interface PhaseDisplayConfig {
 
 /** 阶段显示映射 */
 const PHASE_DISPLAY: Record<WorkflowPhase, PhaseDisplayConfig> = {
-  reference: { label: 'Reference', icon: '🔍', color: '\x1b[34m' }, // blue
-  impact: { label: 'Impact', icon: '💥', color: '\x1b[33m' }, // yellow
-  risk: { label: 'Risk', icon: '⚠️', color: '\x1b[31m' }, // red
-  implementation: { label: 'Implementation', icon: '💻', color: '\x1b[32m' }, // green
-  commit: { label: 'Commit', icon: '💾', color: '\x1b[36m' }, // cyan
-  ci: { label: 'CI', icon: '✅', color: '\x1b[35m' } // magenta
+  find: { label: 'Find', icon: '🔍', color: '\x1b[34m' },
+  read: { label: 'Read', icon: '📖', color: '\x1b[33m' },
+  link: { label: 'Link', icon: '🔗', color: '\x1b[36m' },
+  show: { label: 'Show', icon: '🧭', color: '\x1b[35m' }
 };
 
 /** 状态图标映射 */
@@ -105,7 +103,7 @@ export class WorkflowVisualizer {
    * 渲染阶段流程图
    */
   renderPhaseDiagram(context: WorkflowContext): string {
-    const phases: WorkflowPhase[] = ['reference', 'impact', 'risk', 'implementation', 'commit', 'ci'];
+    const phases: WorkflowPhase[] = ['find', 'read', 'link', 'show'];
     const currentPhase = context.currentPhase;
     const artifacts = context.artifacts;
     
@@ -149,7 +147,7 @@ export class WorkflowVisualizer {
    * 渲染进度条
    */
   renderProgressBar(context: WorkflowContext): string {
-    const totalPhases = 6;
+    const totalPhases = 4;
     const completedPhases = context.artifacts.size;
     const progress = (completedPhases / totalPhases) * 100;
     
@@ -262,7 +260,7 @@ export class WorkflowVisualizer {
     
     // 数据行
     for (const { name, context } of contexts) {
-      const totalPhases = 6;
+      const totalPhases = 4;
       const completedPhases = context.artifacts.size;
       const progress = (completedPhases / totalPhases) * 100;
       

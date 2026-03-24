@@ -14,15 +14,15 @@ import type { UnifiedResult, ConfidenceResult } from '../types.js';
 
 /**
  * 工作流阶段类型
- * 6 个阶段：reference → impact → risk → implementation → commit → ci
+ * 4 个纯分析阶段：find → read → link → show
  */
+export const WORKFLOW_PHASES = ['find', 'read', 'link', 'show'] as const;
+
 export type WorkflowPhase =
-  | 'reference'    // 参考搜索
-  | 'impact'       // 影响分析
-  | 'risk'         // 风险评估
-  | 'implementation' // 代码实现
-  | 'commit'       // 提交验证
-  | 'ci';          // CI 流水线
+  | 'find'    // 查找符号 / 文件
+  | 'read'    // 阅读影响 / 复杂度
+  | 'link'    // 关联依赖 / 引用
+  | 'show';   // 展示概览 / 文档
 
 /**
  * 阶段执行方式
@@ -106,12 +106,14 @@ export interface PhaseArtifacts {
  * 缓存结果
  */
 export interface CachedResults {
-  /** 参考搜索结果 */
-  reference?: UnifiedResult[];
-  /** 影响分析结果 */
-  impact?: UnifiedResult[];
-  /** 风险评估结果 */
-  risk?: RiskScore;
+  /** 查找结果 */
+  find?: UnifiedResult[];
+  /** 阅读结果 */
+  read?: UnifiedResult[];
+  /** 关联结果 */
+  link?: UnifiedResult[];
+  /** 展示结果 */
+  show?: UnifiedResult[];
 }
 
 /**

@@ -94,12 +94,10 @@ export const PHASE_TEST_STRATEGY = {
 export const CONFIDENCE_REQUIREMENTS = {
   /** 各阶段最低置信度要求 */
   phaseThresholds: {
-    reference: { min: 0.3, high: 0.6 },
-    impact: { min: 0.4, high: 0.7 },
-    risk: { min: 0, high: 0 },
-    implementation: { min: 0, high: 0 },
-    commit: { min: 0, high: 0 },
-    ci: { min: 0, high: 0 }
+    find: { min: 0.3, high: 0.6 },
+    read: { min: 0.4, high: 0.7 },
+    link: { min: 0.35, high: 0.65 },
+    show: { min: 0.2, high: 0.5 }
   },
   /** 自动推进阈值 */
   autoProceedThreshold: 0.7,

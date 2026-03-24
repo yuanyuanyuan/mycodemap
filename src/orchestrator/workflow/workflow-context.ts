@@ -1,3 +1,6 @@
+// [META] since:2026-03 | owner:orchestrator-team | stable:true
+// [WHY] Workflow context factory centralizes context creation and validation defaults
+
 /**
  * 工作流上下文管理
  * 提供工作流上下文的创建、验证和管理功能
@@ -22,7 +25,7 @@ export class WorkflowContextFactory {
     return {
       id: this.generateId(),
       task,
-      currentPhase: 'reference' as WorkflowPhase,
+      currentPhase: 'find' as WorkflowPhase,
       phaseStatus: 'pending' as PhaseStatus,
       artifacts: new Map<WorkflowPhase, PhaseArtifacts>(),
       cachedResults: {} as CachedResults,

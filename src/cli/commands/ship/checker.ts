@@ -2,7 +2,6 @@
 // [WHY] Step 3: 质量检查，运行 mustPass 和 shouldPass 检查
 
 import chalk from 'chalk';
-import { execSync } from 'child_process';
 import { AnalyzeResult } from './analyzer.js';
 import { VersionResult } from './versioner.js';
 import { CheckContext, runChecks } from './rules/quality-rules.js';
@@ -19,13 +18,10 @@ export async function runQualityChecks(
   analyzeResult: AnalyzeResult,
   versionResult: VersionResult
 ): Promise<CheckOutput> {
-  const branch = execSync('git branch --show-current', { encoding: 'utf-8' }).trim();
-
   const ctx: CheckContext = {
     commits: analyzeResult.commits,
     changedFiles: analyzeResult.changedFiles,
     currentVersion: versionResult.currentVersion,
-    branch,
     versionType: versionResult.versionType
   };
 

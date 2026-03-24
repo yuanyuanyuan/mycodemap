@@ -3,8 +3,6 @@
  * [WHY] 串联所有模块的"粘合剂"，解决阶段割裂问题
  */
 
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { cwd } from 'node:process';
@@ -17,7 +15,7 @@ import { createCodemapAdapter } from '../adapters/codemap-adapter.js';
 import { createAstGrepAdapter } from '../adapters/ast-grep-adapter.js';
 import { WorkflowPersistence } from './workflow-persistence.js';
 import { PhaseCheckpoint } from './phase-checkpoint.js';
-import { WorkflowTemplateManager } from './templates.js';
+import { WorkflowTemplateManager, createWorkflowAnalysisPhases } from './templates.js';
 import {
   type WorkflowContext,
   type WorkflowPhase,
@@ -25,12 +23,9 @@ import {
   type PhaseStatus,
   type WorkflowStatus,
   type PhaseResult,
-  type PhaseAction,
   type Guidance
 } from './types.js';
 import { WorkflowContextFactory, WorkflowContextValidator } from './workflow-context.js';
-
-const execAsync = promisify(exec);
 
 /**
  * 路径兼容常量
@@ -179,11 +174,7 @@ export class WorkflowOrchestrator {
     if (definition.action === 'analyze' && definition.analyzeIntent) {
       return this.runAnalysis(definition.analyzeIntent, analyzeArgs);
     }
-    if (definition.action === 'ci' && definition.ciCommand) {
-      await this.runCICommand(definition.ciCommand);
-      return [];
-    }
-    // manual 阶段不执行任何操作
+    // 非 analyze 阶段在当前纯分析 workflow 中不执行任何操作
     return [];
   }
 
@@ -230,22 +221,13 @@ export class WorkflowOrchestrator {
    * 根据意图选择要执行的工具列表
    */
   private selectTools(intent: CodemapIntent): string[] {
-    // 根据意图类型选择工具
-    switch (intent.intent) {
-      case 'search':
-      case 'refactor':
-      case 'reference':
-        // 需要 AST 分析的工具
-        return ['codemap'];
-      case 'impact':
-      case 'dependency':
-      case 'complexity':
-      case 'overview':
-      case 'documentation':
-      default:
-        // 默认使用 codemap
-        return ['codemap'];
+    const effectiveIntent = intent.executionIntent ?? intent.intent;
+
+    if (intent.intent === 'find' || effectiveIntent === 'search' || effectiveIntent === 'reference') {
+      return ['ast-grep'];
     }
+
+    return ['codemap'];
   }
 
   /**
@@ -261,17 +243,6 @@ export class WorkflowOrchestrator {
       }
     }
     return weights;
-  }
-
-  /**
-   * 运行 CI 命令
-   */
-  private async runCICommand(ciCommand: string): Promise<void> {
-    try {
-      await execAsync(ciCommand);
-    } catch (error) {
-      console.warn(`CI command failed: ${ciCommand}`, error);
-    }
   }
 
   /**
@@ -446,70 +417,9 @@ export class WorkflowOrchestrator {
    * 初始化阶段定义
    */
   private initializePhaseDefinitions(): Map<WorkflowPhase, PhaseDefinition> {
-    const workflowDir = resolveWorkflowDir();
-    return new Map<WorkflowPhase, PhaseDefinition>([
-      ['reference', {
-        name: 'reference',
-        action: 'analyze' as PhaseAction,
-        analyzeIntent: 'reference',
-        entryCondition: { minConfidence: 0.3 },
-        deliverables: [
-          { name: 'reference-results', path: join(workflowDir, 'reference.json'), validator: () => true }
-        ],
-        nextPhase: 'impact',
-        commands: ['codemap analyze --intent reference']
-      }],
-      ['impact', {
-        name: 'impact',
-        action: 'analyze' as PhaseAction,
-        analyzeIntent: 'impact',
-        entryCondition: { minConfidence: 0.4 },
-        deliverables: [
-          { name: 'impact-report', path: join(workflowDir, 'impact.json'), validator: () => true }
-        ],
-        nextPhase: 'risk',
-        commands: ['codemap analyze --intent impact']
-      }],
-      ['risk', {
-        name: 'risk',
-        action: 'ci' as PhaseAction,
-        ciCommand: 'codemap ci assess-risk --threshold 0.7',
-        entryCondition: {},
-        deliverables: [
-          { name: 'risk-assessment', path: join(workflowDir, 'risk.json'), validator: () => true }
-        ],
-        nextPhase: 'implementation',
-        commands: ['codemap ci assess-risk']
-      }],
-      ['implementation', {
-        name: 'implementation',
-        action: 'manual' as PhaseAction,
-        entryCondition: {},
-        deliverables: [
-          { name: 'implementation', path: 'src/', validator: () => true }
-        ],
-        nextPhase: 'commit',
-        commands: []
-      }],
-      ['commit', {
-        name: 'commit',
-        action: 'manual' as PhaseAction,
-        entryCondition: {},
-        deliverables: [
-          { name: 'commit', path: '.git/COMMIT_EDITMSG', validator: () => true }
-        ],
-        nextPhase: 'ci',
-        commands: ['git commit']
-      }],
-      ['ci', {
-        name: 'ci',
-        action: 'ci' as PhaseAction,
-        ciCommand: 'npm test && codemap ci check-commits && codemap ci check-headers && codemap ci assess-risk --threshold 0.7 && codemap ci check-output-contract',
-        entryCondition: {},
-        deliverables: [],
-        commands: []
-      }]
-    ]);
+    return new Map<WorkflowPhase, PhaseDefinition>(
+      createWorkflowAnalysisPhases().map((phase) => [phase.name, phase])
+    );
   }
 
   private async syncPhaseDefinitionsWithContext(context: WorkflowContext): Promise<void> {

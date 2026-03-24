@@ -86,7 +86,6 @@ function tryRequireTreeSitter(): RequireResult {
 export const COMMANDS_REQUIRING_TREE_SITTER = new Set([
   'generate',
   'complexity',
-  'watch',
   'analyze',
   'deps',
   'cycles',

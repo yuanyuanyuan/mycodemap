@@ -55,32 +55,23 @@ export interface PhaseInheritanceConfig {
  * 定义每个阶段应该继承哪些前一阶段的结果
  */
 const DEFAULT_INHERITANCE_CONFIG: Record<WorkflowPhase, PhaseInheritanceConfig> = {
-  'reference': {
-    phase: 'reference',
-    strategy: 'none',  // reference 是第一阶段，无继承
+  'find': {
+    phase: 'find',
+    strategy: 'none',
   },
-  'impact': {
-    phase: 'impact',
-    strategy: 'code-analysis',  // 继承代码分析结果
-    filterSources: ['ast-grep', 'codemap'],
-  },
-  'risk': {
-    phase: 'risk',
-    strategy: 'all',  // 继承所有分析结果
-  },
-  'implementation': {
-    phase: 'implementation',
-    strategy: 'all',  // 继承所有分析结果用于实现参考
-    minRelevance: 0.5, // 只继承高相关度的结果
-  },
-  'commit': {
-    phase: 'commit',
+  'read': {
+    phase: 'read',
     strategy: 'code-analysis',
     filterSources: ['ast-grep', 'codemap'],
   },
-  'ci': {
-    phase: 'ci',
-    strategy: 'all',  // CI 阶段继承所有结果进行验证
+  'link': {
+    phase: 'link',
+    strategy: 'all',
+  },
+  'show': {
+    phase: 'show',
+    strategy: 'all',
+    minRelevance: 0.4,
   }
 };
 
@@ -159,7 +150,7 @@ export class PhaseInheritance {
     currentPhase: WorkflowPhase
   ): UnifiedResult[] {
     const results: UnifiedResult[] = [];
-    const phaseOrder: WorkflowPhase[] = ['reference', 'impact', 'risk', 'implementation', 'commit', 'ci'];
+    const phaseOrder: WorkflowPhase[] = ['find', 'read', 'link', 'show'];
     const currentIndex = phaseOrder.indexOf(currentPhase);
 
     // 只收集当前阶段之前的结果
