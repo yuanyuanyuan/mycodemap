@@ -186,6 +186,15 @@ export async function generateAIMap(
   lines.push(`- **Total Types**: ${codeMap.summary.totalTypes}`);
   lines.push('');
 
+  if (codeMap.pluginReport) {
+    lines.push('## Plugin Summary');
+    lines.push('');
+    lines.push(`- **Loaded Plugins**: ${codeMap.pluginReport.loadedPlugins.length > 0 ? codeMap.pluginReport.loadedPlugins.join(', ') : 'None'}`);
+    lines.push(`- **Plugin Generated Files**: ${codeMap.pluginReport.generatedFiles.length}`);
+    lines.push(`- **Plugin Diagnostics**: ${codeMap.pluginReport.diagnostics.length}`);
+    lines.push('');
+  }
+
   // 入口点
   const entryPoints = codeMap.modules.filter(m => {
     const basename = path.basename(m.path);

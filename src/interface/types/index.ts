@@ -332,6 +332,20 @@ export interface DependencyGraph {
   edges: DependencyEdge[];
 }
 
+export interface PluginDiagnostic {
+  plugin?: string;
+  stage: 'load' | 'initialize' | 'analyze' | 'generate';
+  level: 'warning' | 'error';
+  message: string;
+}
+
+export interface PluginExecutionReport {
+  loadedPlugins: string[];
+  generatedFiles: string[];
+  metrics: Record<string, unknown>;
+  diagnostics: PluginDiagnostic[];
+}
+
 // ============================================
 // Section 9: 代码地图根对象
 // ============================================
@@ -345,6 +359,7 @@ export interface CodeMap {
   modules: ModuleInfo[];
   dependencies: DependencyGraph;
   actualMode?: 'fast' | 'smart'; // Hybrid 模式下实际使用的模式
+  pluginReport?: PluginExecutionReport;
 }
 
 // ============================================

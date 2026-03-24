@@ -2,44 +2,25 @@
 // [WHY] Core analysis engine that orchestrates parsing, dependency analysis, and code map generation
 import path from 'path';
 import fs from 'fs/promises';
-import { globby } from 'globby';
 import { parseFile, createParser } from '../parser/index.js';
 import type { CodeMap, AnalysisOptions, ModuleInfo, DependencyGraph, ProjectInfo, ProjectSummary } from '../types/index.js';
 import type { ParseResult } from '../parser/interfaces/IParser.js';
 import { createGlobalIndex, GlobalSymbolIndexBuilder } from './global-index.js';
-
-// 默认排除模式
-const DEFAULT_EXCLUDE = [
-  'node_modules/**',
-  'dist/**',
-  'build/**',
-  'coverage/**',
-  '*.test.ts',
-  '*.spec.ts',
-  '*.d.ts'
-];
-
-// 动态检测是否排除 .git（兼容 worktree）
-function getGitExcludePattern(rootDir: string): string[] {
-  const gitPath = path.join(rootDir, '.git');
-  try {
-    const stats = require('fs').statSync(gitPath);
-    // 如果 .git 是目录，使用 .git/**；如果是文件（worktree），跳过
-    return stats.isDirectory() ? ['.git/**'] : [];
-  } catch {
-    return [];
-  }
-}
+import { discoverProjectFiles, DEFAULT_DISCOVERY_EXCLUDES } from './file-discovery.js';
 
 // 阈值配置
 const HYBRID_THRESHOLD = 50; // 文件数 >= 50 时使用 Smart 模式
 
 // 主分析函数
 export async function analyze(options: AnalysisOptions): Promise<CodeMap> {
-  const { rootDir, include = ['src/**/*.ts'], exclude = DEFAULT_EXCLUDE, mode = 'hybrid' } = options;
+  const { rootDir, include = ['src/**/*.ts'], exclude = DEFAULT_DISCOVERY_EXCLUDES, mode = 'hybrid' } = options;
 
   // 1. 发现文件
-  const files = await discoverFiles(rootDir, include, exclude);
+  const files = await discoverProjectFiles({
+    rootDir,
+    include,
+    exclude
+  });
 
   // 2. Hybrid 模式自动选择
   let actualMode: 'fast' | 'smart' = mode === 'hybrid' ? 'fast' : (mode as 'fast' | 'smart');
@@ -161,22 +142,6 @@ function convertToModuleInfo(result: ParseResult): ModuleInfo {
     callGraph: result.callGraph,
     typeInfo: result.typeInfo
   };
-}
-
-// 发现文件
-async function discoverFiles(rootDir: string, include: string[], exclude: string[]): Promise<string[]> {
-  const patterns = include.map(p => path.join(rootDir, p));
-  // 动态添加 .git 排除模式（兼容 worktree）
-  const gitExclude = getGitExcludePattern(rootDir);
-  const allExclude = [...exclude, ...gitExclude];
-  const files = await globby(patterns, {
-    ignore: allExclude,
-    absolute: true,
-    onlyFiles: true
-  });
-
-  // 只返回 .ts 文件
-  return files.filter(f => f.endsWith('.ts') && !f.endsWith('.d.ts'));
 }
 
 // 构建依赖图

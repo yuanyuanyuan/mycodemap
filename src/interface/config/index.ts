@@ -11,12 +11,22 @@ import type { StorageConfig } from '../types/storage.js';
 // ============================================
 
 /** CLI 配置 */
+export interface CodemapPluginConfig {
+  builtInPlugins?: boolean;
+  pluginDir?: string;
+  plugins?: string[];
+  debug?: boolean;
+}
+
+/** CLI 配置 */
 export interface CodemapConfig {
-  mode: 'fast' | 'smart';
+  mode: 'fast' | 'smart' | 'hybrid';
   include: string[];
   exclude: string[];
   output: string;
   watch: boolean;
+  storage?: StorageConfig;
+  plugins?: CodemapPluginConfig;
 }
 
 // ============================================

@@ -7,8 +7,8 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 
-import { storageFactory } from '../../infrastructure/storage/StorageFactory.js';
 import { QueryHandler } from '../../server/handlers/QueryHandler.js';
+import { createConfiguredStorage } from '../../cli/storage-runtime.js';
 import type { QueryOptions } from '../types/index.js';
 
 /**
@@ -40,10 +40,7 @@ export function createQueryCommand(): Command {
         console.log(chalk.blue(`🔍 查询: "${query}" (${type})\n`));
 
         // 创建存储和处理器
-        const storage = await storageFactory.createForProject(
-          process.cwd(),
-          { type: 'filesystem', outputPath: '.codemap/storage' }
-        );
+        const { storage } = await createConfiguredStorage(process.cwd());
         const handler = new QueryHandler(storage);
 
         // 执行查询
@@ -110,9 +107,10 @@ function formatResults(results: Array<Record<string, unknown>>, format: string):
  * 表格格式输出
  */
 function formatAsTable(results: Array<Record<string, unknown>>): string {
-  if (results.length === 0) return '';
+  const firstResult = results[0];
+  if (!firstResult) return '';
 
-  const keys = Object.keys(results[0]!);
+  const keys = Object.keys(firstResult);
   const lines: string[] = [];
 
   // 表头

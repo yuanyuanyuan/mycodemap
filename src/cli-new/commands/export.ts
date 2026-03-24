@@ -7,12 +7,10 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { writeFile } from 'fs/promises';
-import { join } from 'path';
 
-import { storageFactory } from '../../infrastructure/storage/StorageFactory.js';
 import { AnalysisHandler } from '../../server/handlers/AnalysisHandler.js';
 import { CodeGraphBuilder } from '../../domain/services/CodeGraphBuilder.js';
-import type { ExportOptions } from '../types/index.js';
+import { createConfiguredStorage } from '../../cli/storage-runtime.js';
 
 /**
  * Export 命令
@@ -46,10 +44,7 @@ export function createExportCommand(): Command {
         console.log(chalk.blue(`📤 导出代码图为 ${format.toUpperCase()} 格式...\n`));
 
         // 创建存储实例
-        const storage = await storageFactory.createForProject(
-          process.cwd(),
-          { type: 'filesystem', outputPath: '.codemap/storage' }
-        );
+        const { storage } = await createConfiguredStorage(process.cwd());
 
         // 创建分析处理器
         const builder = CodeGraphBuilder.create({

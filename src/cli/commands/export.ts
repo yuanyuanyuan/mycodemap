@@ -5,9 +5,9 @@
 import chalk from 'chalk';
 import { writeFile, readFile, access } from 'fs/promises';
 import { join } from 'path';
-import { storageFactory } from '../../infrastructure/storage/StorageFactory.js';
 import { AnalysisHandler } from '../../server/handlers/AnalysisHandler.js';
 import { CodeGraphBuilder } from '../../domain/services/CodeGraphBuilder.js';
+import { createConfiguredStorage } from '../storage-runtime.js';
 
 interface ExportOptions {
   output?: string;
@@ -91,10 +91,7 @@ export async function exportCommand(format: string, options: ExportOptions): Pro
     }
 
     // 其他格式使用原有的handler方式
-    const storage = await storageFactory.createForProject(
-      process.cwd(),
-      { type: 'filesystem', outputPath: '.mycodemap' }
-    );
+    const { storage } = await createConfiguredStorage(process.cwd());
 
     const builder = CodeGraphBuilder.create({
       mode: 'fast',

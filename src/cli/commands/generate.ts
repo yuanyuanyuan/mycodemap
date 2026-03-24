@@ -1,5 +1,7 @@
 // [META] since:2024-03 | owner:core-team | stable:true
 // [WHY] 提供代码地图生成 CLI 命令，协调分析器和生成器创建项目文档
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import chalk from 'chalk';
 import ora from 'ora';
 import { analyze } from '../../core/analyzer.js';
@@ -13,42 +15,186 @@ import { Symbol as SymbolEntity } from '../../domain/entities/Symbol.js';
 import { Dependency } from '../../domain/entities/Dependency.js';
 import { CodeGraph } from '../../domain/entities/CodeGraph.js';
 import { randomUUID } from 'crypto';
-import type { AnalysisOptions } from '../../types/index.js';
+import { PluginSystem } from '../../plugins/index.js';
+import type { AnalysisOptions, DependencyEdge, PluginDiagnostic, PluginExecutionReport } from '../../types/index.js';
 import type { ModuleInfo } from '../../types/index.js';
+import type { StorageConfig } from '../../interface/types/storage.js';
+import { loadCodemapConfig } from '../config-loader.js';
 
-export async function generateCommand(options: {
+export interface GenerateCommandOptionSources {
+  mode?: string;
+  output?: string;
+}
+
+export interface GenerateCommandOptions {
   mode?: string;
   output?: string;
   watch?: boolean;
   ai?: boolean;
   'ai-context'?: boolean;
-}) {
-  const mode = (options.mode as 'fast' | 'smart' | 'hybrid') || 'hybrid';
-  const { outputDir, isLegacy } = resolveOutputDir(options.output);
+  __optionSources?: GenerateCommandOptionSources;
+}
 
-  // 显示模式信息
-  if (mode === 'hybrid') {
-    console.log(chalk.blue(`🔍 使用 Hybrid 模式生成代码地图...`));
-  } else {
-    console.log(chalk.blue(`🔍 使用 ${mode} 模式生成代码地图...`));
+function hasExplicitOverride(value: unknown, source?: string): boolean {
+  if (source === undefined) {
+    return value !== undefined;
   }
 
-  // 显示迁移提示（如果使用旧路径）
-  if (isLegacy) {
-    console.warn(chalk.yellow('⚠️  检测到使用旧目录 .codemap，请迁移到 .mycodemap'));
+  return source !== 'default';
+}
+
+function mergePluginDependencyEdges(existingEdges: DependencyEdge[], additionalEdges: DependencyEdge[]): DependencyEdge[] {
+  const mergedEdges = [...existingEdges];
+  const existingKeys = new Set(existingEdges.map((edge) => `${edge.from}:${edge.to}:${edge.type}`));
+
+  for (const edge of additionalEdges) {
+    const edgeKey = `${edge.from}:${edge.to}:${edge.type}`;
+    if (!existingKeys.has(edgeKey)) {
+      mergedEdges.push(edge);
+      existingKeys.add(edgeKey);
+    }
   }
 
+  return mergedEdges;
+}
+
+function createPluginReport(
+  loadedPlugins: string[],
+  generatedFiles: string[],
+  metrics: Record<string, unknown>,
+  diagnostics: PluginDiagnostic[]
+): PluginExecutionReport {
+  return {
+    loadedPlugins,
+    generatedFiles,
+    metrics,
+    diagnostics,
+  };
+}
+
+function resolvePluginOutputPath(outputDir: string, relativePath: string): string {
+  const baseDir = path.resolve(outputDir);
+  const absolutePath = path.resolve(baseDir, relativePath);
+
+  if (absolutePath !== baseDir && !absolutePath.startsWith(`${baseDir}${path.sep}`)) {
+    throw new Error(`插件输出路径越界: ${relativePath}`);
+  }
+
+  return absolutePath;
+}
+
+async function writePluginGeneratedFiles(
+  files: Array<{ path: string; content: string }>,
+  outputDir: string
+): Promise<{ writtenFiles: string[]; diagnostics: PluginDiagnostic[] }> {
+  const writtenFiles: string[] = [];
+  const diagnostics: PluginDiagnostic[] = [];
+
+  for (const file of files) {
+    try {
+      const outputPath = resolvePluginOutputPath(outputDir, file.path);
+      await fs.mkdir(path.dirname(outputPath), { recursive: true });
+      await fs.writeFile(outputPath, file.content);
+      writtenFiles.push(path.relative(outputDir, outputPath));
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      diagnostics.push({
+        stage: 'generate',
+        level: 'error',
+        message: `插件输出文件写入失败 (${file.path}): ${reason}`,
+      });
+    }
+  }
+
+  return { writtenFiles, diagnostics };
+}
+
+export async function generateCommand(options: GenerateCommandOptions) {
   const spinner = ora('扫描项目文件...').start();
 
   try {
+    const loadedConfig = await loadCodemapConfig(process.cwd());
+    const mode = hasExplicitOverride(options.mode, options.__optionSources?.mode)
+      ? (options.mode as 'fast' | 'smart' | 'hybrid')
+      : loadedConfig.config.mode;
+    const configuredOutput = hasExplicitOverride(options.output, options.__optionSources?.output)
+      ? options.output
+      : loadedConfig.config.output;
+    const { outputDir, isLegacy } = resolveOutputDir(configuredOutput);
+
+    if (mode === 'hybrid') {
+      console.log(chalk.blue(`🔍 使用 Hybrid 模式生成代码地图...`));
+    } else {
+      console.log(chalk.blue(`🔍 使用 ${mode} 模式生成代码地图...`));
+    }
+
+    if (isLegacy) {
+      console.warn(chalk.yellow('⚠️  检测到使用旧目录 .codemap，请迁移到 .mycodemap'));
+    }
+
+    if (loadedConfig.exists && loadedConfig.isLegacy) {
+      console.warn(chalk.yellow('⚠️  检测到旧配置文件 codemap.config.json，建议迁移到 mycodemap.config.json'));
+    }
+
     // 执行分析（保持原始 output 传递以向后兼容）
     const analysisOptions: AnalysisOptions = {
       mode,
       rootDir: process.cwd(),
-      output: options.output || '.mycodemap'
+      include: loadedConfig.config.include,
+      exclude: loadedConfig.config.exclude,
+      output: configuredOutput || '.mycodemap',
+      watch: loadedConfig.config.watch,
     };
 
     const codeMap = await analyze(analysisOptions);
+    let pluginReport: PluginExecutionReport | undefined;
+
+    if (loadedConfig.hasExplicitPluginConfig) {
+      const pluginSystem = new PluginSystem(loadedConfig.config);
+      const pluginDiagnostics: PluginDiagnostic[] = [];
+      let loadedPlugins: string[] = [];
+      let generatedPluginFiles: string[] = [];
+      let pluginMetrics: Record<string, unknown> = {};
+
+      try {
+        pluginDiagnostics.push(...await pluginSystem.initialize(loadedConfig.config.plugins));
+
+        const pluginAnalyzeRun = await pluginSystem.runAnalyze(codeMap.modules);
+        codeMap.dependencies.edges = mergePluginDependencyEdges(
+          codeMap.dependencies.edges,
+          pluginAnalyzeRun.additionalEdges
+        );
+        pluginMetrics = pluginAnalyzeRun.mergedMetrics;
+        pluginDiagnostics.push(...pluginAnalyzeRun.diagnostics);
+
+        const pluginGenerateRun = await pluginSystem.runGenerate(codeMap);
+        const writtenPluginFiles = await writePluginGeneratedFiles(pluginGenerateRun.allFiles, outputDir);
+        generatedPluginFiles = writtenPluginFiles.writtenFiles;
+        pluginDiagnostics.push(...pluginGenerateRun.diagnostics, ...writtenPluginFiles.diagnostics);
+        loadedPlugins = pluginSystem.getLoadedPlugins();
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        pluginDiagnostics.push({
+          stage: 'generate',
+          level: 'error',
+          message: `插件运行时主流程失败: ${reason}`,
+        });
+      } finally {
+        try {
+          await pluginSystem.dispose();
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          pluginDiagnostics.push({
+            stage: 'generate',
+            level: 'error',
+            message: `插件系统释放失败: ${reason}`,
+          });
+        }
+      }
+
+      pluginReport = createPluginReport(loadedPlugins, generatedPluginFiles, pluginMetrics, pluginDiagnostics);
+      codeMap.pluginReport = pluginReport;
+    }
 
     spinner.text = '生成输出文件...';
 
@@ -62,7 +208,7 @@ export async function generateCommand(options: {
 
     // 保存到 MVP3 storage
     spinner.text = '保存到代码图存储...';
-    await saveToCodeGraphStorage(codeMap);
+    const storageSaveResult = await saveToCodeGraphStorage(codeMap, loadedConfig.config.storage);
 
     spinner.succeed(chalk.green('✅ 代码地图生成完成！'));
 
@@ -83,7 +229,21 @@ export async function generateCommand(options: {
     console.log(chalk.gray(`   codemap.json`));
     console.log(chalk.gray(`   dependency-graph.md`));
     console.log(chalk.gray(`   context/ (${codeMap.summary.totalFiles} 个文件)`));
-    console.log(chalk.gray('   MVP3 Storage (CodeGraph)'));
+    console.log(chalk.gray(`   MVP3 Storage (${storageSaveResult.storageType})`));
+
+    if (pluginReport) {
+      console.log(chalk.gray('\n🔌 插件摘要:'));
+      console.log(chalk.gray(`   已加载插件: ${pluginReport.loadedPlugins.length > 0 ? pluginReport.loadedPlugins.join(', ') : '0 个'}`));
+      console.log(chalk.gray(`   插件生成文件: ${pluginReport.generatedFiles.length}`));
+
+      if (pluginReport.diagnostics.length > 0) {
+        console.warn(chalk.yellow(`⚠️  插件诊断: ${pluginReport.diagnostics.length} 条`));
+        for (const diagnostic of pluginReport.diagnostics.slice(0, 5)) {
+          const pluginLabel = diagnostic.plugin ? `${diagnostic.plugin} / ` : '';
+          console.warn(chalk.yellow(`   - ${pluginLabel}${diagnostic.stage}: ${diagnostic.message}`));
+        }
+      }
+    }
 
   } catch (error) {
     spinner.fail(chalk.red('❌ 生成失败'));
@@ -98,20 +258,23 @@ export async function generateCommand(options: {
 async function saveToCodeGraphStorage(codeMap: {
   project: { name: string; rootDir: string };
   modules: ModuleInfo[];
-}): Promise<void> {
+}, storageConfig: StorageConfig): Promise<{ storageType: string }> {
   const storage = await storageFactory.createForProject(
     process.cwd(),
-    { type: 'filesystem', outputPath: '.codemap/storage' }
+    storageConfig
   );
 
-  // 转换 CodeMap 为 CodeGraph
-  const codeGraph = convertToCodeGraph(codeMap);
+  try {
+    const codeGraph = convertToCodeGraph(codeMap);
+    const repository = new CodeGraphRepositoryImpl(storage);
+    await repository.save(codeGraph);
 
-  // 保存到 storage
-  const repository = new CodeGraphRepositoryImpl(storage);
-  await repository.save(codeGraph);
-
-  await storage.close();
+    return {
+      storageType: storage.type,
+    };
+  } finally {
+    await storage.close();
+  }
 }
 
 /**
