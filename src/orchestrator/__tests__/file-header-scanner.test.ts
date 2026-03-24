@@ -57,4 +57,40 @@ describe('file-header-scanner', () => {
     expect(results).toHaveLength(2);
     expect(results.some((r) => r.valid === false && r.errorCode === 'E0009')).toBe(true);
   });
+
+  it('scanDirectory respects parent .gitignore when scanning a subdirectory', () => {
+    const srcDir = join(root, 'src');
+    mkdirSync(srcDir, { recursive: true });
+
+    writeFileSync(join(root, '.gitignore'), 'src/ignored.ts\n');
+    writeFileSync(
+      join(srcDir, 'ok.ts'),
+      '// [META] since:2026-03 owner:core stable:false\n// [WHY] test\nexport const ok = true;\n'
+    );
+    writeFileSync(join(srcDir, 'ignored.ts'), '// [META] since:2026-03 owner:core stable:false\nexport const bad = true;\n');
+
+    const results = scanDirectory({ directory: srcDir });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.filePath).toContain('ok.ts');
+  });
+
+  it('scanDirectory skips nested test files via shared default excludes', () => {
+    const srcDir = join(root, 'src');
+    mkdirSync(srcDir, { recursive: true });
+
+    writeFileSync(
+      join(srcDir, 'ok.ts'),
+      '// [META] since:2026-03 owner:core stable:false\n// [WHY] test\nexport const ok = true;\n'
+    );
+    writeFileSync(
+      join(srcDir, 'example.test.ts'),
+      '// [META] since:2026-03 owner:core stable:false\nexport const testOnly = true;\n'
+    );
+
+    const results = scanDirectory({ directory: srcDir });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.filePath).toContain('ok.ts');
+  });
 });

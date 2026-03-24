@@ -4,6 +4,18 @@
 import type { SourceLocation } from '../types/index.js';
 
 /**
+ * ComplexityMetrics 复杂度指标
+ */
+export interface ComplexityMetrics {
+  cyclomatic: number;
+  cognitive: number;
+  maintainability: number;
+  functions?: number;
+  classes?: number;
+  lines?: number;
+}
+
+/**
  * UnifiedResult 统一结果接口
  * 用于规范化不同工具的输出格式
  */
@@ -48,6 +60,8 @@ export interface UnifiedResult {
     stability?: boolean;
     /** 风险等级 */
     riskLevel?: 'high' | 'medium' | 'low';
+    /** 复杂度指标 */
+    complexityMetrics?: ComplexityMetrics;
   };
 }
 
@@ -83,26 +97,145 @@ export interface ToolOptions {
 /**
  * IntentType 意图类型
  */
-export type IntentType =
-  | 'impact'
-  | 'dependency'
-  | 'search'
-  | 'documentation'
-  | 'complexity'
-  | 'overview'
-  | 'refactor'
-  | 'reference';
+export const PUBLIC_INTENTS = ['find', 'read', 'link', 'show'] as const;
+
+/**
+ * LegacyIntentType 旧 analyze 意图类型
+ */
+export const LEGACY_INTENTS = [
+  'impact',
+  'dependency',
+  'search',
+  'documentation',
+  'complexity',
+  'overview',
+  'refactor',
+  'reference'
+] as const;
+
+/**
+ * CompatibleLegacyIntentType 兼容期内可归一化的旧意图
+ */
+export const COMPATIBLE_LEGACY_INTENTS = [
+  'impact',
+  'dependency',
+  'search',
+  'documentation',
+  'complexity',
+  'overview',
+  'reference'
+] as const;
+
+export type IntentType = (typeof PUBLIC_INTENTS)[number];
+export type LegacyIntentType = (typeof LEGACY_INTENTS)[number];
+export type CompatibleLegacyIntentType = (typeof COMPATIBLE_LEGACY_INTENTS)[number];
+export type ExecutionIntentType = CompatibleLegacyIntentType;
+
+/**
+ * IntentCompatibility 兼容层元数据
+ */
+export interface IntentCompatibility {
+  /** 是否来自旧意图归一化 */
+  isDeprecated?: boolean;
+  /** 原始旧意图 */
+  normalizedFrom?: CompatibleLegacyIntentType;
+}
+
+/**
+ * AnalyzeWarning 结构化 warning
+ */
+export interface AnalyzeWarning {
+  code: 'deprecated-intent';
+  severity: 'warning';
+  message: string;
+  deprecatedIntent: CompatibleLegacyIntentType;
+  replacementIntent: IntentType;
+  sunsetPolicy: '2-minor-window';
+}
+
+export interface ReadImpactAnalysisItem {
+  file: string;
+  location?: SourceLocation;
+  changedFiles: string[];
+  transitiveDependencies: string[];
+  impactCount: number;
+  risk: 'high' | 'medium' | 'low';
+}
+
+export interface ReadComplexityAnalysisItem {
+  file: string;
+  location?: SourceLocation;
+  metrics: ComplexityMetrics;
+  risk: 'high' | 'medium' | 'low';
+}
+
+export interface ReadAnalysis {
+  intent: 'read';
+  impact?: ReadImpactAnalysisItem[];
+  complexity?: ReadComplexityAnalysisItem[];
+}
+
+export interface LinkReferenceMatch {
+  file: string;
+  line: number;
+  snippet?: string;
+}
+
+export interface LinkReferenceAnalysisItem {
+  target: string;
+  callers: string[];
+  callees: string[];
+  matches: LinkReferenceMatch[];
+}
+
+export interface LinkDependencyAnalysisItem {
+  file: string;
+  location?: SourceLocation;
+  imports: string[];
+  importedBy: string[];
+  cycles?: string[][];
+}
+
+export interface LinkAnalysis {
+  intent: 'link';
+  reference?: LinkReferenceAnalysisItem[];
+  dependency?: LinkDependencyAnalysisItem[];
+}
+
+export interface ShowOverviewSection {
+  title: string;
+  file: string;
+  overview: string;
+  exports: string[];
+}
+
+export interface ShowDocumentationSection {
+  title: string;
+  file: string;
+  content: string;
+}
+
+export interface ShowAnalysis {
+  intent: 'show';
+  overview?: ShowOverviewSection[];
+  documentation?: ShowDocumentationSection[];
+}
+
+export type CodemapAnalysis = ReadAnalysis | LinkAnalysis | ShowAnalysis;
 
 /**
  * CodemapIntent Codemap 意图对象
  */
 export interface CodemapIntent {
   intent: IntentType;
+  /** Phase 03-01 过渡期内的底层执行意图 */
+  executionIntent?: ExecutionIntentType;
   targets: string[];
   keywords: string[];
   scope: 'direct' | 'transitive';
   tool: string;
   secondary?: string;
+  compatibility?: IntentCompatibility;
 }
 
 /**
@@ -152,13 +285,17 @@ export interface CodemapOutput {
   /** Schema 版本，格式: "v1.0.0" */
   schemaVersion: string;
   /** 执行的 intent 类型 */
-  intent: string;
+  intent: IntentType;
   /** 主要工具 */
   tool: string;
   /** 置信度信息 */
   confidence: Confidence;
   /** 结果列表 */
   results: UnifiedResult[];
+  /** 结构化 warning（兼容期弃用提示等） */
+  warnings?: AnalyzeWarning[];
+  /** intent 特定的 machine-readable 聚合分析 */
+  analysis?: CodemapAnalysis;
   /** 可选的元数据 */
   metadata?: {
     /** 执行时间（毫秒） */

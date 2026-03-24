@@ -10,9 +10,9 @@ describe('IntentRouter', () => {
   const router = new IntentRouter();
 
   describe('route', () => {
-    it('应该正确路由 search intent', () => {
+    it('应该正确路由 find intent', () => {
       const args: AnalyzeArgs = {
-        intent: 'search',
+        intent: 'find',
         targets: ['src'],
         keywords: ['test'],
         scope: 'direct'
@@ -20,7 +20,8 @@ describe('IntentRouter', () => {
 
       const result = router.route(args);
 
-      expect(result.intent).toBe('search');
+      expect(result.intent).toBe('find');
+      expect(result.executionIntent).toBe('search');
       expect(result.targets).toEqual(['src']);
       expect(result.keywords).toEqual(['test']);
       expect(result.scope).toBe('direct');
@@ -28,7 +29,7 @@ describe('IntentRouter', () => {
       expect(result.secondary).toBeUndefined();
     });
 
-    it('应该正确路由 impact intent', () => {
+    it('应该将 legacy impact 归一化到 read', () => {
       const args: AnalyzeArgs = {
         intent: 'impact',
         targets: ['src/auth']
@@ -36,22 +37,23 @@ describe('IntentRouter', () => {
 
       const result = router.route(args);
 
-      expect(result.intent).toBe('impact');
+      expect(result.intent).toBe('read');
+      expect(result.executionIntent).toBe('impact');
       expect(result.tool).toBe('codemap');
       expect(result.secondary).toBe('ast-grep');
+      expect(result.compatibility).toEqual({
+        isDeprecated: true,
+        normalizedFrom: 'impact'
+      });
     });
 
-    it('无 intent 参数时应使用默认 search', () => {
-      const args: AnalyzeArgs = {};
-
-      const result = router.route(args);
-
-      expect(result.intent).toBe('search');
+    it('无 intent 参数时应抛出错误', () => {
+      expect(() => router.route({})).toThrow('缺少必要参数: intent');
     });
 
     it('应该设置默认 scope 为 direct', () => {
       const args: AnalyzeArgs = {
-        intent: 'search'
+        intent: 'find'
       };
 
       const result = router.route(args);
@@ -62,20 +64,22 @@ describe('IntentRouter', () => {
 
   describe('validateIntent', () => {
     it('有效 intent 不应抛出错误', () => {
-      expect(() => router.route({ intent: 'search' })).not.toThrow();
-      expect(() => router.route({ intent: 'impact' })).not.toThrow();
-      expect(() => router.route({ intent: 'dependency' })).not.toThrow();
+      expect(() => router.route({ intent: 'find', keywords: ['test'] })).not.toThrow();
+      expect(() => router.route({ intent: 'impact', targets: ['src'] })).not.toThrow();
+      expect(() => router.route({ intent: 'dependency', targets: ['src'] })).not.toThrow();
     });
 
     it('无效 intent 应抛出错误', () => {
       expect(() => router.route({ intent: 'invalid' })).toThrow('无效的 intent: invalid');
+      expect(() => router.route({ intent: 'refactor' })).toThrow('无效的 intent: refactor');
     });
   });
 
   describe('isValidIntent', () => {
     it('应正确判断有效 intent', () => {
-      expect(router.isValidIntent('search')).toBe(true);
+      expect(router.isValidIntent('find')).toBe(true);
       expect(router.isValidIntent('impact')).toBe(true);
+      expect(router.isValidIntent('refactor')).toBe(false);
       expect(router.isValidIntent('invalid')).toBe(false);
     });
   });
@@ -84,15 +88,11 @@ describe('IntentRouter', () => {
     it('应返回所有有效意图类型', () => {
       const intents = router.getValidIntents();
 
-      expect(intents).toContain('search');
-      expect(intents).toContain('impact');
-      expect(intents).toContain('dependency');
-      expect(intents).toContain('documentation');
-      expect(intents).toContain('complexity');
-      expect(intents).toContain('overview');
-      expect(intents).toContain('refactor');
-      expect(intents).toContain('reference');
-      expect(intents).toHaveLength(8);
+      expect(intents).toContain('find');
+      expect(intents).toContain('read');
+      expect(intents).toContain('link');
+      expect(intents).toContain('show');
+      expect(intents).toHaveLength(4);
     });
   });
 });

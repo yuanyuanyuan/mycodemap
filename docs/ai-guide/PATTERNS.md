@@ -1,6 +1,18 @@
 # AI Guide - 使用模式与最佳实践
 
 > 标准工作流模式和输出处理最佳实践
+>
+> CodeMap 的首屏产品面是代码地图与代码分析。`workflow` 仍然是当前公开的过渡能力，本文件会明确区分核心分析模式与过渡 workflow 模式。
+
+---
+
+## 使用边界速查
+
+| 类别 | 说明 |
+|------|------|
+| 核心模式 | `generate`、`query`、`deps`、`impact`、`complexity`、`cycles`、`export`、`ci` |
+| 过渡模式 | `workflow` 仍公开，但不是 AI-first 首次接触项目的主入口 |
+| 输出契约 | 当前多数命令显式加 `--json` 获取机器可读结果；`analyze` 可切换 `--output-mode machine|human` |
 
 ---
 
@@ -48,13 +60,13 @@ node dist/cli/index.js deps -m "src" -j
 
 ```bash
 # Step 1: 搜索相关代码
-node dist/cli/index.js analyze -i search -k "相关关键词" --json
+node dist/cli/index.js analyze -i find -k "相关关键词" --json
 
 # Step 2: 分析影响范围（如果有修改现有代码）
-node dist/cli/index.js analyze -i impact -t "目标文件" --include-tests --json
+node dist/cli/index.js analyze -i read -t "目标文件" --include-tests --json
 
 # Step 3: 检查复杂度（选择最佳实现位置）
-node dist/cli/index.js analyze -i complexity -t "候选目录" --json
+node dist/cli/index.js analyze -i read -t "候选目录" --json
 
 # Step 4: 实现代码
 # - 遵循文件头规范
@@ -85,13 +97,13 @@ npm test
 node dist/cli/index.js cycles -j
 
 # Step 2: 分析目标模块复杂度
-node dist/cli/index.js analyze -i complexity -t "目标模块" --json
+node dist/cli/index.js analyze -i read -t "目标模块" --json
 
 # Step 3: 评估影响范围
-node dist/cli/index.js analyze -i impact -t "目标文件" --scope transitive --json
+node dist/cli/index.js analyze -i read -t "目标文件" --scope transitive --json
 
-# Step 4: 获取重构建议
-node dist/cli/index.js analyze -i refactor -t "目标模块" --json
+# Step 4: 补充依赖上下文
+node dist/cli/index.js analyze -i link -t "目标模块" --json
 
 # Step 5: 执行重构
 
@@ -99,7 +111,7 @@ node dist/cli/index.js analyze -i refactor -t "目标模块" --json
 node dist/cli/index.js cycles -j
 
 # Step 7: 验证复杂度降低
-node dist/cli/index.js analyze -i complexity -t "目标模块" --json
+node dist/cli/index.js analyze -i read -t "目标模块" --json
 
 # Step 8: 运行测试
 npm test
@@ -129,7 +141,7 @@ node dist/cli/index.js impact -f "问题文件" --transitive -j
 node dist/cli/index.js query -s "相关测试" --include-references -j
 
 # Step 4: 搜索相似代码（防止同类问题）
-node dist/cli/index.js analyze -i search -k "问题模式" --json
+node dist/cli/index.js analyze -i find -k "问题模式" --json
 
 # Step 5: 修复 Bug
 
@@ -170,7 +182,7 @@ npm test
 
 ---
 
-### 模式 F: 复杂任务管理
+### 模式 F: 复杂分析任务（当前过渡工作流）
 
 **适用场景**: 需要多步骤完成的复杂开发任务
 
@@ -197,13 +209,52 @@ node dist/cli/index.js workflow checkpoint
 # Step 7: 重复直到完成
 ```
 
-**工作流阶段**:
+**当前工作流阶段（过渡态）**:
 1. `reference` - 参考搜索
 2. `impact` - 影响分析
 3. `risk` - 风险评估
 4. `implementation` - 代码实现
 5. `commit` - 提交验证
 6. `ci` - CI 验证
+
+> 说明：以上是当前公开实现，不代表最终收敛模型；如果只需要代码地图能力，优先使用前面几个核心分析模式。
+
+---
+
+### 模式 G: 切换图存储后端
+
+**适用场景**: 需要把 CodeGraph 从默认文件系统存储切到 KùzuDB / Neo4j，或验证 graph backend 是否真正生效
+
+**执行步骤**:
+
+```bash
+# Step 1: 编辑配置文件
+cat mycodemap.config.json
+
+# Step 2: 选择后端
+# {
+#   "storage": {
+#     "type": "kuzudb",
+#     "databasePath": ".codemap/kuzu"
+#   }
+# }
+
+# Step 3: 如需图数据库后端，安装可选依赖
+npm install kuzu
+# 或
+npm install neo4j-driver
+
+# Step 4: 重新生成代码地图
+node dist/cli/index.js generate
+
+# Step 5: 验证同一 backend 可被读取
+node dist/cli/index.js export json -o /tmp/codemap.json
+```
+
+**决策要点**:
+- 缺少 `kuzu` / `neo4j-driver`，或 Neo4j 连接失败时，应看到显式错误，而不是静默 fallback。
+- `storage.type = "auto"` 当前仍保守落到 `filesystem`，不要把阈值字段误读成已上线自动切换。
+- 图存储生产化只收口存储面，不重新开放公共 HTTP API 产品面。
 
 ---
 

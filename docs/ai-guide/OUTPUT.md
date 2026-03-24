@@ -4,7 +4,18 @@
 
 ---
 
-## 何时使用 --json
+## Phase 1 契约基线
+
+| 维度 | 目标态 | 当前 CLI 现实 |
+|------|--------|---------------|
+| 机器可读 | 机器可读优先，适合 AI/Agent 继续处理 | 多数命令仍通过 `--json` 显式返回结构化结果 |
+| 人类可读 | 显式的人类阅读入口 | `analyze` 当前支持 `--output-mode human`，其余命令多保留现有文本输出 |
+| analyze 收敛 | 输出契约应逐步收敛 | 当前公共契约已固定为 `find` / `read` / `link` / `show`，legacy alias 通过 `warnings[]` 暴露迁移提示 |
+| 文件发现 | 扫描类命令共享一个文件发现模块 | 先尊重仓库 `.gitignore`，无 `.gitignore` 时回退到默认 `exclude` |
+
+---
+
+## 当前 CLI 现实：何时使用 --json
 
 | 场景 | 使用 `--json` | 原因 |
 |------|--------------|------|
@@ -14,6 +25,88 @@
 | 需要计算统计数据 | ✅ 是 | JSON 可直接计算 |
 | 需要过滤或排序结果 | ✅ 是 | 可编程处理 |
 | 简单查询确认存在性 | ❌ 否 | 文本输出更直观 |
+
+---
+
+## 文件发现契约
+
+```typescript
+type DiscoveryFallbackExclude =
+  | "node_modules/**"
+  | "dist/**"
+  | "build/**"
+  | "coverage/**"
+  | "**/*.test.ts"
+  | "**/*.spec.ts"
+  | "**/*.d.ts";
+
+interface DiscoveryContract {
+  gitignore: true;
+  fallbackExclude: DiscoveryFallbackExclude[];
+  sharedBy: ["generate", "analyze", "ci check-headers -d"];
+}
+```
+
+> `generate`、`analyze` 与 `ci check-headers -d` 会共享同一个文件发现模块；若仓库没有 `.gitignore`，则回退到上面的默认排除列表。
+
+---
+
+## generate / codemap.json 插件扩展字段
+
+> 仅当 `mycodemap.config.json` **显式声明** `plugins` 段时，`generate` 输出才会包含 `pluginReport`。
+
+```typescript
+interface PluginDiagnostic {
+  plugin?: string;
+  stage: "load" | "initialize" | "analyze" | "generate";
+  level: "warning" | "error";
+  message: string;
+}
+
+interface PluginExecutionReport {
+  loadedPlugins: string[];
+  generatedFiles: string[];
+  metrics: Record<string, unknown>;
+  diagnostics: PluginDiagnostic[];
+}
+
+interface CodeMap {
+  version: string;
+  generatedAt: string;
+  project: ProjectInfo;
+  summary: ProjectSummary;
+  modules: ModuleInfo[];
+  dependencies: DependencyGraph;
+  actualMode?: "fast" | "smart";
+  pluginReport?: PluginExecutionReport;
+}
+```
+
+### 示例
+
+```json
+{
+  "pluginReport": {
+    "loadedPlugins": ["complexity-analyzer", "my-local-plugin"],
+    "generatedFiles": ["plugins/good.txt"],
+    "metrics": {
+      "complexity-analyzer": {
+        "complexityAnalysis": {
+          "totalCyclomaticComplexity": 17
+        }
+      }
+    },
+    "diagnostics": [
+      {
+        "plugin": "my-local-plugin",
+        "stage": "analyze",
+        "level": "warning",
+        "message": "my-local-plugin warning"
+      }
+    ]
+  }
+}
+```
 
 ---
 
@@ -101,23 +194,38 @@ interface ContextLine {
 
 ## analyze 命令输出结构
 
+> 当前 `analyze` 的公共契约为 `find` / `read` / `link` / `show`；legacy alias 会在输出中返回 `warnings[]`，其中 `refactor` 不在兼容白名单内。
+
 ### 标准 JSON 输出 (--json)
 
 ```typescript
+type AnalyzeIntent = "find" | "read" | "link" | "show";
+
 interface AnalyzeOutput {
   schemaVersion: "v1.0.0";
-  intent: "impact" | "dependency" | "search" | "documentation" | "complexity" | "overview" | "refactor" | "reference";
+  intent: AnalyzeIntent;
   tool: string;
   confidence: {
     score: number;        // 0.0 - 1.0
     level: "high" | "medium" | "low";
   };
   results: AnalyzeResult[];
+  warnings?: AnalyzeWarning[];
+  analysis?: ReadAnalysis | LinkAnalysis | ShowAnalysis;
   metadata: {
     total: number;
     scope: "direct" | "transitive";
     resultCount: number;
   };
+}
+
+interface AnalyzeWarning {
+  code: "deprecated-intent";
+  severity: "warning";
+  message: string;
+  deprecatedIntent: "impact" | "dependency" | "search" | "documentation" | "complexity" | "overview" | "reference";
+  replacementIntent: AnalyzeIntent;
+  sunsetPolicy: "2-minor-window";
 }
 
 interface AnalyzeResult {
@@ -131,9 +239,65 @@ interface AnalyzeResult {
   relevance: number;        // 0.0 - 1.0
   metadata?: {
     testFile?: string;      // 关联的测试文件
-    complexity?: number;    // 复杂度分数
-    [key: string]: any;
+    dependencies?: string[];
+    impactCount?: number;
+    complexityMetrics?: {
+      cyclomatic: number;
+      cognitive: number;
+      maintainability: number;
+    };
+    riskLevel?: "high" | "medium" | "low";
+    [key: string]: unknown;
   };
+}
+
+interface ReadAnalysis {
+  intent: "read";
+  impact?: Array<{
+    file: string;
+    changedFiles: string[];
+    transitiveDependencies: string[];
+    impactCount: number;
+    risk: "high" | "medium" | "low";
+  }>;
+  complexity?: Array<{
+    file: string;
+    metrics: {
+      cyclomatic: number;
+      cognitive: number;
+      maintainability: number;
+    };
+    risk: "high" | "medium" | "low";
+  }>;
+}
+
+interface LinkAnalysis {
+  intent: "link";
+  reference?: Array<{
+    target: string;
+    callers: string[];
+    callees: string[];
+  }>;
+  dependency?: Array<{
+    file: string;
+    imports: string[];
+    importedBy: string[];
+  }>;
+}
+
+interface ShowAnalysis {
+  intent: "show";
+  overview?: Array<{
+    title: string;
+    file: string;
+    overview: string;
+    exports: string[];
+  }>;
+  documentation?: Array<{
+    title: string;
+    file: string;
+    content: string;
+  }>;
 }
 ```
 
@@ -144,13 +308,15 @@ interface AnalyzeResult {
 ```typescript
 interface StructuredAnalyzeOutput {
   schemaVersion: "v1.0.0";
-  intent: string;
+  intent: AnalyzeIntent;
   tool: string;
   confidence: {
     score: number;
     level: "high" | "medium" | "low";
   };
   results: StructuredResult[];
+  warnings?: AnalyzeWarning[];
+  analysis?: ReadAnalysis | LinkAnalysis | ShowAnalysis;
   metadata: {
     total: number;
     scope: string;
@@ -168,7 +334,7 @@ interface StructuredResult {
   // 注意：没有 content 字段
   relevance: number;
   metadata?: {
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 ```
@@ -178,12 +344,22 @@ interface StructuredResult {
 ```json
 {
   "schemaVersion": "v1.0.0",
-  "intent": "impact",
-  "tool": "codemap-impact",
+  "intent": "read",
+  "tool": "codemap-read",
   "confidence": {
     "score": 0.85,
     "level": "high"
   },
+  "warnings": [
+    {
+      "code": "deprecated-intent",
+      "severity": "warning",
+      "message": "legacy intent \"impact\" 已弃用，请改用 \"read\"",
+      "deprecatedIntent": "impact",
+      "replacementIntent": "read",
+      "sunsetPolicy": "2-minor-window"
+    }
+  ],
   "results": [
     {
       "file": "src/cli/commands/analyze.ts",
@@ -192,13 +368,33 @@ interface StructuredResult {
         "line": 45,
         "column": 1
       },
-      "content": "导入自 src/orchestrator/intent-router.ts 的 IntentRouter 类",
+      "content": "被 3 个模块依赖",
       "relevance": 0.95,
       "metadata": {
-        "testFile": "src/cli/commands/analyze.test.ts"
+        "impactCount": 3,
+        "dependencies": [
+          "src/orchestrator/intent-router.ts"
+        ],
+        "riskLevel": "medium"
       }
     }
   ],
+  "analysis": {
+    "intent": "read",
+    "impact": [
+      {
+        "file": "src/cli/commands/analyze.ts",
+        "changedFiles": [
+          "src/cli/commands/analyze.ts"
+        ],
+        "transitiveDependencies": [
+          "src/orchestrator/intent-router.ts"
+        ],
+        "impactCount": 3,
+        "risk": "medium"
+      }
+    ]
+  },
   "metadata": {
     "total": 8,
     "scope": "transitive",

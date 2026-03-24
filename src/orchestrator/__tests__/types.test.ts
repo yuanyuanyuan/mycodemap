@@ -68,8 +68,8 @@ function createMockUnifiedResult(overrides: Partial<UnifiedResult> = {}): Unifie
 function createMockCodemapOutput(overrides: Partial<CodemapOutput> = {}): CodemapOutput {
   return {
     schemaVersion: 'v1.0.0',
-    intent: 'search',
-    tool: 'codemap-search',
+    intent: 'find',
+    tool: 'codemap-find',
     confidence: {
       score: 0.85,
       level: 'high',
@@ -100,7 +100,7 @@ describe('isCodemapOutput', () => {
     it('应返回 true 当包含所有必需字段', () => {
       const output = {
         schemaVersion: 'v1.0.0',
-        intent: 'search',
+        intent: 'find',
         tool: 'test-tool',
         confidence: { score: 0.8, level: 'high' as const },
         results: [],
@@ -150,7 +150,7 @@ describe('isCodemapOutput', () => {
   describe('缺少必需字段测试 (R4.3)', () => {
     it('应返回 false 当缺少 schemaVersion', () => {
       const output = {
-        intent: 'search',
+        intent: 'find',
         tool: 'test-tool',
         confidence: { score: 0.8, level: 'high' },
         results: [],
@@ -171,7 +171,7 @@ describe('isCodemapOutput', () => {
     it('应返回 false 当缺少 tool', () => {
       const output = {
         schemaVersion: 'v1.0.0',
-        intent: 'search',
+        intent: 'find',
         confidence: { score: 0.8, level: 'high' },
         results: [],
       };
@@ -181,7 +181,7 @@ describe('isCodemapOutput', () => {
     it('应返回 false 当缺少 confidence', () => {
       const output = {
         schemaVersion: 'v1.0.0',
-        intent: 'search',
+        intent: 'find',
         tool: 'test-tool',
         results: [],
       };
@@ -191,7 +191,7 @@ describe('isCodemapOutput', () => {
     it('应返回 false 当缺少 results', () => {
       const output = {
         schemaVersion: 'v1.0.0',
-        intent: 'search',
+        intent: 'find',
         tool: 'test-tool',
         confidence: { score: 0.8, level: 'high' },
       };
@@ -201,7 +201,7 @@ describe('isCodemapOutput', () => {
     it('应返回 false 当 confidence 为 null', () => {
       const output = {
         schemaVersion: 'v1.0.0',
-        intent: 'search',
+        intent: 'find',
         tool: 'test-tool',
         confidence: null,
         results: [],
@@ -215,7 +215,7 @@ describe('isCodemapOutput', () => {
     it('应返回 false 当 schemaVersion 不是字符串', () => {
       const output = {
         schemaVersion: 123,
-        intent: 'search',
+        intent: 'find',
         tool: 'test-tool',
         confidence: { score: 0.8, level: 'high' },
         results: [],
@@ -237,7 +237,7 @@ describe('isCodemapOutput', () => {
     it('应返回 false 当 tool 不是字符串', () => {
       const output = {
         schemaVersion: 'v1.0.0',
-        intent: 'search',
+        intent: 'find',
         tool: 123,
         confidence: { score: 0.8, level: 'high' },
         results: [],
@@ -248,7 +248,7 @@ describe('isCodemapOutput', () => {
     it('应返回 false 当 confidence.score 不是数字', () => {
       const output = {
         schemaVersion: 'v1.0.0',
-        intent: 'search',
+        intent: 'find',
         tool: 'test-tool',
         confidence: { score: '0.8', level: 'high' },
         results: [],
@@ -259,7 +259,7 @@ describe('isCodemapOutput', () => {
     it('应返回 false 当 confidence.level 不是 high/medium/low', () => {
       const output = {
         schemaVersion: 'v1.0.0',
-        intent: 'search',
+        intent: 'find',
         tool: 'test-tool',
         confidence: { score: 0.8, level: 'invalid' },
         results: [],
@@ -270,7 +270,7 @@ describe('isCodemapOutput', () => {
     it('应返回 false 当 confidence.level 为其他字符串', () => {
       const output = {
         schemaVersion: 'v1.0.0',
-        intent: 'search',
+        intent: 'find',
         tool: 'test-tool',
         confidence: { score: 0.8, level: 'unknown' },
         results: [],
@@ -281,7 +281,7 @@ describe('isCodemapOutput', () => {
     it('应返回 false 当 results 不是数组', () => {
       const output = {
         schemaVersion: 'v1.0.0',
-        intent: 'search',
+        intent: 'find',
         tool: 'test-tool',
         confidence: { score: 0.8, level: 'high' },
         results: 'not-an-array',
@@ -295,7 +295,7 @@ describe('isCodemapOutput', () => {
     it('应返回 true 当缺少可选 metadata 字段', () => {
       const output = {
         schemaVersion: 'v1.0.0',
-        intent: 'search',
+        intent: 'find',
         tool: 'test-tool',
         confidence: { score: 0.8, level: 'high' },
         results: [],
@@ -339,7 +339,7 @@ describe('isCodemapOutput', () => {
     it('应返回 true 当传入带有额外字段的对象', () => {
       const output = {
         schemaVersion: 'v1.0.0',
-        intent: 'search',
+        intent: 'find',
         tool: 'test-tool',
         confidence: { score: 0.8, level: 'high' },
         results: [],
@@ -546,7 +546,7 @@ describe('CodemapOutput 接口 (R6.2)', () => {
   it('应支持所有必需字段', () => {
     const output: CodemapOutput = {
       schemaVersion: 'v1.0.0',
-      intent: 'search',
+      intent: 'find',
       tool: 'codemap',
       confidence: {
         score: 0.85,
@@ -556,7 +556,7 @@ describe('CodemapOutput 接口 (R6.2)', () => {
     };
 
     expect(output.schemaVersion).toBe('v1.0.0');
-    expect(output.intent).toBe('search');
+    expect(output.intent).toBe('find');
     expect(output.tool).toBe('codemap');
     expect(output.confidence.score).toBe(0.85);
     expect(output.confidence.level).toBe('high');
@@ -603,12 +603,48 @@ describe('CodemapOutput 接口 (R6.2)', () => {
   });
 
   it('应支持所有 intent 字符串值', () => {
-    const intents = ['impact', 'dependency', 'search', 'documentation', 'complexity', 'overview', 'refactor', 'reference'];
+    const intents: IntentType[] = ['find', 'read', 'link', 'show'];
     
     for (const intent of intents) {
       const output = createMockCodemapOutput({ intent });
       expect(output.intent).toBe(intent);
     }
+  });
+
+  it('应支持结构化 warnings 与 analysis', () => {
+    const output: CodemapOutput = createMockCodemapOutput({
+      intent: 'read',
+      warnings: [{
+        code: 'deprecated-intent',
+        severity: 'warning',
+        message: 'legacy intent "impact" 已弃用，请改用 "read"',
+        deprecatedIntent: 'impact',
+        replacementIntent: 'read',
+        sunsetPolicy: '2-minor-window',
+      }],
+      analysis: {
+        intent: 'read',
+        impact: [{
+          file: 'src/cli/index.ts',
+          changedFiles: ['src/cli/index.ts'],
+          transitiveDependencies: ['src/cli/commands/analyze.ts'],
+          impactCount: 1,
+          risk: 'medium',
+        }],
+        complexity: [{
+          file: 'src/cli/index.ts',
+          metrics: {
+            cyclomatic: 3,
+            cognitive: 5,
+            maintainability: 88,
+          },
+          risk: 'low',
+        }],
+      },
+    });
+
+    expect(output.warnings?.[0]?.deprecatedIntent).toBe('impact');
+    expect(output.analysis?.intent).toBe('read');
   });
 });
 
@@ -707,19 +743,15 @@ describe('其他接口类型兼容性', () => {
     expect(result.reasons).toEqual(['reason 1', 'reason 2']);
   });
 
-  it('IntentType 应包含所有 8 种类型', () => {
+  it('IntentType 应包含所有 4 种 public 类型', () => {
     const intents: IntentType[] = [
-      'impact',
-      'dependency',
-      'search',
-      'documentation',
-      'complexity',
-      'overview',
-      'refactor',
-      'reference',
+      'find',
+      'read',
+      'link',
+      'show',
     ];
 
-    expect(intents).toHaveLength(8);
+    expect(intents).toHaveLength(4);
   });
 
   it('ToolOptions 应支持可选字段和扩展', () => {
@@ -737,21 +769,21 @@ describe('其他接口类型兼容性', () => {
 
   it('CodemapIntent 接口应正确', () => {
     const intent: CodemapIntent = {
-      intent: 'search',
+      intent: 'find',
       targets: ['src/'],
       keywords: ['test'],
       scope: 'direct',
       tool: 'codemap',
     };
 
-    expect(intent.intent).toBe('search');
+    expect(intent.intent).toBe('find');
     expect(intent.targets).toEqual(['src/']);
     expect(intent.scope).toBe('direct');
   });
 
   it('AnalyzeArgs 接口应正确', () => {
     const args: AnalyzeArgs = {
-      intent: 'search',
+      intent: 'find',
       targets: ['src/'],
       keywords: ['test'],
       scope: 'direct',
@@ -762,17 +794,17 @@ describe('其他接口类型兼容性', () => {
       outputMode: 'machine',
     };
 
-    expect(args.intent).toBe('search');
+    expect(args.intent).toBe('find');
     expect(args.topK).toBe(5);
     expect(args.json).toBe(true);
   });
 
   it('AnalyzeArgs 应支持部分字段', () => {
     const args: AnalyzeArgs = {
-      intent: 'search',
+      intent: 'find',
     };
 
-    expect(args.intent).toBe('search');
+    expect(args.intent).toBe('find');
     expect(args.targets).toBeUndefined();
   });
 });

@@ -52,12 +52,10 @@ export interface FusionOptions {
  * 越近期的阶段权重越高
  */
 const PHASE_WEIGHTS: Record<WorkflowPhase, number> = {
-  'reference': 0.8,      // 参考搜索阶段
-  'impact': 0.9,         // 影响分析阶段
-  'risk': 1.0,           // 风险评估阶段（最高权重）
-  'implementation': 0.7, // 代码实现阶段
-  'commit': 0.6,         // 提交阶段
-  'ci': 0.5             // CI阶段
+  'find': 0.8,
+  'read': 0.9,
+  'link': 1.0,
+  'show': 0.95
 };
 
 /**
@@ -65,10 +63,10 @@ const PHASE_WEIGHTS: Record<WorkflowPhase, number> = {
  * 用于推断结果的来源阶段
  */
 const SOURCE_TO_PHASE: Record<string, WorkflowPhase> = {
-  'ast-grep': 'reference',
-  'codemap': 'reference',
-  'ai-feed': 'risk',
-  'rg-internal': 'reference'
+  'ast-grep': 'find',
+  'codemap': 'read',
+  'ai-feed': 'link',
+  'rg-internal': 'find'
 };
 
 // ============================================
@@ -270,7 +268,7 @@ export class WorkflowResultFusion {
    * 推断结果来源的阶段
    */
   private inferPhase(source: string): WorkflowPhase {
-    return SOURCE_TO_PHASE[source] || 'reference';
+    return SOURCE_TO_PHASE[source] || 'find';
   }
 
   /**

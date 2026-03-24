@@ -92,35 +92,25 @@ export interface TestConfig {
  * 定义每个阶段应该采用什么样的测试策略
  */
 const PHASE_TEST_STRATEGY: Record<WorkflowPhase, TestStrategy> = {
-  'reference': {
+  'find': {
     mode: 'find-similar',
     includePatterns: ['**/*.test.ts', '**/*.spec.ts'],
     excludePatterns: [],
   },
-  'impact': {
+  'read': {
     mode: 'find-affected',
     includePatterns: ['**/*.test.ts', '**/*.spec.ts'],
     excludePatterns: [],
   },
-  'risk': {
-    mode: 'focus-high-risk',
+  'link': {
+    mode: 'required-tests',
     includePatterns: ['**/*.test.ts'],
     excludePatterns: [],
-    priority: 'high-risk-first',
+    priority: 'relevance-first',
   },
-  'implementation': {
-    mode: 'required-tests',
-    includePatterns: ['**/*.test.ts', '**/*.spec.ts'],
-    excludePatterns: [],
-  },
-  'commit': {
+  'show': {
     mode: 'verify',
     includePatterns: ['**/*.test.ts', '**/*.spec.ts'],
-    excludePatterns: [],
-  },
-  'ci': {
-    mode: 'full-suite',
-    includePatterns: ['**/*.test.ts', '**/*.spec.ts', '**/*.test.js'],
     excludePatterns: [],
   },
 };
@@ -322,12 +312,10 @@ export class WorkflowTestLinker {
    */
   private getSuggestedAction(phase: WorkflowPhase, testFile: string): string {
     const actions: Record<WorkflowPhase, string> = {
-      'reference': '参考此测试的实现模式',
-      'impact': '修改后需运行此测试',
-      'risk': '重点关注此测试，确保通过',
-      'implementation': '实现完成后运行此测试',
-      'commit': '提交前确保此测试通过',
-      'ci': 'CI 会自动运行此测试',
+      'find': '参考此测试定位相关实现与命名模式',
+      'read': '阅读实现后优先运行此测试验证影响',
+      'link': '结合依赖与引用关系补跑此测试',
+      'show': '输出概览后确认此测试场景仍成立',
     };
 
     return actions[phase] || '运行此测试';
@@ -341,7 +329,7 @@ export class WorkflowTestLinker {
     testFile: string,
     analysisResults?: UnifiedResult[]
   ): 'high' | 'medium' | 'low' {
-    if (phase === 'risk') {
+    if (phase === 'link') {
       // 风险阶段：基于分析结果判断
       const riskResult = analysisResults?.find(
         (r) => r.file === testFile || testFile.includes(r.file)
@@ -350,7 +338,7 @@ export class WorkflowTestLinker {
       if (riskResult?.metadata?.riskLevel === 'medium') return 'medium';
     }
 
-    if (phase === 'implementation') {
+    if (phase === 'show') {
       return 'high';
     }
 

@@ -3,8 +3,14 @@
  * [WHY] 为 pre-commit 与 CI 提供统一的 [META]/[WHY] 校验逻辑
  */
 
-import { readFileSync, readdirSync, statSync } from 'fs';
-import { join, extname, relative } from 'path';
+import { readFileSync } from 'fs';
+import { extname } from 'path';
+import {
+  DEFAULT_DISCOVERY_EXCLUDES,
+  createScopedIncludePatterns,
+  discoverProjectFilesSync,
+  resolveDiscoveryRoot
+} from '../core/file-discovery.js';
 
 export const SUPPORTED_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
 
@@ -27,6 +33,17 @@ const DEFAULT_HIGH_RISK_PATTERNS = [
   /\/types\//,
   /\.test\.|\.spec\./,
 ];
+
+const HEADER_SCAN_EXCLUDES = [
+  ...DEFAULT_DISCOVERY_EXCLUDES,
+  '**/__tests__/**',
+  '**/test/**'
+] as const;
+
+function createSupportedExtensionsPattern(): string {
+  const extensions = SUPPORTED_EXTENSIONS.map((extension) => extension.replace(/^\./, ''));
+  return `**/*.{${extensions.join(',')}}`;
+}
 
 /**
  * 扫描文件头注释
@@ -81,35 +98,21 @@ export function scanFileHeader(
  */
 export function scanDirectory(options: ScanOptions): FileHeaderResult[] {
   const { directory } = options;
-  const results: FileHeaderResult[] = [];
+  const discoveryRoot = resolveDiscoveryRoot(directory);
+  const includePatterns = createScopedIncludePatterns(
+    discoveryRoot,
+    directory,
+    [createSupportedExtensionsPattern()]
+  );
+  const files = discoverProjectFilesSync({
+    rootDir: discoveryRoot,
+    include: includePatterns,
+    exclude: HEADER_SCAN_EXCLUDES
+  });
 
-  function walkDir(dir: string): void {
-    const entries = readdirSync(dir);
-
-    for (const entry of entries) {
-      const fullPath = join(dir, entry);
-      const stat = statSync(fullPath);
-
-      // 跳过 node_modules, .git 等目录
-      if (stat.isDirectory()) {
-        if (entry.startsWith('.') && entry !== '.') continue;
-        if (entry === 'node_modules') continue;
-        if (entry === 'dist' || entry === 'build') continue;
-        if (entry === '__tests__' || entry === 'test') continue;
-
-        walkDir(fullPath);
-      } else if (stat.isFile()) {
-        const ext = extname(fullPath);
-        if (SUPPORTED_EXTENSIONS.includes(ext)) {
-          const result = scanFileHeader(fullPath);
-          results.push(result);
-        }
-      }
-    }
-  }
-
-  walkDir(directory);
-  return results;
+  return files
+    .filter((filePath) => SUPPORTED_EXTENSIONS.includes(extname(filePath)))
+    .map((filePath) => scanFileHeader(filePath));
 }
 
 /**

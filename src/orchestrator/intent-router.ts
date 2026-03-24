@@ -8,43 +8,49 @@
  * 验证意图是否在白名单中。
  */
 
-import type { CodemapIntent, AnalyzeArgs, IntentType } from './types.js';
+import {
+  PUBLIC_INTENTS,
+  COMPATIBLE_LEGACY_INTENTS,
+  type CodemapIntent,
+  type AnalyzeArgs,
+  type IntentType,
+  type CompatibleLegacyIntentType,
+  type ExecutionIntentType
+} from './types.js';
 
 /**
- * 有效的意图类型白名单
+ * Public intent 的默认执行配置
  */
-const VALID_INTENTS: IntentType[] = [
-  'impact',
-  'dependency',
-  'search',
-  'documentation',
-  'complexity',
-  'overview',
-  'refactor',
-  'reference'
-];
+const PUBLIC_INTENT_CONFIG: Record<
+  IntentType,
+  { executionIntent: ExecutionIntentType; tool: string; secondary?: string }
+> = {
+  find: { executionIntent: 'search', tool: 'ast-grep' },
+  read: { executionIntent: 'impact', tool: 'codemap', secondary: 'ast-grep' },
+  link: { executionIntent: 'dependency', tool: 'codemap' },
+  show: { executionIntent: 'overview', tool: 'codemap' }
+};
 
 /**
- * 意图到默认工具的映射
+ * 旧 intent 的兼容归一化配置
  */
-const INTENT_DEFAULT_TOOL: Record<IntentType, string> = {
-  impact: 'codemap',
-  dependency: 'codemap',
-  search: 'ast-grep',
-  documentation: 'codemap',
-  complexity: 'codemap',
-  overview: 'codemap',
-  refactor: 'ast-grep',
-  reference: 'ast-grep'
+const LEGACY_INTENT_CONFIG: Record<
+  CompatibleLegacyIntentType,
+  { intent: IntentType; executionIntent: ExecutionIntentType; tool: string; secondary?: string }
+> = {
+  search: { intent: 'find', executionIntent: 'search', tool: 'ast-grep' },
+  impact: { intent: 'read', executionIntent: 'impact', tool: 'codemap', secondary: 'ast-grep' },
+  complexity: { intent: 'read', executionIntent: 'complexity', tool: 'codemap' },
+  dependency: { intent: 'link', executionIntent: 'dependency', tool: 'codemap' },
+  reference: { intent: 'link', executionIntent: 'reference', tool: 'ast-grep' },
+  overview: { intent: 'show', executionIntent: 'overview', tool: 'codemap' },
+  documentation: { intent: 'show', executionIntent: 'documentation', tool: 'codemap' }
 };
 
 /**
  * IntentRouter 类 - 意图路由器
  */
 export class IntentRouter {
-  /** 有效意图白名单 */
-  private validIntents: IntentType[] = VALID_INTENTS;
-
   /**
    * 将分析参数路由为 CodemapIntent
    *
@@ -52,11 +58,7 @@ export class IntentRouter {
    * @returns CodemapIntent 对象
    */
   route(args: AnalyzeArgs): CodemapIntent {
-    // 解析 intent
-    const intent = this.parseIntent(args.intent);
-
-    // 验证 intent 是否有效
-    this.validateIntent(intent);
+    const resolution = this.parseIntent(args.intent);
 
     // 确定目标
     const targets = args.targets ?? [];
@@ -67,57 +69,69 @@ export class IntentRouter {
     // 确定范围
     const scope = args.scope ?? 'direct';
 
-    // 确定工具
-    const tool = args.intent ? INTENT_DEFAULT_TOOL[intent] : 'codemap';
-    const secondary = intent === 'impact' ? 'ast-grep' : undefined;
-
     return {
-      intent,
+      intent: resolution.intent,
+      executionIntent: resolution.executionIntent,
       targets,
       keywords,
       scope,
-      tool,
-      secondary
+      tool: resolution.tool,
+      secondary: resolution.secondary,
+      compatibility: resolution.compatibility
     };
   }
 
   /**
-   * 解析 intent 字符串为 IntentType
+   * 解析并归一化输入 intent
    */
-  private parseIntent(intent?: string): IntentType {
+  private parseIntent(intent?: string): Pick<CodemapIntent, 'intent' | 'executionIntent' | 'tool' | 'secondary' | 'compatibility'> {
     if (!intent) {
-      // 默认意图
-      return 'search';
+      throw new Error('缺少必要参数: intent');
     }
 
-    return intent as IntentType;
-  }
-
-  /**
-   * 验证 intent 是否在白名单中
-   *
-   * @param intent 意图类型
-   * @throws 如果 intent 无效，抛出错误
-   */
-  private validateIntent(intent: IntentType): void {
-    if (!this.validIntents.includes(intent)) {
-      throw new Error(
-        `无效的 intent: ${intent}. 有效的意图类型: ${this.validIntents.join(', ')}`
-      );
+    if (PUBLIC_INTENTS.includes(intent as IntentType)) {
+      const publicIntent = intent as IntentType;
+      const config = PUBLIC_INTENT_CONFIG[publicIntent];
+      return {
+        intent: publicIntent,
+        executionIntent: config.executionIntent,
+        tool: config.tool,
+        secondary: config.secondary
+      };
     }
+
+    if (COMPATIBLE_LEGACY_INTENTS.includes(intent as CompatibleLegacyIntentType)) {
+      const legacyIntent = intent as CompatibleLegacyIntentType;
+      const config = LEGACY_INTENT_CONFIG[legacyIntent];
+      return {
+        intent: config.intent,
+        executionIntent: config.executionIntent,
+        tool: config.tool,
+        secondary: config.secondary,
+        compatibility: {
+          isDeprecated: true,
+          normalizedFrom: legacyIntent
+        }
+      };
+    }
+
+    throw new Error(
+      `无效的 intent: ${intent}. 有效的意图类型: ${PUBLIC_INTENTS.join(', ')}`
+    );
   }
 
   /**
    * 检查 intent 是否有效
    */
   isValidIntent(intent: string): boolean {
-    return this.validIntents.includes(intent as IntentType);
+    return PUBLIC_INTENTS.includes(intent as IntentType)
+      || COMPATIBLE_LEGACY_INTENTS.includes(intent as CompatibleLegacyIntentType);
   }
 
   /**
    * 获取所有有效的意图类型
    */
   getValidIntents(): IntentType[] {
-    return [...this.validIntents];
+    return [...PUBLIC_INTENTS];
   }
 }

@@ -3,7 +3,13 @@
  * [WHY] 负责执行工具、超时控制、错误隔离、回退级联，是连接 IntentRouter、适配器和结果融合的"胶水"组件。
  */
 
-import type { UnifiedResult, CodemapIntent, IntentType, ToolOptions } from './types.js';
+import type {
+  UnifiedResult,
+  CodemapIntent,
+  IntentType,
+  ExecutionIntentType,
+  ToolOptions
+} from './types.js';
 import { calculateConfidence, getThreshold, type ConfidenceResult } from './confidence.js';
 import type { ToolAdapter } from './adapters/base-adapter.js';
 
@@ -77,8 +83,9 @@ export class ToolOrchestrator {
    */
   private convertIntentToAdapterArgs(intent: CodemapIntent): [string[], ToolOptions] {
     const keywords = intent.keywords || [];
+    const effectiveIntent = intent.executionIntent ?? intent.intent;
     const options: ToolOptions = {
-      intent: intent.intent,
+      intent: effectiveIntent,
       targets: intent.targets,
       scope: intent.scope,
       timeout: DEFAULT_TIMEOUT,
@@ -197,14 +204,16 @@ export class ToolOrchestrator {
     // 重置已执行工具集合
     this.executedTools.clear();
 
+    const effectiveIntent = intent.executionIntent ?? intent.intent;
+
     // 1. 执行主工具
     let results = await this.runToolWithTimeout(primaryTool, intent);
-    let confidence = calculateConfidence(results, intent.intent);
+    let confidence = calculateConfidence(results, effectiveIntent as import('./confidence.js').IntentType);
 
     // console.debug(`主工具 ${primaryTool} 置信度: ${confidence.score.toFixed(2)} (${confidence.level})`);
 
     // 2. 检查是否需要回退（低于当前 intent 的中等阈值）
-    const threshold = this.getMediumThreshold(intent.intent);
+    const threshold = this.getMediumThreshold(effectiveIntent);
 
     if (confidence.score < threshold) {
       const fallbackTools = this.fallbackChains[primaryTool] || [];
@@ -220,7 +229,10 @@ export class ToolOrchestrator {
         // console.warn(`[LOW CONFIDENCE] ${primaryTool} confidence: ${confidence.score.toFixed(2)}, trying ${fallbackTool}...`);
 
         const fallbackResults = await this.runToolWithTimeout(fallbackTool, intent);
-        const fallbackConfidence = calculateConfidence(fallbackResults, intent.intent);
+        const fallbackConfidence = calculateConfidence(
+          fallbackResults,
+          effectiveIntent as import('./confidence.js').IntentType
+        );
 
         // 3. 合并结果（去重 + 排序）
         results = this.mergeResults(results, fallbackResults);
@@ -310,7 +322,7 @@ export class ToolOrchestrator {
   /**
    * 获取中等阈值
    */
-  private getMediumThreshold(intent: IntentType): number {
+  private getMediumThreshold(intent: IntentType | ExecutionIntentType): number {
     return getThreshold(intent as import('./confidence.js').IntentType, 'medium');
   }
 }
