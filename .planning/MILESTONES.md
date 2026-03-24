@@ -1,5 +1,30 @@
 # Project Milestones: CodeMap
 
+## v1.3 Kùzu-only 收敛与高信号债务清理 (Shipped: 2026-03-24)
+
+**Delivered:** 将 graph storage 正式产品面从 “Kùzu + Neo4j 并存” 收敛到 “Kùzu-only + filesystem/memory/auto”，并把 unfinished public surface、核心 debt 与 docs guardrail drift 一并收口。
+
+**Phases completed:** 13-16 (12 plans total)
+
+**Key accomplishments:**
+- 从 schema / config / runtime / tests / docs 中移除 `neo4j` 正式支持，并为历史配置补齐明确迁移诊断
+- 关闭 `analyze find` fallback 漂移，移除 public `server` command 残留并清理 `workflow` 过渡措辞
+- 为 `plugin-loader` reload、`global-index` 路径解析、parser debt 与 `AnalysisHandler` unsupported contract 补齐真实实现与回归测试
+- 将 `ci check-docs-sync` 串联 docs guardrail 与 analyze docs sync 校验，并接进 CI Gateway
+- 用 docs / typecheck / lint / test / build / docs-sync 验证固定 Kùzu-only 边界与真实产品面
+
+**Stats:**
+- 4 个 phase，12 个 plans，同日完成收口
+- 8 个实现/文档提交形成主交付边界（`8957fca` → `a4c8e12`）
+- 已归档 `v1.3` roadmap / requirements / milestone audit
+- 1 天（2026-03-24 → 2026-03-24）
+
+**Git range:** `eb49891` → `a4c8e12`
+
+**What's next:** 下一轮应在 `API-01`、`OPT-01`、`WKF-01` 等候选里单独定 scope；不要在未定义 milestone 的前提下重新打开 `neo4j` 或公共 HTTP API 产品面。
+
+---
+
 ## v1.2 图数据库后端生产化 (Shipped: 2026-03-24)
 
 **Delivered:** 将图数据库后端从“抽象层存在但主路径不可达”的占位能力，推进到“可被选择、可持久化、可验证”的正式产品能力，同时明确不重新打开公共 HTTP API 产品面。

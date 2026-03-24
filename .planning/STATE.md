@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Kùzu-only 收敛与高信号债务清理
-current_phase: 13
-current_phase_name: Kùzu-only Storage Surface & Migration
+current_phase: complete
+current_phase_name: Milestone Complete
 current_plan: none
-status: ready
-last_updated: "2026-03-24T15:58:11Z"
+status: completed
+last_updated: "2026-03-24T16:58:03Z"
 last_activity: 2026-03-24
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 4
   total_plans: 12
-  completed_plans: 0
-  percent: 0
+  completed_plans: 12
+  percent: 100
 ---
 
 # Session State
@@ -23,20 +23,20 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-03-24)
 
 **Core Value:** AI 能以稳定、机器可读的方式获得代码上下文，而不是被混杂的实现型工作流和不清晰的命令边界干扰。
-**Current Focus:** `v1.3` 已定义 —— 先移除 `neo4j` 正式支持，再收口 unfinished / debt / docs automation
+**Current Focus:** `v1.3` 已完成并归档；等待下一里程碑定义，而不是继续在旧 scope 上扩面
 
 ## Position
 
 **Milestone:** v1.3 Kùzu-only 收敛与高信号债务清理
-**Current Phase:** 13
-**Current Phase Name:** Kùzu-only Storage Surface & Migration
+**Current Phase:** complete
+**Current Phase Name:** Milestone Complete
 **Current Plan:** None
 **Total Phases:** 4
-**Total Plans in Phase:** 3
-**Status:** Ready
-**Progress:** 0%
+**Total Plans in Milestone:** 12
+**Status:** Completed
+**Progress:** 100%
 **Last Activity:** 2026-03-24
-**Last Activity Description:** Started v1.3 milestone after cleanly committing v1.2 worktree; next up is Phase 13 storage surface reduction
+**Last Activity Description:** Completed v1.3 milestone closeout, created milestone audit + archives, and moved root planning state to shipped/awaiting-next-milestone
 
 ## Decisions
 
@@ -67,10 +67,13 @@ See: `.planning/PROJECT.md` (updated 2026-03-24)
 - 2026-03-24: `v1.3` 选择“Kùzu-only 收敛与高信号债务清理”作为下一轮主线，不再支持 `neo4j` 正式产品面。
 - 2026-03-24: `v1.3` 继续沿用 Phase 13-16 编号，保持跨 milestone traceability。
 - 2026-03-24: 因本轮不是新能力研究而是 brownfield 收口，跳过 research fan-out，直接进入 requirements/roadmap。
+- 2026-03-24: `v1.3` 以 `neo4j` 去支持化、public surface 收口、核心 debt 清偿和 docs sync 自动验证四条线完成闭环，不再继续在旧范围内扩面。
+- 2026-03-24: milestone audit 改以“提交边界 + 根 planning 文件 + 验证命令”组成主证据链，因为 `.planning/phases/` 当前未保留 v1.3 phase artifacts。
+- 2026-03-24: v1.3 完成后，根 planning 文件保持 shipped 状态，等待下个 milestone 单独定 scope。
 
 ## Blockers
 
-- None currently.
+- None. `v1.3` 已完成；当前仅等待下一里程碑定义。
 
 ## Accumulated Context
 
@@ -89,6 +92,18 @@ See: `.planning/PROJECT.md` (updated 2026-03-24)
 - 2026-03-24: 完成 Phase 09，README / AI 文档 / docs guardrail / built-in + user plugin CLI 证据已闭环
 - 2026-03-24: 创建 `.planning/v1.1-MILESTONE-AUDIT.md`，确认 v1.1 无 blocker，可进入 archive / cleanup
 - 2026-03-24: 归档 `.planning/milestones/v1.1-ROADMAP.md` 与 `.planning/milestones/v1.1-REQUIREMENTS.md`，并将根规划文件重置为 next-milestone 待定义状态
+- 2026-03-24: 将 `07/08/09` phase 目录归档到 `.planning/milestones/v1.1-phases/`
+- 2026-03-24: 基于 storage adapter TODO 密度、StorageFactory 接口和 `generate` 硬编码现状，启动 `v1.2 图数据库后端生产化` milestone
+- 2026-03-24: 完成 Phase 10，收口 `storage` 配置面、主路径 activation 与共享 graph helper / contract tests
+- 2026-03-24: 完成 Phase 11，KùzuDB 达到 snapshot-backed persistence、查询与失败验证闭环
+- 2026-03-24: 完成 Phase 12，Neo4j contract、graph storage 文档 / guardrail 与成功/失败路径验证全部闭环
+- 2026-03-24: 创建 `.planning/v1.2-MILESTONE-AUDIT.md`，确认 `11/11` requirements、`3/3` phases、`3/3` integration paths、`3/3` flows 满足
+- 2026-03-24: 归档 `v1.2` roadmap/requirements/phases 到 `.planning/milestones/`，并清空 `.planning/phases/` 等待下个 milestone
+- 2026-03-24: 修复 `.githooks/commit-msg` 与 `.githooks/pre-commit` 的真实阻断问题，并完成旧里程碑封账提交
+- 2026-03-24: 启动 `v1.3 Kùzu-only 收敛与高信号债务清理`，重写 `PROJECT.md` / `REQUIREMENTS.md` / `ROADMAP.md` / `STATE.md`
+- 2026-03-24: 完成 v1.3 主交付提交：`8957fca`、`d07524e`、`4a756d7`、`e5b9560`、`3a5fbc6`、`f64432a`、`27458cd`、`a4c8e12`
+- 2026-03-24: 创建 `.planning/v1.3-MILESTONE-AUDIT.md`，确认 `12/12` requirements、`4/4` phases、`4/4` integration paths、`4/4` flows 满足
+- 2026-03-24: 归档 `.planning/milestones/v1.3-ROADMAP.md` 与 `.planning/milestones/v1.3-REQUIREMENTS.md`，并将根 planning 文件更新为 shipped 状态
 
 ### Verified Existing Capabilities
 
@@ -100,13 +115,14 @@ See: `.planning/PROJECT.md` (updated 2026-03-24)
 - `ship` CHECK 阶段复用 `ci check-working-tree`、`ci check-branch`、`ci check-scripts`
 - 扫描类命令共享 `.gitignore` 感知文件发现模块，并在无 `.gitignore` 时回退到统一默认排除
 - 插件系统已经拥有正式配置入口、runtime 接入、`pluginReport` / `Plugin Summary` 与 docs guardrail / e2e 证据闭环
+- graph storage 正式产品面已收敛为 `filesystem` / `memory` / `kuzudb` / `auto`；历史 `neo4j` 配置走显式迁移诊断
+- `analyze find` / `workflow` / `server` public surface 漂移已收口，`Server Layer` 保持 internal-only
+- docs sync 自动检查已进入 CI Gateway 和 `ci check-docs-sync`，不再只靠手动执行发现漂移
 
 ### Risks To Watch
 
-- 如果移除 `neo4j` 时没有提供显式迁移诊断，历史配置会以更隐蔽的方式失败
-- 如果 `workflow` / `server` 只改文档不改源码，public surface 漂移会继续存在
-- 如果 docs sync 自动检查仍然只靠手动执行，后续任意 phase 都可能再次引入文档漂移
-- parser / handler debt 若只转移注释、不形成真实 contract，会继续污染后续 roadmap 可信度
+- 如果下一里程碑在未重新定 scope 的情况下重开 `neo4j`、HTTP API 或 workflow 扩面，会再次制造产品边界漂移
+- repo-wide ESLint warnings 仍是 warning-only 历史基线；若未来要把 warning 提升为 blocker，需单开新里程碑处理
 
 ## Session Log
 
@@ -144,10 +160,11 @@ See: `.planning/PROJECT.md` (updated 2026-03-24)
 - 2026-03-24: 完成 `v1.1` milestone audit，并将 roadmap/requirements 归档到 `.planning/milestones/`
 - 2026-03-24: 将 `07/08/09` phase 目录归档到 `.planning/milestones/v1.1-phases/`
 - 2026-03-24: 基于 storage adapter TODO 密度、StorageFactory 接口和 `generate` 硬编码现状，启动 `v1.2 图数据库后端生产化` milestone
-- 2026-03-24: 完成 Phase 10，收口 `storage` 配置面、主路径 activation 与共享 graph helper / contract tests
+- 2026-03-24: 完成 Phase 10，收口 `storage` 配置面、主路径 activation 与共享 helper / contract tests
 - 2026-03-24: 完成 Phase 11，KùzuDB 达到 snapshot-backed persistence、查询与失败验证闭环
 - 2026-03-24: 完成 Phase 12，Neo4j contract、graph storage 文档 / guardrail 与成功/失败路径验证全部闭环
 - 2026-03-24: 创建 `.planning/v1.2-MILESTONE-AUDIT.md`，确认 `11/11` requirements、`3/3` phases、`3/3` integration paths、`3/3` flows 满足
 - 2026-03-24: 归档 `v1.2` roadmap/requirements/phases 到 `.planning/milestones/`，并清空 `.planning/phases/` 等待下个 milestone
 - 2026-03-24: 修复 `.githooks/commit-msg` 与 `.githooks/pre-commit` 的真实阻断问题，并完成旧里程碑封账提交
 - 2026-03-24: 启动 `v1.3 Kùzu-only 收敛与高信号债务清理`，重写 `PROJECT.md` / `REQUIREMENTS.md` / `ROADMAP.md` / `STATE.md`
+- 2026-03-24: 完成 v1.3 planning closeout，新增 milestone audit、archive 与 shipped 状态同步
