@@ -2,105 +2,98 @@
 
 ## What This Is
 
-CodeMap 是一个面向 AI / Agent 的代码地图工具，用来给代码分析任务提供结构化、可预测、可机器消费的上下文。当前仓库是 brownfield 项目：既有 legacy CLI/分析管线，也有正在推进的 MVP3 分层架构，因此工作的重点不是“从零构建新产品”，而是把已有能力收敛到更清晰、更可信的产品边界上。
+CodeMap 仍是一个面向 AI / Agent 的代码地图工具，但下一轮不该继续停留在“只给 AI 看代码”。从“人类负责设计、AI agent 负责写代码”的角度看，当前最缺的不是更多零散分析命令，而是把**人类批准的设计意图**稳定翻译成**AI 可执行的实现边界、风险提示与验证清单**。
+
+当前仓库仍是 brownfield：legacy CLI / workflow / analyzer 管线与 MVP3 分层架构并存。因此任何新能力都必须优先保证 public contract、设计输入契约和 docs guardrail 一致，而不是把 CodeMap 扩成失焦的通用执行平台。
 
 ## Core Value
 
-AI 能以稳定、机器可读的方式获得代码上下文，而不是被混杂的实现型工作流和不清晰的命令边界干扰。
+人类负责设计决策，AI 在明确设计契约和代码上下文约束下稳定产出实现范围与验证边界。
 
 ## Latest Shipped Milestone: v1.3 Kùzu-only 收敛与高信号债务清理
 
-**Goal:** 在不重新打开 HTTP API 产品面的前提下，移除 `neo4j` 正式支持，把 graph storage 收敛到 Kùzu-only 主线，并清理当前影响产品可信度的高信号 unfinished / tech debt / docs drift。
+**Goal:** 在不重新打开 HTTP API 产品面的前提下，移除 `neo4j` 正式支持，把 graph storage 收敛到 Kùzu-only 主线，并清理影响产品可信度的高信号 unfinished / tech debt / docs drift。
 
 **Delivered outcome:**
 - 从 config / schema / runtime / tests / docs 中移除 `neo4j` 正式产品面，并为历史配置提供清晰迁移诊断
-- 收口 `analyze` / `workflow` / `server` 边界上的未完成点，消除“文档说已收口、源码仍像过渡态”的漂移
+- 收口 `analyze` / `workflow` / `server` 边界上的未完成点，减少“文档说已收口、源码仍像过渡态”的漂移
 - 清偿 `plugin-loader`、`parser`、`global-index`、`AnalysisHandler` 与 docs sync automation 的高信号技术债
+
+## Current Planned Milestone: v1.4 设计契约与 Agent Handoff
+
+**Goal:** 把 CodeMap 从“AI-first 代码分析工具”推进到“人类设计 → AI 执行”的桥接基础设施，但不把产品扩成通用项目管理器、自动执行器或公共 HTTP 平台。
+
+**Expected outcome:**
+- 人类可以用明确、可验证的 design contract 描述目标、约束、验收标准与非目标
+- CodeMap 能把 design contract 与现有代码图对齐，输出 candidate scope、依赖、风险、unknowns 与测试影响
+- AI agent 能消费一份稳定的 handoff package，而不是靠自由提示词猜实现意图
+- docs / guardrail / workflow 说明与真实实现保持同步，避免 AI 在错误操作说明上继续放大偏差
 
 ## Requirements
 
 ### Validated
 
 - ✓ 代码库已经能生成代码地图和结构化分析结果 —— existing
-- ✓ 代码库已经提供 `query` / `deps` / `cycles` / `complexity` / `impact` / `analyze` 等分析能力 —— existing
-- ✓ 代码库已经具备 CI / 文档护栏与发布自动化 —— existing
-- ✓ 代码库已经存在 MVP3 分层模块：`src/interface/`、`src/infrastructure/`、`src/domain/`、`src/server/` —— existing
-- ✓ 产品与入口文档已收口为 AI-first 代码地图工具定位 —— v1.0 / Phase 1
-- ✓ 默认输出契约已收口为“机器可读优先 + 人类显式入口”—— v1.0 / Phase 1
-- ✓ `Server Layer` 与公共 `server` CLI 命令的命名边界已明确 —— v1.0 / Phase 1
-- ✓ 公共 CLI 已移除越界命令，并统一为受控 public surface —— v1.0 / Phase 2
+- ✓ 代码库已经提供 `query` / `deps` / `cycles` / `complexity` / `impact` / `analyze` / `export` / `ci` 等核心分析能力 —— existing
+- ✓ 代码库已经具备 AI-first 入口文档与机器可读优先的输出定位 —— v1.0 / Phase 1
 - ✓ `analyze` 公共契约已收口为 `find` / `read` / `link` / `show` 四意图 —— v1.0 / Phase 3
-- ✓ `workflow` 已收口为 analysis-only 四阶段 —— v1.0 / Phase 4
-- ✓ `ship` must-pass 检查已复用 `ci` gate checks —— v1.0 / Phase 5
-- ✓ 扫描类命令已共享 `.gitignore` 感知文件发现模块，文档护栏已与实现对齐 —— v1.0 / Phase 6
-- ✓ `mycodemap.config.json` 已成为正式插件配置入口，包含 schema/defaults/loader —— v1.1 / Phase 07
-- ✓ `generate` 已在显式插件配置下真正运行插件，并把结果写入 `pluginReport` / `Plugin Summary` —— v1.1 / Phase 08
-- ✓ 插件失败会以结构化 diagnostics 暴露，good-plugin / broken-plugin 混合场景不再拖垮主流程 —— v1.1 / Phase 08
-- ✓ README / AI 文档 / docs guardrail / built-in + user plugin E2E 已与插件产品面对齐 —— v1.1 / Phase 09
-- ✓ 图数据库后端已成为正式可选存储面，`generate` / `export` / 内部 runtime 可进入配置化 backend —— v1.2 / Phase 10
-- ✓ KùzuDB 已具备真实持久化、更新、查询与最小分析闭环 —— v1.2 / Phase 11
-- ✓ `v1.2` 已验证 Neo4j contract parity、失败语义与文档闭环，为本轮去支持化提供迁移基线 —— v1.2 / Phase 12
-- ✓ graph storage 正式支持只保留 `filesystem` / `memory` / `kuzudb` / `auto`，历史 `neo4j` 配置得到显式迁移报错 —— v1.3 / Phase 13
-- ✓ 当前 `analyze` / `workflow` / `server` / `plugin` / `parser` / `global-index` unfinished 与 TODO-DEBT 不再停留在主路径 —— v1.3 / Phases 14-15
-- ✓ 文档同步自动化进入 CI / must-pass 路径，README / AI docs / rules / schema / guardrail 保持单一事实源 —— v1.3 / Phase 16
+- ✓ `workflow` CLI help 与运行时实现当前是 analysis-only 四阶段，不再把 `commit` / `ci` 当作真实 phase —— v1.0 / runtime validated
+- ✓ `ship` 的 must-pass 检查已复用 `ci` gate checks —— v1.0 / Phase 5
+- ✓ 插件系统已经拥有正式配置入口、runtime 接入与 `pluginReport` diagnostics —— v1.1 / Phases 07-09
+- ✓ graph storage 正式产品面已收敛为 `filesystem` / `memory` / `kuzudb` / `auto`，历史 `neo4j` 配置走显式迁移诊断 —— v1.2-v1.3
+- ✓ docs sync 自动检查已进入 CI / must-pass 路径 —— v1.3 / Phase 16
 
 ### Active
 
-- [ ] 下一里程碑待定义；候选仍来自 `API-01`、`OPT-01`、`WKF-01`，需单独定 scope 后再启动
+- [ ] 人类可通过受文档约束的 design contract 定义 feature goal、constraints、acceptance criteria 与 explicit exclusions
+- [ ] CodeMap 可把 design contract 与代码图对齐，输出 candidate files/modules、dependencies、test impact、risk 与 unknowns
+- [ ] 系统可生成同时面向人类审核和机器消费的 handoff package，并保留 assumptions / approvals / open questions
+- [ ] design / workflow / docs drift 可被 guardrail 明确检出，而不是依赖口头约定或历史记忆
 
 ### Out of Scope
 
-- 恢复或继续扩展 `neo4j` 支持 —— 用户已明确当前不需要，继续投入只会扩大维护面
-- 重新公开 `mycodemap server` / 独立 HTTP API 产品面 —— `Server Layer` 仍是内部层，且当前 handler 仅提供 internal-only contract
-- 一次性引入 Kùzu-native 查询优化或新的图数据库后端 —— 本轮先做“去支持化 + 债务清偿”，不重开性能/扩展战线
-- 直接建设插件 marketplace / 远程安装生态 —— 与当前可信度收口目标无关
+- 自动写代码后直接 commit / ship / 发布 —— 当前里程碑先解决“设计契约 + 交接物”，不把 CodeMap 扩成 autonomous executor
+- 设计编辑器、Figma 实时同步或需求管理看板 —— 这会把产品重心从代码地图拖向设计工具链
+- 重新公开 `mycodemap server` / 独立 HTTP API 产品面 —— 与当前设计到执行桥接主线无关
+- 一次性重开 `neo4j` 支持或优先做 Kùzu-native 查询优化 —— 属于其他候选 milestone
+- 泛化多角色 PM / ticket / sprint orchestration —— 当前先聚焦“设计输入 → agent handoff”闭环
 
 ## Context
 
-- v1.0 ~ v1.3 已交付：当前 public CLI 聚焦 `init/generate/query/deps/cycles/complexity/impact/analyze/ci/workflow/export/ship`，不再重新公开 `server` 产品面。
-- `analyze` 已固定为 `find/read/link/show`，`find` 主路径与 Intent Router 契约一致，不再依赖 legacy fallback。
-- `workflow` 已固定为 analysis-only 四阶段，公开文案不再保留“过渡能力”措辞。
-- analyzer / header scanner 继续共享 `.gitignore` 感知文件发现模块；docs sync automation 已进入 CI 自动阻断链路。
-- 仓库仍是 brownfield：legacy 分析管线与 MVP3 分层架构并存，但产品边界已收口到可被 AI 稳定消费的范围。
-- `src/plugins/` 已成为真实产品面，`plugin-loader` 热重载与 registry 生命周期 debt 已闭环。
-- graph storage 正式产品面已收敛为 `filesystem` / `memory` / `kuzudb` / `auto`；`neo4j` 仅保留为历史迁移诊断，不再是受支持 backend。
-- 当前剩余的非阻断项主要是 repo-wide ESLint warnings 历史基线；它们不属于本 milestone 定义的高信号 debt。
+- 当前 README / AI_GUIDE 明确：AI / Agent 是主要消费者，人类负责配置、维护与按需阅读输出；但还没有把“人类设计工件”定义成正式输入面。
+- `workflow` 的 CLI help 与运行时已经是 analysis-only 四阶段，但 `docs/ai-guide/PATTERNS.md` 仍保留 `commit` / `ci` 两个阶段，说明 docs sync coverage 仍有缺口。
+- 仓库仍是 hybrid architecture：`src/cli/`、`src/core/`、`src/parser/`、`src/orchestrator/` 与 `src/{interface,infrastructure,domain,server,cli-new}` 并存，新增能力不能假设已经完成单路迁移。
+- `src/cli/index.ts`、`src/cli/commands/analyze.ts`、`src/cli/commands/workflow.ts` 与 `scripts/validate-docs.js` 仍是高爆炸半径入口；把新语义继续塞进旧 public surface 成本很高。
+- 文档护栏很强，但也意味着任何 public contract 变化都要同步 `README.md`、`AI_GUIDE.md`、`docs/ai-guide/*`、`docs/rules/*` 与相关测试。
+- 现有产品强项是“代码上下文”和“结构化分析”；下一轮最优扩展方向是把这些能力上接 design contract，而不是横向再堆工具箱命令。
 
 ## Constraints
 
-- **Compatibility**: 当前 CLI 可能已有现存使用者 —— 删除或降级能力必须有迁移或清晰报错策略
-- **Guardrails**: `README.md`、`AI_GUIDE.md`、`docs/ai-guide/*`、`scripts/validate-docs.js`、相关测试必须同步
-- **Architecture**: legacy 与 MVP3 并存 —— 不能假设某一侧已经被完全替换
-- **Runtime**: Node.js 18+、ESM、严格 TypeScript —— 必须保持现有构建假设
-- **Dependencies**: `kuzu` 仍是按需依赖 —— 不允许为了去支持化顺手把可选依赖升级成强依赖
-- **Boundary**: `Server Layer` 仍是内部层 —— 禁止借 debt 清理顺手重开公共 HTTP API 产品面
-- **No Neo4j**: 当前正式产品面不再承诺 `neo4j` 为受支持 backend —— 若要重开，必须单独开新 milestone
-- **Integration**: 每个收口点都必须同时闭环“实现 / 文档 / guardrail / 验证”，而不是只修代码
+- **Product Boundary**: CodeMap 仍是 AI-first 代码地图工具 —— 新能力必须服务于设计到执行桥接，而不是演变成通用工程平台
+- **Human Ownership**: 设计决策、范围批准、验收口径必须由人类确认 —— AI 只能消费已批准契约，不能把猜测伪装成设计
+- **Public Contract Stability**: `analyze` 四意图与 `workflow` 四阶段不能被随意扩写 —— 如需新能力，优先使用单一 purpose-built surface
+- **Docs Sync**: `README.md`、`AI_GUIDE.md`、`docs/ai-guide/PATTERNS.md`、`docs/rules/*`、guardrail tests 必须同步
+- **Architecture**: legacy 与 MVP3 并存 —— 新抽象优先落在 `src/interface` / `src/domain` / `src/infrastructure`，避免继续向 `src/core` 堆责任
+- **Output Discipline**: 输出必须同时支持 human review 和 machine consumption —— 不能只产自然语言摘要，也不能只产无解释 JSON
+- **Path Consistency**: `.mycodemap/`、`.codemap/storage`、workflow persistence 仍存在路径历史包袱 —— 新产物路径必须显式决策，避免继续漂移
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| 产品定位收敛为 AI-first 代码地图工具 | 需要让核心用户、默认输出和命令边界一致 | ✓ Validated in Phase 1 |
-| 默认输出以机器可读结果为主 | AI 是主要消费者，结构化结果比自然语言更稳定 | ✓ Validated in Phase 1 |
-| 收缩 public CLI，移除越界命令 | 避免用户把产品误解成 watcher / report / server 工具箱 | ✓ Validated in Phase 2 |
-| `analyze` 收口为四意图公共契约 | 减少 AI 消费时的歧义与 schema 漂移 | ✓ Validated in Phase 3 |
-| `workflow` 只保留分析阶段 | 避免把实现 / commit / CI 混入同一产品面 | ✓ Validated in Phase 4 |
-| `ship` 必须复用 `ci` gate checks | 保持 must-pass 检查单一事实源 | ✓ Validated in Phase 5 |
-| 用共享发现模块统一扫描规则 | 解决 analyzer / scanner / docs 对 `.gitignore` 与默认 exclude 的漂移 | ✓ Validated in Phase 6 |
-| `v1.1` 优先做插件扩展点产品化 | 插件代码骨架已存在，投入产出比高于图数据库后端生产化 | ✓ Validated in Phases 07-09 |
-| `v1.2` 聚焦图数据库后端生产化 | storage abstraction 已存在，backend productionization 比 HTTP API 更接近可交付主线 | ✓ Validated in Phases 10-12 |
-| `v1.3` 不再支持 `neo4j` 正式产品面 | 用户明确当前不需要，继续保留只会放大文档、测试与维护成本 | ✓ Validated in Phase 13 |
-| `v1.3` 先做去支持化与高信号 debt 清偿，再评估新能力 | 先修正现实与文档漂移，才能恢复 roadmap 的可信度 | ✓ Validated in Phases 13-15 |
-| docs sync automation 必须进入自动验证链路 | 仅靠手动运行 `docs:check` 无法防止后续再次漂移 | ✓ Validated in Phase 16 |
+| `v1.4` 选择“设计契约与 Agent Handoff”作为下一主线 | 它比 `API-01`、`OPT-01`、泛化 `WKF-01` 更直接服务“人类设计、AI 编码”的目标 | — Pending |
+| 新能力优先采用单一 purpose-built handoff surface，而不是继续扩写 `analyze` / `workflow` | 现有 public surface 和 docs guardrail 耦合已经很重，继续叠语义会放大漂移 | — Pending |
+| 人类继续是设计 owner，AI 只消费已批准的 design contract | 不把需求猜测混入实现，可降低 hallucination 和 scope drift | — Pending |
+| `workflow` 保持 analysis-only 四阶段，新 handoff 能力建立在其上游/旁路 | 避免把 `commit` / `ci` 阶段偷偷塞回 workflow，重开既有边界争议 | — Pending |
+| 现存 workflow docs drift 视为 v1.4 的入口问题，而不是“以后再说”的小修补 | 如果操作说明不可信，design-to-agent bridge 会在错误基础上继续放大偏差 | — Pending |
 
 ## Current State
 
 - **Shipped milestones:** `v1.0 AI-first 重构`、`v1.1 插件扩展点产品化`、`v1.2 图数据库后端生产化`、`v1.3 Kùzu-only 收敛与高信号债务清理`
-- **Milestone archive:** `.planning/MILESTONES.md`, `.planning/v1.0-MILESTONE-AUDIT.md`, `.planning/v1.1-MILESTONE-AUDIT.md`, `.planning/v1.2-MILESTONE-AUDIT.md`, `.planning/v1.3-MILESTONE-AUDIT.md`, `.planning/milestones/v1.0-ROADMAP.md`, `.planning/milestones/v1.1-ROADMAP.md`, `.planning/milestones/v1.2-ROADMAP.md`, `.planning/milestones/v1.3-ROADMAP.md`, `.planning/milestones/v1.0-REQUIREMENTS.md`, `.planning/milestones/v1.1-REQUIREMENTS.md`, `.planning/milestones/v1.2-REQUIREMENTS.md`, `.planning/milestones/v1.3-REQUIREMENTS.md`, `.planning/milestones/v1.2-phases/`
-- **Current milestone:** none
-- **Current status:** `v1.3` 已完成并通过 milestone audit；下一步是定义新 milestone scope，而不是继续在未定范围上扩面
-- **Known remaining non-blocking debt:** repo-wide ESLint warnings 仍是历史 warning-only baseline（不阻断当前里程碑 DoD）
+- **Milestone archive:** `.planning/MILESTONES.md`, `.planning/milestones/v1.0-ROADMAP.md`, `.planning/milestones/v1.1-ROADMAP.md`, `.planning/milestones/v1.2-ROADMAP.md`, `.planning/milestones/v1.3-ROADMAP.md`
+- **Current milestone:** `v1.4 设计契约与 Agent Handoff`（in progress, `Phase 17` accepted）
+- **Current status:** `Phase 17` 已完成 execute + verify-work；下一步是为 `Phase 18` 收集 context 并进入 discuss / planning，而不是继续停留在 design contract surface
+- **Known remaining debt:** repo-wide ESLint warnings 仍是 warning-only 历史基线；hybrid architecture 仍带来 implementation seam 成本；backlog 中 `1000` 的存储路线评估需要与 v1.4 主线持续隔离，避免污染 progress 路由
 
 ## Evolution
 
@@ -116,8 +109,8 @@ This document evolves at phase transitions and milestone boundaries.
 **After each milestone**:
 1. 审查 `What This Is` / `Core Value` 是否仍准确
 2. 将已交付 requirement 移入 Validated
-3. 将下一轮候选目标移入 Active
+3. 将下一轮候选目标移入 Active 或 Out of Scope
 4. 更新 Current State / Context / Key Decisions
 
 ---
-*Last updated: 2026-03-24 after completing v1.3 milestone*
+*Last updated: 2026-03-25 after defining v1.4 milestone*
