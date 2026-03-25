@@ -44,9 +44,21 @@ export class StorageFactory implements IStorageFactory {
    * @returns 存储实例
    */
   async create(config: StorageConfig): Promise<IStorage> {
-    const storageType = config.type === 'auto' 
-      ? await this.determineStorageType(config)
-      : config.type;
+    let storageType: StorageType;
+
+    try {
+      storageType = config.type === 'auto'
+        ? await this.determineStorageType(config)
+        : config.type;
+    } catch (error) {
+      // 如果确定类型失败且是 kuzudb 请求，fallback 到 filesystem
+      if (config.type === 'kuzudb' && error instanceof StorageError && error.code === 'KUZU_NOT_AVAILABLE') {
+        console.warn('[StorageFactory] KùzuDB unavailable, falling back to filesystem');
+        storageType = 'filesystem';
+      } else {
+        throw error;
+      }
+    }
 
     switch (storageType) {
       case 'filesystem':
@@ -93,23 +105,55 @@ export class StorageFactory implements IStorageFactory {
   }
 
   /**
+   * 检查 KùzuDB 是否可用
+   * 尝试动态导入 kuzu 并创建临时数据库验证功能正常
+   */
+  private async checkKuzuAvailability(): Promise<boolean> {
+    try {
+      const kuzu = await import('kuzu');
+      const tempDb = new kuzu.Database(':memory:');
+      if (typeof tempDb.close === 'function') {
+        await tempDb.close();
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * 自动确定存储类型
-   * 
-   * 策略：
-   * - 小项目（<100文件）: 文件系统
-   * - 中等项目（100-1000文件）: 文件系统
-   * - 大项目（>1000文件）: KùzuDB
-   * 
-   * 可通过配置调整阈值
+   *
+   * 策略（DEC-01）：
+   * - 优先尝试 KùzuDB（如果可用）
+   * - KùzuDB 不可用时 fallback 到文件系统
+   * - 显式配置优先于自动选择
+   *
+   * 降级策略（DEC-03）：
+   * - auto 模式：静默 fallback 到 filesystem
+   * - kuzudb 模式：抛出错误，由调用者处理降级
    */
   private async determineStorageType(config: StorageConfig): Promise<StorageType> {
-    const thresholds = config.autoThresholds ?? {
-      useGraphDBWhenFileCount: 1000,
-      useGraphDBWhenNodeCount: 10000,
-    };
+    // 如果明确指定了非 auto 类型，直接返回
+    if (config.type !== 'auto' && config.type !== 'kuzudb') {
+      return config.type;
+    }
 
-    // 默认使用文件系统，因为它最简单可靠
-    // 实际项目分析后可能需要更复杂的启发式算法
+    // 优先尝试 KùzuDB
+    const kuzuAvailable = await this.checkKuzuAvailability();
+    if (kuzuAvailable) {
+      return 'kuzudb';
+    }
+
+    // 如果明确指定 kuzudb 但不可用，抛出错误让调用者处理降级
+    if (config.type === 'kuzudb') {
+      throw new StorageError(
+        'KùzuDB is not available. Install with: npm install kuzu',
+        'KUZU_NOT_AVAILABLE'
+      );
+    }
+
+    // auto 模式下 fallback 到 filesystem
     return 'filesystem';
   }
 
