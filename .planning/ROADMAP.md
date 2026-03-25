@@ -88,15 +88,16 @@ Plans:
 
 > Archived: `Phase 999.1` 已于 2026-03-25 从 active planning surface 归档至 `.planning/archive/phases/999.1-kuzu-primary-storage/`，不再参与主线 progress 路由。
 
-### Phase 1000: Evaluate FalkorDB as alternative to KùzuDB (BACKLOG RESEARCH)
+### Phase 1000: Evaluate ArcadeDB as alternative to KùzuDB (BACKLOG RESEARCH)
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** 实现完整的 ArcadeDB 存储适配器，建立性能基准测试，输出 Go/No-Go 决策建议
+**Requirements**: ARC-01, ARC-02, ARC-03, ARC-04, ARC-05
 **Depends on:** Archived decision from Phase 999.1
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 1000 to break down)
+- [ ] 1000-01: 实现 ArcadeDBStorage 适配器、扩展 StorageFactory、更新类型和配置
+- [ ] 1000-02: 创建单元测试、性能基准测试套件和评估报告
 
 ---
 
@@ -108,4 +109,4 @@ Plans:
 | 18. Design-to-Code Mapping | v1.4 | 0/3 | Planned | — |
 | 19. Handoff Package & Human Gates | v1.4 | 0/3 | Planned | — |
 | 20. Design Drift Verification & Docs Sync | v1.4 | 0/3 | Planned | — |
-| 1000. FalkorDB Evaluation | Backlog | 0/0 | Context only | — |
+| 1000. ArcadeDB Evaluation | Backlog | 0/2 | Planned | — |

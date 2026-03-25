@@ -31,6 +31,16 @@
 - [ ] **DOC-07**: `README.md`、`AI_GUIDE.md`、`docs/ai-guide/PATTERNS.md`、`docs/rules/*` 与 guardrail tests 必须反映真实 workflow 和新 handoff surface，并修复当前 workflow stage drift
 - [ ] **VAL-05**: 至少覆盖 3 类失败模式：缺失 design sections、scope 无匹配/过宽、handoff 与 docs / command contract 失 sync
 
+## Phase 1000 Requirements (Backlog - ArcadeDB Evaluation)
+
+### ArcadeDB Storage Backend
+
+- [ ] **ARC-01**: 实现完整的 ArcadeDB 存储适配器，功能与 KuzuDBStorage 对等，支持所有 IStorage 方法
+- [ ] **ARC-02**: StorageFactory 支持 'arcadedb' 类型，复用现有降级机制，失败时自动 fallback 到文件系统
+- [ ] **ARC-03**: 更新类型定义 (StorageType) 和配置 schema，移除 KùzuDB 引用，添加 ArcadeDB 支持
+- [ ] **ARC-04**: 建立完整的单元测试套件，覆盖 ArcadeDBStorage 所有 IStorage 方法
+- [ ] **ARC-05**: 实现性能基准测试，对比 ArcadeDB 与文件系统，输出 Go/No-Go 决策建议
+
 ## v2 Requirements
 
 ### Deferred
@@ -67,12 +77,18 @@
 | VAL-04 | Phase 20 | Pending |
 | DOC-07 | Phase 20 | Pending |
 | VAL-05 | Phase 20 | Pending |
+| ARC-01 | Phase 1000 | Pending |
+| ARC-02 | Phase 1000 | Pending |
+| ARC-03 | Phase 1000 | Pending |
+| ARC-04 | Phase 1000 | Pending |
+| ARC-05 | Phase 1000 | Pending |
 
 **Coverage:**
 - v1.4 requirements: 13 total
-- Mapped to phases: 13
+- Phase 1000 requirements: 5 total
+- Mapped to phases: 18
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 after defining v1.4 milestone*
+*Last updated: 2026-03-25 after adding Phase 1000 requirements*
