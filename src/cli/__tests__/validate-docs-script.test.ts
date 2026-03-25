@@ -20,9 +20,12 @@ const REQUIRED_FIXTURE_FILES = [
   'docs/ai-guide/README.md',
   'docs/ai-guide/COMMANDS.md',
   'docs/ai-guide/OUTPUT.md',
+  'docs/ai-guide/PATTERNS.md',
+  'docs/ai-guide/PROMPTS.md',
   'docs/ai-guide/QUICKSTART.md',
   'docs/ai-guide/INTEGRATION.md',
   'docs/product-specs/README.md',
+  'docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md',
   'docs/product-specs/MVP3-ARCHITECTURE-COMPARISON.md',
   'docs/product-specs/MVP3-ARCHITECTURE-REDESIGN-PRD.md',
   'docs/product-specs/MVP3-ARCHITECTURE-REDESIGN-TECH-PRD.md',
@@ -30,6 +33,7 @@ const REQUIRED_FIXTURE_FILES = [
   'docs/rules/validation.md',
   'docs/rules/engineering-with-codex-openai.md',
   'src/cli/index.ts',
+  'src/cli/commands/design.ts',
   'src/cli/commands/analyze-options.ts',
   'vitest.config.ts',
   'vitest.benchmark.config.ts',
@@ -215,6 +219,25 @@ describe('validate-docs.js', () => {
     }).toThrow(/documentation guardrails failed/);
   });
 
+  it('fails when README drops the design validate entry', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const readmePath = path.join(fixtureRoot, 'README.md');
+    const updatedReadme = readFileSync(readmePath, 'utf8').replaceAll(
+      'mycodemap design validate mycodemap.design.md --json',
+      'mycodemap generate'
+    );
+    writeFileSync(readmePath, updatedReadme);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/documentation guardrails failed/);
+  });
+
   it('fails when README reintroduces non-recursive default exclude patterns', () => {
     const fixtureRoot = createFixtureRoot();
     tempRoots.push(fixtureRoot);
@@ -320,6 +343,25 @@ describe('validate-docs.js', () => {
       '`workflow` 同时包含 analyze、实现、CI、ship 等多个阶段。'
     );
     writeFileSync(commandsPath, updatedCommands);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/documentation guardrails failed/);
+  });
+
+  it('fails when PATTERNS reintroduces workflow commit stage', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const patternsPath = path.join(fixtureRoot, 'docs/ai-guide/PATTERNS.md');
+    const updatedPatterns = readFileSync(patternsPath, 'utf8').replace(
+      '4. `show` - 生成概览、摘要与展示型结果',
+      '4. `show` - 生成概览、摘要与展示型结果\n5. `commit` - 提交验证'
+    );
+    writeFileSync(patternsPath, updatedPatterns);
 
     expect(() => {
       execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {

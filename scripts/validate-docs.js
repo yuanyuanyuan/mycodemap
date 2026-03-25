@@ -226,6 +226,180 @@ function validateAnalyzeDocs(rootDir, failures) {
   failures.push(...collectAnalyzeDocSyncFailures(rootDir));
 }
 
+function validateDesignContractDocs(rootDir, failures) {
+  const readme = readText(rootDir, 'README.md', failures);
+  const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
+  const claudeGuide = readText(rootDir, 'CLAUDE.md', failures);
+  const commandsGuide = readText(rootDir, 'docs/ai-guide/COMMANDS.md', failures);
+  const outputGuide = readText(rootDir, 'docs/ai-guide/OUTPUT.md', failures);
+  const patternsGuide = readText(rootDir, 'docs/ai-guide/PATTERNS.md', failures);
+  const promptsGuide = readText(rootDir, 'docs/ai-guide/PROMPTS.md', failures);
+  const engineeringGuide = readText(rootDir, 'docs/rules/engineering-with-codex-openai.md', failures);
+  const productSpecsReadme = readText(rootDir, 'docs/product-specs/README.md', failures);
+  const designTemplate = readText(rootDir, 'docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md', failures);
+  const cliIndexSource = readText(rootDir, 'src/cli/index.ts', failures);
+  const designCommandSource = readText(rootDir, 'src/cli/commands/design.ts', failures);
+
+  if (cliIndexSource) {
+    expectIncludes(cliIndexSource, 'program.addCommand(designCommand);', 'src/cli/index.ts design command registration', failures);
+  }
+
+  if (designCommandSource) {
+    validateSnippets(
+      designCommandSource,
+      'src/cli/commands/design.ts command surface',
+      [
+        "new Command('design')",
+        ".command('validate')",
+        'DEFAULT_DESIGN_CONTRACT_PATH',
+        'JSON 格式输出'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (readme) {
+    validateSnippets(
+      readme,
+      'README.md design contract baseline',
+      [
+        'mycodemap design validate mycodemap.design.md --json',
+        'docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md',
+        '`mycodemap.design.md`'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (aiGuide) {
+    validateSnippets(
+      aiGuide,
+      'AI_GUIDE.md design contract baseline',
+      [
+        'design validate mycodemap.design.md --json',
+        '`mycodemap.design.md`',
+        'interface DesignValidateOutput {'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (claudeGuide) {
+    validateSnippets(
+      claudeGuide,
+      'CLAUDE.md design retrieval guidance',
+      [
+        'node dist/cli/index.js design validate [file] --json'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (commandsGuide) {
+    validateSnippets(
+      commandsGuide,
+      'docs/ai-guide/COMMANDS.md design contract baseline',
+      [
+        '## design - 设计契约校验',
+        'mycodemap design validate mycodemap.design.md --json',
+        '`mycodemap.design.md`',
+        '### 必填 sections'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (outputGuide) {
+    validateSnippets(
+      outputGuide,
+      'docs/ai-guide/OUTPUT.md design validate schema',
+      [
+        '## design validate 命令输出结构',
+        'type DesignContractDiagnosticCode =',
+        'interface DesignValidateOutput {',
+        '"code": "missing-section"'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (patternsGuide) {
+    validateSnippets(
+      patternsGuide,
+      'docs/ai-guide/PATTERNS.md design/workflow baseline',
+      [
+        'node dist/cli/index.js design validate mycodemap.design.md --json',
+        '`workflow` 仍只保留 `find` / `read` / `link` / `show` 四阶段'
+      ],
+      [
+        '5. `commit` - 提交验证',
+        '6. `ci` - CI 验证'
+      ],
+      failures
+    );
+  }
+
+  if (promptsGuide) {
+    validateSnippets(
+      promptsGuide,
+      'docs/ai-guide/PROMPTS.md design contract prompt',
+      [
+        'cp docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md mycodemap.design.md',
+        'node dist/cli/index.js design validate mycodemap.design.md --json'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (engineeringGuide) {
+    validateSnippets(
+      engineeringGuide,
+      'docs/rules/engineering-with-codex-openai.md design command guardrail',
+      [
+        '`node dist/cli/index.js design validate mycodemap.design.md --json`',
+        '`docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md`'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (productSpecsReadme) {
+    validateSnippets(
+      productSpecsReadme,
+      'docs/product-specs/README.md design template index',
+      [
+        '`DESIGN_CONTRACT_TEMPLATE.md`'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (designTemplate) {
+    validateSnippets(
+      designTemplate,
+      'docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md',
+      [
+        '保存为 `mycodemap.design.md`',
+        '## Goal',
+        '## Constraints',
+        '## Acceptance Criteria',
+        '## Non-Goals'
+      ],
+      [],
+      failures
+    );
+  }
+}
+
 function validatePositioningBaselineDocs(rootDir, failures) {
   const readme = readText(rootDir, 'README.md', failures);
   const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
@@ -938,6 +1112,7 @@ function validateDocs(rootDir) {
   validatePluginRuntimeDocs(rootDir, failures);
   validateGraphStorageDocs(rootDir, failures);
   validateAnalyzeDocs(rootDir, failures);
+  validateDesignContractDocs(rootDir, failures);
   validateTestingDocs(rootDir, failures);
   validateWorkflowAndDiscoveryDocs(rootDir, failures);
   validateProductSpecsDocs(rootDir, failures);
