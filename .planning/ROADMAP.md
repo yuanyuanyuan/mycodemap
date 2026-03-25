@@ -6,7 +6,7 @@
 - ✅ **v1.1 插件扩展点产品化** — Phases 7-9 (shipped 2026-03-24)
 - ✅ **v1.2 图数据库后端生产化** — Phases 10-12 (shipped 2026-03-24)
 - ✅ **v1.3 Kùzu-only 收敛与高信号债务清理** — Phases 13-16 (shipped 2026-03-24)
-- 🟡 **v1.4 设计契约与 Agent Handoff** — Phases 17-20 (planned 2026-03-25)
+- 🟡 **v1.4 设计契约与 Agent Handoff** — Phases 17-20 (in progress 2026-03-25)
 
 ## Overview
 
@@ -14,7 +14,7 @@
 
 ## Phases
 
-- [ ] **Phase 17: Design Contract Surface** - 定义设计输入契约、loader/diagnostics，并修复 workflow docs drift 入口问题
+- [x] **Phase 17: Design Contract Surface** - 定义设计输入契约、loader/diagnostics，并修复 workflow docs drift 入口问题
 - [ ] **Phase 18: Design-to-Code Mapping** - 将 design contract 映射到代码范围、依赖、测试与风险
 - [ ] **Phase 19: Handoff Package & Human Gates** - 生成 agent handoff 产物并保留人类审批边界
 - [ ] **Phase 20: Design Drift Verification & Docs Sync** - 固化设计验收映射、漂移检测与文档/CI 护栏
@@ -30,11 +30,12 @@
   2. design contract 缺字段、字段歧义或结构错误时，CLI 返回结构化 diagnostics，而不是隐式猜测
   3. `README.md` / `AI_GUIDE.md` / `docs/ai-guide/PATTERNS.md` 与 workflow / new surface 的真实语义保持一致
 **Plans**: 3 plans
+**Completed**: 2026-03-25 (execute + verify-work)
 
 Plans:
-- [ ] 17-01: 定义 design contract schema、类型与产物路径约定
-- [ ] 17-02: 实现 loader / validator / diagnostics baseline
-- [ ] 17-03: 同步 README / AI docs / rules / guardrails，并修复 workflow docs drift
+- [x] 17-01: 定义 design contract schema、类型与产物路径约定
+- [x] 17-02: 实现 loader / validator / diagnostics baseline
+- [x] 17-03: 同步 README / AI docs / rules / guardrails，并修复 workflow docs drift
 
 ### Phase 18: Design-to-Code Mapping
 **Goal**: 让 CodeMap 能把设计意图映射到真实代码范围，而不是只返回分散的搜索结果
@@ -85,26 +86,17 @@ Plans:
 
 ## Backlog
 
-### Phase 999.1: KùzuDB 作为主要存储，文件系统作为保底选择 (PLANNED)
+> Archived: `Phase 999.1` 已于 2026-03-25 从 active planning surface 归档至 `.planning/archive/phases/999.1-kuzu-primary-storage/`，不再参与主线 progress 路由。
 
-**Goal**: 完全使用图数据库 (KùzuDB) 作为主力存储，文件系统作为兜底/迁移选项
-**Context**: 当前 v1.2 已实现图数据库后端，但采用双存储并行模式。本项将 KùzuDB 提升为唯一真实源，同时保留文件系统作为降级兜底。
-**Key Decisions**:
-  - DEC-01: KùzuDB 成为 `auto` 和默认配置的首选存储
-  - DEC-02: 迁移到原生图模型（节点/边表 + Cypher 查询）
-  - DEC-03: KùzuDB 初始化失败时 fallback 到文件系统
-  - DEC-04: 现有文件系统用户自动无缝迁移
-  - DEC-05: 不需要基准测试，但需要风险评估
-**Requirements**: DEC-01, DEC-02, DEC-03, DEC-04, DEC-05
-**Plans**: 4 plans in 4 waves
+### Phase 1000: Evaluate FalkorDB as alternative to KùzuDB (BACKLOG RESEARCH)
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Archived decision from Phase 999.1
+**Plans:** 0 plans
 
 Plans:
-- [ ] 999.1-01: Storage Strategy & Fallback — 修改 StorageFactory 优先选择 KùzuDB，实现降级机制
-- [ ] 999.1-02: Native Graph Model — 重构 KuzuDBStorage 使用原生节点/关系表 + Cypher 查询
-- [ ] 999.1-03: Migration & Configuration — 实现文件系统到 KùzuDB 的自动迁移
-- [ ] 999.1-04: Risk Assessment & Documentation — 创建风险评估文档、替代方案评估、更新配置文档
-
-**Risk Note**: KùzuDB 已于 2025-10-10 归档。Phase 999.1-04 包含完整的风险评估和替代方案评估（FalkorDB、DuckPGQ）。
+- [ ] TBD (run /gsd:plan-phase 1000 to break down)
 
 ---
 
@@ -112,8 +104,8 @@ Plans:
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 17. Design Contract Surface | v1.4 | 0/3 | Planned | — |
+| 17. Design Contract Surface | v1.4 | 3/3 | Complete | 2026-03-25 |
 | 18. Design-to-Code Mapping | v1.4 | 0/3 | Planned | — |
 | 19. Handoff Package & Human Gates | v1.4 | 0/3 | Planned | — |
 | 20. Design Drift Verification & Docs Sync | v1.4 | 0/3 | Planned | — |
-| 999.1. KùzuDB Primary Storage | Backlog | 0/4 | Planned | — |
+| 1000. FalkorDB Evaluation | Backlog | 0/0 | Context only | — |
