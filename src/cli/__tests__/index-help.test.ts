@@ -49,6 +49,7 @@ describe('cli help surface', () => {
 
     expect(exitSpy).toHaveBeenCalledWith(0);
     expect(output).toContain('generate');
+    expect(output).toContain('design');
     expect(output).toContain('query');
     expect(output).toContain('deps');
     expect(output).toContain('impact');

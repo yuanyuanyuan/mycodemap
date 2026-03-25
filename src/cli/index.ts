@@ -11,6 +11,7 @@ import { depsCommand } from './commands/deps.js';
 import { cyclesCommand } from './commands/cycles.js';
 import { complexityCommand } from './commands/complexity.js';
 import { impactCommand } from './commands/impact.js';
+import { designCommand } from './commands/design.js';
 import { ciCommand } from './commands/ci.js';
 import { workflowCommand } from './commands/workflow.js';
 import { exportCommand } from './commands/export.js';
@@ -95,6 +96,8 @@ program
       },
     });
   });
+
+program.addCommand(designCommand);
 
 program
   .command('query')
