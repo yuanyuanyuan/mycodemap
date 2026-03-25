@@ -653,3 +653,16 @@ export type {
   IStorage,
   IStorageFactory,
 } from './storage.js';
+
+export type {
+  DesignContractRequiredSectionId,
+  DesignContractOptionalSectionId,
+  DesignContractSectionId,
+  DesignContractDiagnosticSeverity,
+  DesignContractDiagnosticCode,
+  DesignContractSection,
+  DesignContractMetadata,
+  DesignContractDiagnostic,
+  DesignContract,
+  NormalizedDesignContract,
+} from './design-contract.js';
