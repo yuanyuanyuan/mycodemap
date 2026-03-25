@@ -101,6 +101,7 @@ function cmdRoadmapAnalyze(cwd, raw) {
   const rawContent = fs.readFileSync(roadmapPath, 'utf-8');
   const content = extractCurrentMilestone(rawContent, cwd);
   const phasesDir = planningPaths(cwd).phases;
+  const backlogIndex = content.search(/^##\s*Backlog\b/m);
 
   // Extract all phase headings: ## Phase N: Name or ### Phase N: Name
   const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
@@ -117,6 +118,7 @@ function cmdRoadmapAnalyze(cwd, raw) {
     const nextHeader = restOfContent.match(/\n#{2,4}\s+Phase\s+\d/i);
     const sectionEnd = nextHeader ? sectionStart + nextHeader.index : content.length;
     const section = content.slice(sectionStart, sectionEnd);
+    const isBacklog = backlogIndex !== -1 && sectionStart > backlogIndex;
 
     const goalMatch = section.match(/\*\*Goal(?::\*\*|\*\*:)\s*([^\n]+)/i);
     const goal = goalMatch ? goalMatch[1].trim() : null;
@@ -175,6 +177,7 @@ function cmdRoadmapAnalyze(cwd, raw) {
       has_context: hasContext,
       has_research: hasResearch,
       disk_status: diskStatus,
+      is_backlog: isBacklog,
       roadmap_complete: roadmapComplete,
     });
   }
@@ -191,8 +194,8 @@ function cmdRoadmapAnalyze(cwd, raw) {
   }
 
   // Find current and next phase
-  const currentPhase = phases.find(p => p.disk_status === 'planned' || p.disk_status === 'partial') || null;
-  const nextPhase = phases.find(p => p.disk_status === 'empty' || p.disk_status === 'no_directory' || p.disk_status === 'discussed' || p.disk_status === 'researched') || null;
+  const currentPhase = phases.find(p => !p.is_backlog && (p.disk_status === 'planned' || p.disk_status === 'partial')) || null;
+  const nextPhase = phases.find(p => !p.is_backlog && (p.disk_status === 'empty' || p.disk_status === 'no_directory' || p.disk_status === 'discussed' || p.disk_status === 'researched')) || null;
 
   // Aggregated stats
   const totalPlans = phases.reduce((sum, p) => sum + p.plan_count, 0);
