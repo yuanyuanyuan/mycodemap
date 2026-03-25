@@ -340,32 +340,38 @@
 
 请执行以下步骤：
 
-1. **相关代码搜索**
+1. **先把设计写成可验证输入**
+   ```bash
+   cp docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md mycodemap.design.md
+   node dist/cli/index.js design validate mycodemap.design.md --json
+   ```
+
+2. **相关代码搜索**
    ```bash
    node dist/cli/index.js analyze -i find -k "{{RELATED_KEYWORD}}" --topK 10 --json
    ```
 
-2. **参考现有实现**
+3. **参考现有实现**
    分析类似功能的实现方式
 
-3. **确定实现位置**
+4. **确定实现位置**
    ```bash
    node dist/cli/index.js analyze -i read -t "候选目录" --json
    ```
    选择复杂度最低的模块
 
-4. **影响分析**（如果需要修改现有代码）
+5. **影响分析**（如果需要修改现有代码）
    ```bash
    node dist/cli/index.js analyze -i read -t "目标文件" --json
    ```
 
-5. **实现步骤**
+6. **实现步骤**
    - [ ] 创建新文件（添加 [META] [WHY] 头）
    - [ ] 实现核心功能
    - [ ] 添加单元测试
    - [ ] 运行测试验证
 
-6. **验证**
+7. **验证**
    ```bash
    node dist/cli/index.js ci check-headers -f "新文件.ts"
    npm test

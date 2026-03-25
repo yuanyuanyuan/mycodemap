@@ -214,6 +214,37 @@ mycodemap analyze -i show -t "src/index.ts" --output-mode human
 
 ---
 
+## design - 设计契约校验
+
+> `design` 为 human-authored design contract 提供正式输入面。默认文件名是 `mycodemap.design.md`，canonical 模板位于 `docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md`。
+
+### validate
+
+```bash
+# 使用默认文件名
+mycodemap design validate mycodemap.design.md --json
+
+# 显式指定文件
+mycodemap design validate docs/designs/login.design.md
+```
+
+### 必填 sections
+
+| Section | 作用 |
+|---------|------|
+| `Goal` | 定义本次要达成的结果 |
+| `Constraints` | 定义边界、兼容性和约束 |
+| `Acceptance Criteria` | 定义可验证的成功标准 |
+| `Non-Goals` | 明确本次不做什么，防止 scope drift |
+
+### 输出与失败语义
+
+- `--json` 输出纯结构化 diagnostics
+- 缺失必填 section、重复 section、空 section、未知 heading 都会被显式报告
+- blocker diagnostics 存在时命令返回非零 exit code
+
+---
+
 ## ci - CI 门禁
 
 ### 子命令

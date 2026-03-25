@@ -7,7 +7,7 @@ CodeMap 是一个面向 TypeScript/JavaScript/Go 项目的 AI-first 代码地图
 ## 特性
 
 - **AI-first 代码地图** - 生成 `AI_MAP.md`、`CONTEXT.md`、`codemap.json` 等 AI/Agent 可直接消费的上下文
-- **核心分析命令** - 提供 `generate`、`query`、`deps`、`impact`、`complexity`、`cycles`、`analyze`、`export`、`ci`
+- **核心分析命令** - 提供 `generate`、`query`、`deps`、`impact`、`complexity`、`cycles`、`analyze`、`design`、`export`、`ci`
 - **机器可读优先** - 结构化输出是产品基线；当前 CLI 过渡期仍主要通过 `--json` 暴露机器可读结果
 - **分层架构 (MVP3)** - 保持 `Interface → Infrastructure → Domain → Server → CLI` 的明确边界
 - **双层解析模式** - 提供 `fast`（快速正则）和 `smart`（TypeScript AST）两种解析模式
@@ -25,7 +25,7 @@ CodeMap 是一个面向 TypeScript/JavaScript/Go 项目的 AI-first 代码地图
 | 输出契约 | 目标是机器可读优先；`当前 CLI 现实` 是多数命令通过 `--json` 提供结构化结果，`analyze` 额外支持 `--output-mode machine|human` |
 | 架构边界 | `Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令 |
 
-当前公共 CLI 聚焦 `init`、`generate`、`query`、`deps`、`cycles`、`complexity`、`impact`、`analyze`、`ci`、`workflow`、`export`、`ship`；`server`、`watch`、`report`、`logs` 已从 public CLI 移除，并在调用时给出迁移提示。
+当前公共 CLI 聚焦 `init`、`generate`、`query`、`deps`、`cycles`、`complexity`、`impact`、`analyze`、`design`、`ci`、`workflow`、`export`、`ship`；`server`、`watch`、`report`、`logs` 已从 public CLI 移除，并在调用时给出迁移提示。
 
 ## 安装
 
@@ -73,6 +73,10 @@ mycodemap impact -f src/cli/index.ts -j
 
 # analyze 额外支持显式 machine/human 模式
 mycodemap analyze -i read -t src/cli/index.ts --output-mode human
+
+# 人类设计先落成 design contract，再交给 AI/Agent 消费
+cp docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md mycodemap.design.md
+mycodemap design validate mycodemap.design.md --json
 ```
 
 生成后，将 `.mycodemap/AI_MAP.md` 的内容提供给 AI 助手即可让其快速理解你的项目结构；需要结构化结果继续处理时，优先使用 JSON / machine 模式。
@@ -283,6 +287,30 @@ mycodemap export json -o ./out     # 指定输出路径
 | **show** | `analyze --intent show` | 生成模块概览与展示型摘要 | overview / summary 输出 |
 
 > 内置模板（`refactoring` / `bugfix` / `feature` / `hotfix`）共享同一 4 阶段顺序，只通过不同的阶段阈值和适用场景调整体验。
+
+## 设计契约输入面
+
+`design` 是给“人类负责设计、AI 负责执行”协作链路准备的正式输入面。
+先把设计写成 `mycodemap.design.md`，再用 CLI 校验必填 sections、空段、重复 heading 和未知 heading。
+
+```bash
+# 从 canonical template 起步
+cp docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md mycodemap.design.md
+
+# 使用默认文件名校验
+mycodemap design validate mycodemap.design.md --json
+
+# 也可以显式传入其他路径
+mycodemap design validate docs/designs/login.design.md
+```
+
+必填 sections：
+- `## Goal`
+- `## Constraints`
+- `## Acceptance Criteria`
+- `## Non-Goals`
+
+> 设计输入面只负责“可写、可验、可诊断”；design-to-code mapping 与 handoff package 属于后续 phase。
 
 ### 工作流 CLI 命令
 
@@ -631,6 +659,25 @@ cp examples/codex/codemap-agent.md .agents/skills/codemap/SKILL.md
 详细配置请参考 [AI_ASSISTANT_SETUP.md](docs/AI_ASSISTANT_SETUP.md)，设计与规则入口请先看 [docs/README.md](docs/README.md)。
 
 ## 新增 CLI 命令
+
+### `mycodemap design`
+
+校验 human-authored design contract，默认读取仓库根目录的 `mycodemap.design.md`。
+
+```bash
+# 使用默认路径
+mycodemap design validate mycodemap.design.md --json
+
+# 显式指定文件
+mycodemap design validate docs/designs/login.design.md
+```
+
+| 选项 | 说明 |
+|------|------|
+| `-j, --json` | 输出纯 JSON diagnostics，适合 AI/CI 消费 |
+
+> canonical 模板位于 `docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md`。
+> 缺失必填 section、重复 section、空 section 或未知 heading 时，CLI 会返回结构化 diagnostics，而不是继续猜测设计意图。
 
 ### `mycodemap analyze`
 

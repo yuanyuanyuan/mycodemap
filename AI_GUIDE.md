@@ -3,7 +3,7 @@
 > 本文档是 AI/Agent 使用 CodeMap 的**主索引**。
 > 
 > CodeMap 是一个 AI-first 代码地图工具。AI/Agent 是主要消费者；人类开发者负责配置、维护与按需阅读输出。  
-> 当前 CLI 过渡现实：多数命令通过 `--json` 输出机器可读结果；`analyze` 额外提供 `--output-mode machine|human`。  
+> 当前 CLI 过渡现实：多数命令通过 `--json` 输出机器可读结果；`analyze` 额外提供 `--output-mode machine|human`，`design validate` 负责校验 human-authored design contract。
 > 命名边界：`Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令。  
 > 
 > 🔍 **机器可读索引**: `ai-document-index.yaml`  
@@ -55,6 +55,7 @@ cat .mycodemap/AI_MAP.md
 | "这个改动安全吗" | `ci assess-risk` |
 | "发布前是否满足门禁" | `ci check-working-tree → ci check-branch → ci check-scripts` |
 | "需要验证文档/契约是否同步" | `ci check-docs-sync`（含 analyze generated block 校验） |
+| "需要先把人类设计写成可验证输入" | `design validate mycodemap.design.md --json` |
 | "需要导出结构化结果" | `export json -o ./output.json` |
 | "需要插件诊断/扩展结果" | `generate` → 读 `AI_MAP.md` 的 `Plugin Summary` 或解析 `codemap.json.pluginReport` |
 | "需要切换/排查图存储后端" | 编辑 `mycodemap.config.json.storage` → 运行 `generate` / `export` |
@@ -178,6 +179,17 @@ CLI Layer → Server Layer → Domain Layer → Infrastructure Layer → Interfa
 
 **更多模板**: 见 [docs/ai-guide/PROMPTS.md](./docs/ai-guide/PROMPTS.md)
 
+### design contract 速用
+
+```bash
+cp docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md mycodemap.design.md
+node dist/cli/index.js design validate mycodemap.design.md --json
+```
+
+- 默认输入文件：`mycodemap.design.md`
+- 必填 sections：`Goal` / `Constraints` / `Acceptance Criteria` / `Non-Goals`
+- 失败时返回结构化 diagnostics，供后续 handoff / mapping 流程阻断使用
+
 ---
 
 ## ⚡ 关键类型定义
@@ -199,6 +211,20 @@ interface AnalyzeOutput {
     location?: { file: string; line: number; column: number; };
     content?: string;
     relevance: number;
+  }>;
+}
+
+interface DesignValidateOutput {
+  ok: boolean;
+  exists: boolean;
+  filePath: string;
+  title?: string;
+  missingRequiredSections: Array<"goal" | "constraints" | "acceptanceCriteria" | "nonGoals">;
+  diagnostics: Array<{
+    code: "file-not-found" | "missing-section" | "duplicate-section" | "empty-section" | "unknown-section" | "ambiguous-heading";
+    severity: "error" | "warning" | "info";
+    message: string;
+    section?: "goal" | "constraints" | "acceptanceCriteria" | "nonGoals" | "context" | "openQuestions" | "notes";
   }>;
 }
 

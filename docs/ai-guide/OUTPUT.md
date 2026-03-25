@@ -405,6 +405,88 @@ interface StructuredResult {
 
 ---
 
+## design validate 命令输出结构
+
+### JSON 输出 (--json)
+
+```typescript
+type DesignContractSectionId =
+  | "goal"
+  | "constraints"
+  | "acceptanceCriteria"
+  | "nonGoals"
+  | "context"
+  | "openQuestions"
+  | "notes";
+
+type DesignContractDiagnosticCode =
+  | "file-not-found"
+  | "missing-section"
+  | "duplicate-section"
+  | "empty-section"
+  | "unknown-section"
+  | "ambiguous-heading";
+
+interface DesignValidateOutput {
+  ok: boolean;
+  exists: boolean;
+  filePath: string;
+  title?: string;
+  missingRequiredSections: Array<"goal" | "constraints" | "acceptanceCriteria" | "nonGoals">;
+  diagnostics: DesignContractDiagnostic[];
+  sections: Array<{
+    id: DesignContractSectionId;
+    title: string;
+    line: number;
+    itemCount: number;
+  }>;
+}
+
+interface DesignContractDiagnostic {
+  code: DesignContractDiagnosticCode;
+  severity: "error" | "warning" | "info";
+  message: string;
+  section?: DesignContractSectionId;
+  heading?: string;
+  line?: number;
+  suggestion?: string;
+}
+```
+
+### 示例
+
+```json
+{
+  "ok": false,
+  "exists": true,
+  "filePath": "/repo/mycodemap.design.md",
+  "title": "Design Contract: Missing acceptance example",
+  "missingRequiredSections": [
+    "acceptanceCriteria"
+  ],
+  "diagnostics": [
+    {
+      "code": "missing-section",
+      "severity": "error",
+      "message": "缺少必填 section: Acceptance Criteria",
+      "section": "acceptanceCriteria"
+    }
+  ],
+  "sections": [
+    {
+      "id": "goal",
+      "title": "Goal",
+      "line": 3,
+      "itemCount": 1
+    }
+  ]
+}
+```
+
+> `design validate --json` 必须保持纯 JSON；不要在前后拼接说明性 prose。
+
+---
+
 ## impact 命令输出结构
 
 ### JSON 输出 (-j)

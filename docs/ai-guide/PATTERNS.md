@@ -189,13 +189,16 @@ npm test
 **执行步骤**:
 
 ```bash
+# Step 0: 如果任务来自人类设计，先校验 design contract
+node dist/cli/index.js design validate mycodemap.design.md --json
+
 # Step 1: 启动工作流
 node dist/cli/index.js workflow start "实现用户认证模块"
 
 # Step 2: 查看当前阶段建议
 node dist/cli/index.js workflow status
 
-# Step 3: 执行当前阶段的分析和实现
+# Step 3: 执行当前阶段的分析（实现/提交/CI 不在 workflow phase 内）
 
 # Step 4: 完成阶段后推进
 node dist/cli/index.js workflow proceed
@@ -214,10 +217,8 @@ node dist/cli/index.js workflow checkpoint
 2. `read` - 阅读影响范围、复杂度与上下文
 3. `link` - 汇总依赖、引用与关联关系
 4. `show` - 生成概览、摘要与展示型结果
-5. `commit` - 提交验证
-6. `ci` - CI 验证
 
-> 说明：以上是当前公开实现，不代表最终收敛模型；如果只需要代码地图能力，优先使用前面几个核心分析模式。
+> 说明：`workflow` 仍只保留 `find` / `read` / `link` / `show` 四阶段；如果任务由人类设计驱动，先通过 `design validate` 固定输入，再进入 workflow。
 
 ---
 
