@@ -1004,12 +1004,25 @@ function generateSlugInternal(text) {
 
 function getMilestoneInfo(cwd) {
   try {
+    const statePath = path.join(planningDir(cwd), 'STATE.md');
+    if (fs.existsSync(statePath)) {
+      const stateRaw = fs.readFileSync(statePath, 'utf-8');
+      const milestoneMatch = stateRaw.match(/^milestone:\s*(.+)/m);
+      const milestoneNameMatch = stateRaw.match(/^milestone_name:\s*(.+)/m);
+      if (milestoneMatch) {
+        return {
+          version: milestoneMatch[1].trim(),
+          name: milestoneNameMatch ? milestoneNameMatch[1].trim() : 'milestone',
+        };
+      }
+    }
+
     const roadmap = fs.readFileSync(path.join(planningDir(cwd), 'ROADMAP.md'), 'utf-8');
 
     // First: check for list-format roadmaps using 🚧 (in-progress) marker
     // e.g. "- 🚧 **v2.1 Belgium** — Phases 24-28 (in progress)"
     // e.g. "- 🚧 **v1.2.1 Tech Debt** — Phases 1-8 (in progress)"
-    const inProgressMatch = roadmap.match(/🚧\s*\*\*v(\d+(?:\.\d+)+)\s+([^*]+)\*\*/);
+    const inProgressMatch = roadmap.match(/[🚧🟡]\s*\*\*v(\d+(?:\.\d+)+)\s+([^*]+)\*\*.*\((?:in progress|active)\b/i);
     if (inProgressMatch) {
       return {
         version: 'v' + inProgressMatch[1],
@@ -1039,6 +1052,41 @@ function getMilestoneInfo(cwd) {
   }
 }
 
+function parseRoadmapPhaseSections(content) {
+  const followUpIndex = content.search(/^##\s*Approved Follow-up\b/m);
+  const backlogIndex = content.search(/^##\s*Backlog\b/m);
+  const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
+  const phases = [];
+  let match;
+
+  while ((match = phasePattern.exec(content)) !== null) {
+    const sectionStart = match.index;
+    const restOfContent = content.slice(sectionStart);
+    const nextHeader = restOfContent.match(/\n#{2,4}\s+Phase\s+[\w]/i);
+    const sectionEnd = nextHeader ? sectionStart + nextHeader.index : content.length;
+    const section = content.slice(sectionStart, sectionEnd);
+    const plansMatch = section.match(/\*\*Plans(?::\*\*|\*\*:)\s*(\d+)(?:\s*\/\s*(\d+))?\s*plans?/i);
+    const declaredPlanCount = plansMatch
+      ? parseInt(plansMatch[2] || plansMatch[1], 10)
+      : 0;
+    const isBacklog = backlogIndex !== -1 && sectionStart > backlogIndex;
+    const isFollowUp = !isBacklog && followUpIndex !== -1 && sectionStart > followUpIndex;
+
+    phases.push({
+      number: match[1],
+      name: match[2].replace(/\(INSERTED\)/i, '').trim(),
+      section_start: sectionStart,
+      section_end: sectionEnd,
+      section,
+      declared_plan_count: declaredPlanCount,
+      is_backlog: isBacklog,
+      is_follow_up: isFollowUp,
+    });
+  }
+
+  return phases;
+}
+
 /**
  * Returns a filter function that checks whether a phase directory belongs
  * to the current milestone based on ROADMAP.md phase headings.
@@ -1048,11 +1096,11 @@ function getMilestonePhaseFilter(cwd) {
   const milestonePhaseNums = new Set();
   try {
     const roadmap = extractCurrentMilestone(fs.readFileSync(path.join(planningDir(cwd), 'ROADMAP.md'), 'utf-8'), cwd);
-    // Match both numeric phases (Phase 1:) and custom IDs (Phase PROJ-42:)
-    const phasePattern = /#{2,4}\s*Phase\s+([\w][\w.-]*)\s*:/gi;
-    let m;
-    while ((m = phasePattern.exec(roadmap)) !== null) {
-      milestonePhaseNums.add(m[1]);
+    const roadmapPhases = parseRoadmapPhaseSections(roadmap);
+    for (const phase of roadmapPhases) {
+      if (!phase.is_backlog && !phase.is_follow_up) {
+        milestonePhaseNums.add(phase.number);
+      }
     }
   } catch { /* intentionally empty */ }
 
@@ -1142,6 +1190,7 @@ module.exports = {
   pathExistsInternal,
   generateSlugInternal,
   getMilestoneInfo,
+  parseRoadmapPhaseSections,
   getMilestonePhaseFilter,
   stripShippedMilestones,
   extractCurrentMilestone,

@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, stripShippedMilestones, extractCurrentMilestone, normalizePhaseName, planningPaths, planningDir, planningRoot, toPosixPath, output, error } = require('./core.cjs');
+const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, stripShippedMilestones, extractCurrentMilestone, normalizePhaseName, planningPaths, planningDir, planningRoot, toPosixPath, output, error, parseRoadmapPhaseSections } = require('./core.cjs');
 
 function getLatestCompletedMilestone(cwd) {
   const milestonesPath = path.join(planningRoot(cwd), 'MILESTONES.md');
@@ -1023,27 +1023,25 @@ function cmdInitProgress(cwd, raw) {
   const roadmapPhaseNums = new Set();
   const roadmapPhaseNames = new Map();
   const backlogPhaseNums = new Set();
+  const followUpPhaseNums = new Set();
   try {
     const roadmapContent = extractCurrentMilestone(
       fs.readFileSync(path.join(planningDir(cwd), 'ROADMAP.md'), 'utf-8'), cwd
     );
-    const headingPattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
-    let hm;
-    while ((hm = headingPattern.exec(roadmapContent)) !== null) {
-      roadmapPhaseNums.add(hm[1]);
-      roadmapPhaseNames.set(hm[1], hm[2].replace(/\(INSERTED\)/i, '').trim());
-    }
-
-    const backlogIndex = roadmapContent.search(/^##\s*Backlog\b/m);
-    if (backlogIndex !== -1) {
-      const backlogContent = roadmapContent.slice(backlogIndex);
-      const backlogHeadingPattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:/gi;
-      let bhm;
-      while ((bhm = backlogHeadingPattern.exec(backlogContent)) !== null) {
-        const normalized = bhm[1].replace(/^0+/, '') || '0';
-        backlogPhaseNums.add(bhm[1]);
+    for (const roadmapPhase of parseRoadmapPhaseSections(roadmapContent)) {
+      const normalized = roadmapPhase.number.replace(/^0+/, '') || '0';
+      roadmapPhaseNames.set(roadmapPhase.number, roadmapPhase.name);
+      if (roadmapPhase.is_backlog) {
+        backlogPhaseNums.add(roadmapPhase.number);
         backlogPhaseNums.add(normalized);
+        continue;
       }
+      if (roadmapPhase.is_follow_up) {
+        followUpPhaseNums.add(roadmapPhase.number);
+        followUpPhaseNums.add(normalized);
+      }
+      roadmapPhaseNums.add(roadmapPhase.number);
+      roadmapPhaseNums.add(normalized);
     }
   } catch { /* intentionally empty */ }
 
@@ -1067,6 +1065,7 @@ function cmdInitProgress(cwd, raw) {
       const phaseName = match && match[2] ? match[2] : null;
       const normalizedPhaseNumber = phaseNumber.replace(/^0+/, '') || '0';
       const isBacklogPhase = backlogPhaseNums.has(phaseNumber) || backlogPhaseNums.has(normalizedPhaseNumber);
+      const isFollowUpPhase = followUpPhaseNums.has(phaseNumber) || followUpPhaseNums.has(normalizedPhaseNumber);
       seenPhaseNums.add(normalizedPhaseNumber);
 
       const phasePath = path.join(phasesDir, dir);
@@ -1089,15 +1088,16 @@ function cmdInitProgress(cwd, raw) {
         summary_count: summaries.length,
         has_research: hasResearch,
         is_backlog: isBacklogPhase,
+        is_follow_up: isFollowUpPhase,
       };
 
       phases.push(phaseInfo);
 
       // Find current (first incomplete with plans) and next (first pending)
-      if (!isBacklogPhase && !currentPhase && (status === 'in_progress' || status === 'researched')) {
+      if (!isBacklogPhase && !isFollowUpPhase && !currentPhase && (status === 'in_progress' || status === 'researched')) {
         currentPhase = phaseInfo;
       }
-      if (!isBacklogPhase && !nextPhase && status === 'pending') {
+      if (!isBacklogPhase && !isFollowUpPhase && !nextPhase && status === 'pending') {
         nextPhase = phaseInfo;
       }
     }
@@ -1108,6 +1108,7 @@ function cmdInitProgress(cwd, raw) {
     const stripped = num.replace(/^0+/, '') || '0';
     if (!seenPhaseNums.has(stripped)) {
       const isBacklogPhase = backlogPhaseNums.has(num) || backlogPhaseNums.has(stripped);
+      const isFollowUpPhase = followUpPhaseNums.has(num) || followUpPhaseNums.has(stripped);
       const phaseInfo = {
         number: num,
         name: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
@@ -1117,9 +1118,10 @@ function cmdInitProgress(cwd, raw) {
         summary_count: 0,
         has_research: false,
         is_backlog: isBacklogPhase,
+        is_follow_up: isFollowUpPhase,
       };
       phases.push(phaseInfo);
-      if (!isBacklogPhase && !nextPhase && !currentPhase) {
+      if (!isBacklogPhase && !isFollowUpPhase && !nextPhase && !currentPhase) {
         nextPhase = phaseInfo;
       }
     }
@@ -1150,9 +1152,9 @@ function cmdInitProgress(cwd, raw) {
 
     // Phase overview
     phases,
-    phase_count: phases.length,
-    completed_count: phases.filter(p => p.status === 'complete').length,
-    in_progress_count: phases.filter(p => p.status === 'in_progress').length,
+    phase_count: phases.filter(p => !p.is_backlog && !p.is_follow_up).length,
+    completed_count: phases.filter(p => !p.is_backlog && !p.is_follow_up && p.status === 'complete').length,
+    in_progress_count: phases.filter(p => !p.is_backlog && !p.is_follow_up && p.status === 'in_progress').length,
 
     // Current state
     current_phase: currentPhase,

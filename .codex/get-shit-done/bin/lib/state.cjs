@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, loadConfig, getMilestoneInfo, getMilestonePhaseFilter, normalizeMd, planningDir, planningPaths, output, error } = require('./core.cjs');
+const { escapeRegex, loadConfig, getMilestoneInfo, getMilestonePhaseFilter, normalizeMd, planningDir, planningPaths, output, error, extractCurrentMilestone, parseRoadmapPhaseSections } = require('./core.cjs');
 const { extractFrontmatter, reconstructFrontmatter } = require('./frontmatter.cjs');
 
 /** Shorthand — every state command needs this path */
@@ -331,10 +331,13 @@ function cmdStateUpdateProgress(cwd, raw) {
 
   let content = fs.readFileSync(statePath, 'utf-8');
 
-  // Count summaries across current milestone phases only
+  // Count progress across current milestone phases only, using roadmap-declared
+  // plan totals so future planned phases don't collapse progress to 100%.
   const phasesDir = planningPaths(cwd).phases;
+  const roadmapPath = planningPaths(cwd).roadmap;
   let totalPlans = 0;
   let totalSummaries = 0;
+  const diskPhaseStats = new Map();
 
   if (fs.existsSync(phasesDir)) {
     const isDirInMilestone = getMilestonePhaseFilter(cwd);
@@ -342,9 +345,23 @@ function cmdStateUpdateProgress(cwd, raw) {
       .filter(e => e.isDirectory()).map(e => e.name)
       .filter(isDirInMilestone);
     for (const dir of phaseDirs) {
+      const phaseMatch = dir.match(/^(\d+[A-Z]?(?:\.\d+)*)/i);
+      const phaseNumber = phaseMatch ? phaseMatch[1] : dir;
       const files = fs.readdirSync(path.join(phasesDir, dir));
-      totalPlans += files.filter(f => f.match(/-PLAN\.md$/i)).length;
-      totalSummaries += files.filter(f => f.match(/-SUMMARY\.md$/i)).length;
+      diskPhaseStats.set(phaseNumber, {
+        plans: files.filter(f => f.match(/-PLAN\.md$/i)).length,
+        summaries: files.filter(f => f.match(/-SUMMARY\.md$/i)).length,
+      });
+    }
+  }
+
+  if (fs.existsSync(roadmapPath)) {
+    const roadmapContent = extractCurrentMilestone(fs.readFileSync(roadmapPath, 'utf-8'), cwd);
+    for (const roadmapPhase of parseRoadmapPhaseSections(roadmapContent)) {
+      if (roadmapPhase.is_backlog || roadmapPhase.is_follow_up) continue;
+      const diskStats = diskPhaseStats.get(roadmapPhase.number) || { plans: 0, summaries: 0 };
+      totalPlans += Math.max(diskStats.plans, roadmapPhase.declared_plan_count);
+      totalSummaries += diskStats.summaries;
     }
   }
 
@@ -533,7 +550,8 @@ function cmdStateSnapshot(cwd, raw) {
   // Parse numeric fields
   const totalPhases = totalPhasesRaw ? parseInt(totalPhasesRaw, 10) : null;
   const totalPlansInPhase = totalPlansRaw ? parseInt(totalPlansRaw, 10) : null;
-  const progressPercent = progressRaw ? parseInt(progressRaw.replace('%', ''), 10) : null;
+  const progressMatch = progressRaw ? progressRaw.match(/(\d+)%/) : null;
+  const progressPercent = progressMatch ? parseInt(progressMatch[1], 10) : null;
 
   // Extract decisions table
   const decisions = [];

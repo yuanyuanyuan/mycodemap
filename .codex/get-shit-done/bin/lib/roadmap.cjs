@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, normalizePhaseName, planningPaths, output, error, findPhaseInternal, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone } = require('./core.cjs');
+const { escapeRegex, normalizePhaseName, planningPaths, output, error, findPhaseInternal, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone, parseRoadmapPhaseSections } = require('./core.cjs');
 
 function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
   const roadmapPath = planningPaths(cwd).roadmap;
@@ -101,24 +101,15 @@ function cmdRoadmapAnalyze(cwd, raw) {
   const rawContent = fs.readFileSync(roadmapPath, 'utf-8');
   const content = extractCurrentMilestone(rawContent, cwd);
   const phasesDir = planningPaths(cwd).phases;
-  const backlogIndex = content.search(/^##\s*Backlog\b/m);
-
-  // Extract all phase headings: ## Phase N: Name or ### Phase N: Name
-  const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
+  const roadmapPhases = parseRoadmapPhaseSections(content);
   const phases = [];
-  let match;
 
-  while ((match = phasePattern.exec(content)) !== null) {
-    const phaseNum = match[1];
-    const phaseName = match[2].replace(/\(INSERTED\)/i, '').trim();
-
-    // Extract goal from the section
-    const sectionStart = match.index;
-    const restOfContent = content.slice(sectionStart);
-    const nextHeader = restOfContent.match(/\n#{2,4}\s+Phase\s+\d/i);
-    const sectionEnd = nextHeader ? sectionStart + nextHeader.index : content.length;
-    const section = content.slice(sectionStart, sectionEnd);
-    const isBacklog = backlogIndex !== -1 && sectionStart > backlogIndex;
+  for (const roadmapPhase of roadmapPhases) {
+    const phaseNum = roadmapPhase.number;
+    const phaseName = roadmapPhase.name;
+    const section = roadmapPhase.section;
+    const isBacklog = roadmapPhase.is_backlog;
+    const isFollowUp = roadmapPhase.is_follow_up;
 
     const goalMatch = section.match(/\*\*Goal(?::\*\*|\*\*:)\s*([^\n]+)/i);
     const goal = goalMatch ? goalMatch[1].trim() : null;
@@ -155,6 +146,8 @@ function cmdRoadmapAnalyze(cwd, raw) {
       }
     } catch { /* intentionally empty */ }
 
+    planCount = Math.max(planCount, roadmapPhase.declared_plan_count);
+
     // Check ROADMAP checkbox status
     const checkboxPattern = new RegExp(`-\\s*\\[(x| )\\]\\s*.*Phase\\s+${escapeRegex(phaseNum)}[:\\s]`, 'i');
     const checkboxMatch = content.match(checkboxPattern);
@@ -178,6 +171,7 @@ function cmdRoadmapAnalyze(cwd, raw) {
       has_research: hasResearch,
       disk_status: diskStatus,
       is_backlog: isBacklog,
+      is_follow_up: isFollowUp,
       roadmap_complete: roadmapComplete,
     });
   }
@@ -194,13 +188,14 @@ function cmdRoadmapAnalyze(cwd, raw) {
   }
 
   // Find current and next phase
-  const currentPhase = phases.find(p => !p.is_backlog && (p.disk_status === 'planned' || p.disk_status === 'partial')) || null;
-  const nextPhase = phases.find(p => !p.is_backlog && (p.disk_status === 'empty' || p.disk_status === 'no_directory' || p.disk_status === 'discussed' || p.disk_status === 'researched')) || null;
+  const activeMilestonePhases = phases.filter(p => !p.is_backlog && !p.is_follow_up);
+  const currentPhase = activeMilestonePhases.find(p => p.disk_status === 'planned' || p.disk_status === 'partial') || null;
+  const nextPhase = activeMilestonePhases.find(p => p.disk_status === 'empty' || p.disk_status === 'no_directory' || p.disk_status === 'discussed' || p.disk_status === 'researched') || null;
 
   // Aggregated stats
-  const totalPlans = phases.reduce((sum, p) => sum + p.plan_count, 0);
-  const totalSummaries = phases.reduce((sum, p) => sum + p.summary_count, 0);
-  const completedPhases = phases.filter(p => p.disk_status === 'complete').length;
+  const totalPlans = activeMilestonePhases.reduce((sum, p) => sum + p.plan_count, 0);
+  const totalSummaries = activeMilestonePhases.reduce((sum, p) => sum + p.summary_count, 0);
+  const completedPhases = activeMilestonePhases.filter(p => p.disk_status === 'complete').length;
 
   // Detect phases in summary list without detail sections (malformed ROADMAP)
   const checklistPattern = /-\s*\[[ x]\]\s*\*\*Phase\s+(\d+[A-Z]?(?:\.\d+)*)/gi;
@@ -215,7 +210,7 @@ function cmdRoadmapAnalyze(cwd, raw) {
   const result = {
     milestones,
     phases,
-    phase_count: phases.length,
+    phase_count: activeMilestonePhases.length,
     completed_phases: completedPhases,
     total_plans: totalPlans,
     total_summaries: totalSummaries,

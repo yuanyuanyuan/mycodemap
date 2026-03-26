@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { safeReadFile, loadConfig, isGitIgnored, execGit, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, resolveModelInternal, stripShippedMilestones, extractCurrentMilestone, planningDir, planningPaths, toPosixPath, output, error, findPhaseInternal, extractOneLinerFromBody, getRoadmapPhaseInternal } = require('./core.cjs');
+const { safeReadFile, loadConfig, isGitIgnored, execGit, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, resolveModelInternal, stripShippedMilestones, extractCurrentMilestone, planningDir, planningPaths, toPosixPath, output, error, findPhaseInternal, extractOneLinerFromBody, getRoadmapPhaseInternal, parseRoadmapPhaseSections } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { MODEL_PROFILES } = require('./model-profiles.cjs');
 
@@ -512,18 +512,33 @@ function cmdProgressRender(cwd, format, raw) {
   const phases = [];
   let totalPlans = 0;
   let totalSummaries = 0;
+  const diskPhaseStats = new Map();
 
   try {
+    const isDirInMilestone = getMilestonePhaseFilter(cwd);
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => comparePhaseNum(a, b));
+    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name)
+      .filter(isDirInMilestone)
+      .sort((a, b) => comparePhaseNum(a, b));
 
     for (const dir of dirs) {
       const dm = dir.match(/^(\d+(?:\.\d+)*)-?(.*)/);
       const phaseNum = dm ? dm[1] : dir;
-      const phaseName = dm && dm[2] ? dm[2].replace(/-/g, ' ') : '';
       const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
-      const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').length;
-      const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
+      diskPhaseStats.set(phaseNum, {
+        plans: phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').length,
+        summaries: phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length,
+      });
+    }
+  } catch { /* intentionally empty */ }
+
+  try {
+    const roadmapContent = extractCurrentMilestone(fs.readFileSync(roadmapPath, 'utf-8'), cwd);
+    for (const roadmapPhase of parseRoadmapPhaseSections(roadmapContent)) {
+      if (roadmapPhase.is_backlog || roadmapPhase.is_follow_up) continue;
+      const diskStats = diskPhaseStats.get(roadmapPhase.number) || { plans: 0, summaries: 0 };
+      const plans = Math.max(diskStats.plans, roadmapPhase.declared_plan_count);
+      const summaries = diskStats.summaries;
 
       totalPlans += plans;
       totalSummaries += summaries;
@@ -532,9 +547,9 @@ function cmdProgressRender(cwd, format, raw) {
       if (plans === 0) status = 'Pending';
       else if (summaries >= plans) status = 'Complete';
       else if (summaries > 0) status = 'In Progress';
-      else status = 'Planned';
+      else status = diskStats.plans > 0 ? 'Planned' : 'Pending';
 
-      phases.push({ number: phaseNum, name: phaseName, plans, summaries, status });
+      phases.push({ number: roadmapPhase.number, name: roadmapPhase.name, plans, summaries, status });
     }
   } catch { /* intentionally empty */ }
 
