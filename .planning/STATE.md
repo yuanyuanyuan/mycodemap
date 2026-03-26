@@ -4,9 +4,9 @@ milestone: v1.4
 milestone_name: design-contract-and-agent-handoff
 current_phase: 20
 current_phase_name: design drift verification & docs sync
-current_plan: Not started
+current_plan: 20-01
 status: planning
-last_updated: "2026-03-26T12:14:15Z"
+last_updated: "2026-03-26T12:23:54Z"
 last_activity: 2026-03-26
 progress:
   total_phases: 4
@@ -30,13 +30,13 @@ See: `.planning/PROJECT.md` (updated 2026-03-25)
 **Milestone:** v1.4 设计契约与 Agent Handoff
 **Current Phase:** 20
 **Current Phase Name:** design drift verification & docs sync
-**Current Plan:** Not started
+**Current Plan:** 20-01
 **Total Phases:** 4
 **Total Plans in Milestone:** 12
-**Status:** Phase 20 discuss-phase complete; Phase 20 plan-phase is next
+**Status:** Phase 20 plan-phase complete; Phase 20 execute-phase is next
 **Progress:** [███████░░░] 75%
 **Last Activity:** 2026-03-26
-**Last Activity Description:** Phase 20 discuss-phase completed; `20-CONTEXT.md` 与 `20-DISCUSSION-LOG.md` 已创建，下一步进入 plan-phase
+**Last Activity Description:** Phase 20 plan-phase completed; `20-RESEARCH.md`、`20-VALIDATION.md` 与 `20-01/02/03-PLAN.md` 已创建，下一步进入 execute-phase
 
 ## Decisions
 
@@ -56,7 +56,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-25)
 
 ## Blockers
 
-- None. `Phase 20` discuss-phase 已完成；下一步可直接进入 `Phase 20` plan-phase。
+- None. `Phase 20` plan-phase 已完成；下一步可直接进入 `Phase 20` execute-phase。
 
 ## Accumulated Context
 
@@ -91,6 +91,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-25)
 
 ## Session Log
 
+- 2026-03-26: 完成 `Phase 20` plan-phase，创建 `20-RESEARCH.md`、`20-VALIDATION.md`、`20-01/02/03-PLAN.md`，锁定 `design verify` surface、docs/CI full closure、ready-path fixture 与三类失败预演
 - 2026-03-26: 完成 `Phase 20` discuss-phase，创建 `20-CONTEXT.md` 与 `20-DISCUSSION-LOG.md`，锁定 verification surface、drift truth、docs/CI full closure 与 failure rehearsal 边界
 - 2026-03-25: 完成 `Phase 19` plan-phase，创建 `19-RESEARCH.md`、`19-VALIDATION.md`、`19-01/02/03-PLAN.md`，覆盖 `HOF-01` / `HOF-02` / `HOF-03` / `HOF-04`、artifact path、gate semantics 与最小 docs sync 边界
 - 2026-03-25: 完成 `Phase 19` discuss-phase，创建 `19-CONTEXT.md` 与 `19-DISCUSSION-LOG.md`，锁定 `design handoff` surface、artifact path、human gate policy 与 provenance-first traceability
