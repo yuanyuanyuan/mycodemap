@@ -1,6 +1,6 @@
 <purpose>
 
-Mark a shipped version (v1.0, v1.1, v2.0) as complete. Creates historical record in MILESTONES.md, performs full PROJECT.md evolution review, reorganizes ROADMAP.md with milestone groupings, and tags the release in git.
+Mark a shipped milestone identifier (for example `v1.0`, `v1.1`, or `post-v1.4`) as complete. Creates historical record in MILESTONES.md, performs full PROJECT.md evolution review, and reorganizes ROADMAP.md with milestone groupings. Git tagging only applies when the milestone identifier is also a release version.
 
 </purpose>
 
@@ -18,8 +18,8 @@ Mark a shipped version (v1.0, v1.1, v2.0) as complete. Creates historical record
 
 When a milestone completes:
 
-1. Extract full milestone details to `.planning/milestones/v[X.Y]-ROADMAP.md`
-2. Archive requirements to `.planning/milestones/v[X.Y]-REQUIREMENTS.md`
+1. Extract full milestone details to `.planning/milestones/{milestone_id}-ROADMAP.md`
+2. Archive requirements to `.planning/milestones/{milestone_id}-REQUIREMENTS.md`
 3. Update ROADMAP.md — replace milestone details with one-line summary
 4. Delete REQUIREMENTS.md (fresh one for next milestone)
 5. Perform full PROJECT.md evolution review
@@ -238,7 +238,7 @@ Update PROJECT.md inline. Update "Last updated" footer:
 *Last updated: [date] after v[X.Y] milestone*
 ```
 
-**Example full evolution (v1.0 → v1.1 prep):**
+**Example full evolution (release milestone prep):**
 
 Before:
 
@@ -370,13 +370,13 @@ Update `.planning/ROADMAP.md` — group completed milestone phases:
 **Delegate archival to gsd-tools:**
 
 ```bash
-ARCHIVE=$(node "/data/codemap/.claude/get-shit-done/bin/gsd-tools.cjs" milestone complete "v[X.Y]" --name "[Milestone Name]")
+ARCHIVE=$(node "/data/codemap/.claude/get-shit-done/bin/gsd-tools.cjs" milestone complete "{milestone_id}" --name "[Milestone Name]")
 ```
 
 The CLI handles:
 - Creating `.planning/milestones/` directory
-- Archiving ROADMAP.md to `milestones/v[X.Y]-ROADMAP.md`
-- Archiving REQUIREMENTS.md to `milestones/v[X.Y]-REQUIREMENTS.md` with archive header
+- Archiving ROADMAP.md to `milestones/{milestone_id}-ROADMAP.md`
+- Archiving REQUIREMENTS.md to `milestones/{milestone_id}-REQUIREMENTS.md` with archive header
 - Moving audit file to milestones if it exists
 - Creating/appending MILESTONES.md entry with accomplishments from SUMMARY.md files
 - Updating STATE.md (status, last activity)
@@ -387,7 +387,7 @@ Verify: `✅ Milestone archived to .planning/milestones/`
 
 **Phase archival (optional):** After archival completes, ask the user:
 
-AskUserQuestion(header="Archive Phases", question="Archive phase directories to milestones/?", options: "Yes — move to milestones/v[X.Y]-phases/" | "Skip — keep phases in place")
+AskUserQuestion(header="Archive Phases", question="Archive phase directories to milestones/?", options: "Yes — move to milestones/{milestone_id}-phases/" | "Skip — keep phases in place")
 
 If "Yes": move phase directories to the milestone archive:
 ```bash
@@ -680,29 +680,29 @@ git push origin v[X.Y]
 Commit milestone completion.
 
 ```bash
-node "/data/codemap/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: complete v[X.Y] milestone" --files .planning/milestones/v[X.Y]-ROADMAP.md .planning/milestones/v[X.Y]-REQUIREMENTS.md .planning/milestones/v[X.Y]-MILESTONE-AUDIT.md .planning/MILESTONES.md .planning/PROJECT.md .planning/STATE.md
+node "/data/codemap/.claude/get-shit-done/bin/gsd-tools.cjs" commit "chore: complete {milestone_id} milestone" --files .planning/milestones/{milestone_id}-ROADMAP.md .planning/milestones/{milestone_id}-REQUIREMENTS.md .planning/milestones/{milestone_id}-MILESTONE-AUDIT.md .planning/MILESTONES.md .planning/PROJECT.md .planning/STATE.md
 ```
 ```
 
-Confirm: "Committed: chore: complete v[X.Y] milestone"
+Confirm: "Committed: chore: complete {milestone_id} milestone"
 
 </step>
 
 <step name="offer_next">
 
 ```
-✅ Milestone v[X.Y] [Name] complete
+✅ Milestone {milestone_id} [Name] complete
 
 Shipped:
 - [N] phases ([M] plans, [P] tasks)
 - [One sentence of what shipped]
 
 Archived:
-- milestones/v[X.Y]-ROADMAP.md
-- milestones/v[X.Y]-REQUIREMENTS.md
+- milestones/{milestone_id}-ROADMAP.md
+- milestones/{milestone_id}-REQUIREMENTS.md
 
 Summary: .planning/MILESTONES.md
-Tag: v[X.Y]
+Tag: only for release-style milestones when explicitly requested
 
 ---
 
@@ -751,11 +751,11 @@ Milestone completion is successful when:
 - [ ] All shipped requirements moved to Validated in PROJECT.md
 - [ ] Key Decisions updated with outcomes
 - [ ] ROADMAP.md reorganized with milestone grouping
-- [ ] Roadmap archive created (milestones/v[X.Y]-ROADMAP.md)
-- [ ] Requirements archive created (milestones/v[X.Y]-REQUIREMENTS.md)
+- [ ] Roadmap archive created (milestones/{milestone_id}-ROADMAP.md)
+- [ ] Requirements archive created (milestones/{milestone_id}-REQUIREMENTS.md)
 - [ ] REQUIREMENTS.md deleted (fresh for next milestone)
 - [ ] STATE.md updated with fresh project reference
-- [ ] Git tag created (v[X.Y])
+- [ ] Git tag created only when the milestone id is also a release version and the user asked for it
 - [ ] Milestone commit made (includes archive files and deletion)
 - [ ] Requirements completion checked against REQUIREMENTS.md traceability table
 - [ ] Incomplete requirements surfaced with proceed/audit/abort options

@@ -737,7 +737,7 @@ Skill(skill="gsd:audit-milestone")
 After audit completes, detect the result:
 
 ```bash
-AUDIT_FILE=".planning/v${milestone_version}-MILESTONE-AUDIT.md"
+AUDIT_FILE=".planning/${milestone_version}-MILESTONE-AUDIT.md"
 AUDIT_STATUS=$(grep "^status:" "${AUDIT_FILE}" 2>/dev/null | head -1 | cut -d: -f2 | tr -d ' ')
 ```
 
@@ -793,7 +793,7 @@ Skill(skill="gsd:complete-milestone", args="${milestone_version}")
 After complete-milestone returns, verify it produced output:
 
 ```bash
-ls .planning/milestones/v${milestone_version}-ROADMAP.md 2>/dev/null || true
+ls .planning/milestones/${milestone_version}-ROADMAP.md 2>/dev/null || true
 ```
 
 If the archive file does not exist, go to handle_blocker: "Complete milestone did not produce expected archive files."

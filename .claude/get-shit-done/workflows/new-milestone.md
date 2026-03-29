@@ -30,6 +30,7 @@ If the flag is absent, keep the current behavior of continuing phase numbering f
 - Read PROJECT.md (existing project, validated requirements, decisions)
 - Read MILESTONES.md (what shipped previously)
 - Read STATE.md (pending todos, blockers)
+- Read dormant seeds in `.planning/seeds/` when present; treat them as candidate future context, not automatic scope commitments
 - Check for MILESTONE-CONTEXT.md (from /gsd:discuss-milestone)
 
 ## 2. Gather Milestone Goals
@@ -40,6 +41,9 @@ If the flag is absent, keep the current behavior of continuing phase numbering f
 
 **If no context file:**
 - Present what shipped in last milestone
+- Surface any dormant seeds whose `title` or `trigger_when` looks relevant to the proposed milestone or the just-completed milestone debt
+- If no milestone name was provided and dormant seeds exist, show a short "Possible dormant seeds to revive" list before asking what to build next
+- Make it explicit that seeds are optional prompts, not pre-approved scope
 - Ask inline (freeform, NOT AskUserQuestion): "What do you want to build next?"
 - Wait for their response, then use AskUserQuestion to probe specifics
 - If user selects "Other" at any point to provide freeform input, ask follow-up as plain text — not another AskUserQuestion
@@ -151,7 +155,12 @@ AGENT_SKILLS_SYNTHESIZER=$(node "/data/codemap/.claude/get-shit-done/bin/gsd-too
 AGENT_SKILLS_ROADMAPPER=$(node "/data/codemap/.claude/get-shit-done/bin/gsd-tools.cjs" agent-skills gsd-roadmapper 2>/dev/null)
 ```
 
-Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`, `latest_completed_milestone`, `phase_dir_count`, `phase_archive_path`.
+Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`, `latest_completed_milestone`, `phase_dir_count`, `phase_archive_path`, `available_seed_count`, `available_seeds`.
+
+If `available_seed_count > 0`, review `available_seeds` before milestone questioning:
+- Prefer seeds with obvious semantic overlap to the requested milestone
+- Present matches as "Dormant seeds to consider"
+- Keep non-matching seeds dormant and out of scope
 
 ## 7.5 Reset-phase safety (only when `--reset-phase-numbers`)
 

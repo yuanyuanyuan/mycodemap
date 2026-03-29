@@ -87,7 +87,7 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
 
 function cmdMilestoneComplete(cwd, version, options, raw) {
   if (!version) {
-    error('version required for milestone complete (e.g., v1.0)');
+    error('milestone identifier required for milestone complete (e.g., v1.0 or post-v1.4)');
   }
 
   const roadmapPath = planningPaths(cwd).roadmap;

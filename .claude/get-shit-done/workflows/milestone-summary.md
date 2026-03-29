@@ -23,18 +23,18 @@ Set `VERSION` to the resolved version (e.g., "1.0").
 
 Determine whether the milestone is **archived** or **current**:
 
-**Archived milestone** (`.planning/milestones/v{VERSION}-ROADMAP.md` exists):
+**Archived milestone** (`.planning/milestones/{VERSION}-ROADMAP.md` exists):
 ```
-ROADMAP_PATH=".planning/milestones/v${VERSION}-ROADMAP.md"
-REQUIREMENTS_PATH=".planning/milestones/v${VERSION}-REQUIREMENTS.md"
-AUDIT_PATH=".planning/milestones/v${VERSION}-MILESTONE-AUDIT.md"
+ROADMAP_PATH=".planning/milestones/${VERSION}-ROADMAP.md"
+REQUIREMENTS_PATH=".planning/milestones/${VERSION}-REQUIREMENTS.md"
+AUDIT_PATH=".planning/milestones/${VERSION}-MILESTONE-AUDIT.md"
 ```
 
 **Current/in-progress milestone** (no archive yet):
 ```
 ROADMAP_PATH=".planning/ROADMAP.md"
 REQUIREMENTS_PATH=".planning/REQUIREMENTS.md"
-AUDIT_PATH=".planning/v${VERSION}-MILESTONE-AUDIT.md"
+AUDIT_PATH=".planning/${VERSION}-MILESTONE-AUDIT.md"
 ```
 
 Note: The audit file moves to `.planning/milestones/` on archive (per `complete-milestone` workflow). Check both locations as a fallback.

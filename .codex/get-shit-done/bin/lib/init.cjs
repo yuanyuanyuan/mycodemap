@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, stripShippedMilestones, extractCurrentMilestone, normalizePhaseName, planningPaths, planningDir, planningRoot, toPosixPath, output, error, parseRoadmapPhaseSections } = require('./core.cjs');
+const { extractFrontmatter } = require('./frontmatter.cjs');
 
 function getLatestCompletedMilestone(cwd) {
   const milestonesPath = path.join(planningRoot(cwd), 'MILESTONES.md');
@@ -13,7 +14,7 @@ function getLatestCompletedMilestone(cwd) {
 
   try {
     const content = fs.readFileSync(milestonesPath, 'utf-8');
-    const match = content.match(/^##\s+(v[\d.]+)\s+(.+?)\s+\(Shipped:/m);
+    const match = content.match(/^##\s+([^\s]+)\s+(.+?)\s+\(Shipped:/m);
     if (!match) return null;
     return {
       version: match[1],
@@ -21,6 +22,39 @@ function getLatestCompletedMilestone(cwd) {
     };
   } catch {
     return null;
+  }
+}
+
+function getDormantSeeds(cwd) {
+  const seedsDir = path.join(planningDir(cwd), 'seeds');
+  if (!fs.existsSync(seedsDir)) return [];
+
+  try {
+    return fs.readdirSync(seedsDir, { withFileTypes: true })
+      .filter(entry => entry.isFile() && /^SEED-\d+.*\.md$/i.test(entry.name))
+      .map(entry => {
+        const fullPath = path.join(seedsDir, entry.name);
+        const content = fs.readFileSync(fullPath, 'utf-8');
+        const fm = extractFrontmatter(content);
+        const status = String(fm.status || 'dormant').trim().toLowerCase();
+        if (status !== 'dormant') return null;
+
+        const titleMatch = content.match(/^#\s+SEED-[^:]+:\s+([^\n]+)/m);
+        return {
+          id: fm.id || entry.name.replace(/\.md$/i, ''),
+          status,
+          title: titleMatch ? titleMatch[1].trim() : entry.name.replace(/^SEED-\d+-/i, '').replace(/\.md$/i, '').replace(/-/g, ' '),
+          trigger_when: fm.trigger_when || null,
+          scope: fm.scope || null,
+          planted: fm.planted || null,
+          planted_during: fm.planted_during || null,
+          path: toPosixPath(path.relative(cwd, fullPath)),
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  } catch {
+    return [];
   }
 }
 
@@ -314,6 +348,7 @@ function cmdInitNewMilestone(cwd, raw) {
   const config = loadConfig(cwd);
   const milestone = getMilestoneInfo(cwd);
   const latestCompleted = getLatestCompletedMilestone(cwd);
+  const dormantSeeds = getDormantSeeds(cwd);
   const phasesDir = path.join(planningDir(cwd), 'phases');
   let phaseDirCount = 0;
 
@@ -342,6 +377,8 @@ function cmdInitNewMilestone(cwd, raw) {
     latest_completed_milestone_name: latestCompleted?.name || null,
     phase_dir_count: phaseDirCount,
     phase_archive_path: latestCompleted ? toPosixPath(path.relative(cwd, path.join(planningRoot(cwd), 'milestones', `${latestCompleted.version}-phases`))) : null,
+    available_seed_count: dormantSeeds.length,
+    available_seeds: dormantSeeds,
 
     // File existence
     project_exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),

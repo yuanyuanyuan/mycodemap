@@ -1064,9 +1064,90 @@ function generateSlugInternal(text) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
+function readStateMilestoneRef(cwd) {
+  try {
+    const statePath = path.join(planningDir(cwd), 'STATE.md');
+    if (!fs.existsSync(statePath)) return null;
+    const stateRaw = fs.readFileSync(statePath, 'utf-8');
+    const milestoneMatch = stateRaw.match(/^milestone:\s*(.+)$/m);
+    return milestoneMatch ? milestoneMatch[1].trim().replace(/^['"]|['"]$/g, '') : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeMilestoneLabel(rawLabel) {
+  return String(rawLabel || '')
+    .replace(/^\s*[-*+]\s*/, '')
+    .replace(/^#{1,6}\s*/, '')
+    .replace(/\*\*/g, '')
+    .replace(/^[✅📋🚧]\s*/, '')
+    .replace(/\s+[—–-]\s+Phases?\s+[\w.]+(?:\s*[-–]\s*[\w.]+)?[^\\n]*$/i, '')
+    .replace(/\s+\((?:shipped|completed|in progress|planned)[^)]*\)\s*$/i, '')
+    .trim();
+}
+
+function findMilestoneLabelInRoadmap(roadmap, milestoneRef) {
+  if (!roadmap) return null;
+
+  const candidates = [];
+  for (const line of roadmap.split('\n')) {
+    const headingMatch = line.match(/^#{1,6}\s+(.+)$/);
+    if (headingMatch) candidates.push(headingMatch[1]);
+
+    const bulletMatch = line.match(/^\s*-\s*[^\n]*\*\*([^*]+)\*\*/);
+    if (bulletMatch) candidates.push(bulletMatch[1]);
+  }
+
+  const normalizedCandidates = candidates
+    .map(candidate => normalizeMilestoneLabel(candidate))
+    .filter(Boolean);
+
+  const preferred = String(milestoneRef || '').trim().toLowerCase();
+  if (preferred) {
+    const exact = normalizedCandidates.find(candidate => candidate.toLowerCase().startsWith(preferred));
+    if (exact) return exact;
+
+    const contains = normalizedCandidates.find(candidate => candidate.toLowerCase().includes(preferred));
+    if (contains) return contains;
+  }
+
+  return normalizedCandidates.find(candidate => /^(?:post-|pre-)?v\d+(?:\.\d+)+\b/i.test(candidate)) || null;
+}
+
+function buildMilestoneInfo(label, preferredRef) {
+  const cleaned = normalizeMilestoneLabel(label);
+  const preferred = String(preferredRef || '').trim();
+
+  if (preferred && cleaned.toLowerCase().startsWith(preferred.toLowerCase())) {
+    const name = cleaned.slice(preferred.length).trim().replace(/^[:\-—–]\s*/, '');
+    return { version: preferred, name: name || 'milestone' };
+  }
+
+  const versionMatch = cleaned.match(/^((?:post-|pre-)?v\d+(?:\.\d+)+)\b(?:\s+(.+))?$/i);
+  if (versionMatch) {
+    return {
+      version: versionMatch[1],
+      name: versionMatch[2] ? versionMatch[2].trim() : 'milestone',
+    };
+  }
+
+  if (preferred) {
+    return { version: preferred, name: cleaned || 'milestone' };
+  }
+
+  return { version: cleaned || 'v1.0', name: 'milestone' };
+}
+
 function getMilestoneInfo(cwd) {
   try {
     const roadmap = fs.readFileSync(path.join(planningDir(cwd), 'ROADMAP.md'), 'utf-8');
+    const stateMilestone = readStateMilestoneRef(cwd);
+
+    if (stateMilestone) {
+      const stateLabel = findMilestoneLabelInRoadmap(roadmap, stateMilestone);
+      return buildMilestoneInfo(stateLabel || stateMilestone, stateMilestone);
+    }
 
     // First: check for list-format roadmaps using 🚧 (in-progress) marker
     // e.g. "- 🚧 **v2.1 Belgium** — Phases 24-28 (in progress)"

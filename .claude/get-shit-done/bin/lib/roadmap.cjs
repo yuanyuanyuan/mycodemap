@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, normalizePhaseName, planningPaths, output, error, findPhaseInternal, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone } = require('./core.cjs');
+const { escapeRegex, normalizePhaseName, planningPaths, output, error, findPhaseInternal, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone, getMilestoneInfo } = require('./core.cjs');
 
 function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
   const roadmapPath = planningPaths(cwd).roadmap;
@@ -180,15 +180,13 @@ function cmdRoadmapAnalyze(cwd, raw) {
   }
 
   // Extract milestone info
-  const milestones = [];
-  const milestonePattern = /##\s*(.*v(\d+(?:\.\d+)+)[^(\n]*)/gi;
-  let mMatch;
-  while ((mMatch = milestonePattern.exec(content)) !== null) {
-    milestones.push({
-      heading: mMatch[1].trim(),
-      version: 'v' + mMatch[2],
-    });
-  }
+  const milestoneInfo = getMilestoneInfo(cwd);
+  const milestones = milestoneInfo
+    ? [{
+        heading: [milestoneInfo.version, milestoneInfo.name].filter(Boolean).join(' ').trim(),
+        version: milestoneInfo.version,
+      }]
+    : [];
 
   // Find current and next phase
   const currentPhase = phases.find(p => p.disk_status === 'planned' || p.disk_status === 'partial') || null;

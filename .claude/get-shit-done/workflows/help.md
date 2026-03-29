@@ -206,6 +206,7 @@ Result: Phase 17 deleted, phases 18-20 become 17-19
 Start a new milestone through unified flow.
 
 - Deep questioning to understand what you're building next
+- Surfaces matching dormant seeds from `.planning/seeds/` before scoping
 - Optional domain research (spawns 4 parallel researcher agents)
 - Requirements definition with scoping
 - Roadmap creation with phase breakdown

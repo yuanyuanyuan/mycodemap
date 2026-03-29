@@ -11,8 +11,8 @@ Read all files referenced by the invoking prompt's execution_context before star
 ## 1. Load Audit Results
 
 ```bash
-# Find the most recent audit file
-(ls -t .planning/v*-MILESTONE-AUDIT.md 2>/dev/null || true) | head -1
+# Find the most recent unarchived audit file
+(ls -t .planning/*-MILESTONE-AUDIT.md 2>/dev/null | grep -v '/milestones/' || true) | head -1
 ```
 
 Parse YAML frontmatter to extract structured gaps:

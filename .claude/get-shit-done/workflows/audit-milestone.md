@@ -160,9 +160,9 @@ Add to audit YAML: `nyquist: { compliant_phases, partial_phases, missing_phases,
 
 Discovery only — never auto-calls `/gsd:validate-phase`.
 
-## 6. Aggregate into v{version}-MILESTONE-AUDIT.md
+## 6. Aggregate into {version}-MILESTONE-AUDIT.md
 
-Create `.planning/v{version}-v{version}-MILESTONE-AUDIT.md` with:
+Create `.planning/{version}-MILESTONE-AUDIT.md` with:
 
 ```yaml
 ---
@@ -219,7 +219,7 @@ Output this markdown directly (not as a code block). Route based on status:
 ## ✓ Milestone {version} — Audit Passed
 
 **Score:** {N}/{M} requirements satisfied
-**Report:** .planning/v{version}-MILESTONE-AUDIT.md
+**Report:** .planning/{version}-MILESTONE-AUDIT.md
 
 All requirements covered. Cross-phase integration verified. E2E flows complete.
 
@@ -242,7 +242,7 @@ All requirements covered. Cross-phase integration verified. E2E flows complete.
 ## ⚠ Milestone {version} — Gaps Found
 
 **Score:** {N}/{M} requirements satisfied
-**Report:** .planning/v{version}-MILESTONE-AUDIT.md
+**Report:** .planning/{version}-MILESTONE-AUDIT.md
 
 ### Unsatisfied Requirements
 
@@ -281,7 +281,7 @@ Phases needing validation: run `/gsd:validate-phase {N}` for each flagged phase.
 ───────────────────────────────────────────────────────────────
 
 **Also available:**
-- cat .planning/v{version}-MILESTONE-AUDIT.md — see full report
+- cat .planning/{version}-MILESTONE-AUDIT.md — see full report
 - /gsd:complete-milestone {version} — proceed anyway (accept tech debt)
 
 ───────────────────────────────────────────────────────────────
@@ -293,7 +293,7 @@ Phases needing validation: run `/gsd:validate-phase {N}` for each flagged phase.
 ## ⚡ Milestone {version} — Tech Debt Review
 
 **Score:** {N}/{M} requirements satisfied
-**Report:** .planning/v{version}-MILESTONE-AUDIT.md
+**Report:** .planning/{version}-MILESTONE-AUDIT.md
 
 All requirements met. No critical blockers. Accumulated tech debt needs review.
 
@@ -332,7 +332,7 @@ All requirements met. No critical blockers. Accumulated tech debt needs review.
 - [ ] Orphaned requirements detected (in traceability but absent from all VERIFICATIONs)
 - [ ] Tech debt and deferred gaps aggregated
 - [ ] Integration checker spawned with milestone requirement IDs
-- [ ] v{version}-MILESTONE-AUDIT.md created with structured requirement gap objects
+- [ ] {version}-MILESTONE-AUDIT.md created with structured requirement gap objects
 - [ ] FAIL gate enforced — any unsatisfied requirement forces gaps_found status
 - [ ] Nyquist compliance scanned for all milestone phases (if enabled)
 - [ ] Missing VALIDATION.md phases flagged with validate-phase suggestion
