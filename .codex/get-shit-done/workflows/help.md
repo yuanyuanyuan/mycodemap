@@ -207,6 +207,7 @@ Start a new milestone through unified flow.
 
 - Deep questioning to understand what you're building next
 - Surfaces matching dormant seeds from `.planning/seeds/` before scoping
+- Uses milestone text to pre-rank the most relevant dormant seeds when possible
 - Optional domain research (spawns 4 parallel researcher agents)
 - Requirements definition with scoping
 - Roadmap creation with phase breakdown

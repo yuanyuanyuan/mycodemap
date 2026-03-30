@@ -25,12 +25,27 @@ function getLatestCompletedMilestone(cwd) {
   }
 }
 
-function getDormantSeeds(cwd) {
+function tokenizeSeedMatchText(text) {
+  return [...new Set(
+    String(text || '')
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(token => token.length >= 3 && !token.startsWith('--'))
+  )];
+}
+
+function getDormantSeeds(cwd, matchText = '') {
   const seedsDir = path.join(planningDir(cwd), 'seeds');
-  if (!fs.existsSync(seedsDir)) return [];
+  if (!fs.existsSync(seedsDir)) {
+    return {
+      availableSeeds: [],
+      matchingSeeds: [],
+      matchQuery: String(matchText || '').trim() || null,
+    };
+  }
 
   try {
-    return fs.readdirSync(seedsDir, { withFileTypes: true })
+    const availableSeeds = fs.readdirSync(seedsDir, { withFileTypes: true })
       .filter(entry => entry.isFile() && /^SEED-\d+.*\.md$/i.test(entry.name))
       .map(entry => {
         const fullPath = path.join(seedsDir, entry.name);
@@ -53,8 +68,37 @@ function getDormantSeeds(cwd) {
       })
       .filter(Boolean)
       .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+
+    const query = String(matchText || '').trim();
+    const queryTokens = tokenizeSeedMatchText(query);
+    const matchingSeeds = queryTokens.length === 0
+      ? []
+      : availableSeeds
+        .map(seed => {
+          const haystack = `${seed.title} ${seed.trigger_when || ''}`.toLowerCase();
+          const matched_terms = queryTokens.filter(token => haystack.includes(token));
+          return matched_terms.length === 0
+            ? null
+            : {
+                ...seed,
+                matched_terms,
+                match_score: matched_terms.length,
+              };
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.match_score - a.match_score || String(a.id).localeCompare(String(b.id)));
+
+    return {
+      availableSeeds,
+      matchingSeeds,
+      matchQuery: query || null,
+    };
   } catch {
-    return [];
+    return {
+      availableSeeds: [],
+      matchingSeeds: [],
+      matchQuery: String(matchText || '').trim() || null,
+    };
   }
 }
 
@@ -377,11 +421,11 @@ function cmdInitNewProject(cwd, raw) {
   output(withProjectRoot(cwd, result), raw);
 }
 
-function cmdInitNewMilestone(cwd, raw) {
+function cmdInitNewMilestone(cwd, raw, milestoneHint = '') {
   const config = loadConfig(cwd);
   const milestone = getMilestoneInfo(cwd);
   const latestCompleted = getLatestCompletedMilestone(cwd);
-  const dormantSeeds = getDormantSeeds(cwd);
+  const { availableSeeds, matchingSeeds, matchQuery } = getDormantSeeds(cwd, milestoneHint);
   const phasesDir = path.join(planningDir(cwd), 'phases');
   let phaseDirCount = 0;
 
@@ -410,8 +454,11 @@ function cmdInitNewMilestone(cwd, raw) {
     latest_completed_milestone_name: latestCompleted?.name || null,
     phase_dir_count: phaseDirCount,
     phase_archive_path: latestCompleted ? toPosixPath(path.relative(cwd, path.join(planningRoot(cwd), 'milestones', `${latestCompleted.version}-phases`))) : null,
-    available_seed_count: dormantSeeds.length,
-    available_seeds: dormantSeeds,
+    seed_match_query: matchQuery,
+    available_seed_count: availableSeeds.length,
+    available_seeds: availableSeeds,
+    matching_seed_count: matchingSeeds.length,
+    matching_seeds: matchingSeeds,
 
     // File existence
     project_exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),

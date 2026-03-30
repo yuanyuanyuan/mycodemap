@@ -155,12 +155,15 @@ AGENT_SKILLS_SYNTHESIZER=$(node "/data/codemap/.claude/get-shit-done/bin/gsd-too
 AGENT_SKILLS_ROADMAPPER=$(node "/data/codemap/.claude/get-shit-done/bin/gsd-tools.cjs" agent-skills gsd-roadmapper 2>/dev/null)
 ```
 
-Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`, `latest_completed_milestone`, `phase_dir_count`, `phase_archive_path`, `available_seed_count`, `available_seeds`.
+If a milestone name or theme is already known from `$ARGUMENTS`, pass that text to `init new-milestone` so seed matching can pre-rank related dormant seeds.
+
+Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`, `latest_completed_milestone`, `phase_dir_count`, `phase_archive_path`, `seed_match_query`, `available_seed_count`, `available_seeds`, `matching_seed_count`, `matching_seeds`.
 
 If `available_seed_count > 0`, review `available_seeds` before milestone questioning:
 - Prefer seeds with obvious semantic overlap to the requested milestone
 - Present matches as "Dormant seeds to consider"
 - Keep non-matching seeds dormant and out of scope
+- If `matching_seed_count > 0`, show `matching_seeds` first and explain that they matched the milestone hint rather than being auto-approved scope
 
 ## 7.5 Reset-phase safety (only when `--reset-phase-numbers`)
 
