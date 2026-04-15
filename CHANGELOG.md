@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2026-04-15 - Design Contract Surface
+
+### 🏗️ v1.4 Milestone: Design-to-Code Mapping & Handoff Package
+
+v1.4 milestone 完成，新增完整的 design contract 公共 CLI 表面，支持人类设计到 AI 执行的标准化 handoff。
+
+#### Phase 17: Design Contract Validation
+- **feature**: 发布 `design validate` 命令，校验 `mycodemap.design.md` 必填 sections
+- **feature**: 返回结构化 diagnostics（missing-section、duplicate-section、empty-section 等）
+
+#### Phase 18: Design-to-Code Mapping
+- **feature**: 发布 `design map` 命令，将 design contract 解析为 candidate code scope
+- **feature**: 支持 `no-candidates`、`over-broad-scope`、`high-risk-scope` 自动阻断
+
+#### Phase 19: Handoff Package & Human Gates
+- **feature**: 发布 `design handoff` 命令，生成 reviewer / AI agent 共用的 handoff artifact
+- **feature**: 输出 `readyForExecution`、`approvals`、`assumptions`、`openQuestions`
+
+#### Phase 20: Design Drift Verification
+- **feature**: 发布 `design verify` 命令，基于 reviewed handoff truth 做 checklist / drift 检查
+- **feature**: `needs-review` 保持零退出码，仅 blocker diagnostics 返回非零 exit code
+
+### 🚀 New Features
+
+- **design**: 新增 design contract 四阶段 CLI 命令（validate / map / handoff / verify）
+- **docs**: 同步 AI_GUIDE.md、README.md 和 docs/ai-guide 中的 design 类型定义与 workflow 命令
+- **ci**: 更新文档一致性校验脚本，覆盖 design contract 测试与 fixture
+
+### 🐛 Bug Fixes
+
+- **storage**: 修复 `kuzu` 可选依赖在 CI typecheck 中的模块缺失错误
+- **publish**: 移除 GitHub Actions 中不稳定的 `npm install -g npm@latest` 步骤
+
 ## [0.4.2] - 2026-03-25 - Test Infrastructure Fix
 
 ### 🏗️ v1.3 Milestone: Kùzu-only Convergence & High-Signal Debt Cleanup
