@@ -666,3 +666,47 @@ export type {
   DesignContract,
   NormalizedDesignContract,
 } from './design-contract.js';
+
+export type {
+  DesignMappingCandidateKind,
+  DesignMappingEvidenceType,
+  DesignMappingRiskLevel,
+  DesignMappingDiagnosticSeverity,
+  DesignMappingDiagnosticCode,
+  DesignMappingConfidence,
+  DesignMappingReason,
+  DesignMappingCandidate,
+  DesignMappingDiagnostic,
+  DesignMappingSummary,
+  DesignMappingResult,
+} from './design-mapping.js';
+
+export type {
+  DesignHandoffApprovalStatus,
+  DesignHandoffDiagnosticSeverity,
+  DesignHandoffDiagnosticCode,
+  DesignHandoffSourceRef,
+  DesignHandoffTraceItem,
+  DesignHandoffApproval,
+  DesignHandoffAssumption,
+  DesignHandoffOpenQuestion,
+  DesignHandoffArtifacts,
+  DesignHandoffSummary,
+  DesignHandoffPayload,
+  DesignHandoffDiagnostic,
+  DesignHandoffResult,
+} from './design-handoff.js';
+
+export type {
+  DesignVerificationStatus,
+  DesignDriftKind,
+  DesignDriftSeverity,
+  DesignVerificationDiagnosticSeverity,
+  DesignVerificationDiagnosticCode,
+  DesignVerificationEvidenceRef,
+  DesignVerificationChecklistItem,
+  DesignDriftItem,
+  DesignVerificationSummary,
+  DesignVerificationDiagnostic,
+  DesignVerificationResult,
+} from './design-verification.js';
