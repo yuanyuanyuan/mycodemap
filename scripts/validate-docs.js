@@ -235,6 +235,7 @@ function validateDesignContractDocs(rootDir, failures) {
   const patternsGuide = readText(rootDir, 'docs/ai-guide/PATTERNS.md', failures);
   const promptsGuide = readText(rootDir, 'docs/ai-guide/PROMPTS.md', failures);
   const engineeringGuide = readText(rootDir, 'docs/rules/engineering-with-codex-openai.md', failures);
+  const validationRule = readText(rootDir, 'docs/rules/validation.md', failures);
   const productSpecsReadme = readText(rootDir, 'docs/product-specs/README.md', failures);
   const designTemplate = readText(rootDir, 'docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md', failures);
   const cliIndexSource = readText(rootDir, 'src/cli/index.ts', failures);
@@ -251,6 +252,13 @@ function validateDesignContractDocs(rootDir, failures) {
       [
         "new Command('design')",
         ".command('validate')",
+        ".command('map')",
+        ".command('handoff')",
+        ".command('verify')",
+        'renderDesignMappingResult',
+        'renderDesignVerificationResult',
+        'runDesignHandoff',
+        'runDesignVerify',
         'DEFAULT_DESIGN_CONTRACT_PATH',
         'JSON 格式输出'
       ],
@@ -265,8 +273,12 @@ function validateDesignContractDocs(rootDir, failures) {
       'README.md design contract baseline',
       [
         'mycodemap design validate mycodemap.design.md --json',
+        'mycodemap design map mycodemap.design.md --json',
+        'mycodemap design handoff mycodemap.design.md --json',
+        'mycodemap design verify mycodemap.design.md --json',
         'docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md',
-        '`mycodemap.design.md`'
+        '`mycodemap.design.md`',
+        '`design validate → design map → design handoff → design verify`'
       ],
       [],
       failures
@@ -279,8 +291,14 @@ function validateDesignContractDocs(rootDir, failures) {
       'AI_GUIDE.md design contract baseline',
       [
         'design validate mycodemap.design.md --json',
+        'design map mycodemap.design.md --json',
+        'design handoff mycodemap.design.md --json',
+        'design verify mycodemap.design.md --json',
         '`mycodemap.design.md`',
-        'interface DesignValidateOutput {'
+        'interface DesignValidateOutput {',
+        'interface DesignMapOutput {',
+        'interface DesignHandoffOutput {',
+        'interface DesignVerificationOutput {'
       ],
       [],
       failures
@@ -292,7 +310,10 @@ function validateDesignContractDocs(rootDir, failures) {
       claudeGuide,
       'CLAUDE.md design retrieval guidance',
       [
-        'node dist/cli/index.js design validate [file] --json'
+        'node dist/cli/index.js design validate [file] --json',
+        'node dist/cli/index.js design map [file] --json',
+        'node dist/cli/index.js design handoff [file] --json',
+        'node dist/cli/index.js design verify [file] --json'
       ],
       [],
       failures
@@ -304,10 +325,17 @@ function validateDesignContractDocs(rootDir, failures) {
       commandsGuide,
       'docs/ai-guide/COMMANDS.md design contract baseline',
       [
-        '## design - 设计契约校验',
+        '## design - 设计契约输入、范围映射与验证',
         'mycodemap design validate mycodemap.design.md --json',
+        'mycodemap design map mycodemap.design.md --json',
+        'mycodemap design handoff mycodemap.design.md --json',
+        'mycodemap design verify mycodemap.design.md --json',
         '`mycodemap.design.md`',
-        '### 必填 sections'
+        '### 必填 sections',
+        '### map',
+        '### handoff',
+        '### verify',
+        'no-candidates'
       ],
       [],
       failures
@@ -320,9 +348,28 @@ function validateDesignContractDocs(rootDir, failures) {
       'docs/ai-guide/OUTPUT.md design validate schema',
       [
         '## design validate 命令输出结构',
+        '## design map 命令输出结构',
+        '## design handoff 命令输出结构',
+        '## design verify 命令输出结构',
         'type DesignContractDiagnosticCode =',
         'interface DesignValidateOutput {',
-        '"code": "missing-section"'
+        'interface DesignMapOutput {',
+        'interface DesignHandoffOutput {',
+        'interface DesignVerificationOutput {',
+        'unknowns: string[];',
+        'diagnostics: DesignMappingDiagnostic[];',
+        'readyForExecution: boolean;',
+        'approvals: Array<DesignHandoffTraceItem & {',
+        'assumptions: DesignHandoffTraceItem[];',
+        'openQuestions: DesignHandoffTraceItem[];',
+        'type DesignVerificationStatus =',
+        'type DesignDriftKind =',
+        'checklist: Array<{',
+        'drift: Array<{',
+        '"code": "handoff-missing"',
+        '"code": "missing-section"',
+        '"code": "high-risk-scope"',
+        '"code": "review-required"'
       ],
       [],
       failures
@@ -335,6 +382,10 @@ function validateDesignContractDocs(rootDir, failures) {
       'docs/ai-guide/PATTERNS.md design/workflow baseline',
       [
         'node dist/cli/index.js design validate mycodemap.design.md --json',
+        'node dist/cli/index.js design map mycodemap.design.md --json',
+        'node dist/cli/index.js design handoff mycodemap.design.md --json',
+        'node dist/cli/index.js design verify mycodemap.design.md --json',
+        '`design validate → design map → design handoff → design verify`',
         '`workflow` 仍只保留 `find` / `read` / `link` / `show` 四阶段'
       ],
       [
@@ -364,6 +415,12 @@ function validateDesignContractDocs(rootDir, failures) {
       'docs/rules/engineering-with-codex-openai.md design command guardrail',
       [
         '`node dist/cli/index.js design validate mycodemap.design.md --json`',
+        '`node dist/cli/index.js design map mycodemap.design.md --json`',
+        '`node dist/cli/index.js design handoff mycodemap.design.md --json`',
+        '`node dist/cli/index.js design verify mycodemap.design.md --json`',
+        '`candidates` / `unknowns` / `diagnostics`',
+        '`readyForExecution` / `approvals` / `assumptions` / `openQuestions`',
+        '`checklist` / `drift` / `diagnostics` / `readyForExecution`',
         '`docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md`'
       ],
       [],
@@ -377,6 +434,21 @@ function validateDesignContractDocs(rootDir, failures) {
       'docs/product-specs/README.md design template index',
       [
         '`DESIGN_CONTRACT_TEMPLATE.md`'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (validationRule) {
+    validateSnippets(
+      validationRule,
+      'docs/rules/validation.md design verification baseline',
+      [
+        '`design validate` / `design map` / `design handoff` / `design verify`',
+        '`design validate → design map → design handoff → design verify`',
+        'design verify mycodemap.design.md --json',
+        'review-needed 与 blocker 退出语义'
       ],
       [],
       failures

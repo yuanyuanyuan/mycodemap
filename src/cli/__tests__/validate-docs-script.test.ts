@@ -238,6 +238,63 @@ describe('validate-docs.js', () => {
     }).toThrow(/documentation guardrails failed/);
   });
 
+  it('fails when README drops the design map entry', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const readmePath = path.join(fixtureRoot, 'README.md');
+    const updatedReadme = readFileSync(readmePath, 'utf8').replaceAll(
+      'mycodemap design map mycodemap.design.md --json',
+      'mycodemap generate'
+    );
+    writeFileSync(readmePath, updatedReadme);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/documentation guardrails failed/);
+  });
+
+  it('fails when README drops the design handoff entry', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const readmePath = path.join(fixtureRoot, 'README.md');
+    const updatedReadme = readFileSync(readmePath, 'utf8').replaceAll(
+      'mycodemap design handoff mycodemap.design.md --json',
+      'mycodemap generate'
+    );
+    writeFileSync(readmePath, updatedReadme);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/documentation guardrails failed/);
+  });
+
+  it('fails when README drops the design verify entry', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const readmePath = path.join(fixtureRoot, 'README.md');
+    const updatedReadme = readFileSync(readmePath, 'utf8').replaceAll(
+      'mycodemap design verify mycodemap.design.md --json',
+      'mycodemap generate'
+    );
+    writeFileSync(readmePath, updatedReadme);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/documentation guardrails failed/);
+  });
+
   it('fails when README reintroduces non-recursive default exclude patterns', () => {
     const fixtureRoot = createFixtureRoot();
     tempRoots.push(fixtureRoot);
@@ -333,6 +390,25 @@ describe('validate-docs.js', () => {
     }).toThrow(/documentation guardrails failed/);
   });
 
+  it('fails when AI commands guide drops the design verify entry', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const commandsPath = path.join(fixtureRoot, 'docs/ai-guide/COMMANDS.md');
+    const updatedCommands = readFileSync(commandsPath, 'utf8').replaceAll(
+      'mycodemap design verify mycodemap.design.md --json',
+      'mycodemap generate'
+    );
+    writeFileSync(commandsPath, updatedCommands);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/documentation guardrails failed/);
+  });
+
   it('fails when AI commands guide drops the workflow four-phase boundary', () => {
     const fixtureRoot = createFixtureRoot();
     tempRoots.push(fixtureRoot);
@@ -343,6 +419,25 @@ describe('validate-docs.js', () => {
       '`workflow` 同时包含 analyze、实现、CI、ship 等多个阶段。'
     );
     writeFileSync(commandsPath, updatedCommands);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/documentation guardrails failed/);
+  });
+
+  it('fails when OUTPUT guide drops the design verify checklist contract', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const outputPath = path.join(fixtureRoot, 'docs/ai-guide/OUTPUT.md');
+    const updatedOutput = readFileSync(outputPath, 'utf8').replace(
+      'checklist: Array<{',
+      'checklistItems: Array<{'
+    );
+    writeFileSync(outputPath, updatedOutput);
 
     expect(() => {
       execFileSync('node', ['scripts/validate-docs.js', '--root', fixtureRoot], {
