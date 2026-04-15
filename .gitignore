@@ -158,3 +158,4 @@ custom-output/
 src/parser/implementations/*.backup
 .mcp.json
 .omc
+.claude/skills/gstack/

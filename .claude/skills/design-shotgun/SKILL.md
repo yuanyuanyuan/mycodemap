@@ -1,0 +1,1 @@
+/data/codemap/.claude/skills/gstack/design-shotgun/SKILL.md
