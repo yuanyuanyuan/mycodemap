@@ -46,6 +46,9 @@
 - 需求澄清、影响分析、引用定位优先走 `query`、`analyze`、`deps`、`impact`，不要直接全仓漫游。
 - 修改 `design`、`analyze`、`query`、`ci`、`workflow` 等高影响命令时，至少验证：
   - `node dist/cli/index.js design validate mycodemap.design.md --json` 的成功/失败路径符合文档；
+  - `node dist/cli/index.js design map mycodemap.design.md --json` 的 success/blocker 路径、`candidates` / `unknowns` / `diagnostics` 与文档一致；
+  - `node dist/cli/index.js design handoff mycodemap.design.md --json` 的 `readyForExecution` / `approvals` / `assumptions` / `openQuestions` 与文档一致；
+  - `node dist/cli/index.js design verify mycodemap.design.md --json` 的 `checklist` / `drift` / `diagnostics` / `readyForExecution` 与文档一致，并保持 review-needed / blocker 分离语义；
   - `node dist/cli/index.js analyze --help` 与文档示例一致；
   - `find` / `read` / `link` / `show` 中受影响的 public intent 可以在当前仓库运行；
   - 若文档保留 legacy alias 说明，真实输出仍会返回 `warnings[]`；

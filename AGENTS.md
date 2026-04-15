@@ -327,3 +327,51 @@ function temporaryBypass(data: any): any {
 - 当前新文档结构已落地；历史归档仍保留在 `docs/archive/`，少量操作指南仍在 `docs/` 根层，执行时以"实际存在的文件"为准。
 - 当前 CLI 构建输出目录是 `dist/`，CLI bin 指向 `dist/cli/index.js`；不要把 `build/` 当成事实默认值。
 - 入口文档应保持短小；长命令清单、问题模板、配置大段样例应下沉到对应文档。
+
+## 11. RTK 使用规范
+
+本仓库已安装 [rtk](https://github.com/rtk-ai/rtk)（Rust Token Killer），作为 Bash 命令的 token 优化代理。
+**所有 AI 助手（Kimi Code / Claude Code / Codex）执行 shell 命令时，均应优先使用 `rtk` 前缀。**
+
+### 11.1 核心原则
+
+- **所有 Bash 工具调用**，只要 rtk 支持该命令，必须加 `rtk` 前缀。
+- rtk 不支持的命令会透传执行，因此加前缀**总是安全**的。
+- Claude Code 已配置 `PreToolUse` hook，Bash 命令会自动重写为 `rtk` 等价形式；Kimi Code / Codex 需**显式手动前缀**。
+
+### 11.2 高频命令速查表
+
+| 原始命令 | RTK 写法 | 说明 |
+|---------|---------|------|
+| `git status` | `rtk git status` | 精简状态（-80% tokens） |
+| `git log` | `rtk git log` | 单行提交列表 |
+| `git diff` | `rtk git diff` | 压缩 diff（-80%） |
+| `git add/commit/push` | `rtk git add . && rtk git commit -m "msg" && rtk git push` | 极简确认 |
+| `npm test` | `rtk npm test` / `rtk vitest run` | 仅失败项（-90%） |
+| `npm run build` | `rtk npm run build` | 精简构建输出 |
+| `cargo test` | `rtk cargo test` | 仅失败项（-90%） |
+| `cargo build` | `rtk cargo build` | 精简输出（-80%） |
+| `tsc` | `rtk tsc` | TypeScript 错误按文件聚合 |
+| `eslint .` | `rtk lint` | 违规按规则/文件聚合 |
+| `ls -la` | `rtk ls .` | 紧凑目录树 |
+| `cat file.ts` | `rtk read file.ts` | 智能代码阅读 |
+| `rg pattern` | `rtk grep pattern .` | 按文件分组结果 |
+| `find . -name "*.ts"` | `rtk find "*.ts" .` | 按目录分组结果 |
+| `docker ps` | `rtk docker ps` | 紧凑容器列表 |
+| `gh pr list` | `rtk gh pr list` | 紧凑 PR 列表 |
+
+### 11.3 元命令与验证
+
+```bash
+rtk gain              # 查看 token 节省统计
+rtk gain --history    # 近期命令节省历史
+rtk proxy <cmd>       # 不透传过滤，原样执行（调试用）
+rtk --version         # 验证 rtk 已安装
+```
+
+### 11.4 注意事项
+
+- rtk 的自动重写 **仅对 Bash 工具生效**。内置工具（如 `Read`、`Grep`、`Glob`）不经过 Bash hook，不会自动优化。
+- 若需对内置工具的输出做 token 优化，应改用对应的 `rtk` 命令（如 `rtk read`、`rtk grep`、`rtk find`）。
+
+@RTK.md

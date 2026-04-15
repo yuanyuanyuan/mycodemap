@@ -192,6 +192,15 @@ npm test
 # Step 0: 如果任务来自人类设计，先校验 design contract
 node dist/cli/index.js design validate mycodemap.design.md --json
 
+# Step 0.5: 把 design contract 映射成 candidate code scope
+node dist/cli/index.js design map mycodemap.design.md --json
+
+# Step 0.75: 生成 reviewer / agent 共用的 handoff package
+node dist/cli/index.js design handoff mycodemap.design.md --json
+
+# Step 0.9: 基于 reviewed handoff truth 做 verification / drift 检查
+node dist/cli/index.js design verify mycodemap.design.md --json
+
 # Step 1: 启动工作流
 node dist/cli/index.js workflow start "实现用户认证模块"
 
@@ -218,7 +227,7 @@ node dist/cli/index.js workflow checkpoint
 3. `link` - 汇总依赖、引用与关联关系
 4. `show` - 生成概览、摘要与展示型结果
 
-> 说明：`workflow` 仍只保留 `find` / `read` / `link` / `show` 四阶段；如果任务由人类设计驱动，先通过 `design validate` 固定输入，再进入 workflow。
+> 说明：`workflow` 仍只保留 `find` / `read` / `link` / `show` 四阶段；如果任务由人类设计驱动，先走 `design validate → design map → design handoff → design verify` 固定输入、候选范围、review gate 与 drift 检查，再进入 workflow。
 
 ---
 

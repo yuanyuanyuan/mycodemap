@@ -77,6 +77,9 @@ mycodemap analyze -i read -t src/cli/index.ts --output-mode human
 # 人类设计先落成 design contract，再交给 AI/Agent 消费
 cp docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md mycodemap.design.md
 mycodemap design validate mycodemap.design.md --json
+mycodemap design map mycodemap.design.md --json
+mycodemap design handoff mycodemap.design.md --json
+mycodemap design verify mycodemap.design.md --json
 ```
 
 生成后，将 `.mycodemap/AI_MAP.md` 的内容提供给 AI 助手即可让其快速理解你的项目结构；需要结构化结果继续处理时，优先使用 JSON / machine 模式。
@@ -300,6 +303,15 @@ cp docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md mycodemap.design.md
 # 使用默认文件名校验
 mycodemap design validate mycodemap.design.md --json
 
+# 校验通过后生成 candidate scope
+mycodemap design map mycodemap.design.md --json
+
+# 把 scope 打包成 handoff artifact，供 reviewer / AI agent 消费
+mycodemap design handoff mycodemap.design.md --json
+
+# 基于 reviewed handoff truth 做 verification / drift 检查
+mycodemap design verify mycodemap.design.md --json
+
 # 也可以显式传入其他路径
 mycodemap design validate docs/designs/login.design.md
 ```
@@ -310,7 +322,7 @@ mycodemap design validate docs/designs/login.design.md
 - `## Acceptance Criteria`
 - `## Non-Goals`
 
-> 设计输入面只负责“可写、可验、可诊断”；design-to-code mapping 与 handoff package 属于后续 phase。
+> 建议最小工作流：`design validate → design map → design handoff → design verify`。`design map --json` 会返回 `summary`、`candidates`、`diagnostics` 与 `unknowns`；`design handoff --json` 会继续返回 `readyForExecution`、`approvals`、`assumptions` 与 `openQuestions`，默认 artifact 路径为 `.mycodemap/handoffs/{stem}.handoff.md|json`；`design verify --json` 会返回 `checklist`、`drift`、`diagnostics` 与 `readyForExecution`，其中 review-needed 不会直接变成非零退出，只有 blocker diagnostics 才会阻断。
 
 ### 工作流 CLI 命令
 
@@ -662,14 +674,23 @@ cp examples/codex/codemap-agent.md .agents/skills/codemap/SKILL.md
 
 ### `mycodemap design`
 
-校验 human-authored design contract，默认读取仓库根目录的 `mycodemap.design.md`。
+校验、映射并验证 human-authored design contract，默认读取仓库根目录的 `mycodemap.design.md`。
 
 ```bash
-# 使用默认路径
+# validate: 使用默认路径校验
 mycodemap design validate mycodemap.design.md --json
 
-# 显式指定文件
+# validate: 显式指定文件
 mycodemap design validate docs/designs/login.design.md
+
+# map: 生成 candidate code scope
+mycodemap design map mycodemap.design.md --json
+
+# handoff: 生成 reviewer + agent 共用的 handoff package
+mycodemap design handoff mycodemap.design.md --json
+
+# verify: 基于 reviewed handoff truth 做 checklist / drift 校验
+mycodemap design verify mycodemap.design.md --json
 ```
 
 | 选项 | 说明 |
@@ -678,6 +699,9 @@ mycodemap design validate docs/designs/login.design.md
 
 > canonical 模板位于 `docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md`。
 > 缺失必填 section、重复 section、空 section 或未知 heading 时，CLI 会返回结构化 diagnostics，而不是继续猜测设计意图。
+> `design map` 会基于 design contract 返回 `candidates`、`diagnostics` 与 `unknowns`；若命中 `no-candidates`、`over-broad-scope` 或 `high-risk-scope`，命令会直接阻断。
+> `design handoff` 会基于 validated design contract + mapping truth 返回 `readyForExecution`、`approvals`、`assumptions`、`openQuestions`；human mode 默认写出 `.mycodemap/handoffs/{stem}.handoff.md|json`。
+> `design verify` 会把 `Acceptance Criteria` 固定映射为 `checklist`，并输出 `drift` / `diagnostics`；当结果只是 `needs-review` 时保持零退出码，只有 `ok=false` 或 blocker diagnostics 才返回非零 exit code。
 
 ### `mycodemap analyze`
 
@@ -729,50 +753,6 @@ mycodemap analyze -i link -t src/index.ts --structured --json
 >
 > legacy 兼容映射：`search → find`、`impact/complexity → read`、`dependency/reference → link`、`overview/documentation → show`；`refactor` 会返回 `E0001_INVALID_INTENT`。
 
-### `mycodemap ci`
-
-CI Gateway - 代码质量门禁工具：
-
-```bash
-# 验证工作区是否干净（ship 的发布前检查也复用这条规则）
-mycodemap ci check-working-tree
-
-# 验证当前分支是否允许执行发布前检查
-mycodemap ci check-branch
-mycodemap ci check-branch --allow main,release/*
-
-# 运行发布前脚本集合（docs/typecheck/lint/test/build/pack）
-mycodemap ci check-scripts
-
-# 验证提交格式（[TAG] scope: message）
-mycodemap ci check-commits
-mycodemap ci check-commits -c 5
-mycodemap ci check-commits -r origin/main..HEAD
-
-# 验证文件头注释（[META], [WHY]）
-mycodemap ci check-headers
-mycodemap ci check-headers -d src/domain
-mycodemap ci check-headers -f "src/index.ts,src/cli/index.ts"
-
-# 评估变更风险
-mycodemap ci assess-risk
-mycodemap ci assess-risk -t 0.5
-
-# 验证文档同步（含 analyze generated block 校验）
-mycodemap ci check-docs-sync
-
-# 验证输出契约
-mycodemap ci check-output-contract
-
-# 检查提交文件数量（限制 10 个文件）
-mycodemap ci check-commit-size
-mycodemap ci check-commit-size -m 15
-```
-
-> `mycodemap ship` 的 CHECK 阶段现在复用 `ci check-working-tree`、`ci check-branch`、`ci check-scripts` 作为 must-pass 事实源，而不是重复实现这些检查。
-> `mycodemap ci check-headers -d <dir>` 与 `generate` / `analyze` 共享同一套 `.gitignore` 感知排除模块；若仓库没有 `.gitignore`，则回退到默认 `exclude` 列表。
-
-支持的提交 TAG 类型：`[REFACTOR]`, `[TEST]`, `[DOCS]`, `[FEAT]`, `[FIX]`, `[CHORE]`, `[PERF]`, `[SECURITY]`, `[BREAKING]`, `[HOTFIX]`, `[MIGRATION]`, `[WIP]`
 
 ## 贡献指南
 
@@ -863,3 +843,47 @@ DELETE   删除代码/文件
 ## 许可证
 
 [MIT](LICENSE)
+### `mycodemap ci`
+
+CI Gateway - 代码质量门禁工具：
+
+```bash
+# 验证工作区是否干净（ship 的发布前检查也复用这条规则）
+mycodemap ci check-working-tree
+
+# 验证当前分支是否允许执行发布前检查
+mycodemap ci check-branch
+mycodemap ci check-branch --allow main,release/*
+
+# 运行发布前脚本集合（docs/typecheck/lint/test/build/pack）
+mycodemap ci check-scripts
+
+# 验证提交格式（[TAG] scope: message）
+mycodemap ci check-commits
+mycodemap ci check-commits -c 5
+mycodemap ci check-commits -r origin/main..HEAD
+
+# 验证文件头注释（[META], [WHY]）
+mycodemap ci check-headers
+mycodemap ci check-headers -d src/domain
+mycodemap ci check-headers -f "src/index.ts,src/cli/index.ts"
+
+# 评估变更风险
+mycodemap ci assess-risk
+mycodemap ci assess-risk -t 0.5
+
+# 验证文档同步（含 analyze generated block 校验）
+mycodemap ci check-docs-sync
+
+# 验证输出契约
+mycodemap ci check-output-contract
+
+# 检查提交文件数量（限制 10 个文件）
+mycodemap ci check-commit-size
+mycodemap ci check-commit-size -m 15
+```
+
+> `mycodemap ship` 的 CHECK 阶段现在复用 `ci check-working-tree`、`ci check-branch`、`ci check-scripts` 作为 must-pass 事实源，而不是重复实现这些检查。
+> `mycodemap ci check-headers -d <dir>` 与 `generate` / `analyze` 共享同一套 `.gitignore` 感知排除模块；若仓库没有 `.gitignore`，则回退到默认 `exclude` 列表。
+
+支持的提交 TAG 类型：`[REFACTOR]`, `[TEST]`, `[DOCS]`, `[FEAT]`, `[FIX]`, `[CHORE]`, `[PERF]`, `[SECURITY]`, `[BREAKING]`, `[HOTFIX]`, `[MIGRATION]`, `[WIP]`

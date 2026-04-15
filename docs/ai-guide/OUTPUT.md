@@ -487,6 +487,339 @@ interface DesignContractDiagnostic {
 
 ---
 
+## design map 命令输出结构
+
+### JSON 输出 (--json)
+
+```typescript
+type DesignMappingCandidateKind = "file" | "module" | "symbol";
+
+type DesignMappingDiagnosticCode =
+  | "no-candidates"
+  | "over-broad-scope"
+  | "high-risk-scope"
+  | string;
+
+interface DesignMappingReason {
+  section: DesignContractSectionId;
+  matchedText: string;
+  evidenceType: string;
+}
+
+interface DesignMappingCandidate {
+  kind: DesignMappingCandidateKind;
+  path: string;
+  moduleName?: string;
+  symbolName?: string;
+  reasons: DesignMappingReason[];
+  dependencies: string[];
+  testImpact: string[];
+  risk: "high" | "medium" | "low";
+  confidence: {
+    score: number;
+    level: "high" | "medium" | "low";
+  };
+  unknowns: string[];
+}
+
+interface DesignMappingDiagnostic {
+  code: DesignMappingDiagnosticCode;
+  severity: "error" | "warning" | "info";
+  blocker: boolean;
+  message: string;
+  candidatePaths?: string[];
+}
+
+interface DesignMapOutput {
+  ok: boolean;
+  filePath: string;
+  summary: {
+    candidateCount: number;
+    blocked: boolean;
+    unknownCount: number;
+    diagnosticCount: number;
+  };
+  candidates: DesignMappingCandidate[];
+  diagnostics: DesignMappingDiagnostic[];
+}
+```
+
+### 示例
+
+```json
+{
+  "ok": false,
+  "filePath": "/repo/mycodemap.design.md",
+  "summary": {
+    "candidateCount": 1,
+    "blocked": true,
+    "unknownCount": 0,
+    "diagnosticCount": 1
+  },
+  "candidates": [
+    {
+      "kind": "file",
+      "path": "src/cli/commands/analyze.ts",
+      "reasons": [
+        {
+          "section": "goal",
+          "matchedText": "src/cli/commands/analyze.ts",
+          "evidenceType": "path-anchor"
+        }
+      ],
+      "dependencies": [],
+      "testImpact": [],
+      "risk": "high",
+      "confidence": {
+        "score": 0.92,
+        "level": "high"
+      },
+      "unknowns": []
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "high-risk-scope",
+      "severity": "error",
+      "blocker": true,
+      "message": "候选范围命中了高 blast-radius 文件；请先补充更具体的 design scope，再继续执行。"
+    }
+  ]
+}
+```
+
+> `design map --json` 必须保持纯 JSON；不要在前后拼接说明性 prose。`unknowns` 与 `diagnostics` 都属于正式契约，不是可选注释。
+
+---
+
+## design handoff 命令输出结构
+
+### JSON 输出 (--json)
+
+```typescript
+type DesignHandoffApprovalStatus = "approved" | "needs-review";
+
+interface DesignHandoffTraceItem {
+  id: string;
+  text: string;
+  sourceRefs: string[];
+}
+
+interface DesignHandoffOutput {
+  ok: boolean;
+  filePath: string;
+  outputDir: string;
+  readyForExecution: boolean;
+  artifacts: {
+    markdownPath: string;
+    jsonPath: string;
+  };
+  summary: {
+    approvalCount: number;
+    assumptionCount: number;
+    openQuestionCount: number;
+    requiresReview: boolean;
+  };
+  handoff: {
+    touchedFiles: string[];
+    constraints: string[];
+    tests: string[];
+    approvals: Array<DesignHandoffTraceItem & {
+      status: DesignHandoffApprovalStatus;
+    }>;
+    assumptions: DesignHandoffTraceItem[];
+    openQuestions: DesignHandoffTraceItem[];
+  };
+  diagnostics: Array<{
+    code: "blocked-mapping" | "review-required" | string;
+    blocker: boolean;
+    message: string;
+  }>;
+}
+```
+
+### 示例
+
+```json
+{
+  "ok": true,
+  "filePath": "/repo/mycodemap.design.md",
+  "outputDir": "/repo/.mycodemap/handoffs",
+  "readyForExecution": false,
+  "artifacts": {
+    "markdownPath": "/repo/.mycodemap/handoffs/mycodemap.handoff.md",
+    "jsonPath": "/repo/.mycodemap/handoffs/mycodemap.handoff.json"
+  },
+  "summary": {
+    "approvalCount": 4,
+    "assumptionCount": 1,
+    "openQuestionCount": 1,
+    "requiresReview": true
+  },
+  "handoff": {
+    "touchedFiles": [
+      "src/cli/design-handoff-builder.ts"
+    ],
+    "constraints": [
+      "默认 artifact path 必须复用 src/cli/paths.ts"
+    ],
+    "tests": [
+      "src/cli/__tests__/design-handoff-builder.test.ts"
+    ],
+    "approvals": [
+      {
+        "id": "approved-goal",
+        "status": "approved",
+        "text": "Goal 已被纳入 handoff 事实输入",
+        "sourceRefs": ["design:goal"]
+      }
+    ],
+    "assumptions": [
+      {
+        "id": "assumption-1-1",
+        "text": "需要补充 reviewer 对未知范围的确认",
+        "sourceRefs": ["candidate:src/cli/design-handoff-builder.ts"]
+      }
+    ],
+    "openQuestions": [
+      {
+        "id": "open-question-1",
+        "text": "低风险 assumptions 是否也必须显式批准？",
+        "sourceRefs": ["design:openQuestions"]
+      }
+    ]
+  },
+  "diagnostics": [
+    {
+      "code": "review-required",
+      "blocker": false,
+      "message": "Handoff generated successfully but still requires human review before execution."
+    }
+  ]
+}
+```
+
+> `design handoff --json` 必须保持纯 JSON；`readyForExecution`、`approvals`、`assumptions`、`openQuestions` 都属于正式契约。human mode 默认写出 `.mycodemap/handoffs/{stem}.handoff.md|json`。
+
+---
+
+## design verify 命令输出结构
+
+### JSON 输出 (--json)
+
+```typescript
+type DesignVerificationStatus =
+  | "satisfied"
+  | "needs-review"
+  | "violated"
+  | "blocked";
+
+type DesignDriftKind =
+  | "scope-extra"
+  | "acceptance-unverified"
+  | "handoff-missing"
+  | "blocked-input";
+
+interface DesignVerificationOutput {
+  ok: boolean;
+  filePath: string;
+  readyForExecution: boolean;
+  summary: {
+    checklistCount: number;
+    satisfiedCount: number;
+    needsReviewCount: number;
+    violatedCount: number;
+    blockedCount: number;
+    driftCount: number;
+    diagnosticCount: number;
+    reviewRequired: boolean;
+    blocked: boolean;
+  };
+  checklist: Array<{
+    id: string;
+    text: string;
+    status: DesignVerificationStatus;
+    evidenceRefs: string[];
+  }>;
+  drift: Array<{
+    kind: DesignDriftKind;
+    severity: "error" | "warning" | "info";
+    message: string;
+    sourceRefs: string[];
+  }>;
+  diagnostics: Array<{
+    code: "handoff-missing" | "handoff-invalid" | "blocked-input" | string;
+    blocker: boolean;
+    message: string;
+    sourceRefs: string[];
+  }>;
+}
+```
+
+### 示例
+
+```json
+{
+  "ok": true,
+  "filePath": "/repo/tests/fixtures/design-contracts/verify-ready.design.md",
+  "readyForExecution": false,
+  "summary": {
+    "checklistCount": 3,
+    "satisfiedCount": 1,
+    "needsReviewCount": 2,
+    "violatedCount": 0,
+    "blockedCount": 0,
+    "driftCount": 3,
+    "diagnosticCount": 1,
+    "reviewRequired": true,
+    "blocked": false
+  },
+  "checklist": [
+    {
+      "id": "acceptance-1",
+      "text": "src/cli/design-verification-builder.ts 会产出 conservative verification result",
+      "status": "satisfied",
+      "evidenceRefs": [
+        "candidate:src/cli/design-verification-builder.ts",
+        "diagnostic:handoff-missing"
+      ]
+    },
+    {
+      "id": "acceptance-2",
+      "text": "src/interface/types/design-verification.ts 会定义正式 verification schema",
+      "status": "needs-review",
+      "evidenceRefs": [
+        "design:acceptanceCriteria"
+      ]
+    }
+  ],
+  "drift": [
+    {
+      "kind": "handoff-missing",
+      "severity": "warning",
+      "message": "Canonical handoff artifact is missing, so verification remains review-needed even though a live handoff was rebuilt.",
+      "sourceRefs": [
+        "diagnostic:handoff-missing"
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "handoff-missing",
+      "blocker": false,
+      "message": "Canonical handoff artifact is missing, so verification remains review-needed even though a live handoff was rebuilt.",
+      "sourceRefs": [
+        "diagnostic:handoff-missing"
+      ]
+    }
+  ]
+}
+```
+
+> `design verify --json` 必须保持纯 JSON；`checklist` 与 `drift` 都属于正式契约。`readyForExecution=false` 不等于 blocker，只有 `ok=false` 或 blocker diagnostics 才应返回非零 exit code。
+
+---
+
 ## impact 命令输出结构
 
 ### JSON 输出 (-j)

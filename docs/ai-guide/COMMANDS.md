@@ -214,7 +214,7 @@ mycodemap analyze -i show -t "src/index.ts" --output-mode human
 
 ---
 
-## design - 设计契约校验
+## design - 设计契约输入、范围映射与验证
 
 > `design` 为 human-authored design contract 提供正式输入面。默认文件名是 `mycodemap.design.md`，canonical 模板位于 `docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md`。
 
@@ -242,6 +242,48 @@ mycodemap design validate docs/designs/login.design.md
 - `--json` 输出纯结构化 diagnostics
 - 缺失必填 section、重复 section、空 section、未知 heading 都会被显式报告
 - blocker diagnostics 存在时命令返回非零 exit code
+
+### map
+
+```bash
+# 先校验，再映射 candidate scope
+mycodemap design validate mycodemap.design.md --json
+mycodemap design map mycodemap.design.md --json
+```
+
+- `design map` 返回 `summary`、`candidates`、`diagnostics`、`unknowns`
+- `candidates[]` 会同时暴露 `kind`、`path`、`reasons`、`dependencies`、`testImpact`、`risk`、`confidence`
+- blocker diagnostics 包括 `no-candidates`、`over-broad-scope`、`high-risk-scope`
+- 若 diagnostics 中存在 blocker，命令返回非零 exit code
+
+### handoff
+
+```bash
+# 先固定 design input / scope，再生成 handoff package
+mycodemap design validate mycodemap.design.md --json
+mycodemap design map mycodemap.design.md --json
+mycodemap design handoff mycodemap.design.md --json
+```
+
+- `design handoff` 返回 `readyForExecution`、`approvals`、`assumptions`、`openQuestions`
+- human mode 默认写入 `.mycodemap/handoffs/{stem}.handoff.md|json`
+- `--json` 保持纯 JSON，不混入 prose
+- review-needed 通过 `readyForExecution=false` 表达；只有 blocker diagnostics 才返回非零 exit code
+
+### verify
+
+```bash
+# 使用 reviewed handoff truth 做 checklist / drift 校验
+mycodemap design validate mycodemap.design.md --json
+mycodemap design map mycodemap.design.md --json
+mycodemap design handoff mycodemap.design.md --json
+mycodemap design verify mycodemap.design.md --json
+```
+
+- `design verify` 返回 `summary`、`checklist`、`drift`、`diagnostics`
+- `checklist[]` 直接来自 `Acceptance Criteria`，并保留 `status` + `evidenceRefs`
+- `drift[]` 至少区分 `scope-extra`、`acceptance-unverified`、`handoff-missing`
+- review-needed 通过 `readyForExecution=false` + warning diagnostics 表达；只有 `ok=false` 或 blocker diagnostics 才返回非零 exit code
 
 ---
 

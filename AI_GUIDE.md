@@ -3,7 +3,7 @@
 > 本文档是 AI/Agent 使用 CodeMap 的**主索引**。
 > 
 > CodeMap 是一个 AI-first 代码地图工具。AI/Agent 是主要消费者；人类开发者负责配置、维护与按需阅读输出。  
-> 当前 CLI 过渡现实：多数命令通过 `--json` 输出机器可读结果；`analyze` 额外提供 `--output-mode machine|human`，`design validate` 负责校验 human-authored design contract。
+> 当前 CLI 过渡现实：多数命令通过 `--json` 输出机器可读结果；`analyze` 额外提供 `--output-mode machine|human`，`design validate` 负责校验 human-authored design contract，`design map` 负责把 design contract 映射成 candidate code scope。
 > 命名边界：`Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令。  
 > 
 > 🔍 **机器可读索引**: `ai-document-index.yaml`  
@@ -54,8 +54,12 @@ cat .mycodemap/AI_MAP.md
 | "查找与 XXX 相关的代码" | `query -S "XXX" -j` |
 | "这个改动安全吗" | `ci assess-risk` |
 | "发布前是否满足门禁" | `ci check-working-tree → ci check-branch → ci check-scripts` |
+| "需要执行复杂的多步骤分析" | `workflow start "任务描述"` |
 | "需要验证文档/契约是否同步" | `ci check-docs-sync`（含 analyze generated block 校验） |
 | "需要先把人类设计写成可验证输入" | `design validate mycodemap.design.md --json` |
+| "需要把 design contract 映射成代码范围" | `design map mycodemap.design.md --json` |
+| "需要把 design scope 打包成 agent handoff" | `design handoff mycodemap.design.md --json` |
+| "需要检查实现是否仍在批准范围内" | `design verify mycodemap.design.md --json` |
 | "需要导出结构化结果" | `export json -o ./output.json` |
 | "需要插件诊断/扩展结果" | `generate` → 读 `AI_MAP.md` 的 `Plugin Summary` 或解析 `codemap.json.pluginReport` |
 | "需要切换/排查图存储后端" | 编辑 `mycodemap.config.json.storage` → 运行 `generate` / `export` |
@@ -184,10 +188,17 @@ CLI Layer → Server Layer → Domain Layer → Infrastructure Layer → Interfa
 ```bash
 cp docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md mycodemap.design.md
 node dist/cli/index.js design validate mycodemap.design.md --json
+node dist/cli/index.js design map mycodemap.design.md --json
+node dist/cli/index.js design handoff mycodemap.design.md --json
+node dist/cli/index.js design verify mycodemap.design.md --json
 ```
 
 - 默认输入文件：`mycodemap.design.md`
 - 必填 sections：`Goal` / `Constraints` / `Acceptance Criteria` / `Non-Goals`
+- 建议顺序：`design validate → design map → design handoff → design verify`
+- `design map` 会输出 `summary`、`candidates`、`diagnostics` 与 `unknowns`
+- `design handoff` 会输出 `readyForExecution`、`approvals`、`assumptions`、`openQuestions`
+- `design verify` 会输出 `checklist`、`drift`、`diagnostics` 与 `readyForExecution`
 - 失败时返回结构化 diagnostics，供后续 handoff / mapping 流程阻断使用
 
 ---
@@ -225,6 +236,122 @@ interface DesignValidateOutput {
     severity: "error" | "warning" | "info";
     message: string;
     section?: "goal" | "constraints" | "acceptanceCriteria" | "nonGoals" | "context" | "openQuestions" | "notes";
+  }>;
+}
+
+interface DesignMapOutput {
+  ok: boolean;
+  filePath: string;
+  summary: {
+    candidateCount: number;
+    blocked: boolean;
+    unknownCount: number;
+    diagnosticCount: number;
+  };
+  candidates: Array<{
+    kind: "file" | "module" | "symbol";
+    path: string;
+    symbolName?: string;
+    moduleName?: string;
+    reasons: Array<{
+      section: string;
+      matchedText: string;
+      evidenceType: string;
+      detail?: string;
+    }>;
+    dependencies: string[];
+    testImpact: string[];
+    risk: "high" | "medium" | "low";
+    confidence: { score: number; level: "high" | "medium" | "low"; };
+    unknowns: string[];
+  }>;
+  diagnostics: Array<{
+    code: "no-candidates" | "over-broad-scope" | "high-risk-scope" | string;
+    severity: "error" | "warning" | "info";
+    blocker: boolean;
+    message: string;
+    candidatePaths?: string[];
+  }>;
+}
+
+interface DesignHandoffOutput {
+  ok: boolean;
+  filePath: string;
+  outputDir: string;
+  readyForExecution: boolean;
+  artifacts: {
+    stem: string;
+    markdownPath: string;
+    jsonPath: string;
+  };
+  summary: {
+    candidateCount: number;
+    touchedFileCount: number;
+    supportingFileCount: number;
+    testCount: number;
+    riskCount: number;
+    approvalCount: number;
+    assumptionCount: number;
+    openQuestionCount: number;
+    diagnosticCount: number;
+    requiresReview: boolean;
+  };
+  handoff: {
+    goal: string[];
+    constraints: string[];
+    acceptanceCriteria: string[];
+    nonGoals: string[];
+    touchedFiles: string[];
+    supportingFiles: string[];
+    tests: string[];
+    risks: string[];
+    validationChecklist: string[];
+    approvals: Array<{ id: string; status: "approved" | "needs-review"; text: string; sourceRefs: string[]; }>;
+    assumptions: Array<{ id: string; text: string; sourceRefs: string[]; }>;
+    openQuestions: Array<{ id: string; text: string; sourceRefs: string[]; }>;
+  };
+  diagnostics: Array<{
+    code: "blocked-mapping" | "review-required" | string;
+    severity: "error" | "warning" | "info";
+    blocker: boolean;
+    message: string;
+    sourceRefs: string[];
+  }>;
+}
+
+interface DesignVerificationOutput {
+  ok: boolean;
+  filePath: string;
+  readyForExecution: boolean;
+  summary: {
+    checklistCount: number;
+    satisfiedCount: number;
+    needsReviewCount: number;
+    violatedCount: number;
+    blockedCount: number;
+    driftCount: number;
+    diagnosticCount: number;
+    reviewRequired: boolean;
+    blocked: boolean;
+  };
+  checklist: Array<{
+    id: string;
+    text: string;
+    status: "satisfied" | "needs-review" | "violated" | "blocked";
+    evidenceRefs: string[];
+  }>;
+  drift: Array<{
+    kind: "scope-extra" | "acceptance-unverified" | "handoff-missing" | "blocked-input";
+    severity: "error" | "warning" | "info";
+    message: string;
+    sourceRefs: string[];
+  }>;
+  diagnostics: Array<{
+    code: "handoff-missing" | "handoff-invalid" | "blocked-input" | string;
+    severity: "error" | "warning" | "info";
+    blocker: boolean;
+    message: string;
+    sourceRefs: string[];
   }>;
 }
 
