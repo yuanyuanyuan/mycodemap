@@ -21,6 +21,7 @@ key-files:
 key-decisions:
   - "设计输入以 Markdown sections 为人类编写面，机器稳定性由 validator 保证"
   - "类型语义放在 Interface Layer，路径与 alias 规则收口在 CLI schema helper"
+requirements-completed: [DES-01]
 duration: 15min
 completed: 2026-03-25
 ---

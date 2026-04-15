@@ -6,107 +6,83 @@
 - ✅ **v1.1 插件扩展点产品化** — Phases 7-9 (shipped 2026-03-24)
 - ✅ **v1.2 图数据库后端生产化** — Phases 10-12 (shipped 2026-03-24)
 - ✅ **v1.3 Kùzu-only 收敛与高信号债务清理** — Phases 13-16 (shipped 2026-03-24)
-- 🟡 **v1.4 设计契约与 Agent Handoff** — Phases 17-20 (in progress 2026-03-25)
+- ✅ **v1.4 设计契约与 Agent Handoff** — Phases 17-20 (shipped 2026-03-26)
+- ✅ **post-v1.4 ArcadeDB Node feasibility follow-up** — Phase 21 (completed 2026-03-28)
+- 🚧 **v1.5 Isolated ArcadeDB Server-backed Prototype** — Phases 22-24 (active 2026-03-30)
 
 ## Overview
 
-`v1.4` 选择“人类设计 → AI 执行”的桥接主线，而不是立即打开 HTTP API、Kùzu 性能优化或泛化 workflow 编排。执行顺序按风险从高到低收敛：先定义 design contract 输入面并修复已观察到的 workflow docs drift → 再建立 design-to-code scope mapping → 再生成稳定的 handoff package 与人类审批边界 → 最后把 design drift verification 与 docs/CI guardrail 固定下来。
+`post-v1.4` 已经完成 direct replacement `NO-GO` 的决策闭环，所以当前 active milestone 不再讨论“ArcadeDB 能不能直接替换 KùzuDB”。`v1.5` 的唯一目标，是验证那条仅剩的条件性继续路径：一个 isolated、server-backed、evidence-first 的 prototype。
+
+这里最容易犯的错误不是“做得太慢”，而是“在 live smoke 之前就开始改产品面”。因此 `v1.5` 以失败优先：如果真实 server smoke、auth/TLS 前提、setup friction 或 blast radius 站不住脚，就应该尽早停在 prototype 证据包，而不是继续扩大 shipped surface。
+
+## Archived Milestone Detail
+
+- `v1.4` roadmap / requirements / audit 已归档到 `.planning/milestones/v1.4-ROADMAP.md`、`.planning/milestones/v1.4-REQUIREMENTS.md`、`.planning/milestones/v1.4-MILESTONE-AUDIT.md`
+- `post-v1.4` roadmap / requirements / audit 已归档到 `.planning/milestones/post-v1.4-ROADMAP.md`、`.planning/milestones/post-v1.4-REQUIREMENTS.md`、`.planning/milestones/post-v1.4-MILESTONE-AUDIT.md`
+- dormant seed 来源：`.planning/seeds/SEED-001-evaluate-isolated-arcadedb-server-backed-prototype.md`
+
+## v1.5 Isolated ArcadeDB Server-backed Prototype
 
 ## Phases
 
-- [x] **Phase 17: Design Contract Surface** - 定义设计输入契约、loader/diagnostics，并修复 workflow docs drift 入口问题
-- [ ] **Phase 18: Design-to-Code Mapping** - 将 design contract 映射到代码范围、依赖、测试与风险
-- [ ] **Phase 19: Handoff Package & Human Gates** - 生成 agent handoff 产物并保留人类审批边界
-- [ ] **Phase 20: Design Drift Verification & Docs Sync** - 固化设计验收映射、漂移检测与文档/CI 护栏
+- [ ] **Phase 22: Real ArcadeDB server live smoke gate** - 先证明 isolated live smoke 能在真实 server 上成立，再决定是否值得继续 prototype
+- [ ] **Phase 23: Isolated prototype evidence & blast-radius pack** - 在不改 shipped storage surface 的前提下补齐 latency / setup / approval evidence
+- [ ] **Phase 24: Continue/Pause/Close decision package** - 用 evidence-backed 决策收尾，明确是否继续、暂停或关闭路线
 
-## Phase Details
-
-### Phase 17: Design Contract Surface
-**Goal**: 建立一个清晰、可验证、可被 AI 直接消费的 design contract 输入面，并先修复会污染新能力信任度的 workflow docs drift
-**Depends on**: Phase 16 (v1.3 shipped)
-**Requirements**: DES-01, DES-02, DES-03
+### Phase 22: Real ArcadeDB server live smoke gate
+**Goal**: 基于真实 ArcadeDB server 验证 isolated smoke harness / prototype seam 是否可跑通，并明确 env、auth、TLS 与 setup 前置条件
+**Depends on**: `post-v1.4` archived decision package + `SEED-001`
+**Requirements**: PROTO-01
 **Success Criteria** (what must be TRUE):
-  1. 人类可以用明确文件格式表达目标、约束、验收标准和非目标，而不是只靠自由提示词
-  2. design contract 缺字段、字段歧义或结构错误时，CLI 返回结构化 diagnostics，而不是隐式猜测
-  3. `README.md` / `AI_GUIDE.md` / `docs/ai-guide/PATTERNS.md` 与 workflow / new surface 的真实语义保持一致
-**Plans**: 3 plans
-**Completed**: 2026-03-25 (execute + verify-work)
+  1. 真实 ArcadeDB server live smoke 在 isolated seam 下成功完成，而不是只停留在离线脚本或 `--help`
+  2. 所需 `ARCADEDB_*` env contract、凭证、auth/TLS 前提和 failure modes 被明确记录
+  3. 如果 live smoke 跑不通，milestone 允许在此停止，并保持 shipped storage/runtime surface 完全不变
+**Status**: Blocked after execution (`No reachable server`; local Docker provisioning still blocked on 2026-03-31 behind proxy)
+**Plans**: 2 plans across 2 waves
 
-Plans:
-- [x] 17-01: 定义 design contract schema、类型与产物路径约定
-- [x] 17-02: 实现 loader / validator / diagnostics baseline
-- [x] 17-03: 同步 README / AI docs / rules / guardrails，并修复 workflow docs drift
+Failure rehearsal:
+- 如果 smoke 只能靠提前修改 shipped config/runtime 才能成立，必须判定当前 milestone 路线失败，而不是把改动合理化成“顺手接一下”。
 
-### Phase 18: Design-to-Code Mapping
-**Goal**: 让 CodeMap 能把设计意图映射到真实代码范围，而不是只返回分散的搜索结果
-**Depends on**: Phase 17
-**Requirements**: MAP-01, MAP-02, MAP-03
+### Phase 23: Isolated prototype evidence & blast-radius pack
+**Goal**: 在 Phase 22 成功的前提下，记录 `handshake latency`、`query latency`、`setup complexity`，并量化 `remote config` / `auth` / `TLS` / `lifecycle` / `docs` 的 blast radius
+**Depends on**: Phase 22
+**Requirements**: PROTO-02, PROTO-03, PROTO-04
 **Success Criteria** (what must be TRUE):
-  1. design contract 能解析出 candidate files / modules / symbols，并给出原因链
-  2. 输出同时包含 dependencies、test impact、risk、confidence 与 unknowns，足以支持人类 review
-  3. 无匹配、过宽命中或高风险范围会被显式阻断并要求人类补充设计
-**Plans**: 3 plans
+  1. benchmark evidence 仅在 live smoke 成功后记录，且至少覆盖 `handshake/query/setup` 三个维度
+  2. prototype 仍保持 isolated experiment boundary，不引入 `storage.type = arcadedb`、public schema 或 shipped runtime integration
+  3. config/auth/TLS/lifecycle/docs 的 blast radius 被量化成明确审批输入，而不是模糊地写成“后续再看”
+**Status**: Not started
+**Plans**: 0 plans yet
 
-Plans:
-- [ ] 18-01: 基于现有 `query` / `analyze` / `impact` 组合构建 scope resolver
-- [ ] 18-02: 丰富映射结果的 dependency / test / risk / unknowns 元数据
-- [ ] 18-03: 固定 no-match / over-broad / high-risk 失败语义与测试夹具
+Failure rehearsal:
+- 如果 latency 或 setup evidence 的采集必须先扩写 public surface，必须停下并把该成本记为 blocker，而不是继续假设“以后再清理”。
 
-### Phase 19: Handoff Package & Human Gates
-**Goal**: 产出一份既能给人类审核，也能给 AI agent 直接执行的 handoff package，同时不破坏现有 public contract
-**Depends on**: Phase 18
-**Requirements**: HOF-01, HOF-02, HOF-03, HOF-04
+### Phase 24: Continue/Pause/Close decision package
+**Goal**: 汇总 prototype evidence，给出 `continue / pause / close` 决策、stop conditions 与后续路线建议
+**Depends on**: Phase 23
+**Requirements**: PROTO-05
 **Success Criteria** (what must be TRUE):
-  1. handoff package 同时提供 human-readable summary 与 machine-readable JSON
-  2. approvals、assumptions、open questions 在 handoff artifact 中持久可追踪
-  3. 新能力不通过给 `analyze` 增加新 intent 或给 `workflow` 恢复 `commit` / `ci` phase 来偷渡实现
-**Plans**: 3 plans
+  1. milestone 以 evidence-backed `continue / pause / close` 结论收尾，而不是留下“理论可行”的模糊 optimism
+  2. 若继续，也只允许提出新的 productization milestone 输入，不能在本 milestone 内直接把 ArcadeDB 变成 shipped backend
+  3. README / AI docs / rules 若无需更新，也必须明确写出“不更新的原因”，防止文档真相漂移
+**Status**: Not started
+**Plans**: 0 plans yet
 
-Plans:
-- [ ] 19-01: 定义 handoff artifact schema、summary 模板与输出路径
-- [ ] 19-02: 实现 handoff generation 与 approval / assumption / open-question 追踪
-- [ ] 19-03: 在不破坏 `workflow` 四阶段语义的前提下集成 handoff 入口
-
-### Phase 20: Design Drift Verification & Docs Sync
-**Goal**: 把 design contract 的验收标准真正接入验证链路，并用 docs / CI guardrail 固定新的协作模式
-**Depends on**: Phase 19
-**Requirements**: VAL-04, DOC-07, VAL-05
-**Success Criteria** (what must be TRUE):
-  1. design contract 的 acceptance criteria 能映射为实现后验证清单和 drift 报告
-  2. README / AI docs / rules / guardrail tests 与 new handoff surface 完整同步
-  3. 至少一个 end-to-end 示例证明“人类设计 → handoff → AI 执行准备 → drift 验证”闭环，并覆盖失败预演
-**Plans**: 3 plans
-
-Plans:
-- [ ] 20-01: 实现 design-vs-implementation drift 检查与 acceptance checklist
-- [ ] 20-02: 将 design docs / handoff docs sync 校验接入 CI / must-pass 验证
-- [ ] 20-03: 编写端到端示例、失败预演与 milestone audit 证据
-
-## Progress
-
-## Backlog
-
-> Archived: `Phase 999.1` 已于 2026-03-25 从 active planning surface 归档至 `.planning/archive/phases/999.1-kuzu-primary-storage/`，不再参与主线 progress 路由。
-
-### Phase 1000: Evaluate ArcadeDB as alternative to KùzuDB (BACKLOG RESEARCH)
-
-**Goal:** 实现完整的 ArcadeDB 存储适配器，建立性能基准测试，输出 Go/No-Go 决策建议
-**Requirements**: ARC-01, ARC-02, ARC-03, ARC-04, ARC-05
-**Depends on:** Archived decision from Phase 999.1
-**Plans:** 2 plans
-
-Plans:
-- [ ] 1000-01: 实现 ArcadeDBStorage 适配器、扩展 StorageFactory、更新类型和配置
-- [ ] 1000-02: 创建单元测试、性能基准测试套件和评估报告
-
----
+Failure rehearsal:
+- 如果证据互相矛盾、live smoke 不稳定或 ops cost 高于价值，必须输出 `pause` 或 `close`，而不是把不确定性美化成“继续试试”。
 
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 17. Design Contract Surface | v1.4 | 3/3 | Complete | 2026-03-25 |
-| 18. Design-to-Code Mapping | v1.4 | 0/3 | Planned | — |
-| 19. Handoff Package & Human Gates | v1.4 | 0/3 | Planned | — |
-| 20. Design Drift Verification & Docs Sync | v1.4 | 0/3 | Planned | — |
-| 1000. ArcadeDB Evaluation | Backlog | 0/2 | Planned | — |
+| 22. Live smoke gate | v1.5 | 2/2 | Blocked | — |
+| 23. Evidence & blast radius | v1.5 | 0/0 | Not Started | — |
+| 24. Decision package | v1.5 | 0/0 | Not Started | — |
+
+## Exit Gate
+
+- `continue`: 仅当真实 live smoke 成功、latency/setup evidence 可信、且 approval surface 被显式量化后，才允许提议后续 productization milestone
+- `pause`: 当 smoke 能跑，但 blast radius / docs / ops 成本暂时高于当前价值时，保留证据后暂停
+- `close`: 当 live smoke 不稳定、setup friction 过高，或证明价值必须先改 shipped surface 时，直接关闭路线
+- `non-goals remain`: `storage.type = arcadedb`、shipped runtime integration、Kùzu migration、无 live smoke 的 benchmark claims
