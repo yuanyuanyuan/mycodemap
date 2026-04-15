@@ -110,6 +110,7 @@ export class StorageFactory implements IStorageFactory {
    */
   private async checkKuzuAvailability(): Promise<boolean> {
     try {
+      // @ts-ignore kuzu is an optional dependency, not installed in CI
       const kuzu = await import('kuzu');
       const tempDb = new kuzu.Database(':memory:');
       if (typeof tempDb.close === 'function') {
