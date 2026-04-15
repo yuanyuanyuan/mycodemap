@@ -12,7 +12,7 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 ```bash
 # Find the most recent audit file
-ls -t .planning/v*-MILESTONE-AUDIT.md 2>/dev/null | head -1
+(ls -t .planning/v*-MILESTONE-AUDIT.md 2>/dev/null || true) | head -1
 ```
 
 Parse YAML frontmatter to extract structured gaps:
@@ -164,8 +164,6 @@ node "/data/codemap/.codex/get-shit-done/bin/gsd-tools.cjs" commit "docs(roadmap
 **Plan first gap closure phase**
 
 `$gsd-plan-phase {N}`
-
-<sub>`/clear` first → fresh context window</sub>
 
 ---
 

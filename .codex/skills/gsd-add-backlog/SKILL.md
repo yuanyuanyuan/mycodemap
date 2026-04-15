@@ -66,7 +66,7 @@ the normal phase sequence and accumulate context over time.
 
 3. **Create the phase directory:**
    ```bash
-   SLUG=$(node "/data/codemap/.codex/get-shit-done/bin/gsd-tools.cjs" generate-slug "{{GSD_ARGS}}")
+   SLUG=$(node "/data/codemap/.codex/get-shit-done/bin/gsd-tools.cjs" generate-slug "{{GSD_ARGS}}" --raw)
    mkdir -p ".planning/phases/${NEXT}-${SLUG}"
    touch ".planning/phases/${NEXT}-${SLUG}/.gitkeep"
    ```

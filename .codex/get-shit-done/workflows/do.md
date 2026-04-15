@@ -11,6 +11,8 @@ Read all files referenced by the invoking prompt's execution_context before star
 <step name="validate">
 **Check for input.**
 
+
+**Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `{{GSD_ARGS}}` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-the agent runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
 If `{{GSD_ARGS}}` is empty, ask via AskUserQuestion:
 
 ```
@@ -84,7 +86,7 @@ Which approach fits better?
 <step name="dispatch">
 **Invoke the chosen command.**
 
-Run the selected `/gsd:*` command, passing `{{GSD_ARGS}}` as args.
+Run the selected `/gsd-*` command, passing `{{GSD_ARGS}}` as args.
 
 If the chosen command expects a phase number and one wasn't provided in the text, extract it from context or ask via AskUserQuestion.
 

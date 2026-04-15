@@ -4,9 +4,36 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { safeReadFile, loadConfig, isGitIgnored, execGit, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, resolveModelInternal, stripShippedMilestones, extractCurrentMilestone, planningDir, planningPaths, toPosixPath, output, error, findPhaseInternal, extractOneLinerFromBody, getRoadmapPhaseInternal, parseRoadmapPhaseSections } = require('./core.cjs');
+const { safeReadFile, loadConfig, isGitIgnored, execGit, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, resolveModelInternal, stripShippedMilestones, extractCurrentMilestone, planningDir, planningPaths, toPosixPath, output, error, findPhaseInternal, extractOneLinerFromBody, getRoadmapPhaseInternal } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { MODEL_PROFILES } = require('./model-profiles.cjs');
+
+/**
+ * Determine phase status by checking plan/summary counts AND verification state.
+ * Introduces "Executed" for phases with all summaries but no passing verification.
+ */
+function determinePhaseStatus(plans, summaries, phaseDir, defaultPending) {
+  if (plans === 0) return defaultPending;
+  if (summaries < plans && summaries > 0) return 'In Progress';
+  if (summaries < plans) return 'Planned';
+
+  // summaries >= plans — check verification
+  try {
+    const files = fs.readdirSync(phaseDir);
+    const verificationFile = files.find(f => f === 'VERIFICATION.md' || f.endsWith('-VERIFICATION.md'));
+    if (verificationFile) {
+      const content = fs.readFileSync(path.join(phaseDir, verificationFile), 'utf-8');
+      if (/status:\s*passed/i.test(content)) return 'Complete';
+      if (/status:\s*human_needed/i.test(content)) return 'Needs Review';
+      if (/status:\s*gaps_found/i.test(content)) return 'Executed';
+      // Verification exists but unrecognized status — treat as executed
+      return 'Executed';
+    }
+  } catch { /* directory read failed — fall through */ }
+
+  // No verification file — executed but not verified
+  return 'Executed';
+}
 
 function cmdGenerateSlug(text, raw) {
   if (!text) {
@@ -16,7 +43,8 @@ function cmdGenerateSlug(text, raw) {
   const slug = text
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/^-+|-+$/g, '')
+    .substring(0, 60);
 
   const result = { slug };
   output(result, raw, slug);
@@ -254,7 +282,7 @@ function cmdCommit(cwd, message, files, raw, amend, noVerify) {
     let branchName = null;
     if (config.branching_strategy === 'phase') {
       // Determine which phase we're committing for from the file paths
-      const phaseMatch = (files || []).join(' ').match(/(\d+)-/);
+      const phaseMatch = (files || []).join(' ').match(/(\d+(?:\.\d+)*)-/);
       if (phaseMatch) {
         const phaseNum = phaseMatch[1];
         const phaseInfo = findPhaseInternal(cwd, phaseNum);
@@ -285,11 +313,19 @@ function cmdCommit(cwd, message, files, raw, amend, noVerify) {
   }
 
   // Stage files
-  const filesToStage = files && files.length > 0 ? files : ['.planning/'];
+  const explicitFiles = files && files.length > 0;
+  const filesToStage = explicitFiles ? files : ['.planning/'];
   for (const file of filesToStage) {
     const fullPath = path.join(cwd, file);
     if (!fs.existsSync(fullPath)) {
-      // File was deleted/moved — stage the deletion
+      if (explicitFiles) {
+        // Caller passed an explicit --files list: missing files are skipped.
+        // Staging a deletion here would silently remove tracked planning files
+        // (e.g. STATE.md, ROADMAP.md) when they are temporarily absent (#2014).
+        continue;
+      }
+      // Default mode (staging all of .planning/): stage the deletion so
+      // removed planning files are not left dangling in the index.
       execGit(cwd, ['rm', '--cached', '--ignore-unmatch', file]);
     } else {
       execGit(cwd, ['add', file]);
@@ -512,44 +548,25 @@ function cmdProgressRender(cwd, format, raw) {
   const phases = [];
   let totalPlans = 0;
   let totalSummaries = 0;
-  const diskPhaseStats = new Map();
 
   try {
-    const isDirInMilestone = getMilestonePhaseFilter(cwd);
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name)
-      .filter(isDirInMilestone)
-      .sort((a, b) => comparePhaseNum(a, b));
+    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => comparePhaseNum(a, b));
 
     for (const dir of dirs) {
       const dm = dir.match(/^(\d+(?:\.\d+)*)-?(.*)/);
       const phaseNum = dm ? dm[1] : dir;
+      const phaseName = dm && dm[2] ? dm[2].replace(/-/g, ' ') : '';
       const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
-      diskPhaseStats.set(phaseNum, {
-        plans: phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').length,
-        summaries: phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length,
-      });
-    }
-  } catch { /* intentionally empty */ }
-
-  try {
-    const roadmapContent = extractCurrentMilestone(fs.readFileSync(roadmapPath, 'utf-8'), cwd);
-    for (const roadmapPhase of parseRoadmapPhaseSections(roadmapContent)) {
-      if (roadmapPhase.is_backlog || roadmapPhase.is_follow_up) continue;
-      const diskStats = diskPhaseStats.get(roadmapPhase.number) || { plans: 0, summaries: 0 };
-      const plans = Math.max(diskStats.plans, roadmapPhase.declared_plan_count);
-      const summaries = diskStats.summaries;
+      const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').length;
+      const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
 
       totalPlans += plans;
       totalSummaries += summaries;
 
-      let status;
-      if (plans === 0) status = 'Pending';
-      else if (summaries >= plans) status = 'Complete';
-      else if (summaries > 0) status = 'In Progress';
-      else status = diskStats.plans > 0 ? 'Planned' : 'Pending';
+      const status = determinePhaseStatus(plans, summaries, path.join(phasesDir, dir), 'Pending');
 
-      phases.push({ number: roadmapPhase.number, name: roadmapPhase.name, plans, summaries, status });
+      phases.push({ number: phaseNum, name: phaseName, plans, summaries, status });
     }
   } catch { /* intentionally empty */ }
 
@@ -756,7 +773,7 @@ function cmdScaffold(cwd, type, options, raw) {
   switch (type) {
     case 'context': {
       filePath = path.join(phaseDir, `${padded}-CONTEXT.md`);
-      content = `---\nphase: "${padded}"\nname: "${name || phaseInfo?.phase_name || 'Unnamed'}"\ncreated: ${today}\n---\n\n# Phase ${phase}: ${name || phaseInfo?.phase_name || 'Unnamed'} — Context\n\n## Decisions\n\n_Decisions will be captured during /gsd:discuss-phase ${phase}_\n\n## Discretion Areas\n\n_Areas where the executor can use judgment_\n\n## Deferred Ideas\n\n_Ideas to consider later_\n`;
+      content = `---\nphase: "${padded}"\nname: "${name || phaseInfo?.phase_name || 'Unnamed'}"\ncreated: ${today}\n---\n\n# Phase ${phase}: ${name || phaseInfo?.phase_name || 'Unnamed'} — Context\n\n## Decisions\n\n_Decisions will be captured during /gsd-discuss-phase ${phase}_\n\n## Discretion Areas\n\n_Areas where the executor can use judgment_\n\n## Deferred Ideas\n\n_Ideas to consider later_\n`;
       break;
     }
     case 'uat': {
@@ -843,18 +860,14 @@ function cmdStats(cwd, format, raw) {
       totalPlans += plans;
       totalSummaries += summaries;
 
-      let status;
-      if (plans === 0) status = 'Not Started';
-      else if (summaries >= plans) status = 'Complete';
-      else if (summaries > 0) status = 'In Progress';
-      else status = 'Planned';
+      const status = determinePhaseStatus(plans, summaries, path.join(phasesDir, dir), 'Not Started');
 
       const existing = phasesByNumber.get(phaseNum);
       phasesByNumber.set(phaseNum, {
         number: phaseNum,
         name: existing?.name || phaseName,
-        plans,
-        summaries,
+        plans: (existing?.plans || 0) + plans,
+        summaries: (existing?.summaries || 0) + summaries,
         status,
       });
     }
@@ -955,6 +968,39 @@ function cmdStats(cwd, format, raw) {
   }
 }
 
+/**
+ * Check whether a commit should be allowed based on commit_docs config.
+ * When commit_docs is false, rejects commits that stage .planning/ files.
+ * Intended for use as a pre-commit hook guard.
+ */
+function cmdCheckCommit(cwd, raw) {
+  const config = loadConfig(cwd);
+
+  // If commit_docs is true (or not set), allow all commits
+  if (config.commit_docs !== false) {
+    output({ allowed: true, reason: 'commit_docs_enabled' }, raw, 'allowed');
+    return;
+  }
+
+  // commit_docs is false — check if any .planning/ files are staged
+  try {
+    const staged = execSync('git diff --cached --name-only', { cwd, encoding: 'utf-8' }).trim();
+    const planningFiles = staged.split('\n').filter(f => f.startsWith('.planning/') || f.startsWith('.planning\\'));
+
+    if (planningFiles.length > 0) {
+      error(
+        `commit_docs is false but ${planningFiles.length} .planning/ file(s) are staged:\n` +
+        planningFiles.map(f => `  ${f}`).join('\n') +
+        `\n\nTo unstage: git reset HEAD ${planningFiles.join(' ')}`
+      );
+    }
+  } catch {
+    // git diff --cached failed (no staged files or not a git repo) — allow
+  }
+
+  output({ allowed: true, reason: 'no_planning_files_staged' }, raw, 'allowed');
+}
+
 module.exports = {
   cmdGenerateSlug,
   cmdCurrentTimestamp,
@@ -971,4 +1017,5 @@ module.exports = {
   cmdTodoMatchPhase,
   cmdScaffold,
   cmdStats,
+  cmdCheckCommit,
 };

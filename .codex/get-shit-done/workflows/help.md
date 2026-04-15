@@ -126,7 +126,7 @@ Route freeform text to the right GSD command automatically.
 - Analyzes natural language input to find the best matching GSD command
 - Acts as a dispatcher — never does the work itself
 - Resolves ambiguity by asking you to pick between top matches
-- Use when you know what you want but don't know which `/gsd:*` command to run
+- Use when you know what you want but don't know which `/gsd-*` command to run
 
 Usage: `$gsd-do fix the login button`
 Usage: `$gsd-do refactor the auth system`
@@ -134,7 +134,7 @@ Usage: `$gsd-do I want to start a new milestone`
 
 ### Quick Mode
 
-**`$gsd-quick [--full] [--discuss] [--research]`**
+**`$gsd-quick [--full] [--validate] [--discuss] [--research]`**
 Execute small, ad-hoc tasks with GSD guarantees but skip optional agents.
 
 Quick mode uses the same system with a shorter path:
@@ -143,14 +143,16 @@ Quick mode uses the same system with a shorter path:
 - Updates STATE.md tracking (not ROADMAP.md)
 
 Flags enable additional quality steps:
+- `--full` — Complete quality pipeline: discussion + research + plan-checking + verification
+- `--validate` — Plan-checking (max 2 iterations) and post-execution verification only
 - `--discuss` — Lightweight discussion to surface gray areas before planning
 - `--research` — Focused research agent investigates approaches before planning
-- `--full` — Adds plan-checking (max 2 iterations) and post-execution verification
 
-Flags are composable: `--discuss --research --full` gives the complete quality pipeline for a single task.
+Granular flags are composable: `--discuss --research --validate` gives the same as `--full`.
 
 Usage: `$gsd-quick`
-Usage: `$gsd-quick --research --full`
+Usage: `$gsd-quick --full`
+Usage: `$gsd-quick --research --validate`
 Result: Creates `.planning/quick/NNN-slug/PLAN.md`, `.planning/quick/NNN-slug/SUMMARY.md`
 
 ---
@@ -206,8 +208,6 @@ Result: Phase 17 deleted, phases 18-20 become 17-19
 Start a new milestone through unified flow.
 
 - Deep questioning to understand what you're building next
-- Surfaces matching dormant seeds from `.planning/seeds/` before scoping
-- Uses milestone text to pre-rank the most relevant dormant seeds when possible
 - Optional domain research (spawns 4 parallel researcher agents)
 - Requirements definition with scoping
 - Roadmap creation with phase breakdown
@@ -345,11 +345,12 @@ Usage: `$gsd-ship 4` or `$gsd-ship 4 --draft`
 
 ---
 
-**`$gsd-review --phase N [--gemini] [--claude] [--codex] [--all]`**
+**`$gsd-review --phase N [--gemini] [--claude] [--codex] [--coderabbit] [--opencode] [--qwen] [--cursor] [--all]`**
 Cross-AI peer review — invoke external AI CLIs to independently review phase plans.
 
-- Detects available CLIs (gemini, claude, codex)
+- Detects available CLIs (gemini, claude, codex, coderabbit)
 - Each CLI reviews plans independently with the same structured prompt
+- CodeRabbit reviews the current git diff (not a prompt) — may take up to 5 minutes
 - Produces REVIEWS.md with per-reviewer feedback and consensus summary
 - Feed reviews back into planning: `$gsd-plan-phase N --reviews`
 
@@ -553,9 +554,9 @@ Example config:
 
 ```
 $gsd-new-project        # Unified flow: questioning → research → requirements → roadmap
-/clear
+
 $gsd-plan-phase 1       # Create plans for first phase
-/clear
+
 $gsd-execute-phase 1    # Execute all plans in phase
 ```
 
@@ -577,7 +578,7 @@ $gsd-execute-phase 5.1
 
 ```
 $gsd-complete-milestone 1.0.0
-/clear
+
 $gsd-new-milestone  # Start next milestone (questioning → research → requirements → roadmap)
 ```
 
@@ -595,7 +596,7 @@ $gsd-check-todos api             # Filter by area
 ```
 $gsd-debug "form submission fails silently"  # Start debug session
 # ... investigation happens, context fills up ...
-/clear
+
 $gsd-debug                                    # Resume from where you left off
 ```
 

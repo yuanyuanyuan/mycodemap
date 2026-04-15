@@ -64,16 +64,17 @@ Look for incomplete work that needs attention:
 
 ```bash
 # Check for structured handoff (preferred — machine-readable)
-cat .planning/HANDOFF.json 2>/dev/null
+cat .planning/HANDOFF.json 2>/dev/null || true
 
 # Check for continue-here files (mid-plan resumption)
-ls .planning/phases/*/.continue-here*.md 2>/dev/null
+ls .planning/phases/*/.continue-here*.md 2>/dev/null || true
 
 # Check for plans without summaries (incomplete execution)
 for plan in .planning/phases/*/*-PLAN.md; do
+  [ -e "$plan" ] || continue
   summary="${plan/PLAN/SUMMARY}"
   [ ! -f "$summary" ] && echo "Incomplete: $plan"
-done 2>/dev/null
+done 2>/dev/null || true
 
 # Check for interrupted agents (use has_interrupted_agent and interrupted_agent_id from init)
 if [ "$has_interrupted_agent" = "true" ]; then
@@ -215,7 +216,7 @@ What would you like to do?
 **Note:** When offering phase planning, check for CONTEXT.md existence first:
 
 ```bash
-ls .planning/phases/XX-name/*-CONTEXT.md 2>/dev/null
+ls .planning/phases/XX-name/*-CONTEXT.md 2>/dev/null || true
 ```
 
 If missing, suggest discuss-phase before plan. If exists, offer plan directly.
@@ -236,8 +237,6 @@ Based on user selection, route to appropriate workflow:
 
   `$gsd-execute-phase {phase} ${GSD_WS}`
 
-  <sub>`/clear` first → fresh context window</sub>
-
   ---
   ```
 - **Plan phase** → Show command for user to run after clearing:
@@ -249,8 +248,6 @@ Based on user selection, route to appropriate workflow:
   **Phase [N]: [Name]** — [Goal from ROADMAP.md]
 
   `$gsd-plan-phase [phase-number] ${GSD_WS}`
-
-  <sub>`/clear` first → fresh context window</sub>
 
   ---
 

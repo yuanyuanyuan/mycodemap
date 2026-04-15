@@ -85,7 +85,7 @@ Use this instead of manually reading/parsing ROADMAP.md.
 - Use `current_phase` and `next_phase` from `$ROADMAP`
 - Note `paused_at` if work was paused (from `$STATE`)
 - Count pending todos: use `init todos` or `list-todos`
-- Check for active debug sessions: `ls .planning/debug/*.md 2>/dev/null | grep -v resolved | wc -l`
+- Check for active debug sessions: `(ls .planning/debug/*.md 2>/dev/null || true) | grep -v resolved | wc -l`
   </step>
 
 <step name="report">
@@ -143,9 +143,9 @@ CONTEXT: [✓ if has_context | - if not]
 List files in the current phase directory:
 
 ```bash
-ls -1 .planning/phases/[current-phase-dir]/*-PLAN.md 2>/dev/null | wc -l
-ls -1 .planning/phases/[current-phase-dir]/*-SUMMARY.md 2>/dev/null | wc -l
-ls -1 .planning/phases/[current-phase-dir]/*-UAT.md 2>/dev/null | wc -l
+(ls -1 .planning/phases/[current-phase-dir]/*-PLAN.md 2>/dev/null || true) | wc -l
+(ls -1 .planning/phases/[current-phase-dir]/*-SUMMARY.md 2>/dev/null || true) | wc -l
+(ls -1 .planning/phases/[current-phase-dir]/*-UAT.md 2>/dev/null || true) | wc -l
 ```
 
 State: "This phase has {X} plans, {Y} summaries."
@@ -156,7 +156,7 @@ Check for UAT.md files with status "diagnosed" (has gaps needing fixes).
 
 ```bash
 # Check for diagnosed UAT with gaps or partial (incomplete) testing
-grep -l "status: diagnosed\|status: partial" .planning/phases/[current-phase-dir]/*-UAT.md 2>/dev/null
+grep -l "status: diagnosed\|status: partial" .planning/phases/[current-phase-dir]/*-UAT.md 2>/dev/null || true
 ```
 
 Track:
@@ -217,8 +217,6 @@ Read its `<objective>` section.
 
 `$gsd-execute-phase {phase} ${GSD_WS}`
 
-<sub>`/clear` first → fresh context window</sub>
-
 ---
 ```
 
@@ -247,8 +245,6 @@ PHASE_HAS_UI=$(echo "$PHASE_SECTION" | grep -qi "UI hint.*yes" && echo "true" ||
 
 `$gsd-plan-phase {phase-number} ${GSD_WS}`
 
-<sub>`/clear` first → fresh context window</sub>
-
 ---
 ```
 
@@ -262,8 +258,6 @@ PHASE_HAS_UI=$(echo "$PHASE_SECTION" | grep -qi "UI hint.*yes" && echo "true" ||
 **Phase {N}: {Name}** — {Goal from ROADMAP.md}
 
 `$gsd-discuss-phase {phase}` — gather context and clarify approach
-
-<sub>`/clear` first → fresh context window</sub>
 
 ---
 
@@ -285,8 +279,6 @@ PHASE_HAS_UI=$(echo "$PHASE_SECTION" | grep -qi "UI hint.*yes" && echo "true" ||
 **Phase {N}: {Name}** — {Goal from ROADMAP.md}
 
 `$gsd-discuss-phase {phase} ${GSD_WS}` — gather context and clarify approach
-
-<sub>`/clear` first → fresh context window</sub>
 
 ---
 
@@ -312,8 +304,6 @@ UAT.md exists with gaps (diagnosed issues). User needs to plan fixes.
 
 `$gsd-plan-phase {phase} --gaps ${GSD_WS}`
 
-<sub>`/clear` first → fresh context window</sub>
-
 ---
 
 **Also available:**
@@ -337,8 +327,6 @@ UAT.md exists with `status: partial` — testing session ended before all items 
 **{phase_num}-UAT.md** has {N} unresolved tests (pending, blocked, or skipped).
 
 `$gsd-verify-work {phase} ${GSD_WS}` — resume testing from where you left off
-
-<sub>`/clear` first → fresh context window</sub>
 
 ---
 
@@ -394,8 +382,6 @@ NEXT_HAS_UI=$(echo "$NEXT_PHASE_SECTION" | grep -qi "UI hint.*yes" && echo "true
 
 `$gsd-discuss-phase {Z+1}` — gather context and clarify approach
 
-<sub>`/clear` first → fresh context window</sub>
-
 ---
 
 **Also available:**
@@ -418,8 +404,6 @@ NEXT_HAS_UI=$(echo "$NEXT_PHASE_SECTION" | grep -qi "UI hint.*yes" && echo "true
 **Phase {Z+1}: {Name}** — {Goal from ROADMAP.md}
 
 `$gsd-discuss-phase {Z+1} ${GSD_WS}` — gather context and clarify approach
-
-<sub>`/clear` first → fresh context window</sub>
 
 ---
 
@@ -446,8 +430,6 @@ All {N} phases finished!
 **Complete Milestone** — archive and prepare for next
 
 `$gsd-complete-milestone ${GSD_WS}`
-
-<sub>`/clear` first → fresh context window</sub>
 
 ---
 
@@ -477,8 +459,6 @@ Ready to plan the next milestone.
 **Start Next Milestone** — questioning → research → requirements → roadmap
 
 `$gsd-new-milestone ${GSD_WS}`
-
-<sub>`/clear` first → fresh context window</sub>
 
 ---
 ```

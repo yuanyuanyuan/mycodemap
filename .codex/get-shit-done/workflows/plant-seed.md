@@ -32,6 +32,9 @@ mkdir -p .planning/seeds
 <step name="gather_context">
 Ask focused questions to build a complete seed:
 
+
+**Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `{{GSD_ARGS}}` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-the agent runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
+
 ```
 AskUserQuestion(
   header: "Trigger",
@@ -86,7 +89,7 @@ Store relevant file paths as `$BREADCRUMBS`.
 <step name="generate_seed_id">
 ```bash
 # Find next seed number
-EXISTING=$(ls .planning/seeds/SEED-*.md 2>/dev/null | wc -l)
+EXISTING=$( (ls .planning/seeds/SEED-*.md 2>/dev/null || true) | wc -l )
 NEXT=$((EXISTING + 1))
 PADDED=$(printf "%03d" $NEXT)
 ```

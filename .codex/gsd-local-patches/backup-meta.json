@@ -1,0 +1,27 @@
+{
+  "backed_up_at": "2026-04-15T08:52:37.095Z",
+  "from_version": "1.28.0",
+  "from_manifest_timestamp": "2026-03-24T16:24:18.752Z",
+  "files": [
+    "get-shit-done/bin/gsd-tools.cjs",
+    "get-shit-done/bin/lib/commands.cjs",
+    "get-shit-done/bin/lib/core.cjs",
+    "get-shit-done/bin/lib/init.cjs",
+    "get-shit-done/bin/lib/roadmap.cjs",
+    "get-shit-done/bin/lib/state.cjs",
+    "get-shit-done/workflows/help.md",
+    "get-shit-done/workflows/new-milestone.md",
+    "skills/gsd-complete-milestone/SKILL.md"
+  ],
+  "pristine_hashes": {
+    "get-shit-done/bin/gsd-tools.cjs": "7cced5afc82575d2686d064a4005dd7eefffe09f3699b5133f222521ecb57a32",
+    "get-shit-done/bin/lib/commands.cjs": "95a7ff9eda6a8099aa26dbc4b3cc97d1d8c414bf106540b274c7e871dd73fdb7",
+    "get-shit-done/bin/lib/core.cjs": "0ef571ad3daa3dac184da10805cef9cff60171781d0e4c7ad4485fe162e97164",
+    "get-shit-done/bin/lib/init.cjs": "03d89880f87b1f92e2e2d2d62a3dbd84865499f2085cacde5ccf192632aafc08",
+    "get-shit-done/bin/lib/roadmap.cjs": "0fdc875ca221710be2b129b1751cd3b4a4fa75361d23b3ef48950462b18aea08",
+    "get-shit-done/bin/lib/state.cjs": "c9561c0211e2bbb812da7891b1b2ebc8ff37a4b1c2043592f5cc746986b58331",
+    "get-shit-done/workflows/help.md": "500b54b67ddaba64e5056f9b049b8fc07d39bcd7573d7e6eda5a4a36c1fe7cab",
+    "get-shit-done/workflows/new-milestone.md": "415e1f706563974635dedc6ab5b834eb381eda9abb0f6f8caad08cd2efdd7d69",
+    "skills/gsd-complete-milestone/SKILL.md": "b049c4b823c977c83eedc9d6facd68a3214edf98066724682f138505d19ccd89"
+  }
+}

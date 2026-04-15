@@ -10,6 +10,13 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 </required_reading>
 
+<available_agent_types>
+Valid GSD subagent types (use exact names — do not fall back to 'general-purpose'):
+- gsd-project-researcher — Researches project-level technical decisions
+- gsd-research-synthesizer — Synthesizes findings from parallel research agents
+- gsd-roadmapper — Creates phased execution roadmaps
+</available_agent_types>
+
 <process>
 
 ## 1. Load Context
@@ -23,7 +30,6 @@ If the flag is absent, keep the current behavior of continuing phase numbering f
 - Read PROJECT.md (existing project, validated requirements, decisions)
 - Read MILESTONES.md (what shipped previously)
 - Read STATE.md (pending todos, blockers)
-- Read dormant seeds in `.planning/seeds/` when present; treat them as candidate future context, not automatic scope commitments
 - Check for MILESTONE-CONTEXT.md (from $gsd-discuss-milestone)
 
 ## 2. Gather Milestone Goals
@@ -34,12 +40,60 @@ If the flag is absent, keep the current behavior of continuing phase numbering f
 
 **If no context file:**
 - Present what shipped in last milestone
-- Surface any dormant seeds whose `title` or `trigger_when` looks relevant to the proposed milestone or the just-completed milestone debt
-- If no milestone name was provided and dormant seeds exist, show a short "Possible dormant seeds to revive" list before asking what to build next
-- Make it explicit that seeds are optional prompts, not pre-approved scope
+
+**Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `{{GSD_ARGS}}` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-the agent runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
 - Ask inline (freeform, NOT AskUserQuestion): "What do you want to build next?"
 - Wait for their response, then use AskUserQuestion to probe specifics
 - If user selects "Other" at any point to provide freeform input, ask follow-up as plain text — not another AskUserQuestion
+
+## 2.5. Scan Planted Seeds
+
+Check `.planning/seeds/` for seed files that match the milestone goals gathered in step 2.
+
+```bash
+ls .planning/seeds/SEED-*.md 2>/dev/null
+```
+
+**If no seed files exist:** Skip this step silently — do not print any message or prompt.
+
+**If seed files exist:** Read each `SEED-*.md` file and extract from its frontmatter and body:
+- **Idea** — the seed title (heading after frontmatter, e.g. `# SEED-001: <idea>`)
+- **Trigger conditions** — the `trigger_when` frontmatter field and the "When to Surface" section's bullet list
+- **Planted during** — the `planted_during` frontmatter field (for context)
+
+Compare each seed's trigger conditions against the milestone goals from step 2. A seed matches when its trigger conditions are relevant to any of the milestone's target features or goals.
+
+**If no seeds match:** Skip silently — do not prompt the user.
+
+**If matching seeds found:**
+
+**`--auto` mode:** Auto-select ALL matching seeds. Log: `[auto] Selected N matching seed(s): [list seed names]`
+
+**Text mode (`TEXT_MODE=true`):** Present matching seeds as a plain-text numbered list:
+```
+Seeds that match your milestone goals:
+1. SEED-001: <idea> (trigger: <trigger_when>)
+2. SEED-003: <idea> (trigger: <trigger_when>)
+
+Enter numbers to include (comma-separated), or "none" to skip:
+```
+
+**Normal mode:** Present via AskUserQuestion:
+```
+AskUserQuestion(
+  header: "Seeds",
+  question: "These planted seeds match your milestone goals. Include any in this milestone's scope?",
+  multiSelect: true,
+  options: [
+    { label: "SEED-001: <idea>", description: "Trigger: <trigger_when> | Planted during: <planted_during>" },
+    ...
+  ]
+)
+```
+
+**After selection:**
+- Selected seeds become additional context for requirement definition in step 9. Store them in an accumulator (e.g. `$SELECTED_SEEDS`) so step 9 can reference the ideas and their "Why This Matters" sections when defining requirements.
+- Unselected seeds remain untouched in `.planning/seeds/` — never delete or modify seed files during this workflow.
 
 ## 3. Determine Milestone Version
 
@@ -134,6 +188,12 @@ Keep Accumulated Context section from previous milestone.
 
 Delete MILESTONE-CONTEXT.md if exists (consumed).
 
+Clear leftover phase directories from the previous milestone:
+
+```bash
+node "/data/codemap/.codex/get-shit-done/bin/gsd-tools.cjs" phases clear --confirm
+```
+
 ```bash
 node "/data/codemap/.codex/get-shit-done/bin/gsd-tools.cjs" commit "docs: start milestone v[X.Y] [Name]" --files .planning/PROJECT.md .planning/STATE.md
 ```
@@ -143,17 +203,12 @@ node "/data/codemap/.codex/get-shit-done/bin/gsd-tools.cjs" commit "docs: start 
 ```bash
 INIT=$(node "/data/codemap/.codex/get-shit-done/bin/gsd-tools.cjs" init new-milestone)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+AGENT_SKILLS_RESEARCHER=$(node "/data/codemap/.codex/get-shit-done/bin/gsd-tools.cjs" agent-skills gsd-project-researcher 2>/dev/null)
+AGENT_SKILLS_SYNTHESIZER=$(node "/data/codemap/.codex/get-shit-done/bin/gsd-tools.cjs" agent-skills gsd-synthesizer 2>/dev/null)
+AGENT_SKILLS_ROADMAPPER=$(node "/data/codemap/.codex/get-shit-done/bin/gsd-tools.cjs" agent-skills gsd-roadmapper 2>/dev/null)
 ```
 
-If a milestone name or theme is already known from `{{GSD_ARGS}}`, pass that text to `init new-milestone` so seed matching can pre-rank related dormant seeds.
-
-Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`, `latest_completed_milestone`, `phase_dir_count`, `phase_archive_path`, `seed_match_query`, `available_seed_count`, `available_seeds`, `matching_seed_count`, `matching_seeds`.
-
-If `available_seed_count > 0`, review `available_seeds` before milestone questioning:
-- Prefer seeds with obvious semantic overlap to the requested milestone
-- Present matches as "Dormant seeds to consider"
-- Keep non-matching seeds dormant and out of scope
-- If `matching_seed_count > 0`, show `matching_seeds` first and explain that they matched the milestone hint rather than being auto-approved scope
+Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`, `latest_completed_milestone`, `phase_dir_count`, `phase_archive_path`.
 
 ## 7.5 Reset-phase safety (only when `--reset-phase-numbers`)
 
@@ -227,6 +282,8 @@ Focus ONLY on what's needed for the NEW features.
 - .planning/PROJECT.md (Project context)
 </files_to_read>
 
+${AGENT_SKILLS_RESEARCHER}
+
 <downstream_consumer>{CONSUMER}</downstream_consumer>
 
 <quality_gate>{GATES}</quality_gate>
@@ -261,6 +318,8 @@ Synthesize research outputs into SUMMARY.md.
 - .planning/research/PITFALLS.md
 </files_to_read>
 
+${AGENT_SKILLS_SYNTHESIZER}
+
 Write to: .planning/research/SUMMARY.md
 Use template: /data/codemap/.codex/get-shit-done/templates/research-project/SUMMARY.md
 Commit after writing.
@@ -289,6 +348,8 @@ Display key findings from SUMMARY.md:
 ```
 
 Read PROJECT.md: core value, current milestone goals, validated requirements (what exists).
+
+**If `$SELECTED_SEEDS` is non-empty (from step 2.5):** Include selected seed ideas and their "Why This Matters" sections as additional input when defining requirements. Seeds provide user-validated feature ideas that should be incorporated into the requirement categories alongside research findings or conversation-gathered features.
 
 **If research exists:** Read FEATURES.md, extract feature categories.
 
@@ -375,6 +436,9 @@ Task(prompt="
 - .planning/config.json
 - .planning/MILESTONES.md
 </files_to_read>
+
+${AGENT_SKILLS_ROADMAPPER}
+
 </planning_context>
 
 <instructions>
@@ -456,8 +520,6 @@ node "/data/codemap/.codex/get-shit-done/bin/gsd-tools.cjs" commit "docs: create
 
 `$gsd-discuss-phase [N] ${GSD_WS}` — gather context and clarify approach
 
-<sub>`/clear` first → fresh context window</sub>
-
 Also: `$gsd-plan-phase [N] ${GSD_WS}` — skip discussion, plan directly
 ```
 
@@ -479,3 +541,4 @@ Also: `$gsd-plan-phase [N] ${GSD_WS}` — skip discussion, plan directly
 
 **Atomic commits:** Each phase commits its artifacts immediately.
 </success_criteria>
+</output>

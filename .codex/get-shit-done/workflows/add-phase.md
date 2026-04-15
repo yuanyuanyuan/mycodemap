@@ -89,8 +89,6 @@ Roadmap updated: .planning/ROADMAP.md
 
 `$gsd-plan-phase {N}`
 
-<sub>`/clear` first → fresh context window</sub>
-
 ---
 
 **Also available:**

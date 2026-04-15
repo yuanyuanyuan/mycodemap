@@ -49,7 +49,7 @@ Result parsing:
 **Flags:**
 - `--name` (required) — Workspace name
 - `--repos` — Comma-separated repo paths or names. If omitted, interactive selection from child git repos in cwd
-- `--path` — Target directory. Defaults to `~/gsd-workspaces/<name>`
+- `--path` — Target directory. Defaults to `~$gsd-workspaces/<name>`
 - `--strategy` — `worktree` (default, lightweight) or `clone` (fully independent)
 - `--branch` — Branch to checkout. Defaults to `workspace/<name>`
 - `--auto` — Skip interactive questions, use defaults

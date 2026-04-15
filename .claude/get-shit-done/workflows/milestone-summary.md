@@ -15,7 +15,7 @@ If `$ARGUMENTS` is empty:
 1. Check `.planning/STATE.md` for current milestone version
 2. Check `.planning/milestones/` for the latest archived version
 3. If neither found, check if `.planning/ROADMAP.md` exists (project may be mid-milestone)
-4. If nothing found: error "No milestone found. Run /gsd:new-project or /gsd:new-milestone first."
+4. If nothing found: error "No milestone found. Run /gsd-new-project or /gsd-new-milestone first."
 
 Set `VERSION` to the resolved version (e.g., "1.0").
 
@@ -23,18 +23,18 @@ Set `VERSION` to the resolved version (e.g., "1.0").
 
 Determine whether the milestone is **archived** or **current**:
 
-**Archived milestone** (`.planning/milestones/{VERSION}-ROADMAP.md` exists):
+**Archived milestone** (`.planning/milestones/v{VERSION}-ROADMAP.md` exists):
 ```
-ROADMAP_PATH=".planning/milestones/${VERSION}-ROADMAP.md"
-REQUIREMENTS_PATH=".planning/milestones/${VERSION}-REQUIREMENTS.md"
-AUDIT_PATH=".planning/milestones/${VERSION}-MILESTONE-AUDIT.md"
+ROADMAP_PATH=".planning/milestones/v${VERSION}-ROADMAP.md"
+REQUIREMENTS_PATH=".planning/milestones/v${VERSION}-REQUIREMENTS.md"
+AUDIT_PATH=".planning/milestones/v${VERSION}-MILESTONE-AUDIT.md"
 ```
 
 **Current/in-progress milestone** (no archive yet):
 ```
 ROADMAP_PATH=".planning/ROADMAP.md"
 REQUIREMENTS_PATH=".planning/REQUIREMENTS.md"
-AUDIT_PATH=".planning/${VERSION}-MILESTONE-AUDIT.md"
+AUDIT_PATH=".planning/v${VERSION}-MILESTONE-AUDIT.md"
 ```
 
 Note: The audit file moves to `.planning/milestones/` on archive (per `complete-milestone` workflow). Check both locations as a fallback.
@@ -212,7 +212,7 @@ If the user asks questions:
 - Stay grounded in what was actually built (not speculation)
 
 If the user is done:
-- Suggest next steps: `/gsd:new-milestone`, `/gsd:progress`, or sharing the summary with the team
+- Suggest next steps: `/gsd-new-milestone`, `/gsd-progress`, or sharing the summary with the team
 
 ## Step 9: Update STATE.md
 

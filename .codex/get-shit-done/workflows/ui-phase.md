@@ -8,6 +8,12 @@ UI-SPEC.md locks spacing, typography, color, copywriting, and design system deci
 @/data/codemap/.codex/get-shit-done/references/ui-brand.md
 </required_reading>
 
+<available_agent_types>
+Valid GSD subagent types (use exact names — do not fall back to 'general-purpose'):
+- gsd-ui-researcher — Researches UI/UX approaches
+- gsd-ui-checker — Reviews UI implementation quality
+</available_agent_types>
+
 <process>
 
 ## 1. Initialize
@@ -15,6 +21,8 @@ UI-SPEC.md locks spacing, typography, color, copywriting, and design system deci
 ```bash
 INIT=$(node "/data/codemap/.codex/get-shit-done/bin/gsd-tools.cjs" init plan-phase "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+AGENT_SKILLS_UI=$(node "/data/codemap/.codex/get-shit-done/bin/gsd-tools.cjs" agent-skills gsd-ui-researcher 2>/dev/null)
+AGENT_SKILLS_UI_CHECKER=$(node "/data/codemap/.codex/get-shit-done/bin/gsd-tools.cjs" agent-skills gsd-ui-checker 2>/dev/null)
 ```
 
 Parse JSON for: `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_context`, `has_research`, `commit_docs`.
@@ -75,6 +83,8 @@ Continue (non-blocking).
 UI_SPEC_FILE=$(ls "${PHASE_DIR}"/*-UI-SPEC.md 2>/dev/null | head -1)
 ```
 
+
+**Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `{{GSD_ARGS}}` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-the agent runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
 **If exists:** Use AskUserQuestion:
 - header: "Existing UI-SPEC"
 - question: "UI-SPEC.md already exists for Phase {N}. What would you like to do?"
@@ -115,6 +125,8 @@ Answer: "What visual and interaction contracts does this phase need?"
 - {context_path} (USER DECISIONS from $gsd-discuss-phase)
 - {research_path} (Technical Research — stack decisions)
 </files_to_read>
+
+${AGENT_SKILLS_UI}
 
 <output>
 Write to: {phase_dir}/{padded_phase}-UI-SPEC.md
@@ -173,6 +185,8 @@ Check all 6 dimensions. Return APPROVED or BLOCKED.
 - {context_path} (USER DECISIONS — check compliance)
 - {research_path} (Technical Research — check stack alignment)
 </files_to_read>
+
+${AGENT_SKILLS_UI_CHECKER}
 
 <config>
 ui_safety_gate: {ui_safety_gate config value}
@@ -249,11 +263,17 @@ Dimensions: 6/6 passed
 
 ## ▶ Next Up
 
+{If CONTEXT.md exists for this phase:}
 **Plan Phase {N}** — planner will use UI-SPEC.md as design context
 
 `$gsd-plan-phase {N}`
 
-<sub>/clear first → fresh context window</sub>
+{If CONTEXT.md does NOT exist:}
+**Discuss Phase {N}** — gather implementation context before planning
+
+`$gsd-discuss-phase {N}`
+
+(or `$gsd-plan-phase {N}` to skip discussion)
 
 ───────────────────────────────────────────────────────────────
 ```

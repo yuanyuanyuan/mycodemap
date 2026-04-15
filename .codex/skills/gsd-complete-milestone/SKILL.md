@@ -77,7 +77,7 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
 
 0. **Check for audit:**
 
-   - Look for `.planning/{{version}}-MILESTONE-AUDIT.md`
+   - Look for `.planning/v{{version}}-MILESTONE-AUDIT.md`
    - If missing or stale: recommend `$gsd-audit-milestone` first
    - If audit status is `gaps_found`: recommend `$gsd-plan-milestone-gaps` first
    - If audit status is `passed`: proceed to step 1
@@ -85,7 +85,7 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
    ```markdown
    ## Pre-flight Check
 
-   {If no {{version}}-MILESTONE-AUDIT.md:}
+   {If no v{{version}}-MILESTONE-AUDIT.md:}
    ⚠ No milestone audit found. Run `$gsd-audit-milestone` first to verify
    requirements coverage, cross-phase integration, and E2E flows.
 
@@ -118,14 +118,14 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
 
 4. **Archive milestone:**
 
-   - Create `.planning/milestones/{{version}}-ROADMAP.md`
+   - Create `.planning/milestones/v{{version}}-ROADMAP.md`
    - Extract full phase details from ROADMAP.md
    - Fill milestone-archive.md template
    - Update ROADMAP.md to one-line summary with link
 
 5. **Archive requirements:**
 
-   - Create `.planning/milestones/{{version}}-REQUIREMENTS.md`
+   - Create `.planning/milestones/v{{version}}-REQUIREMENTS.md`
    - Mark all v1 requirements as complete (checkboxes checked)
    - Note requirement outcomes (validated, adjusted, dropped)
    - Delete `.planning/REQUIREMENTS.md` (fresh one created for next milestone)
@@ -139,9 +139,9 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
 7. **Commit and tag:**
 
    - Stage: MILESTONES.md, PROJECT.md, ROADMAP.md, STATE.md, archive files
-   - Commit: `chore: archive {{version}} milestone`
-   - If `{{version}}` is a release version and the user explicitly wants a tag, create `git tag -a {{version}} -m "[milestone summary]"`
-   - Ask about pushing only if the user explicitly wants it
+   - Commit: `chore: archive v{{version}} milestone`
+   - Tag: `git tag -a v{{version}} -m "[milestone summary]"`
+   - Ask about pushing tag
 
 8. **Offer next steps:**
    - `$gsd-new-milestone` — start next milestone (questioning → research → requirements → roadmap)
@@ -150,12 +150,12 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
 
 <success_criteria>
 
-- Milestone archived to `.planning/milestones/{{version}}-ROADMAP.md`
-- Requirements archived to `.planning/milestones/{{version}}-REQUIREMENTS.md`
+- Milestone archived to `.planning/milestones/v{{version}}-ROADMAP.md`
+- Requirements archived to `.planning/milestones/v{{version}}-REQUIREMENTS.md`
 - `.planning/REQUIREMENTS.md` deleted (fresh for next milestone)
 - ROADMAP.md collapsed to one-line entry
 - PROJECT.md updated with current state
-- Git tag created only when `{{version}}` is a release version and the user requested it
+- Git tag v{{version}} created
 - Commit successful
 - User knows next steps (including need for fresh requirements)
   </success_criteria>
