@@ -103,8 +103,10 @@ jobs:
 
       # 使用 OIDC Trusted Publishing 发布
       # OIDC 通过 id-token: write 权限自动获取认证，不需要 NPM_TOKEN
+      # 注意: Node 22 自带的 npm 10.9.7 在 OIDC provenance 发布 scoped package 时有 E404 bug
+      # 必须使用 npm 11.x 才能成功发布。使用 npx 避免全局 npm 升级时的 MODULE_NOT_FOUND 问题。
       - name: Publish to NPM
-        run: npm publish --access public --provenance --registry https://registry.npmjs.org
+        run: npx npm@11.2.0 publish --access public --provenance --registry https://registry.npmjs.org
 
       - name: Generate Release Notes
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
