@@ -15,6 +15,8 @@ import { designCommand } from './commands/design.js';
 import { ciCommand } from './commands/ci.js';
 import { workflowCommand } from './commands/workflow.js';
 import { exportCommand } from './commands/export.js';
+import { checkCommand } from './commands/check.js';
+import { historyCommand } from './commands/history.js';
 import { shipCommand } from './commands/ship/index.js';
 import { ANALYZE_COMMAND_DESCRIPTION, configureAnalyzeCommand } from './commands/analyze-options.js';
 import { setupRuntimeLogging } from './runtime-logger.js';
@@ -164,6 +166,12 @@ configureAnalyzeCommand(
 
 // CI Gateway 命令
 program.addCommand(ciCommand);
+
+// Contract gate 命令
+program.addCommand(checkCommand);
+
+// History risk 命令
+program.addCommand(historyCommand);
 
 // Workflow 命令
 program.addCommand(workflowCommand);

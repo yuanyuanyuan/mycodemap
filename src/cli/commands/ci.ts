@@ -9,8 +9,10 @@ import path from 'node:path';
 import { Command } from 'commander';
 import { validateCommitMessage, validateRecentCommits, VALID_TAGS } from '../../orchestrator/commit-validator.js';
 import { scanDirectory, scanFileHeader, type FileHeaderResult } from '../../orchestrator/file-header-scanner.js';
-import { GitAnalyzer } from '../../orchestrator/git-analyzer.js';
+import type { FileHistoryAnalysisResult } from '../../interface/types/history-risk.js';
+import { GitHistoryService } from '../../orchestrator/history-risk-service.js';
 import { isCodemapOutput } from '../../orchestrator/types.js';
+import { createConfiguredStorage } from '../storage-runtime.js';
 
 /**
  * CI 命令错误码
@@ -502,70 +504,131 @@ async function checkHeadersAction(options: { directory?: string; files?: string 
 async function assessRiskAction(options: { files?: string; threshold?: string }): Promise<void> {
   const threshold = parseFloat(options.threshold ?? '0.7');
   const changedFiles = await getChangedFiles(options);
+  const assessment = await assessHistoryRisk({
+    files: changedFiles,
+    threshold,
+  });
 
-  const targetFiles = changedFiles.filter(
-    (file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && !file.endsWith('.d.ts')
-  );
-
-  if (targetFiles.length === 0) {
+  if (assessment.files.length === 0) {
     console.log('No changed TypeScript source files detected.');
     return;
   }
 
-  const projectRoot = process.cwd();
-  const gitAnalyzer = new GitAnalyzer();
-
-  const commits = await gitAnalyzer.findRelatedCommits([], targetFiles, {
-    maxCommits: 100,
-    projectRoot,
-  });
-
-  // 简化版风险评估（移除 AIFeed 依赖）
-  type RiskLevel = 'low' | 'medium' | 'high';
-  
-  const risk: { score: number; level: RiskLevel; riskFactors: string[] } = {
-    score: 0.3, // 默认低风险
-    level: 'low',
-    riskFactors: [],
-  };
-
-  // 根据文件数量和提交历史简单评估
-  if (targetFiles.length > 10) {
-    risk.score += 0.2;
-    risk.riskFactors.push(`变更文件数量较多: ${targetFiles.length} 个文件`);
-  }
-
-  if (commits.length > 20) {
-    risk.score += 0.2;
-    risk.riskFactors.push(`相关提交历史复杂: ${commits.length} 个提交`);
-  }
-
-  // 调整风险等级
-  if (risk.score >= 0.7) {
-    risk.level = 'high';
-  } else if (risk.score >= 0.4) {
-    risk.level = 'medium';
-  }
-
   console.log('Risk assessment summary');
-  console.log(`score=${risk.score.toFixed(2)}`);
-  console.log(`level=${risk.level}`);
+  console.log(`status=${assessment.result.diagnostics.status}`);
+  console.log(`confidence=${assessment.result.diagnostics.confidence}`);
+  console.log(`freshness=${assessment.result.diagnostics.freshness}`);
+  console.log(`score=${formatRiskScore(assessment.result.aggregatedRisk.score)}`);
+  console.log(`level=${assessment.result.aggregatedRisk.level}`);
   console.log(`threshold=${threshold.toFixed(2)}`);
 
-  if (risk.riskFactors.length > 0) {
+  if (assessment.result.aggregatedRisk.riskFactors.length > 0) {
     console.log('riskFactors:');
-    for (const factor of risk.riskFactors) {
+    for (const factor of assessment.result.aggregatedRisk.riskFactors) {
       console.log(`- ${factor}`);
     }
   }
 
-  if (risk.score > threshold) {
-    console.error(`ERROR: Risk score ${risk.score.toFixed(2)} exceeds threshold ${threshold.toFixed(2)}`);
+  if (
+    typeof assessment.result.aggregatedRisk.score === 'number'
+    && assessment.result.aggregatedRisk.score > threshold
+  ) {
+    console.error(`ERROR: Risk score ${assessment.result.aggregatedRisk.score.toFixed(2)} exceeds threshold ${threshold.toFixed(2)}`);
     console.error('Risk mitigation notes required. Add explanation to commit body.');
     process.exit(1);
   }
 
+  if (assessment.result.aggregatedRisk.score == null) {
+    console.log('Risk assessment passed with unavailable history signals; threshold was not applied.');
+    return;
+  }
+
   console.log('Risk assessment passed.');
+}
+
+function isHistoryRiskCandidateFile(file: string): boolean {
+  return /\.(?:[cm]?[jt]sx?)$/u.test(file)
+    && !/\.d\.ts$/u.test(file)
+    && !/\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(file);
+}
+
+function formatRiskScore(score: number | null): string {
+  return score == null ? 'unavailable' : score.toFixed(2);
+}
+
+export interface AssessHistoryRiskOptions {
+  files: string[];
+  threshold: number;
+  projectRoot?: string;
+  persist?: boolean;
+}
+
+export interface AssessHistoryRiskResult {
+  files: string[];
+  threshold: number;
+  result: FileHistoryAnalysisResult;
+}
+
+export async function assessHistoryRisk(
+  options: AssessHistoryRiskOptions,
+): Promise<AssessHistoryRiskResult> {
+  const targetFiles = [...new Set(
+    options.files
+      .map((file) => file.trim())
+      .filter(Boolean)
+      .filter((file) => isHistoryRiskCandidateFile(file)),
+  )];
+  if (targetFiles.length === 0) {
+    return {
+      files: [],
+      threshold: options.threshold,
+      result: {
+        requestedFiles: [],
+        files: [],
+        aggregatedRisk: {
+          level: 'unavailable',
+          score: null,
+          gravity: null,
+          heat: null,
+          impact: null,
+          riskFactors: ['no source files to analyze'],
+        },
+        diagnostics: {
+          status: 'not_found',
+          confidence: 'unavailable',
+          freshness: 'unknown',
+          source: 'unavailable',
+          reasons: ['no source files to analyze'],
+          analyzedAt: null,
+          scopeMode: 'full',
+          requestedFiles: 0,
+          analyzedFiles: 0,
+          requiresPrecompute: false,
+        },
+      },
+    };
+  }
+
+  const projectRoot = options.projectRoot ?? process.cwd();
+  const { storage } = await createConfiguredStorage(projectRoot);
+
+  try {
+    const service = new GitHistoryService({
+      projectRoot,
+      storage,
+    });
+    const result = await service.analyzeFiles(targetFiles, {
+      persist: options.persist ?? true,
+    });
+
+    return {
+      files: targetFiles,
+      threshold: options.threshold,
+      result,
+    };
+  } finally {
+    await storage.close();
+  }
 }
 
 /**
