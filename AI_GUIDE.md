@@ -53,6 +53,7 @@ cat .mycodemap/AI_MAP.md
 | "代码质量如何" | `complexity -f "src/file.ts" -j` |
 | "查找与 XXX 相关的代码" | `query -S "XXX" -j` |
 | "这个改动安全吗" | `ci assess-risk` |
+| "这个符号最近为什么危险 / 谁改过" | `history --symbol <name>` |
 | "发布前是否满足门禁" | `ci check-working-tree → ci check-branch → ci check-scripts` |
 | "需要执行复杂的多步骤分析" | `workflow start "任务描述"` |
 | "需要验证文档/契约是否同步" | `ci check-docs-sync`（含 analyze generated block 校验） |
@@ -60,6 +61,8 @@ cat .mycodemap/AI_MAP.md
 | "需要把 design contract 映射成代码范围" | `design map mycodemap.design.md --json` |
 | "需要把 design scope 打包成 agent handoff" | `design handoff mycodemap.design.md --json` |
 | "需要检查实现是否仍在批准范围内" | `design verify mycodemap.design.md --json` |
+| "需要把 design contract 作为代码门禁执行" | `check --contract mycodemap.design.md --against src` |
+| "需要在 PR 中看到 contract gate annotations" | `check --contract mycodemap.design.md --against src --base <sha> --annotation-format github` |
 | "需要导出结构化结果" | `export json -o ./output.json` |
 | "需要插件诊断/扩展结果" | `generate` → 读 `AI_MAP.md` 的 `Plugin Summary` 或解析 `codemap.json.pluginReport` |
 | "需要切换/排查图存储后端" | 编辑 `mycodemap.config.json.storage` → 运行 `generate` / `export` |
@@ -101,16 +104,16 @@ cat .mycodemap/AI_MAP.md
 ```jsonc
 {
   "storage": {
-    "type": "kuzudb",
-    "databasePath": ".codemap/kuzu"
+    "type": "sqlite",
+    "databasePath": ".codemap/governance.sqlite"
   }
 }
 ```
 
 - `generate` 会写入配置的图存储后端；`export` 与内部 `Server Layer` handler 会读取同一份后端数据。
-- `neo4j` 已不再是正式支持的 backend；旧配置会暴露显式迁移错误，不会静默 fallback。
-- 选择 `kuzudb` 前先安装 `npm install kuzu`；缺少依赖时会暴露显式错误。
-- `storage.type = "auto"` 当前仍保守选择 `filesystem`；阈值字段是契约，不是已验证的自动切换承诺。
+- `neo4j` 与 `kuzudb` 已不再是正式支持的 backend；旧配置会暴露显式迁移错误，不会静默 fallback。
+- 选择 `sqlite` 时默认落盘到 `.codemap/governance.sqlite`；也可通过 `storage.databasePath` 覆盖。
+- `storage.type = "auto"` 当前优先选择 `sqlite`；若运行时缺少 `better-sqlite3` 或 Node.js `<20` 导致 SQLite 不可用，则 warning 后回退到 `filesystem`。
 - 图存储后端是存储面收口，不是重新开放公共 HTTP API 产品面。
 
 ---
@@ -191,6 +194,7 @@ node dist/cli/index.js design validate mycodemap.design.md --json
 node dist/cli/index.js design map mycodemap.design.md --json
 node dist/cli/index.js design handoff mycodemap.design.md --json
 node dist/cli/index.js design verify mycodemap.design.md --json
+node dist/cli/index.js check --contract mycodemap.design.md --against src
 ```
 
 - 默认输入文件：`mycodemap.design.md`
@@ -199,6 +203,8 @@ node dist/cli/index.js design verify mycodemap.design.md --json
 - `design map` 会输出 `summary`、`candidates`、`diagnostics` 与 `unknowns`
 - `design handoff` 会输出 `readyForExecution`、`approvals`、`assumptions`、`openQuestions`
 - `design verify` 会输出 `checklist`、`drift`、`diagnostics` 与 `readyForExecution`
+- `check` 会输出 `ContractCheckResult`，默认 JSON，`severity:error` 返回非零退出码
+- `check` / `ci assess-risk` / `history` 现在共用同一套 Git history risk truth；history unavailable 时会显式给出 `unavailable` / `confidence=low`，而不是伪装成低风险
 - 失败时返回结构化 diagnostics，供后续 handoff / mapping 流程阻断使用
 
 ---
@@ -213,8 +219,13 @@ interface AnalyzeOutput {
   tool: string;
   confidence: { score: number; level: "high" | "medium" | "low"; };
   warnings?: Array<{
-    code: "deprecated-intent";
-    replacementIntent: "find" | "read" | "link" | "show";
+    code:
+      | "deprecated-intent"
+      | "git-history-unavailable"
+      | "git-history-precompute-recommended"
+      | "git-history-stale"
+      | "git-history-unsupported-intent";
+    replacementIntent?: "find" | "read" | "link" | "show";
   }>;
   analysis?: unknown;
   results: Array<{
@@ -222,6 +233,14 @@ interface AnalyzeOutput {
     location?: { file: string; line: number; column: number; };
     content?: string;
     relevance: number;
+    metadata?: {
+      historyRisk?: {
+        status: "ok" | "ambiguous" | "not_found" | "unavailable";
+        level: "high" | "medium" | "low" | "unavailable";
+        confidence: "high" | "medium" | "low" | "unavailable";
+        freshness: "fresh" | "stale" | "expired" | "unknown";
+      };
+    };
   }>;
 }
 
@@ -231,12 +250,97 @@ interface DesignValidateOutput {
   filePath: string;
   title?: string;
   missingRequiredSections: Array<"goal" | "constraints" | "acceptanceCriteria" | "nonGoals">;
+  rules: Array<{
+    name: string;
+    type: "layer_direction" | "forbidden_imports" | "module_public_api_only";
+    severity: "error" | "warn";
+  }>;
   diagnostics: Array<{
-    code: "file-not-found" | "missing-section" | "duplicate-section" | "empty-section" | "unknown-section" | "ambiguous-heading";
+    code:
+      | "file-not-found"
+      | "missing-section"
+      | "duplicate-section"
+      | "empty-section"
+      | "unknown-section"
+      | "ambiguous-heading"
+      | "invalid-frontmatter"
+      | "invalid-rules-root"
+      | "invalid-rule-type"
+      | "missing-rule-field"
+      | "invalid-rule-severity"
+      | "unknown-rule-field"
+      | "unknown-frontmatter-field";
     severity: "error" | "warning" | "info";
     message: string;
     section?: "goal" | "constraints" | "acceptanceCriteria" | "nonGoals" | "context" | "openQuestions" | "notes";
   }>;
+}
+
+interface ContractCheckResult {
+  passed: boolean;
+  scan_mode: "full" | "diff";
+  contract_path: string;
+  against_path: string;
+  changed_files: string[];
+  scanned_files: string[];
+  warnings: Array<{
+    code: string;
+    message: string;
+    details?: Record<string, string | number | boolean | null>;
+  }>;
+  history?: {
+    status: "ok" | "ambiguous" | "not_found" | "unavailable";
+    confidence: "high" | "medium" | "low" | "unavailable";
+    freshness: "fresh" | "stale" | "expired" | "unknown";
+    scope_mode: "full" | "partial" | "top-files-only" | "precompute-required";
+    requires_precompute: boolean;
+  };
+  violations: Array<{
+    rule: string;
+    rule_type: "layer_direction" | "forbidden_imports" | "module_public_api_only" | "complexity_threshold";
+    severity: "error" | "warn";
+    location: string;
+    message: string;
+    dependency_chain: string[];
+    hard_fail: boolean;
+    diagnostic?: {
+      file?: string;
+      line?: number;
+      column?: number;
+      endLine?: number;
+      endColumn?: number;
+      scope: "line" | "file" | "general";
+      source: "dependency-cruiser" | "custom-evaluator";
+      category: "dependency" | "module_boundary" | "complexity";
+      degraded: boolean;
+    };
+    risk?: {
+      status: "ok" | "ambiguous" | "not_found" | "unavailable";
+      level: "high" | "medium" | "low" | "unavailable";
+      confidence: "high" | "medium" | "low" | "unavailable";
+      freshness: "fresh" | "stale" | "expired" | "unknown";
+      score: number | null;
+      factors: string[];
+    };
+  }>;
+  summary: {
+    total_violations: number;
+    error_count: number;
+    warn_count: number;
+    scanned_file_count: number;
+    rule_count: number;
+  };
+}
+
+interface HistoryCommandResult {
+  query: string;
+  status: "ok" | "ambiguous" | "not_found" | "unavailable";
+  warnings: string[];
+  risk: {
+    level: "high" | "medium" | "low" | "unavailable";
+    score: number | null;
+    riskFactors: string[];
+  };
 }
 
 interface DesignMapOutput {
@@ -368,6 +472,8 @@ interface PluginExecutionReport {
 }
 ```
 
+> CI-native contract gate truth：PR 默认 hard gate 仅在 calibration 通过且 `changed files <= 10` 时启用；超过窗口、`diff-scope-fallback` 或 `false-positive rate >10%` 时必须退回 `warn-only / fallback`。GitHub 用 `--annotation-format github`，GitLab 用 `--annotation-format gitlab --annotation-file gl-code-quality-report.json`。校准命令：`node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10`
+
 **完整类型定义**: 见 [docs/ai-guide/OUTPUT.md](./docs/ai-guide/OUTPUT.md)
 
 ---
@@ -387,6 +493,11 @@ query -S "关键词" -j → impact -f "文件" -t -j → 实现 → ci check-hea
 ### 模式 C: 重构代码
 ```bash
 cycles → analyze -i read -t "src/core/analyzer.ts" --scope transitive → analyze -i link -t "src/core/analyzer.ts"
+```
+
+### 模式 D: CI-native contract gate
+```bash
+node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10 → check --contract mycodemap.design.md --against src --base "$BASE_SHA" --annotation-format github
 ```
 
 **完整模式**: 见 [docs/ai-guide/PATTERNS.md](./docs/ai-guide/PATTERNS.md)

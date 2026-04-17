@@ -49,6 +49,7 @@
   - `node dist/cli/index.js design map mycodemap.design.md --json` 的 success/blocker 路径、`candidates` / `unknowns` / `diagnostics` 与文档一致；
   - `node dist/cli/index.js design handoff mycodemap.design.md --json` 的 `readyForExecution` / `approvals` / `assumptions` / `openQuestions` 与文档一致；
   - `node dist/cli/index.js design verify mycodemap.design.md --json` 的 `checklist` / `drift` / `diagnostics` / `readyForExecution` 与文档一致，并保持 review-needed / blocker 分离语义；
+  - `node dist/cli/index.js check --contract mycodemap.design.md --against src` 的 JSON / `--human` / exit code 语义与文档一致；
   - `node dist/cli/index.js analyze --help` 与文档示例一致；
   - `find` / `read` / `link` / `show` 中受影响的 public intent 可以在当前仓库运行；
   - 若文档保留 legacy alias 说明，真实输出仍会返回 `warnings[]`；
@@ -57,6 +58,7 @@
 - 修改 `docs/product-specs/*` 现行规格时，必须同步 `docs/product-specs/README.md` 与 `scripts/validate-docs.js` 的高信号断言，避免规格正文和目录索引分叉；`docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md` 也属于这一约束。
 - 若改动会影响 agent 执行手册、README 示例、测试事实或入口路由，先执行 `npm run docs:check`。
 - 若希望通过统一 CLI 护栏入口执行同一检查，使用 `node dist/cli/index.js ci check-docs-sync`；该命令会同时执行 docs guardrail 与 `sync-analyze-docs.js --check`。
+- 若改动涉及 repo-root contract 或 CI gate，确认 `.github/workflows/ci-gateway.yml` 中的 `node dist/cli/index.js check --contract mycodemap.design.md --against src` 仍保持 PR 显式 base / push full scan 语义。
 - `ci check-branch --allow` 支持 `*` 通配；在 CI / PR 环境中，分支识别会回退到 `GITHUB_HEAD_REF` / `GITHUB_REF_NAME`。
 - `generate`、`analyze` 与 `ci check-headers -d` 共享 `.gitignore` 感知文件发现模块；没有 `.gitignore` 时回退到统一默认 `exclude`。
 - 涉及发布边界时，再补 `npm run build` 与 `npm run validate-pack`；不要把本地临时产物当成发布事实。

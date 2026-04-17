@@ -170,6 +170,9 @@ node dist/cli/index.js ci check-headers
 # Step 3: 评估变更风险
 node dist/cli/index.js ci assess-risk
 
+# Step 3.5: 需要看某个符号为什么危险 / 最近谁改过时
+node dist/cli/index.js history --symbol createCheckCommand
+
 # Step 4: 检查输出契约（如果修改了 analyze）
 node dist/cli/index.js ci check-output-contract
 
@@ -179,6 +182,8 @@ node dist/cli/index.js ci check-docs-sync
 # Step 6: 运行测试
 npm test
 ```
+
+> `ci assess-risk`、`check`、`history` 共用同一套 Git history risk truth；若历史不可用，输出会显式返回 `unavailable` / warning，而不是默默降成低风险。
 
 ---
 
@@ -200,6 +205,12 @@ node dist/cli/index.js design handoff mycodemap.design.md --json
 
 # Step 0.9: 基于 reviewed handoff truth 做 verification / drift 检查
 node dist/cli/index.js design verify mycodemap.design.md --json
+
+# Step 0.95: 先校准当前仓库是否还能默认 hard gate
+node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10
+
+# Step 0.97: 如果需要把 contract 变成 PR 门禁，显式输出 GitHub annotations
+node dist/cli/index.js check --contract mycodemap.design.md --against src --base origin/main --annotation-format github
 
 # Step 1: 启动工作流
 node dist/cli/index.js workflow start "实现用户认证模块"
@@ -227,11 +238,33 @@ node dist/cli/index.js workflow checkpoint
 3. `link` - 汇总依赖、引用与关联关系
 4. `show` - 生成概览、摘要与展示型结果
 
-> 说明：`workflow` 仍只保留 `find` / `read` / `link` / `show` 四阶段；如果任务由人类设计驱动，先走 `design validate → design map → design handoff → design verify` 固定输入、候选范围、review gate 与 drift 检查，再进入 workflow。
+> 说明：`workflow` 仍只保留 `find` / `read` / `link` / `show` 四阶段；如果任务由人类设计驱动，先走 `design validate → design map → design handoff → design verify` 固定输入、候选范围、review gate 与 drift 检查；若还需要执行仓库级代码门禁，先校准再显式运行 `check`。
+
+### 模式 G: CI-native contract gate
+
+**适用场景**: 需要把 `mycodemap.design.md` 真正接进 PR / CI，同时保持 annotation 可见且避免 noisy hard gate
+
+**执行步骤**:
+
+```bash
+# Step 1: 校准当前仓库的 hard-gate 窗口
+node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10
+
+# Step 2: 在 GitHub PR 中输出 annotation-friendly diagnostics
+node dist/cli/index.js check --contract mycodemap.design.md --against src --base origin/main --annotation-format github
+
+# Step 3: 如需 GitLab artifact，写出 line-scoped code-quality 报告
+node dist/cli/index.js check --contract mycodemap.design.md --against src --base origin/main --annotation-format gitlab --annotation-file gl-code-quality-report.json
+```
+
+**决策要点**:
+- PR 默认 hard gate 只在 calibration 通过且 `changed files <= 10` 时开启。
+- 超过窗口、出现 `diff-scope-fallback`，或 `false-positive rate >10%` 时必须显式退回 `warn-only / fallback`。
+- GitHub 允许 file-scoped degraded diagnostics；GitLab 只应输出 line-scoped diagnostics，不伪造行号。
 
 ---
 
-### 模式 G: 切换图存储后端
+### 模式 H: 切换图存储后端
 
 **适用场景**: 需要把 CodeGraph 从默认文件系统存储切到 KùzuDB，或验证 graph backend 是否真正生效
 
@@ -244,24 +277,21 @@ cat mycodemap.config.json
 # Step 2: 选择后端
 # {
 #   "storage": {
-#     "type": "kuzudb",
-#     "databasePath": ".codemap/kuzu"
+#     "type": "sqlite",
+#     "databasePath": ".codemap/governance.sqlite"
 #   }
 # }
 
-# Step 3: 如需 Kùzu 图数据库后端，安装可选依赖
-npm install kuzu
-
-# Step 4: 重新生成代码地图
+# Step 3: 重新生成代码地图
 node dist/cli/index.js generate
 
-# Step 5: 验证同一 backend 可被读取
+# Step 4: 验证同一 backend 可被读取
 node dist/cli/index.js export json -o /tmp/codemap.json
 ```
 
 **决策要点**:
-- 旧的 `neo4j` 配置现在应该直接报迁移错误；缺少 `kuzu` 时也应看到显式错误，而不是静默 fallback。
-- `storage.type = "auto"` 当前仍保守落到 `filesystem`，不要把阈值字段误读成已上线自动切换。
+- 旧的 `neo4j` / `kuzudb` 配置现在应该直接报迁移错误；显式 `sqlite` 但运行时不满足条件时也应看到显式错误，而不是静默 fallback。
+- `storage.type = "auto"` 当前优先落到 `sqlite`；只有 SQLite 不可用时才回退 `filesystem`，不要把阈值字段误读成更复杂的调度器。
 - 图存储生产化只收口存储面，不重新开放公共 HTTP API 产品面。
 
 ---

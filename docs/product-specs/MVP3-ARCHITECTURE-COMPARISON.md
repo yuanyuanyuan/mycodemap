@@ -22,7 +22,7 @@
 |------|--------|----------------|
 | CLI | 多个命令直接碰核心实现 | 公共 CLI 收口为分析优先的命令面，命名边界清晰 |
 | Server Layer | 设计概念模糊，易与公共 `server` 命令混淆 | `src/server/` 保留为**内部架构层**；公共 `server` 命令已移除 |
-| Storage | 以文件输出为中心，图存储路径不稳定 | `filesystem` / `memory` / `kuzudb` / `auto` 为正式 surface；`neo4j` 已退出正式支持 |
+| Storage | 以文件输出为中心，图存储路径不稳定 | `filesystem` / `memory` / `sqlite` / `auto` 为正式 surface；`neo4j` 与 `kuzudb` 已退出正式支持 |
 | Parser | 以 TypeScript 逻辑为主，扩展能力弱 | `ParserRegistry` + `TypeScript/JavaScript`、`Go`、`Python` 三类已落地实现 |
 | Workflow | 设计上曾试图扩到更多工程阶段 | 当前公开能力仅保留 analysis-only：`find → read → link → show` |
 | Docs / CI | 文档与实现容易漂移 | `docs:check` + `ci check-docs-sync` + CI gateway 固定当前契约 |
@@ -68,7 +68,7 @@ Domain Layer (`src/domain/`)
   └─ 面向业务模型，不直接暴露 CLI 细节
 
 Infrastructure Layer (`src/infrastructure/`)
-  ├─ storage: FileSystem / Memory / KùzuDB
+  ├─ storage: FileSystem / SQLite / Memory
   ├─ parser: TypeScript(JS) / Go / Python
   └─ repositories / shared graph helpers
 
@@ -80,7 +80,7 @@ Interface Layer (`src/interface/`)
 ### 当前架构要点
 
 - `Server Layer` 是内部架构层，不等于公共 `mycodemap server`
-- 图存储正式产品面已收敛为 Kùzu-only 主线，不再把 `neo4j` 当成受支持 backend
+- 图存储正式产品面已收敛为 `filesystem` / `sqlite` / `memory` / `auto`；旧 `neo4j` / `kuzudb` 配置只保留迁移诊断
 - `workflow` 是公开能力，但仅编排分析阶段，不再混入实现/提交/CI 阶段
 
 ---
@@ -103,7 +103,7 @@ await fs.writeFile(path.join(outputDir, 'AI_MAP.md'), markdown);
 ### After：存储契约已稳定，但产品面已收敛
 
 ```typescript
-export type StorageType = 'filesystem' | 'kuzudb' | 'memory';
+export type StorageType = 'filesystem' | 'sqlite' | 'memory';
 
 export interface StorageConfig {
   type: StorageType | 'auto';
@@ -118,10 +118,11 @@ export interface StorageConfig {
 
 当前事实：
 
-- **正式支持**：`filesystem`、`memory`、`kuzudb`、`auto`
-- **不再正式支持**：`neo4j`
-- **迁移语义**：旧 `neo4j` 配置会返回显式错误，不会静默 fallback
-- **`auto` 现状**：配置面存在，但当前仍保守落到 `filesystem`；阈值字段是契约，不代表已完成智能切换
+- **正式支持**：`filesystem`、`memory`、`sqlite`、`auto`
+- **不再正式支持**：`neo4j`、`kuzudb`
+- **迁移语义**：旧 `neo4j` / `kuzudb` 配置会返回显式错误，不会静默 fallback
+- **`auto` 现状**：配置面存在，当前优先选择 `sqlite`；仅当 SQLite 运行时不可用时 warning 后回退 `filesystem`
+- **SQLite runtime**：显式 `sqlite` 需要 `better-sqlite3` + Node.js `>=20`；否则返回 `SQLITE_NOT_AVAILABLE`
 
 ---
 
@@ -209,7 +210,7 @@ mycodemap ci check-docs-sync
 | 能力 | 当前状态 |
 |------|----------|
 | `neo4j` 正式支持 | 已移除出正式产品面 |
-| 更丰富的自动后端切换启发式 | 仍 deferred；`auto` 当前保守落到 `filesystem` |
+| 更丰富的自动后端切换启发式 | 仍 deferred；`auto` 当前优先选择 `sqlite`，仅在 SQLite 不可用时回退 `filesystem` |
 | Java / Rust / C/C++ 等更多 parser 实现 | 接口预留，未作为当前 shipped reality |
 | `viz` / `tui` / CLI 可视化套件 | 未作为当前 public CLI 基线交付 |
 | 公共 HTTP API / `mycodemap server` 产品面 | 未开放；`Server Layer` 仍是 internal-only |
@@ -221,7 +222,7 @@ mycodemap ci check-docs-sync
 `MVP3` 的核心价值已经从“理想化设计图”收口成了当前可验证的产品基线：
 
 - 5 层架构已在目录结构与职责边界上落地
-- 存储面已稳定为 Kùzu-only 主线
+- 存储面已稳定为 `filesystem` / `sqlite` / `memory` / `auto` 四态 surface
 - 解析器已具备可扩展注册机制，并落地 3 类实现
 - 公共 CLI 已回到分析优先的可维护命令面
 - 文档、测试与 CI 已能共同约束这些边界

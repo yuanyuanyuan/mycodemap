@@ -346,32 +346,37 @@
    node dist/cli/index.js design validate mycodemap.design.md --json
    ```
 
-2. **相关代码搜索**
+2. **如果这是架构边界类需求，先跑 contract gate**
+   ```bash
+   node dist/cli/index.js check --contract mycodemap.design.md --against src
+   ```
+
+3. **相关代码搜索**
    ```bash
    node dist/cli/index.js analyze -i find -k "{{RELATED_KEYWORD}}" --topK 10 --json
    ```
 
-3. **参考现有实现**
+4. **参考现有实现**
    分析类似功能的实现方式
 
-4. **确定实现位置**
+5. **确定实现位置**
    ```bash
    node dist/cli/index.js analyze -i read -t "候选目录" --json
    ```
    选择复杂度最低的模块
 
-5. **影响分析**（如果需要修改现有代码）
+6. **影响分析**（如果需要修改现有代码）
    ```bash
    node dist/cli/index.js analyze -i read -t "目标文件" --json
    ```
 
-6. **实现步骤**
+7. **实现步骤**
    - [ ] 创建新文件（添加 [META] [WHY] 头）
    - [ ] 实现核心功能
    - [ ] 添加单元测试
    - [ ] 运行测试验证
 
-7. **验证**
+8. **验证**
    ```bash
    node dist/cli/index.js ci check-headers -f "新文件.ts"
    npm test

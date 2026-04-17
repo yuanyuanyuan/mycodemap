@@ -200,7 +200,7 @@ Full guide: `AI_GUIDE.md`
 | `风险评分过高` | 变更文件太多 | 拆分提交或添加解释 |
 | `输出契约验证失败` | analyze 输出格式变更 | 检查 schemaVersion 和字段 |
 | `pluginReport.diagnostics` 出现 `initialize` / `generate` 错误 | 插件加载或执行失败 | 检查 `mycodemap.config.json` 的 `plugins` 段、插件导出格式和生成路径 |
-| `UNSUPPORTED_STORAGE_TYPE` / `ADAPTER_NOT_AVAILABLE` / `KUZU_INIT_FAILED` | 图存储后端配置不受支持或缺少依赖 | 检查 `mycodemap.config.json.storage`，确认未继续使用 `neo4j`，并安装 `kuzu` |
+| `UNSUPPORTED_STORAGE_TYPE` / `STORAGE_BACKEND_MIGRATED` / `SQLITE_NOT_AVAILABLE` | 图存储后端配置不受支持、仍在使用旧 `neo4j` / `kuzudb` 配置，或显式 `sqlite` 时运行时不满足条件 | 检查 `mycodemap.config.json.storage`；把旧配置迁移到 `filesystem` / `sqlite` / `memory` / `auto`；确认已安装 `better-sqlite3` 且 Node.js `>=20`；若使用 `auto`，SQLite 不可用时会 warning 后回退 `filesystem` |
 
 ---
 

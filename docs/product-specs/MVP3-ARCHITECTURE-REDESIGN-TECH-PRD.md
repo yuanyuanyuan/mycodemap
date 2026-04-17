@@ -87,7 +87,7 @@ src/
 ### 4.1 当前类型契约
 
 ```typescript
-export type StorageType = 'filesystem' | 'kuzudb' | 'memory';
+export type StorageType = 'filesystem' | 'sqlite' | 'memory';
 
 export interface StorageConfig {
   type: StorageType | 'auto';
@@ -106,27 +106,31 @@ export interface StorageConfig {
 |------|------|----------|
 | `filesystem` | `FileSystemStorage` | shipped |
 | `memory` | `MemoryStorage` | shipped |
-| `kuzudb` | `KuzuDBStorage` | shipped |
-| `auto` | `StorageFactory.determineStorageType()` | shipped surface，但当前保守返回 `filesystem` |
+| `sqlite` | `SQLiteStorage` | shipped |
+| `auto` | `StorageFactory.determineStorageType()` | shipped surface，当前优先返回 `sqlite`，不可用时 warning 后回退 `filesystem` |
 
 ### 4.3 已移除的正式产品面
 
-`neo4j` 已不再是正式支持 backend。
+`neo4j` 与 `kuzudb` 已不再是正式支持 backend。
 
 当前技术语义：
 
 - 旧配置若出现 `neo4j`，`StorageFactory` 会抛出 `UNSUPPORTED_STORAGE_TYPE`
-- 文档和实现都不再承诺 Neo4j runtime surface
+- 旧配置若出现 `kuzudb`，`StorageFactory` 会抛出 `STORAGE_BACKEND_MIGRATED`
+- 显式选择 `sqlite` 且运行时缺少 `better-sqlite3` 或 Node.js `<20` 时，`StorageFactory` 会抛出 `SQLITE_NOT_AVAILABLE`
+- 文档和实现都不再承诺 Neo4j / Kùzu runtime surface
 
 ### 4.4 `auto` 的真实状态
 
-`autoThresholds` 仍保留在契约里，但当前 `StorageFactory` 的保守行为是：
+`autoThresholds` 仍保留在契约里，但当前 `StorageFactory` 的实际行为是：
 
 ```typescript
-const thresholds = config.autoThresholds ?? {
-  useGraphDBWhenFileCount: 1000,
-  useGraphDBWhenNodeCount: 10000,
-};
+const sqliteAvailable = await this.checkSQLiteAvailability();
+if (sqliteAvailable) {
+  return 'sqlite';
+}
+
+console.warn('[StorageFactory] SQLite unavailable, falling back to filesystem');
 
 return 'filesystem';
 ```
@@ -134,6 +138,7 @@ return 'filesystem';
 因此：
 
 - `auto` 是稳定配置面
+- `auto` 会先探测 SQLite runtime，可用时返回 `sqlite`，不可用时 warning 后回退 `filesystem`
 - 但“按规模自动切到图数据库”的更强启发式仍是未来候选，而不是当前完成能力
 
 ---
@@ -279,11 +284,11 @@ find → read → link → show
 
 | 项目 | 说明 |
 |------|------|
-| 更强的 auto storage heuristic | 当前仍保守返回 `filesystem` |
+| 更强的 auto storage heuristic | 当前仍只在 `sqlite` / `filesystem` 间切换，未按规模动态调度更多后端 |
 | 更多 parser 实现 | 接口预留，当前未交付 |
 | 公共 HTTP API 产品化 | 当前不在范围内 |
 | `viz` / `tui` / 更强交互可视化 | 当前不在公共 CLI 基线中 |
-| Kùzu-native 深度查询优化 | 后续候选，不属于 `v1.3` 已交付事实 |
+| 更深的 SQLite / in-memory 协同查询优化 | 后续候选，不属于 `v1.3` 已交付事实 |
 
 ---
 

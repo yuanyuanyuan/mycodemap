@@ -220,12 +220,18 @@ interface AnalyzeOutput {
 }
 
 interface AnalyzeWarning {
-  code: "deprecated-intent";
+  code:
+    | "deprecated-intent"
+    | "git-history-unavailable"
+    | "git-history-precompute-recommended"
+    | "git-history-stale"
+    | "git-history-unsupported-intent";
   severity: "warning";
   message: string;
-  deprecatedIntent: "impact" | "dependency" | "search" | "documentation" | "complexity" | "overview" | "reference";
-  replacementIntent: AnalyzeIntent;
-  sunsetPolicy: "2-minor-window";
+  details?: Record<string, string | number | boolean | null>;
+  deprecatedIntent?: "impact" | "dependency" | "search" | "documentation" | "complexity" | "overview" | "reference";
+  replacementIntent?: AnalyzeIntent;
+  sunsetPolicy?: "2-minor-window";
 }
 
 interface AnalyzeResult {
@@ -241,6 +247,15 @@ interface AnalyzeResult {
     testFile?: string;      // 关联的测试文件
     dependencies?: string[];
     impactCount?: number;
+    historyRisk?: {
+      status: "ok" | "ambiguous" | "not_found" | "unavailable";
+      level: "high" | "medium" | "low" | "unavailable";
+      confidence: "high" | "medium" | "low" | "unavailable";
+      freshness: "fresh" | "stale" | "expired" | "unknown";
+      score: number | null;
+      factors: string[];
+      analyzedAt: string | null;
+    };
     complexityMetrics?: {
       cyclomatic: number;
       cognitive: number;
@@ -268,6 +283,22 @@ interface ReadAnalysis {
       maintainability: number;
     };
     risk: "high" | "medium" | "low";
+  }>;
+  history?: Array<{
+    file: string;
+    status: "ok" | "ambiguous" | "not_found" | "unavailable";
+    confidence: "high" | "medium" | "low" | "unavailable";
+    freshness: "fresh" | "stale" | "expired" | "unknown";
+    source: "git-live" | "sqlite-materialized" | "sqlite-cache" | "unavailable";
+    scopeMode: "full" | "partial" | "top-files-only" | "precompute-required";
+    analyzedAt: string | null;
+    risk: {
+      level: "high" | "medium" | "low" | "unavailable";
+      score: number | null;
+      gravity: number | null;
+      impact: number | null;
+      factors: string[];
+    };
   }>;
 }
 
@@ -375,7 +406,16 @@ interface StructuredResult {
         "dependencies": [
           "src/orchestrator/intent-router.ts"
         ],
-        "riskLevel": "medium"
+        "riskLevel": "medium",
+        "historyRisk": {
+          "status": "ok",
+          "level": "high",
+          "confidence": "high",
+          "freshness": "fresh",
+          "score": 0.82,
+          "factors": ["recent bugfixes"],
+          "analyzedAt": "2026-04-15T00:00:00.000Z"
+        }
       }
     }
   ],
@@ -392,6 +432,24 @@ interface StructuredResult {
         ],
         "impactCount": 3,
         "risk": "medium"
+      }
+    ],
+    "history": [
+      {
+        "file": "src/cli/commands/analyze.ts",
+        "status": "ok",
+        "confidence": "high",
+        "freshness": "fresh",
+        "source": "git-live",
+        "scopeMode": "full",
+        "analyzedAt": "2026-04-15T00:00:00.000Z",
+        "risk": {
+          "level": "high",
+          "score": 0.82,
+          "gravity": 0.6,
+          "impact": 0.8,
+          "factors": ["recent bugfixes"]
+        }
       }
     ]
   },
@@ -425,7 +483,14 @@ type DesignContractDiagnosticCode =
   | "duplicate-section"
   | "empty-section"
   | "unknown-section"
-  | "ambiguous-heading";
+  | "ambiguous-heading"
+  | "invalid-frontmatter"
+  | "invalid-rules-root"
+  | "invalid-rule-type"
+  | "missing-rule-field"
+  | "invalid-rule-severity"
+  | "unknown-rule-field"
+  | "unknown-frontmatter-field";
 
 interface DesignValidateOutput {
   ok: boolean;
@@ -434,6 +499,11 @@ interface DesignValidateOutput {
   title?: string;
   missingRequiredSections: Array<"goal" | "constraints" | "acceptanceCriteria" | "nonGoals">;
   diagnostics: DesignContractDiagnostic[];
+  rules: Array<{
+    name: string;
+    type: "layer_direction" | "forbidden_imports" | "module_public_api_only";
+    severity: "error" | "warn";
+  }>;
   sections: Array<{
     id: DesignContractSectionId;
     title: string;
@@ -464,6 +534,7 @@ interface DesignContractDiagnostic {
   "missingRequiredSections": [
     "acceptanceCriteria"
   ],
+  "rules": [],
   "diagnostics": [
     {
       "code": "missing-section",
@@ -484,6 +555,225 @@ interface DesignContractDiagnostic {
 ```
 
 > `design validate --json` 必须保持纯 JSON；不要在前后拼接说明性 prose。
+
+---
+
+## check 命令输出结构
+
+### JSON 输出（默认）
+
+```typescript
+interface ContractCheckResult {
+  passed: boolean;
+  scan_mode: "full" | "diff";
+  contract_path: string;
+  against_path: string;
+  changed_files: string[];
+  scanned_files: string[];
+  warnings: Array<{
+    code: string;
+    message: string;
+    details?: Record<string, string | number | boolean | null>;
+  }>;
+  history?: {
+    status: "ok" | "ambiguous" | "not_found" | "unavailable";
+    confidence: "high" | "medium" | "low" | "unavailable";
+    freshness: "fresh" | "stale" | "expired" | "unknown";
+    scope_mode: "full" | "partial" | "top-files-only" | "precompute-required";
+    enriched_file_count: number;
+    unavailable_count: number;
+    stale_count: number;
+    low_confidence_count: number;
+    requires_precompute: boolean;
+  };
+  violations: Array<{
+    rule: string;
+    rule_type: "layer_direction" | "forbidden_imports" | "module_public_api_only" | "complexity_threshold";
+    severity: "error" | "warn";
+    location: string;
+    message: string;
+    dependency_chain: string[];
+    hard_fail: boolean;
+    diagnostic?: {
+      file?: string;
+      line?: number;
+      column?: number;
+      endLine?: number;
+      endColumn?: number;
+      scope: "line" | "file" | "general";
+      source: "dependency-cruiser" | "custom-evaluator";
+      category: "dependency" | "module_boundary" | "complexity";
+      degraded: boolean;
+    };
+    risk?: {
+      status: "ok" | "ambiguous" | "not_found" | "unavailable";
+      level: "high" | "medium" | "low" | "unavailable";
+      confidence: "high" | "medium" | "low" | "unavailable";
+      freshness: "fresh" | "stale" | "expired" | "unknown";
+      score: number | null;
+      factors: string[];
+      analyzed_at: string | null;
+    };
+  }>;
+  summary: {
+    total_violations: number;
+    error_count: number;
+    warn_count: number;
+    scanned_file_count: number;
+    rule_count: number;
+  };
+}
+```
+
+### 示例
+
+```json
+{
+  "passed": false,
+  "scan_mode": "diff",
+  "contract_path": "/repo/mycodemap.design.md",
+  "against_path": "src",
+  "changed_files": ["src/domain/index.ts"],
+  "scanned_files": ["src/app/use-domain.ts", "src/domain/index.ts"],
+  "warnings": [
+    {
+      "code": "hard-gate-window-exceeded",
+      "message": "changed files=11 超出 calibrated hard-gate window <=10",
+      "details": {
+        "calibrated": false,
+        "changed_files": 11,
+        "max_changed_files": 10,
+        "recommended_mode": "warn-only"
+      }
+    }
+  ],
+  "history": {
+    "status": "ok",
+    "confidence": "high",
+    "freshness": "fresh",
+    "scope_mode": "full",
+    "enriched_file_count": 1,
+    "unavailable_count": 0,
+    "stale_count": 0,
+    "low_confidence_count": 0,
+    "requires_precompute": false
+  },
+  "violations": [
+    {
+      "rule": "app 不可依赖 domain barrel",
+      "rule_type": "layer_direction",
+      "severity": "error",
+      "location": "src/app/use-domain.ts",
+      "message": "src/app/use-domain.ts 依赖 src/domain/index.ts，违反规则 app 不可依赖 domain barrel",
+      "dependency_chain": ["src/app/use-domain.ts", "src/domain/index.ts"],
+      "hard_fail": true,
+      "diagnostic": {
+        "file": "src/app/use-domain.ts",
+        "line": 3,
+        "column": 1,
+        "scope": "line",
+        "source": "dependency-cruiser",
+        "category": "dependency",
+        "degraded": false
+      },
+      "risk": {
+        "status": "ok",
+        "level": "high",
+        "confidence": "high",
+        "freshness": "fresh",
+        "score": 0.88,
+        "factors": ["recent bugfixes", "high blast radius"],
+        "analyzed_at": "2026-04-15T00:00:00.000Z"
+      }
+    }
+  ],
+  "summary": {
+    "total_violations": 1,
+    "error_count": 1,
+    "warn_count": 0,
+    "scanned_file_count": 2,
+    "rule_count": 1
+  }
+}
+```
+
+> `check` 默认就是纯 JSON；`--human` 只改变渲染，不改变底层 `ContractCheckResult` truth。
+> Git history risk 是 additive enrichment：它补充 `history` 与 `violations[].risk`，但不会改变 `severity:error` / exit 语义。history 不可用时应显式返回 `unavailable` / warning，而不是伪装成低风险。
+> CI-native truth：PR 默认 hard gate 仅在 calibration 通过且 `changed files <= 10` 时启用；若出现 `diff-scope-fallback`、`hard-gate-window-exceeded` 或 `false-positive rate >10%`，CI 必须回退 `warn-only / fallback`。校准命令：`node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10`
+
+### Annotation-friendly diagnostics
+
+```typescript
+interface ContractViolationDiagnostic {
+  file?: string;
+  line?: number;
+  column?: number;
+  endLine?: number;
+  endColumn?: number;
+  scope: "line" | "file" | "general";
+  source: "dependency-cruiser" | "custom-evaluator";
+  category: "dependency" | "module_boundary" | "complexity";
+  degraded: boolean;
+}
+
+type ContractGateRecommendation = "hard-gate-ok" | "warn-only" | "re-scope";
+
+interface GitLabContractAnnotation {
+  description: string;
+  check_name: string;
+  fingerprint: string;
+  severity: "major" | "minor";
+  location: {
+    path: string;
+    lines: {
+      begin: number;
+    };
+  };
+}
+```
+
+- `--annotation-format github` 会直接输出 GitHub Actions annotations；允许 file-scoped degraded diagnostics，但不会伪造不存在的行号。
+- `--annotation-format gitlab --annotation-file gl-code-quality-report.json` 会输出 GitLab Code Quality artifact；只包含 `scope="line"` 且有 `line` 的 diagnostics。
+- `recommended_mode` 是 CI 编排 truth：当 calibration 失败、`changed files <= 10` 条件不满足或 false-positive 漂移时，workflow 必须走 `warn-only / fallback`。
+
+---
+
+## history 命令输出结构
+
+### JSON 输出（默认）
+
+```typescript
+interface HistoryCommandResult {
+  query: string;
+  status: "ok" | "ambiguous" | "not_found" | "unavailable";
+  symbol: null | {
+    name: string;
+    kind: string;
+    file: string;
+    line: number;
+  };
+  candidates: Array<{
+    symbolId: string;
+    name: string;
+    file: string;
+    line: number;
+  }>;
+  files: string[];
+  warnings: string[];
+  risk: {
+    level: "high" | "medium" | "low" | "unavailable";
+    score: number | null;
+    riskFactors: string[];
+  };
+}
+```
+
+### 失败语义
+
+- `ok`: 找到唯一 symbol，并返回 timeline + risk
+- `ambiguous`: 找到多个候选 symbol，不自动合并
+- `not_found`: storage 中找不到 symbol
+- `unavailable`: Git history 不可用或无持久化快照
 
 ---
 

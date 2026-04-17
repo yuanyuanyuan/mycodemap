@@ -37,9 +37,9 @@ mycodemap generate --ai-context             # 生成 AI 描述
 
 **图存储运行时说明**:
 - `generate` 会读取 `mycodemap.config.json.storage`，并把 CodeGraph 写入所选后端。
-- `storage.type` 支持 `filesystem`、`kuzudb`、`memory`、`auto`；默认是 `filesystem`。
-- 旧的 `neo4j` 配置会直接报迁移错误；缺少 `kuzu` 时也会直接报错，不会静默 fallback 到 `filesystem`。
-- `storage.type = "auto"` 当前仍保守走 `filesystem`；阈值字段是配置契约，不代表自动切换已完成。
+- `storage.type` 支持 `filesystem`、`sqlite`、`memory`、`auto`；默认是 `filesystem`。
+- 旧的 `neo4j` / `kuzudb` 配置会直接报迁移错误；显式选择 `sqlite` 但运行时缺少 `better-sqlite3` 或 Node.js `<20` 时也会直接报错，不会静默 fallback 到 `filesystem`。
+- `storage.type = "auto"` 当前优先走 `sqlite`；只有 SQLite 不可用时才 warning 后回退 `filesystem`。
 
 ---
 
@@ -287,6 +287,44 @@ mycodemap design verify mycodemap.design.md --json
 
 ---
 
+## check - 执行 contract gate
+
+```bash
+# 默认 full scan
+mycodemap check --contract mycodemap.design.md --against src
+
+# 人类可读渲染
+mycodemap check --contract mycodemap.design.md --against src --human
+
+# PR / CI 显式 diff
+mycodemap check --contract mycodemap.design.md --against src --base origin/main
+
+# 显式 changed files
+mycodemap check --contract mycodemap.design.md --against src --changed-files src/core/service.ts
+
+# GitHub PR annotations
+mycodemap check --contract mycodemap.design.md --against src --base origin/main --annotation-format github
+
+# GitLab code quality artifact
+mycodemap check --contract mycodemap.design.md --against src --base origin/main --annotation-format gitlab --annotation-file gl-code-quality-report.json
+
+# 校准当前仓库是否允许默认 hard gate
+node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10
+```
+
+- 默认输出 `ContractCheckResult` JSON；`--human` 只改变渲染，不改变底层 truth
+- `severity:error` 返回非零退出码，`severity:warn` 不阻断
+- diff-aware 只在显式提供 `--base` 或 `--changed-files` 时启用
+- 坏掉的 diff base 或越界 changed files 会回退 full scan，并把原因写进 `warnings[]`
+- 当前 rule families 为 `layer_direction` / `forbidden_imports` / `module_public_api_only` / `complexity_threshold`
+- `--annotation-format github` 会输出 GitHub Actions annotations；`gitlab` 需要配合 `--annotation-file gl-code-quality-report.json`，并只保留 line-scoped diagnostics
+- PR 默认 hard gate 只在 calibration 通过且 `changed files <= 10` 时开启；超窗、`diff-scope-fallback` 或 `false-positive rate >10%` 时必须显式切回 `warn-only / fallback`
+- calibration 输出的 recommendation 目前是 `hard-gate-ok` / `warn-only` / `re-scope`；fallback 不应伪装成稳定 hard gate
+- Git history risk 是 additive enrichment：会附加 `violations[].risk` 与顶层 `history`，但不会改变 `severity:error` / exit 语义
+- 仓库根 `mycodemap.design.md` 是当前 canonical contract truth
+
+---
+
 ## ci - CI 门禁
 
 ### 子命令
@@ -312,7 +350,7 @@ mycodemap ci check-headers
 mycodemap ci check-headers -d "src/domain"  # 指定目录
 mycodemap ci check-headers -f "file1.ts,file2.ts"
 
-# 评估变更风险
+# 评估变更风险（与 `check` / `history` 共用同一套 Git history risk truth）
 mycodemap ci assess-risk
 mycodemap ci assess-risk -t 0.5             # 设置阈值 0.5
 mycodemap ci assess-risk -f "changed.ts"
@@ -334,6 +372,23 @@ mycodemap ci check-commit-size -m 15
 
 > `ship` 的 CHECK 阶段会复用 `ci check-working-tree`、`ci check-branch`、`ci check-scripts` 这三条发布前 gate checks。
 > `ci check-branch --allow` 支持 `*` 通配；`ci check-headers -d` 与 `generate` / `analyze` 共享同一套 `.gitignore` 感知排除规则，在没有 `.gitignore` 时回退到默认 `exclude`。
+> `ci assess-risk` 现在输出 `status / confidence / freshness / source / score / level`；若 Git history 不可用，会显式给出 `unavailable` / warning，并说明阈值未被应用。
+
+---
+
+## history - 符号级 Git history / risk 查询
+
+```bash
+# 默认输出 machine-first JSON
+mycodemap history --symbol createCheckCommand
+
+# 人类可读渲染
+mycodemap history --symbol createCheckCommand --human
+```
+
+- 返回 `ok` / `ambiguous` / `not_found` / `unavailable` 四种状态
+- `--human` 只改变展示，不改变结构化 truth
+- 与 `check` / `ci assess-risk` 共用同一套 history risk service；历史缺失时会显式返回 `unavailable`
 
 ### 支持的提交 TAG
 

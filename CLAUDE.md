@@ -130,10 +130,14 @@ AI 完成任务前必须自检并勾选：
 - 首选：`node dist/cli/index.js deps -m "<module>"`
 - 首选：`node dist/cli/index.js impact -f "<file>"`
 - 首选：`node dist/cli/index.js analyze -i <find|read|link|show>`
+- Git 历史追溯：`node dist/cli/index.js history --symbol <name>`
 - 设计输入校验：`node dist/cli/index.js design validate [file] --json`
 - 设计范围映射：`node dist/cli/index.js design map [file] --json`
 - 设计交接打包：`node dist/cli/index.js design handoff [file] --json`
 - 设计漂移验证：`node dist/cli/index.js design verify [file] --json`
+- 架构契约执行：`node dist/cli/index.js check --contract mycodemap.design.md --against src [--base <sha> | --changed-files <paths...>] [--annotation-format github|gitlab]`
+- contract gate 校准：`node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10`
+- CI-native truth：PR 默认 hard gate 仅在 calibration 通过且 `changed files <= 10` 时启用；超窗、fallback 或 `false-positive rate >10%` 时必须显式回到 `warn-only / fallback`
 
 ### 4.2 MVP3 架构层检索（按层次查找）
 - **Interface 层**：`src/interface/types/`, `src/interface/config/`
@@ -157,7 +161,19 @@ AI 完成任务前必须自检并勾选：
 - 全部检查：`npm run check:all`（类型 + 测试 + Lint）
 - 发布：`codemap ship`（创建版本提交与 tag，并触发 GitHub Actions 发布）
 
+### 5.2 Git History Risk Truth 速记
+- `check` / `ci assess-risk` / `history` 共用同一套 `GitHistoryService` 真相。
+- `node dist/cli/index.js history --symbol <name>` 默认输出 machine-first JSON，`--human` 只改变渲染。
+- `analyze --include-git-history` 当前仅在 `read` intent 上生效；其余 intent 会显式 warning，不再 silent noop。
+- Git history 不可用时，CLI 应返回 `unavailable` / `confidence=low` / warning，而不是伪装成 `low risk`。
+
 注意：当前仓库真实输出目录是 `dist/`，不是 `build/`。
+
+### 5.1 Storage Truth 速记
+- `storage.type` 正式支持 `filesystem` / `sqlite` / `memory` / `auto`。
+- `storage.type = "auto"` 当前优先选择 `sqlite`；仅当 `better-sqlite3` 不可用或 Node.js `<20` 时 warning 后回退 `filesystem`。
+- 旧 `neo4j` / `kuzudb` 配置会返回显式迁移错误；显式 `sqlite` 但运行时不满足条件时返回 `SQLITE_NOT_AVAILABLE`。
+- `sqlite` 默认数据库路径是 `.codemap/governance.sqlite`；治理图主线以 SQLite 为真相源，内存图仅作为阈值驱动的加速层。
 
 ## 6. 改动策略
 
