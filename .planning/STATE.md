@@ -1,19 +1,19 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.5
-milestone_name: Isolated ArcadeDB server-backed prototype
+milestone_name: Isolated ArcadeDB Server-backed Prototype
 current_phase: 22
 current_phase_name: Real ArcadeDB server live smoke gate
 current_plan: 2 plans executed
-status: blocked
-last_updated: "2026-03-31T00:13:38Z"
-last_activity: 2026-03-30
+status: Blocked on external prerequisites
+last_updated: "2026-04-17T10:24:44.848Z"
+last_activity: 2026-04-17
 progress:
-  total_phases: 3
-  completed_phases: 0
-  total_plans: 2
-  completed_plans: 2
-  percent: 0
+  total_phases: 4
+  completed_phases: 2
+  total_plans: 3
+  completed_plans: 3
+  percent: 100
 ---
 
 # Session State
@@ -23,7 +23,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-03-30)
 
 **Core Value:** 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
-**Current Focus:** `Phase 22` 已在 2026-03-31 再验证一次；外部 server / Docker provisioning blocker 仍在，因此继续停在 gate，不进入 `Phase 23`。
+**Current Focus:** `Phase 22` 已在 2026-03-31 再验证一次；外部 server / Docker provisioning blocker 仍在，因此继续停在 gate，不进入 `Phase 23`。`Phase 25` 已作为 out-of-band CLI reliability follow-up 完成，但不改变该 blocker 结论。
 
 ## Position
 
@@ -31,17 +31,18 @@ See: `.planning/PROJECT.md` (updated 2026-03-30)
 **Current Phase:** 22
 **Current Phase Name:** Real ArcadeDB server live smoke gate
 **Current Plan:** 2 plans executed
-**Total Phases:** 3
-**Total Plans in Milestone:** 2
+**Total Phases:** 4
+**Total Plans in Milestone:** 3
 **Status:** Blocked on external prerequisites
-**Progress:** [░░░░░░░░░░] 0%
-**Last Activity:** 2026-03-31
-**Last Activity Description:** revalidated `Phase 22` blocker; Docker pull still hangs behind proxy and `Phase 23` remains locked
+**Progress:** [░░░░░░░░░░] 0% mainline milestone progress (`Phase 25` completed out-of-band)
+**Last Activity:** 2026-04-17
+**Last Activity Description:** completed out-of-band `Phase 25` CLI reliability follow-up while keeping `Phase 22` blocked on external ArcadeDB prerequisites
 
 ## Decisions Made
 
 | Date | Summary | Rationale |
 |------|---------|-----------|
+| 2026-04-17 | `Phase 25` out-of-band completion recorded | `analyze -i find` 现在在主扫描退化时输出 stdout-visible `diagnostics.status`，且不改变 `Phase 22` blocker 主线 |
 | 2026-03-31 | `Phase 22` blocker revalidated | `ARCADEDB_*` 仍缺失，Docker daemon 仍使用 `192.168.3.74:7890` 代理，`docker pull arcadedata/arcadedb:latest` 在 20 秒窗口内仍未完成 |
 | 2026-03-30 | `Phase 22` gate result = `blocked` | 官方 Docker quick-start 无法在当前环境拉取镜像，直连 smoke 也因 `ECONNREFUSED` 证明没有 reachable server |
 | 2026-03-30 | 启动 `v1.5` isolated prototype milestone | 用户已批准按建议继续，但 scope 仍限制在 prototype-only + evidence-first |
@@ -63,6 +64,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-30)
 - 2026-03-26: `v1.4` milestone 完成并归档
 - 2026-03-28: `post-v1.4` follow-up 完成并归档，锁定 direct replacement `NO-GO`
 - 2026-03-30: 从 `SEED-001` 启动 `v1.5`，切换到 isolated server-backed prototype 主线
+- 2026-04-17: Phase 25 added and completed out-of-band: Fix CodeMap CLI dogfood gaps from `docs/exec-plans/completed/2026-04-17-eatdogfood-codemap-cli.md`
 
 ### Verified Existing Capabilities
 
