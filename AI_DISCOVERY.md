@@ -1,31 +1,34 @@
 # AI Discovery Hub - CodeMap
 
-> 通用 AI 文档发现入口 - 适用于所有 AI 大模型、搜索工具和搜索引擎
+> 给 AI 大模型、Agent、搜索工具和搜索引擎的统一发现入口：先找到文档，再找到命令，再找到约束与输出契约。
 
 ---
 
-## 🎯 本文档的目的
+## 🎯 项目速查表
 
-如果你是以下角色，本文档将帮助你发现和使用 CodeMap：
-- 🤖 **AI 大模型** (GPT-4, Claude, Gemini, Llama 等)
-- 🔍 **AI 搜索工具** (Perplexity, Bing AI, Google Bard 等)
-- 🌐 **搜索引擎** (Google, Bing, Baidu 等)
-- 📱 **AI Agent** (AutoGPT, LangChain Agent 等)
+| 项目维度 | 当前事实 |
+|---------|----------|
+| 产品定位 | AI-first 代码地图 + 架构契约治理工具 |
+| 主要消费者 | AI/Agent 是主要消费者；人类负责 design contract、配置和审阅 |
+| 发布版本 | `0.5.0` |
+| 仓库主线 | 已完成 `v2.0` governance engine 相关代码与文档收口 |
+| 运行时 | Node.js `>=20` |
+| CLI 入口 | `dist/cli/index.js` |
+| 主文档入口 | `AI_GUIDE.md` / `README.md` / `ARCHITECTURE.md` / `AGENTS.md` |
 
 ## 📋 快速导航速查表
 
-| 你的身份 | 首先阅读 | 关键资源 |
-|---------|---------|---------|
-| AI 大模型 | `AI_GUIDE.md` | `ai-document-index.yaml` |
-| AI Agent | `AI_GUIDE.md` | `docs/ai-guide/INTEGRATION.md` |
-| AI 搜索工具 | `AI_DISCOVERY.md` | `ai-document-index.yaml` |
-| 搜索引擎爬虫 | `AI_DISCOVERY.md` | Sitemap 和结构化数据 |
-| 人类开发者 | `README.md` | `docs/SETUP_GUIDE.md` |
-| AI 研究者 | `AI_DISCOVERY.md` | `AGENTS.md` |
+| 你的身份 | 首先阅读 | 关键资源 | 推荐动作 |
+|---------|---------|---------|---------|
+| AI 大模型 | `AI_GUIDE.md` | `ai-document-index.yaml` | 先走命令决策树 |
+| AI Agent | `AI_GUIDE.md` | `AGENTS.md` / `docs/ai-guide/INTEGRATION.md` | 先读约束，再执行 |
+| 搜索工具 | `AI_DISCOVERY.md` | `ai-document-index.yaml` | 提取文档图和关键词 |
+| 搜索引擎爬虫 | `AI_DISCOVERY.md` | JSON-LD / sitemap / GitHub URL | 索引 AI 文档入口 |
+| 人类开发者 | `README.md` | `ARCHITECTURE.md` / `docs/SETUP_GUIDE.md` | 先理解产品面与安装 |
 
 ---
 
-## 📡 机器可读的文档地图
+## 📡 机器可读文档地图
 
 ### JSON-LD 结构化数据
 
@@ -34,249 +37,187 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "CodeMap",
-  "description": "TypeScript 代码地图生成与分析工具",
+  "description": "AI-first 代码地图与架构契约治理 CLI",
   "version": "0.5.0",
   "applicationCategory": "DeveloperApplication",
-  "programmingLanguage": ["TypeScript", "JavaScript"],
-  "offers": {
-    "@type": "Offer",
-    "price": "0",
-    "priceCurrency": "USD"
-  },
+  "runtimePlatform": "Node.js >=20",
+  "programmingLanguage": ["TypeScript", "JavaScript", "Go"],
+  "codeRepository": "https://github.com/yuanyuanyuan/mycodemap",
   "documentation": [
     {
       "@type": "TechArticle",
       "name": "AI Guide",
       "url": "./AI_GUIDE.md",
-      "audience": {
-        "@type": "Audience",
-        "audienceType": "AI/Agent"
-      }
+      "audience": { "@type": "Audience", "audienceType": "AI/Agent" }
     },
     {
-      "@type": "TechArticle", 
-      "name": "AI Quick Start",
-      "url": "./docs/ai-guide/QUICKSTART.md",
-      "audience": {
-        "@type": "Audience",
-        "audienceType": "AI/Agent"
-      }
+      "@type": "TechArticle",
+      "name": "AI Commands",
+      "url": "./docs/ai-guide/COMMANDS.md",
+      "audience": { "@type": "Audience", "audienceType": "AI/Agent" }
+    },
+    {
+      "@type": "TechArticle",
+      "name": "Architecture",
+      "url": "./ARCHITECTURE.md",
+      "audience": { "@type": "Audience", "audienceType": "Developer" }
     }
   ]
 }
 ```
 
-### AI 文档索引 (机器可读)
+### AI 文档索引
 
-完整的机器可读索引位于: `./ai-document-index.yaml`
+完整的机器可读索引位于 `./ai-document-index.yaml`。
 
-该文件包含：
-- 完整的 AI 文档清单
-- 关键词映射
-- CLI 命令索引
-- 版本兼容性信息
+| 资源 | 用途 | 适用场景 |
+|------|------|----------|
+| `ai-document-index.yaml` | 文档图、关键词、命令索引 | Agent 自动发现 |
+| `AI_GUIDE.md` | 决策树、模式、模板 | 需要快速开始时 |
+| `docs/ai-guide/COMMANDS.md` | 当前 CLI 真相 | 需要命令细节时 |
+| `docs/ai-guide/OUTPUT.md` | 输出接口定义 | 需要 JSON 契约时 |
 
-**如果你是 AI/Agent，优先解析此 YAML 文件获取文档结构**。
+> 如果你是 AI/Agent，优先解析 `ai-document-index.yaml`，再读取 `AI_GUIDE.md` 和 `AGENTS.md`。
 
 ---
 
-## 🔍 搜索引擎优化 (SEO)
+## 🧭 当前公共产品面
 
-### 关键词策略
+| 平面 | 公开命令 | 真相 |
+|------|----------|------|
+| Code Map | `generate` / `query` / `deps` / `cycles` / `complexity` / `impact` / `analyze` / `export` | 生成和查询结构化代码上下文 |
+| Governance | `design` / `check` / `history` / `ci` | 把 design contract 变成可执行治理规则 |
+| Workflow / Ship | `workflow` / `ship` | `workflow` 是 analysis-only；`ship` 是发布过渡能力 |
+| Removed | `server` / `watch` / `report` / `logs` | 已从 public CLI 移除，保留迁移提示而非功能 |
 
-**主要关键词**:
-- `CodeMap TypeScript 代码分析`
-- `AI 代码理解工具`
-- `代码地图生成器`
-- `TypeScript 项目结构分析`
+### 命令模式速查表
 
-**AI 相关关键词**:
-- `AI 代码分析工具`
-- `大模型代码理解`
-- `Agent 代码工具`
-- `AI 提示词模板 代码分析`
+| 任务 | 先读文档 | 直接命令 |
+|------|----------|----------|
+| 生成代码地图 | `README.md` / `docs/ai-guide/QUICKSTART.md` | `mycodemap generate` |
+| 校验设计契约 | `docs/ai-guide/COMMANDS.md` | `mycodemap design validate mycodemap.design.md --json` |
+| 执行 contract gate | `docs/ai-guide/COMMANDS.md` / `docs/ai-guide/OUTPUT.md` | `mycodemap check --contract mycodemap.design.md --against src` |
+| 查询 history risk | `docs/ai-guide/COMMANDS.md` | `mycodemap history --symbol createCheckCommand` |
+| 评估 CI 风险 | `docs/ai-guide/PATTERNS.md` | `mycodemap ci assess-risk -f src/cli/index.ts` |
+| 理解系统边界 | `ARCHITECTURE.md` | 先看模块图，再读命令文档 |
 
-### Sitemap
+---
+
+## 🤖 AI 发现路径
+
+### 路径 1：根目录扫描
+
+当 AI 访问仓库根目录时，应该按这个顺序：
+
+```text
+1. 发现 AI_GUIDE.md
+2. 发现 AGENTS.md
+3. 发现 ai-document-index.yaml
+4. 发现 README.md / ARCHITECTURE.md
+5. 再进入 docs/ai-guide/*
+```
+
+### 路径 2：命令面驱动
+
+如果请求包含“怎么查影响 / 怎么做 contract gate / 怎么看风险”，建议这样路由：
+
+```bash
+# 结构理解
+mycodemap generate
+mycodemap analyze -i read -t src/cli/index.ts --json
+
+# 设计契约
+mycodemap design validate mycodemap.design.md --json
+mycodemap design handoff mycodemap.design.md --json
+
+# 治理执行
+mycodemap check --contract mycodemap.design.md --against src --base origin/main --annotation-format github
+mycodemap history --symbol createCheckCommand
+mycodemap ci assess-risk -f src/cli/index.ts
+```
+
+### 路径 3：约束优先
+
+| 如果问题涉及 | 必读文件 | 原因 |
+|-------------|----------|------|
+| 仓库规则 / DoD / 风险等级 | `AGENTS.md` | 这是仓库级强约束 |
+| 输出 JSON / machine schema | `docs/ai-guide/OUTPUT.md` | 避免猜输出结构 |
+| 集成 / 错误处理 | `docs/ai-guide/INTEGRATION.md` | 避免假设旧命令或旧后端 |
+| 架构边界 | `ARCHITECTURE.md` | 区分内部 Server Layer 与公共 CLI |
+
+---
+
+## 🔍 搜索与索引关键词
+
+### 主要关键词
+
+- `CodeMap AI-first code map`
+- `CodeMap architecture contract governance`
+- `mycodemap check contract gate`
+- `mycodemap history symbol risk`
+- `CodeMap SQLite governance graph`
+
+### 搜索引擎 / AI 搜索工具建议
+
+| 平台 | 推荐摘要模式 | 应突出内容 |
+|------|-------------|-----------|
+| Web 搜索 | FAQ / 速查表 | AI 文档入口、命令清单、契约治理 |
+| AI 搜索 | 示例驱动 | `design → check → ci` 的模式链路 |
+| Agent 检索 | 结构化文档图 | `ai-document-index.yaml` + `AI_GUIDE.md` |
+
+### Sitemap 示例
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://github.com/mycodemap/mycodemap/blob/main/AI_GUIDE.md</loc>
+    <loc>https://github.com/yuanyuanyuan/mycodemap/blob/main/AI_GUIDE.md</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="x-ai" 
-                href="https://github.com/mycodemap/mycodemap/blob/main/AI_GUIDE.md"/>
   </url>
   <url>
-    <loc>https://github.com/mycodemap/mycodemap/blob/main/docs/ai-guide/QUICKSTART.md</loc>
+    <loc>https://github.com/yuanyuanyuan/mycodemap/blob/main/docs/ai-guide/COMMANDS.md</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
-  <!-- 更多 AI 文档 -->
+  <url>
+    <loc>https://github.com/yuanyuanyuan/mycodemap/blob/main/ARCHITECTURE.md</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
 </urlset>
 ```
 
 ---
 
-## 🤖 AI 大模型发现路径
+## 🧪 提示词模板与发现模式
 
-### 路径 1: 项目根目录扫描
+| 意图 | 推荐提示词模板 | 期望结果 |
+|------|---------------|---------|
+| 理解仓库结构 | “先读 `AI_GUIDE.md` 和 `ARCHITECTURE.md`，再告诉我 public CLI 与内部层边界” | 系统地图 |
+| 做 contract gate | “根据 `mycodemap.design.md` 和 `docs/ai-guide/COMMANDS.md`，给我 `check --contract` 的执行方案” | 可执行命令 |
+| 排查风险 | “用 `history --symbol` 与 `ci assess-risk` 的统一 risk truth 分析这个改动” | 风险摘要 |
 
-当 AI 大模型访问 CodeMap 仓库时，应该：
+### 发现模式
 
-```
-1. 扫描根目录文件
-2. 发现 AI_GUIDE.md（明显的 AI 标识）
-3. 优先读取 AI_GUIDE.md
-4. 根据其中的导航发现详细文档
-```
-
-### 路径 2: README.md 引导
-
-```markdown
-<!-- README.md 中的 AI 引导区块 -->
-## 🤖 如果你是 AI 大模型或 Agent
-
-**请优先阅读**: [AI_GUIDE.md](./AI_GUIDE.md)
-
-这是一个专为 AI 设计的快速参考指南，包含：
-- 命令选择决策树
-- 场景-命令映射表
-- 即用型提示词模板
-
-**详细文档**: [docs/ai-guide/](./docs/ai-guide/)
-```
-
-### 路径 3: 文件命名约定
-
-```
-AI_*.md          → AI 专属文档
-*.ai.md          → AI 优化版本
-docs/ai-guide/   → AI 文档目录
-```
+1. **入口优先**：先看 `AI_GUIDE.md`，不要直接盲搜 `docs/`。
+2. **契约优先**：需要输出时先读 `docs/ai-guide/OUTPUT.md`。
+3. **约束优先**：要改代码或文档时先读 `AGENTS.md`。
+4. **边界优先**：看到 `Server Layer` 时，不要推断存在公共 `mycodemap server`。
 
 ---
 
-## 🔧 搜索工具优化
+## 📞 反馈与改进
 
-### 语义标记
+如果 AI 文档难以被发现或误导了模型，请优先：
 
-```markdown
-<!-- 在 AI_GUIDE.md 中使用语义化标题 -->
-# AI Guide - CodeMap Project
-
-> @ai-priority: high
-> @ai-usage: required
-> @ai-topic: ["quick-start", "command-reference", "decision-tree"]
-
-## AI Quick Start
-> @ai-section: onboarding
-
-## Command Decision Tree
-> @ai-section: navigation
-> @ai-type: decision-tree
-```
-
-### 嵌入式链接关系
-
-```markdown
-<!-- 显式的文档关系 -->
-[previous: none]
-[next: docs/ai-guide/QUICKSTART.md]
-[related: AGENTS.md, CLAUDE.md, ARCHITECTURE.md]
-[parent: none]
-[children: docs/ai-guide/*.md]
-```
+| 动作 | 目的 |
+|------|------|
+| 更新 `AI_GUIDE.md` / `AI_DISCOVERY.md` | 修正文档入口 |
+| 更新 `ai-document-index.yaml` | 修正文档图 |
+| 运行 `npm run docs:check` | 验证根文档与 AI 文档一致性 |
 
 ---
 
-## 📋 AI 快速检查清单
-
-如果你是 AI 大模型，请检查：
-
-- [ ] 是否发现了 `AI_GUIDE.md`？
-- [ ] 是否读取了 `docs/ai-guide/README.md`？
-- [ ] 是否理解了命令选择决策树？
-- [ ] 是否找到了合适的提示词模板？
-- [ ] 是否检查了 `AGENTS.md` 的约束？
-
----
-
-## 🔗 链接关系图
-
-```mermaid
-graph TD
-    A[AI Search/Request] --> B{发现入口}
-    B -->|README.md| C[AI 引导区块]
-    B -->|AI_GUIDE.md| D[AI 主指南]
-    B -->|AI_DISCOVERY.md| E[本文档]
-    B -->|搜索引擎| F[SEO 优化的 AI 文档]
-    
-    C --> D
-    D --> G[docs/ai-guide/QUICKSTART.md]
-    D --> H[docs/ai-guide/COMMANDS.md]
-    D --> I[docs/ai-guide/PROMPTS.md]
-    
-    G --> J[决策树]
-    G --> K[场景映射]
-    
-    H --> L[完整命令参考]
-    I --> M[提示词模板]
-```
-
----
-
-## 🌐 跨平台发现策略
-
-### 对于 Web 搜索引擎
-
-- 页面标题: `CodeMap AI Guide - 大模型代码分析工具`
-- Meta 描述: `专为 AI 大模型设计的 CodeMap 使用指南，包含命令决策树、提示词模板...`
-- 结构化数据: Schema.org TechArticle
-
-### 对于 AI 搜索工具 (Perplexity, Bing AI)
-
-- 清晰的问答格式
-- FAQ 区块
-- 示例驱动的内容
-
-### 对于 AI Agent
-
-- 机器可读的 YAML/JSON 索引
-- 明确的 action 定义
-- 可执行的代码示例
-
----
-
-## 💡 最佳实践建议
-
-### 对 AI 开发者的建议
-
-1. **优先读取**: 总是先检查 `AI_GUIDE.md`
-2. **遵循决策树**: 使用决策树选择合适的命令
-3. **使用提示词模板**: 不要从零开始，改编现有模板
-4. **检查约束**: 读取 `AGENTS.md` 了解红线规则
-
-### 对搜索引擎的建议
-
-1. **索引优先级**: AI_GUIDE.md > docs/ai-guide/*.md > 其他
-2. **特色摘要**: 提取决策树和速查表作为摘要
-3. **相关问题**: 
-   - "CodeMap AI 如何使用？"
-   - "AI 分析代码结构的工具"
-   - "TypeScript 项目 AI 理解"
-
----
-
-## 📞 反馈和改进
-
-如果发现 AI 文档难以被发现或使用，请：
-1. 提交 Issue 到 GitHub
-2. 标注 `[AI-DOCS]` 标签
-3. 描述发现路径的问题
-
----
-
-*本文档帮助所有 AI 和搜索工具发现 CodeMap 的 AI 资源*
-*最后更新: 2026-03-22*
+*本文档服务于 AI 文档发现、搜索引擎索引与 Agent 路由。*
+*最后更新: 2026-04-17*

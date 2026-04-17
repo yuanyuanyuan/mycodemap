@@ -1,38 +1,38 @@
 # CodeMap
 
-> CodeMap 是一个 TypeScript 代码地图生成与分析工具，为 AI 辅助开发提供结构化上下文。
-> 版本: 0.5.0 (MVP3) | 仓库: https://github.com/mycodemap/mycodemap
+> CodeMap 是一个 AI-first 代码地图与架构契约治理 CLI：既能生成项目代码地图，也能把 `mycodemap.design.md` 执行成可落到 CI 的 contract gate。
+> 发布版本: 0.5.0 | 仓库: https://github.com/yuanyuanyuan/mycodemap | 运行时: Node.js >= 20
 
-CodeMap 帮助 AI 大模型、Agent 和开发者理解 TypeScript/JavaScript 项目的代码结构、依赖关系和模块边界。它生成结构化的代码地图，支持影响分析、依赖查询、复杂度评估等功能。
+CodeMap 的当前仓库主线重点不是再扩张“更多命令”，而是把结构化代码上下文、design contract、diff-aware contract check、Git history risk、SQLite governance storage 和 CI hard-gate 校准收敛成一套可复用的治理管线。
 
 ## 快速开始
 
-如果你是 AI 大模型或 Agent，请按以下顺序阅读：
+如果你是 AI/Agent，请按下面的速查表读取：
 
-- [AI Guide](./AI_GUIDE.md): AI/Agent 主索引 - 包含命令速查表和快速参考
-- [Quick Start](./docs/ai-guide/QUICKSTART.md): 场景到命令的映射 - 决策树和工作流
-- [AI Discovery](./AI_DISCOVERY.md): 通用发现机制 - SEO 优化和多平台策略
+| 身份 | 首先阅读 | 为什么 |
+|------|----------|--------|
+| AI 助手 / Agent | [AI_GUIDE.md](./AI_GUIDE.md) | 主索引，含命令决策树、提示词模板、输出契约 |
+| 需要完整命令面 | [docs/ai-guide/COMMANDS.md](./docs/ai-guide/COMMANDS.md) | `design` / `check` / `history` / `ci` / `analyze` 全量参考 |
+| 需要机器可读结构 | [ai-document-index.yaml](./ai-document-index.yaml) | YAML 索引，适合自动发现与导航 |
+| 需要系统地图 | [ARCHITECTURE.md](./ARCHITECTURE.md) | 分层边界、执行流、模块职责 |
+| 需要仓库约束 | [AGENTS.md](./AGENTS.md) | 证据协议、任务分级、DoD、文档同步规则 |
 
-## 完整文档
+## 文档
 
 ### 核心参考
-- [Commands](./docs/ai-guide/COMMANDS.md): 完整 CLI 命令参考 - 所有命令和选项详解
-- [Output Schema](./docs/ai-guide/OUTPUT.md): JSON 输出结构解析 - TypeScript 接口定义
-- [Patterns](./docs/ai-guide/PATTERNS.md): 标准工作流模式 - 6种常见任务的标准流程
-
-### 模板与集成
-- [Prompts](./docs/ai-guide/PROMPTS.md): 即用型提示词模板 - 可直接使用或改编
-- [Integration](./docs/ai-guide/INTEGRATION.md): MCP/Agent 集成指南 - 错误处理和边界情况
+- [AI Guide](./AI_GUIDE.md): AI/Agent 主索引、决策树、提示词模板
+- [Commands](./docs/ai-guide/COMMANDS.md): 当前公共 CLI 命令面与参数速查表
+- [Output Schema](./docs/ai-guide/OUTPUT.md): `ContractCheckResult` / `HistoryCommandResult` / `AnalyzeResult` 等输出类型
+- [Patterns](./docs/ai-guide/PATTERNS.md): 标准工作流模式、contract gate 与 governance 模式
 
 ### 机器可读资源
-- [Document Index](./ai-document-index.yaml): 结构化 YAML 索引 - 完整的文档清单和命令索引
-- [AI Discovery](./AI_DISCOVERY.md): 包含 JSON-LD 结构化数据，适用于搜索引擎
+- [Document Index](./ai-document-index.yaml): 文档地图、关键词映射、命令索引
+- [AI Discovery](./AI_DISCOVERY.md): 发现路径、结构化数据、跨平台索引建议
 
-## 约束与规范
-
-- [AGENTS.md](./AGENTS.md): 仓库级 AI 协议和强约束
-- [CLAUDE.md](./CLAUDE.md): Claude/Codex 执行手册
-- [ARCHITECTURE.md](./ARCHITECTURE.md): 系统架构总图
+### 人类入口
+- [README](./README.md): 人类开发者主入口
+- [ARCHITECTURE](./ARCHITECTURE.md): 系统总图与边界
+- [CHANGELOG](./CHANGELOG.md): 发布历史与 `Unreleased` 演进记录
 
 ## 命令速查
 
@@ -40,23 +40,45 @@ CodeMap 帮助 AI 大模型、Agent 和开发者理解 TypeScript/JavaScript 项
 # 生成代码地图
 node dist/cli/index.js generate
 
-# 查询符号定义
-node dist/cli/index.js query -s "symbolName"
+# 设计契约链路
+node dist/cli/index.js design validate mycodemap.design.md --json
+node dist/cli/index.js design handoff mycodemap.design.md --json
 
-# 分析影响范围
-node dist/cli/index.js analyze -i read -t "file.ts" --scope transitive --json
+# 执行 contract gate
+node dist/cli/index.js check --contract mycodemap.design.md --against src --base origin/main --annotation-format github
 
-# 检查代码质量
-node dist/cli/index.js analyze -i read -t "src/" --json
+# 查询符号级 Git history / risk
+node dist/cli/index.js history --symbol createCheckCommand
+
+# 评估变更风险
+node dist/cli/index.js ci assess-risk -f src/cli/index.ts
+
+# 统一分析入口
+node dist/cli/index.js analyze -i read -t src/cli/index.ts --scope transitive --json
 ```
+
+## 当前产品面
+
+| 平面 | 当前能力 | 备注 |
+|------|----------|------|
+| Code Map | `generate` / `query` / `deps` / `cycles` / `complexity` / `impact` / `analyze` / `export` | 结构化代码上下文与查询 |
+| Governance | `design validate|map|handoff|verify` / `check` / `history` / `ci assess-risk` | design contract、风险评估、CI gate |
+| Workflow | `workflow` / `ship` | 仍保留，但 `workflow` 是 analysis-only，`ship` 是发布过渡能力 |
+| Removed | `server` / `watch` / `report` / `logs` | 已从 public CLI 移除，仅保留迁移提示 |
+
+## 约束与规范
+
+- [AGENTS.md](./AGENTS.md): 仓库级协议、证据标签、文档同步触发条件
+- [CLAUDE.md](./CLAUDE.md): Codex / Claude 执行手册
+- [docs/rules/validation.md](./docs/rules/validation.md): docs gate、contract gate、history risk 校验模式
 
 ## 可选
 
-- [Changelog](./CHANGELOG.md): 版本历史和变更日志
-- [README](./README.md): 人类用户主入口
-- [License](./LICENSE): MIT 许可证
+- [docs/ai-guide/QUICKSTART.md](./docs/ai-guide/QUICKSTART.md): 场景 → 命令速查表
+- [docs/ai-guide/PROMPTS.md](./docs/ai-guide/PROMPTS.md): 提示词模板
+- [LICENSE](./LICENSE): MIT 许可证
 
 ---
 
 *本文档遵循 llms.txt 标准格式: https://llmstxt.org/*
-*最后更新: 2026-03-22*
+*最后更新: 2026-04-17*

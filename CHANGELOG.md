@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - 2026-04-16 - Governance Engine Closeout
+
+> 仓库主线已完成 `v2.0` 架构契约治理引擎相关代码与文档收口；当前 npm/package 发布版本仍是 `0.5.0`，因此本节记录的是尚未发布的主干演进。
+
+### 🏗️ v2.0 Milestone: Architecture Contract Governance Engine
+
+#### Phase 25: Diff-Aware Contract Gate
+- **feature**: 发布 `mycodemap check --contract <file> --against <path>`，把 design contract 真正执行到代码上
+- **feature**: 支持 diff-aware 扫描、barrel downstream 扫描、JSON 默认输出与 `--human` 可读渲染
+- **feature**: `severity:error` 触发非零退出码，`warn` 保持 non-blocking
+
+#### Phase 26: SQLite + In-Memory Governance Graph
+- **feature**: 治理查询主线收敛到 `sqlite` / `memory` / `filesystem` / `auto`
+- **feature**: `auto` 优先 SQLite，SQLite 不可用时 warning 后回退 `filesystem`
+- **refactor**: 明确拒绝历史 `neo4j` / `kuzudb` 配置，返回显式迁移错误
+
+#### Phase 27: Git History Risk Fusion
+- **feature**: 发布 `mycodemap history --symbol <name>`，输出符号级 Git history / risk 摘要
+- **feature**: `check` / `history` / `ci assess-risk` / `analyze --include-git-history` 共用统一 history risk truth
+- **feature**: `ci assess-risk` 输出 `status / confidence / freshness / source / score / level`
+
+#### Phase 28: Rule Hardening + CI-Native Enforcement
+- **feature**: `check` 支持 `--annotation-format github|gitlab` 与 `--annotation-file`
+- **feature**: PR hard gate 仅在 calibration 通过且 `changed files <= 10` 时启用
+- **feature**: push 路径固定为 full scan `warn-only / fallback`，避免把 noisy fallback 伪装成稳定 hard gate
+
+### 🚀 New Features
+
+- **governance**: design contract 现在可从 `validate → map → handoff → verify → check` 闭环落到 CI
+- **risk**: 引入 symbol-first history risk 查询与共享风险语义
+- **storage**: SQLite governance storage 成为正式主线，并通过 `mycodemap.config.json.storage` 统一装配
+
+### 📚 Documentation
+
+- **docs**: 同步 `README.md`、`llms.txt`、`AI_DISCOVERY.md`、`ARCHITECTURE.md` 到当前 public CLI 与 governance truth
+- **docs**: 明确区分“发布版本 0.5.0”与“仓库主线已完成但未发布的 v2.0 演进”
+
 ## [0.5.0] - 2026-04-15 - Design Contract Surface
 
 ### 🏗️ v1.4 Milestone: Design-to-Code Mapping & Handoff Package

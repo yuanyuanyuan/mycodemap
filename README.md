@@ -1,20 +1,21 @@
 # CodeMap
 
-> AI-first 代码地图工具 - 为 AI/Agent 提供结构化、可预测的代码上下文
+> AI-first 代码地图与架构契约治理工具 - 为 AI/Agent 提供结构化上下文、design contract 和可执行的 CI gate
 
-CodeMap 是一个面向 TypeScript/JavaScript/Go 项目的 AI-first 代码地图工具。它通过静态分析生成稳定的项目地图、依赖关系和结构化结果，帮助 AI/Agent 更快理解代码结构、定位影响范围，并把分析结果交给人类开发者继续判断与维护。
+CodeMap 是一个面向 TypeScript/JavaScript/Go 项目的 AI-first 代码地图与架构契约治理工具。它既能通过静态分析生成稳定的项目地图、依赖关系和结构化结果，也能把 `mycodemap.design.md` 执行成 diff-aware 的 contract gate，让 AI/Agent 与人类在同一套治理真相上协作。
 
 ## 特性
 
 - **AI-first 代码地图** - 生成 `AI_MAP.md`、`CONTEXT.md`、`codemap.json` 等 AI/Agent 可直接消费的上下文
-- **核心分析命令** - 提供 `generate`、`query`、`deps`、`impact`、`complexity`、`cycles`、`analyze`、`design`、`export`、`ci`
+- **设计契约治理链路** - 提供 `design validate|map|handoff|verify`，把人类设计转换成 AI/CI 可消费的 contract truth
+- **Contract gate + risk** - 提供 `check --contract`、`history --symbol`、`ci assess-risk` 与 annotation-friendly diagnostics
 - **机器可读优先** - 结构化输出是产品基线；当前 CLI 过渡期仍主要通过 `--json` 暴露机器可读结果
 - **分层架构 (MVP3)** - 保持 `Interface → Infrastructure → Domain → Server → CLI` 的明确边界
 - **双层解析模式** - 提供 `fast`（快速正则）和 `smart`（TypeScript AST）两种解析模式
 - **多语言支持** - 支持 TypeScript/JavaScript、Go、Python（可扩展架构）
 - **依赖/影响/复杂度分析** - 适合变更影响评估、重构盘点和架构回溯
 - **CI 门禁与文档护栏** - 提供提交格式、文件头、风险评估、文档/输出契约检查
-- **多格式导出与存储抽象** - 支持导出图数据，并保留文件系统/内存/图数据库后端接口
+- **SQLite 治理存储** - 正式支持 `filesystem` / `sqlite` / `memory` / `auto`，并把历史 `neo4j` / `kuzudb` 标成迁移错误
 
 ## 产品定位
 
@@ -25,7 +26,7 @@ CodeMap 是一个面向 TypeScript/JavaScript/Go 项目的 AI-first 代码地图
 | 输出契约 | 目标是机器可读优先；`当前 CLI 现实` 是多数命令通过 `--json` 提供结构化结果，`analyze` 额外支持 `--output-mode machine|human` |
 | 架构边界 | `Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令 |
 
-当前公共 CLI 聚焦 `init`、`generate`、`query`、`deps`、`cycles`、`complexity`、`impact`、`analyze`、`design`、`ci`、`workflow`、`export`、`ship`；`server`、`watch`、`report`、`logs` 已从 public CLI 移除，并在调用时给出迁移提示。
+当前公共 CLI 聚焦 `init`、`generate`、`design`、`check`、`history`、`query`、`deps`、`cycles`、`complexity`、`impact`、`analyze`、`ci`、`workflow`、`export`、`ship`；`server`、`watch`、`report`、`logs` 已从 public CLI 移除，并在调用时给出迁移提示。
 
 ## 安装
 
@@ -43,11 +44,11 @@ pnpm add @mycodemap/mycodemap
 npm install -g @mycodemap/mycodemap
 ```
 
-**环境要求**: Node.js >= 18.0.0
+**环境要求**: Node.js >= 20.0.0
 
-**MVP3 新依赖**:
-- `hono` - HTTP 服务器框架
-- `@hono/node-server` - Node.js 适配器
+**版本说明**:
+- npm/package 当前发布版本仍是 `0.5.0`
+- 仓库主线已完成 `v2.0` governance engine 相关代码收口；未发布演进记录见 `CHANGELOG.md` 的 `Unreleased`
 
 ## 快速开始
 
@@ -80,6 +81,12 @@ mycodemap design validate mycodemap.design.md --json
 mycodemap design map mycodemap.design.md --json
 mycodemap design handoff mycodemap.design.md --json
 mycodemap design verify mycodemap.design.md --json
+
+# 把 design contract 真正执行成 contract gate
+mycodemap check --contract mycodemap.design.md --against src --base origin/main --annotation-format github
+
+# 查询某个符号的历史轨迹与风险摘要
+mycodemap history --symbol createCheckCommand
 ```
 
 生成后，将 `.mycodemap/AI_MAP.md` 的内容提供给 AI 助手即可让其快速理解你的项目结构；需要结构化结果继续处理时，优先使用 JSON / machine 模式。
@@ -103,6 +110,7 @@ mycodemap design verify mycodemap.design.md --json
 | 文档 | 说明 |
 |------|------|
 | **[📘 AI_GUIDE.md](AI_GUIDE.md)** | **AI 主指南** - 快速参考、命令选择决策树、提示词模板速用 |
+| **[🛰️ AI_DISCOVERY.md](AI_DISCOVERY.md)** | AI 文档发现入口、结构化数据、跨平台索引策略 |
 | **[🚀 docs/ai-guide/QUICKSTART.md](docs/ai-guide/QUICKSTART.md)** | 快速开始、场景-命令映射表 |
 | **[📚 docs/ai-guide/COMMANDS.md](docs/ai-guide/COMMANDS.md)** | 完整 CLI 命令参考 |
 | **[📊 docs/ai-guide/OUTPUT.md](docs/ai-guide/OUTPUT.md)** | JSON 输出结构解析 |
@@ -395,13 +403,22 @@ Phases: find → read → link → show
 Current phase: find
 ```
 
-## CI 门禁 (v2.5)
+## CI 门禁（v2.0 governance plane）
 
 CodeMap 提供 CI 阶段自动检查，确保代码质量。
 
 ```bash
 # 检查 README / docs / CLI 示例是否与仓库事实同步
 npm run docs:check
+
+# 校准当前仓库 contract gate 是否还能默认 hard gate
+node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10
+
+# GitHub PR annotation-friendly contract gate
+mycodemap check --contract mycodemap.design.md --against src --base origin/main --annotation-format github
+
+# GitLab code quality artifact
+mycodemap check --contract mycodemap.design.md --against src --base origin/main --annotation-format gitlab --annotation-file gl-code-quality-report.json
 
 # 通过统一 CLI 护栏入口复用同一检查
 mycodemap ci check-docs-sync
@@ -412,12 +429,17 @@ mycodemap ci check-commits
 # 检查文件头注释 ([META], [WHY])
 mycodemap ci check-headers
 
-# 评估变更风险
+# 使用统一 Git history risk truth 评估变更风险
 mycodemap ci assess-risk -f src/cache/lru-cache.ts
+
+# 查询某个符号的历史轨迹与风险摘要
+mycodemap history --symbol createCheckCommand
 
 # 检查输出契约
 mycodemap ci check-output-contract
 ```
+
+> CI-native truth：PR 默认 hard gate 仅在 calibration 通过且 `changed files <= 10` 时启用；push 路径始终是 full scan `warn-only / fallback`，避免把 noisy fallback 伪装成稳定 hard gate。
 
 ## 配置说明
 
@@ -475,9 +497,9 @@ mycodemap ci check-output-contract
 | `exclude` | `string[]` | 排除的文件 glob 模式 | `["node_modules/**", "dist/**", ...]` |
 | `output` | `string` | 输出目录路径 | `".mycodemap"` |
 | `watch` | `boolean` | 监听模式预留配置 | `false` |
-| `storage.type` | `"filesystem" \| "kuzudb" \| "memory" \| "auto"` | 图存储后端类型 | `"filesystem"` |
+| `storage.type` | `"filesystem" \| "sqlite" \| "memory" \| "auto"` | 图存储后端类型 | `"filesystem"` |
 | `storage.outputPath` | `string` | 文件系统存储目录 | `".codemap/storage"` |
-| `storage.databasePath` | `string` | KùzuDB 数据目录（相对项目根目录） | - |
+| `storage.databasePath` | `string` | SQLite 数据库文件路径（相对项目根目录） | `".codemap/governance.sqlite"` |
 | `storage.autoThresholds` | `object` | `auto` 后端选择阈值 | - |
 | `plugins.builtInPlugins` | `boolean` | 是否启用内置插件 | `true` |
 | `plugins.pluginDir` | `string` | 额外插件目录 | - |
@@ -489,16 +511,16 @@ mycodemap ci check-output-contract
 ```jsonc
 {
   "storage": {
-    "type": "kuzudb",
-    "databasePath": ".codemap/kuzu"
+    "type": "sqlite",
+    "databasePath": ".codemap/governance.sqlite"
   }
 }
 ```
 
 - `generate` 会把 CodeGraph 写入配置的 `storage` 后端，`export` 与内部 `Server Layer` handler 会读取同一份后端数据。
-- `neo4j` 已不再是正式支持的 backend；旧配置会返回显式迁移错误，不会静默 fallback 到 `filesystem`。
-- 选择 `kuzudb` 前先安装 `npm install kuzu`；缺少依赖时会返回显式错误。
-- `storage.type = "auto"` 当前仍以 `filesystem` 为保守默认值；阈值字段先作为显式契约保留，不伪装成已完成的自动切换能力。
+- `neo4j` 与 `kuzudb` 已不再是正式支持的 backend；旧配置会返回显式迁移错误，不会静默 fallback 到 `filesystem`。
+- 选择 `sqlite` 时默认落盘到 `.codemap/governance.sqlite`；也可通过 `storage.databasePath` 覆盖。
+- `storage.type = "auto"` 当前优先选择 `sqlite`；若运行时缺少 `better-sqlite3` 或 Node.js `<20` 导致 SQLite 不可用，则 warning 后回退到 `filesystem`。
 - 图存储后端生产化不等于重新开放公共 HTTP API 产品面；`Server Layer` 仍是内部架构层。
 
 ### 插件运行时说明
@@ -578,7 +600,7 @@ CodeMap 采用清晰的分层架构设计（MVP3），各层职责明确：
 │  │ Storage          │ │ Parser           │                 │
 │  │ - FileSystem     │ │ - TypeScript     │                 │
 │  │ - Memory         │ │ - Go             │                 │
-│  │ - KùzuDB         │ │ - Python         │                 │
+│  │ - SQLite         │ │ - Python         │                 │
 │  │ - Auto Select    │ │ - Registry       │                 │
 │  └──────────────────┘ └──────────────────┘                 │
 │  ┌──────────────────┐                                      │
@@ -596,7 +618,7 @@ CodeMap 采用清晰的分层架构设计（MVP3），各层职责明确：
 
 | 层级 | 路径 | 职责 | 关键组件 |
 |------|------|------|----------|
-| **CLI** | `src/cli/` | 命令行接口（核心分析命令 + `workflow` / `ship` 扩展 surface） | `generate`, `query`, `impact`, `export` |
+| **CLI** | `src/cli/` | 命令行接口（analysis + governance + release 过渡 surface） | `generate`, `design`, `check`, `history`, `analyze`, `ci`, `export` |
 | **Server** | `src/server/` | 内部 Server Layer / HTTP transport | `CodeMapServer`, `QueryHandler` |
 | **Domain** | `src/domain/` | 核心业务逻辑 | `Project`, `Module`, `CodeGraph` |
 | **Infrastructure** | `src/infrastructure/` | 技术实现 | `Storage`, `Parser`, `Repository` |
@@ -606,10 +628,14 @@ CodeMap 采用清晰的分层架构设计（MVP3），各层职责明确：
 
 ```
 src/
-  ├── cli/                    # CLI 命令入口 (原有 + MVP3 新增)
+  ├── cli/                    # CLI 命令入口（public CLI truth）
   │   ├── commands/
-  │   │   ├── server.ts       # MVP3: HTTP API 服务器
-  │   │   ├── export.ts       # MVP3: 导出命令
+  │   │   ├── design.ts       # design contract 链路
+  │   │   ├── check.ts        # contract gate
+  │   │   ├── history.ts      # symbol history / risk
+  │   │   ├── ci.ts           # CI 护栏
+  │   │   ├── workflow.ts     # analysis-only workflow
+  │   │   ├── export.ts       # 导出命令
   │   │   ├── generate.ts     # 生成代码地图
   │   │   ├── query.ts        # 查询命令
   │   │   └── ...             # 其他命令
@@ -625,7 +651,7 @@ src/
   │   └── repositories/       # 仓库接口
   ├── infrastructure/         # MVP3: 基础设施层
   │   ├── storage/            # 存储适配器
-  │   │   ├── adapters/       # FileSystem, Memory, KùzuDB
+  │   │   ├── adapters/       # FileSystem, Memory, SQLite
   │   │   └── StorageFactory.ts
   │   ├── parser/             # 解析器
   │   │   ├── interfaces/     # ParserBase
@@ -637,13 +663,13 @@ src/
   │   └── config/             # 配置类型
   ├── core/                   # 核心分析引擎 (原有)
   ├── parser/                 # 原有解析器 (逐步迁移到 infrastructure/parser)
-  ├── orchestrator/           # 编排层 (v2.5)
+  ├── orchestrator/           # 编排层：analyze / history risk / governance services
   └── ...
 ```
 
 ## AI 助手集成
 
-MyCodeMap 可与多种 AI 编程助手深度集成，提供智能代码分析能力：
+CodeMap 可与多种 AI 编程助手深度集成，提供智能代码分析能力：
 
 | AI 助手 | 配置方式 | 支持功能 |
 |---------|----------|----------|
@@ -703,6 +729,49 @@ mycodemap design verify mycodemap.design.md --json
 > `design handoff` 会基于 validated design contract + mapping truth 返回 `readyForExecution`、`approvals`、`assumptions`、`openQuestions`；human mode 默认写出 `.mycodemap/handoffs/{stem}.handoff.md|json`。
 > `design verify` 会把 `Acceptance Criteria` 固定映射为 `checklist`，并输出 `drift` / `diagnostics`；当结果只是 `needs-review` 时保持零退出码，只有 `ok=false` 或 blocker diagnostics 才返回非零 exit code。
 
+### `mycodemap check`
+
+把 `mycodemap.design.md` 中的 frontmatter rules 真正执行到代码上；默认输出 `ContractCheckResult` JSON，`--human` 只改变渲染。
+
+```bash
+# 默认 full scan
+mycodemap check --contract mycodemap.design.md --against src
+
+# 人类可读输出
+mycodemap check --contract mycodemap.design.md --against src --human
+
+# PR / CI 显式 diff
+mycodemap check --contract mycodemap.design.md --against src --base origin/main
+
+# 显式 changed files
+mycodemap check --contract mycodemap.design.md --against src --changed-files src/core/service.ts
+
+# GitHub PR annotations
+mycodemap check --contract mycodemap.design.md --against src --base origin/main --annotation-format github
+
+# GitLab code quality artifact
+mycodemap check --contract mycodemap.design.md --against src --base origin/main --annotation-format gitlab --annotation-file gl-code-quality-report.json
+
+# 校准当前仓库是否允许默认 hard gate
+node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10
+```
+
+| 选项 | 说明 |
+|------|------|
+| `--contract <file>` | design contract 文件路径，通常为仓库根 `mycodemap.design.md` |
+| `--against <path>` | 要扫描的代码目录或项目根 |
+| `--human` | 人类可读输出；默认仍是 JSON |
+| `--base <git-ref>` | 显式启用 diff-aware，并从给定 base 计算 changed files |
+| `--changed-files <paths...>` | 显式指定 changed files；优先级高于 `--base` |
+| `--annotation-format <github\|gitlab>` | 输出 annotation-friendly diagnostics；适合 PR / merge request |
+| `--annotation-file <file>` | 把 annotation 输出写到文件；`gitlab` 模式通常写成 `gl-code-quality-report.json` |
+
+> `severity:error` 会触发非零退出码；`severity:warn` 只进入 `warnings` / `violations`，不会阻断 CI。
+> diff-aware 只会在显式 `--base` 或 `--changed-files` 下启用；失败时会回退 full scan，并把原因写进 `warnings[]`。
+> 当前 rule families 为 `layer_direction` / `forbidden_imports` / `module_public_api_only` / `complexity_threshold`。
+> PR 默认 hard gate 只在 calibration 通过且 `changed files <= 10` 时开启；超过窗口、diff base 失效或 `false-positive rate >10%` 时，CI 必须回退为 `warn-only / fallback`。
+> `--annotation-format github` 会输出 GitHub Actions annotations；`gitlab` 需要配合 `--annotation-file gl-code-quality-report.json`，且只保留 line-scoped diagnostics，不伪造行号。
+
 ### `mycodemap analyze`
 
 统一分析入口，当前公共契约只暴露四个 intent，并统一返回结构化输出：
@@ -752,6 +821,8 @@ mycodemap analyze -i link -t src/index.ts --structured --json
 > 产品目标是机器可读优先；当前实现仍以显式 `--json` / `--output-mode` 作为主要入口。
 >
 > legacy 兼容映射：`search → find`、`impact/complexity → read`、`dependency/reference → link`、`overview/documentation → show`；`refactor` 会返回 `E0001_INVALID_INTENT`。
+>
+> `--include-git-history` 现在只会在 `read` intent 上附加统一的 Git history enrichment；其他 intent 会显式给出 warning，而不是 silent noop。history 信号不可用时会返回 `unavailable` / `confidence=low` 诊断，而不是伪装成低风险。
 
 
 ## 贡献指南
@@ -868,9 +939,10 @@ mycodemap ci check-headers
 mycodemap ci check-headers -d src/domain
 mycodemap ci check-headers -f "src/index.ts,src/cli/index.ts"
 
-# 评估变更风险
+# 评估变更风险（与 `check` / `history` 共用同一套 Git history risk truth）
 mycodemap ci assess-risk
 mycodemap ci assess-risk -t 0.5
+mycodemap ci assess-risk -f "src/cli/index.ts,src/cli/commands/analyze.ts"
 
 # 验证文档同步（含 analyze generated block 校验）
 mycodemap ci check-docs-sync
@@ -885,5 +957,20 @@ mycodemap ci check-commit-size -m 15
 
 > `mycodemap ship` 的 CHECK 阶段现在复用 `ci check-working-tree`、`ci check-branch`、`ci check-scripts` 作为 must-pass 事实源，而不是重复实现这些检查。
 > `mycodemap ci check-headers -d <dir>` 与 `generate` / `analyze` 共享同一套 `.gitignore` 感知排除模块；若仓库没有 `.gitignore`，则回退到默认 `exclude` 列表。
+> `ci assess-risk` 现在输出 `status/confidence/freshness/source` 与统一 risk level；若 Git history 不可用，会显式打印 `unavailable` / warning，并说明阈值未被应用。
+
+### `mycodemap history`
+
+符号级 Git history / risk 查询：
+
+```bash
+# 默认输出 machine-first JSON
+mycodemap history --symbol createCheckCommand
+
+# 人类可读渲染
+mycodemap history --symbol createCheckCommand --human
+```
+
+> `history` 会返回 `ok` / `ambiguous` / `not_found` / `unavailable` 四种状态；`--human` 只改变渲染，不改变底层 truth。
 
 支持的提交 TAG 类型：`[REFACTOR]`, `[TEST]`, `[DOCS]`, `[FEAT]`, `[FIX]`, `[CHORE]`, `[PERF]`, `[SECURITY]`, `[BREAKING]`, `[HOTFIX]`, `[MIGRATION]`, `[WIP]`
