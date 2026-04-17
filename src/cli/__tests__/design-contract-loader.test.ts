@@ -124,4 +124,44 @@ describe('design-contract-loader', () => {
       ]),
     );
   });
+
+  it('parses executable rules from YAML frontmatter', async () => {
+    const filePath = path.join(fixturesDir, 'valid-frontmatter.design.md');
+    const result = await loadDesignContract({ filePath });
+
+    expect(result.ok).toBe(true);
+    expect(result.contract.rules).toEqual([
+      expect.objectContaining({
+        type: 'layer_direction',
+        name: 'core 不可依赖 cli',
+        severity: 'error',
+      }),
+      expect.objectContaining({
+        type: 'forbidden_imports',
+        name: 'parser 禁止直接引用 fs',
+        severity: 'warn',
+      }),
+      expect.objectContaining({
+        type: 'module_public_api_only',
+        name: 'domain 模块对外仅暴露 index.ts',
+        severity: 'error',
+      }),
+    ]);
+  });
+
+  it('surfaces structured diagnostics for invalid frontmatter rules', async () => {
+    const filePath = path.join(fixturesDir, 'contract-invalid-rule.design.md');
+    const result = await loadDesignContract({ filePath });
+    const diagnosticCodes = result.diagnostics.map((diagnostic) => diagnostic.code);
+
+    expect(result.ok).toBe(false);
+    expect(diagnosticCodes).toEqual(
+      expect.arrayContaining([
+        'invalid-rule-type',
+        'invalid-rule-severity',
+        'missing-rule-field',
+        'unknown-rule-field',
+      ]),
+    );
+  });
 });

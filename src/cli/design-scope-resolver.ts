@@ -95,6 +95,10 @@ interface SourceSnapshot {
   testFiles: string[];
 }
 
+const codeMapSnapshotCache = new Map<string, CodeMap | null>();
+const sourceSnapshotCache = new Map<string, Promise<SourceSnapshot>>();
+const designScopeResultCache = new Map<string, Promise<DesignMappingResult>>();
+
 function normalizeSlashes(value: string): string {
   return value.replace(/\\/gu, '/');
 }
@@ -340,15 +344,23 @@ function addCandidate(
 }
 
 function loadCodeMapSnapshot(rootDir: string): CodeMap | null {
+  if (codeMapSnapshotCache.has(rootDir)) {
+    return codeMapSnapshotCache.get(rootDir) ?? null;
+  }
+
   const dataPath = resolveDataPath(rootDir);
 
   if (!existsSync(dataPath)) {
+    codeMapSnapshotCache.set(rootDir, null);
     return null;
   }
 
   try {
-    return JSON.parse(readFileSync(dataPath, 'utf8')) as CodeMap;
+    const snapshot = JSON.parse(readFileSync(dataPath, 'utf8')) as CodeMap;
+    codeMapSnapshotCache.set(rootDir, snapshot);
+    return snapshot;
   } catch {
+    codeMapSnapshotCache.set(rootDir, null);
     return null;
   }
 }
@@ -456,23 +468,39 @@ function indexedPathsFrom(codeMap: CodeMap | null, rootDir: string): Set<string>
 }
 
 async function buildSourceSnapshot(rootDir: string, codeMap: CodeMap | null): Promise<SourceSnapshot> {
-  const files = await discoverSourceFiles(rootDir);
-  const testFiles = await globby(TEST_GLOBS, {
-    cwd: rootDir,
-    absolute: true,
-    gitignore: true,
-    ignore: SOURCE_IGNORE,
-  });
-  const entries = await Promise.all(
-    files.map(async (filePath) => [filePath, await readFile(filePath, 'utf8')] as const),
-  );
+  const cachedSnapshot = sourceSnapshotCache.get(rootDir);
+  if (cachedSnapshot) {
+    return cachedSnapshot;
+  }
 
-  return {
-    files,
-    contents: new Map(entries),
-    indexedPaths: indexedPathsFrom(codeMap, rootDir),
-    testFiles,
-  };
+  const snapshotPromise = (async () => {
+    const files = await discoverSourceFiles(rootDir);
+    const testFiles = await globby(TEST_GLOBS, {
+      cwd: rootDir,
+      absolute: true,
+      gitignore: true,
+      ignore: SOURCE_IGNORE,
+    });
+    const entries = await Promise.all(
+      files.map(async (filePath) => [filePath, await readFile(filePath, 'utf8')] as const),
+    );
+
+    return {
+      files,
+      contents: new Map(entries),
+      indexedPaths: indexedPathsFrom(codeMap, rootDir),
+      testFiles,
+    };
+  })();
+
+  sourceSnapshotCache.set(rootDir, snapshotPromise);
+
+  try {
+    return await snapshotPromise;
+  } catch (error) {
+    sourceSnapshotCache.delete(rootDir);
+    throw error;
+  }
 }
 
 async function resolveSymbolSignals(
@@ -889,6 +917,12 @@ function synthesizeUnknowns(
   return uniq(unknowns);
 }
 
+function hasWeakEvidence(candidate: CandidateDraft): boolean {
+  return candidate.reasons.some(
+    (reason) => reason.evidenceType === 'keyword-match' || reason.evidenceType === 'analyze-find',
+  );
+}
+
 async function enrichCandidate(
   candidate: CandidateDraft,
   rootDir: string,
@@ -896,18 +930,24 @@ async function enrichCandidate(
   sourceSnapshot: SourceSnapshot,
   codeMap: CodeMap | null,
 ): Promise<CandidateDraft> {
-  const shouldRunAnalyze = sourceSnapshot.indexedPaths.has(candidate.path);
   const fallbackDependencies = localDependencies(candidate, rootDir, sourceSnapshot, codeMap);
   const fallbackRisk = localRisk(candidate, fallbackDependencies);
+  const shouldRunAnalyze = sourceSnapshot.indexedPaths.has(candidate.path) && hasWeakEvidence(candidate);
   const [readOutput, linkOutput, testImpact] = await Promise.all([
     shouldRunAnalyze ? readEnrichment(candidate) : Promise.resolve(null),
     shouldRunAnalyze ? linkEnrichment(candidate) : Promise.resolve(null),
     resolveTestImpact(candidate, rootDir, sourceSnapshot),
   ]);
-  const confidence = resolveConfidence(candidate, readOutput, linkOutput);
+  const confidence = shouldRunAnalyze
+    ? resolveConfidence(candidate, readOutput, linkOutput)
+    : candidate.confidence;
   const enriched: EnrichmentData = {
-    dependencies: mergeDependencies(candidate, readOutput, linkOutput, rootDir, fallbackDependencies),
-    risk: resolveRisk(candidate, readOutput, rootDir, fallbackRisk),
+    dependencies: shouldRunAnalyze
+      ? mergeDependencies(candidate, readOutput, linkOutput, rootDir, fallbackDependencies)
+      : fallbackDependencies,
+    risk: shouldRunAnalyze
+      ? resolveRisk(candidate, readOutput, rootDir, fallbackRisk)
+      : fallbackRisk,
     confidence,
     testImpact,
     unknowns: synthesizeUnknowns({ ...candidate, confidence }, testImpact, hasOpenQuestions, sourceSnapshot),
@@ -1042,6 +1082,13 @@ export async function resolveDesignScope(
     filePath: options.filePath,
     rootDir,
   });
+  const cacheKey = `${rootDir}::${loadedContract.filePath}`;
+  const cachedResult = designScopeResultCache.get(cacheKey);
+  if (cachedResult) {
+    return cachedResult;
+  }
+
+  const resultPromise = (async () => {
   const baseDiagnostics = loadedContract.diagnostics.map(toMappingDiagnostic);
 
   if (!loadedContract.ok) {
@@ -1080,9 +1127,19 @@ export async function resolveDesignScope(
   );
   const scopeDiagnostics = buildScopeDiagnostics(enrichedCandidates);
 
-  return toResult(
-    loadedContract.filePath,
-    enrichedCandidates,
-    [...baseDiagnostics, ...scopeDiagnostics],
-  );
+    return toResult(
+      loadedContract.filePath,
+      enrichedCandidates,
+      [...baseDiagnostics, ...scopeDiagnostics],
+    );
+  })();
+
+  designScopeResultCache.set(cacheKey, resultPromise);
+
+  try {
+    return await resultPromise;
+  } catch (error) {
+    designScopeResultCache.delete(cacheKey);
+    throw error;
+  }
 }

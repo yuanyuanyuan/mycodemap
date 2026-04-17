@@ -23,9 +23,48 @@
 - `Non-Goals` 不能为空；它是防止越界实现的第一道护栏。
 - 如果某个关键决策尚未确定，写进 `Open Questions`，不要让 AI 自行猜测。
 
+## Frontmatter Rules
+
+把可执行规则写在文件开头的 YAML frontmatter 中。当前 Phase 25 只支持三种规则：
+
+- `layer_direction`
+- `forbidden_imports`
+- `module_public_api_only`
+
+```yaml
+---
+rules:
+  - type: layer_direction
+    name: "core 不可依赖 cli"
+    from: "src/core/**"
+    to: "src/cli/**"
+    severity: error
+  - type: forbidden_imports
+    name: "parser 禁止直接引用 fs"
+    module: "src/infrastructure/parser/**"
+    forbidden:
+      - fs
+      - path
+    severity: warn
+  - type: module_public_api_only
+    name: "domain 模块对外仅暴露 index.ts"
+    module: "src/domain/**"
+    public_api: "index.ts"
+    severity: error
+---
+```
+
 ## Copy-Paste Template
 
 ```markdown
+---
+rules:
+  - type: layer_direction
+    name: "core 不可依赖 cli"
+    from: "src/core/**"
+    to: "src/cli/**"
+    severity: error
+---
 # Design Contract: <feature name>
 
 ## Goal
@@ -59,6 +98,14 @@
 ## Minimal Example
 
 ```markdown
+---
+rules:
+  - type: layer_direction
+    name: "core 不可依赖 cli"
+    from: "src/core/**"
+    to: "src/cli/**"
+    severity: error
+---
 # Design Contract: Add design validate command
 
 ## Goal

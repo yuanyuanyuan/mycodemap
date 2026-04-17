@@ -35,6 +35,11 @@ export interface DesignValidateJsonOutput {
   title?: string;
   missingRequiredSections: string[];
   diagnostics: LoadedDesignContract['diagnostics'];
+  rules: Array<{
+    name: string;
+    type: LoadedDesignContract['contract']['rules'][number]['type'];
+    severity: LoadedDesignContract['contract']['rules'][number]['severity'];
+  }>;
   sections: Array<{
     id: string;
     title: string;
@@ -64,6 +69,11 @@ function toJsonOutput(result: LoadedDesignContract): DesignValidateJsonOutput {
     title: result.contract.metadata.title,
     missingRequiredSections: [...result.contract.missingRequiredSections],
     diagnostics: result.diagnostics,
+    rules: result.contract.rules.map((rule) => ({
+      name: rule.name,
+      type: rule.type,
+      severity: rule.severity,
+    })),
     sections: result.contract.orderedSections.map((section) => ({
       id: section.id,
       title: section.title,
@@ -84,6 +94,7 @@ export function renderDesignValidationResult(result: LoadedDesignContract): stri
   }
 
   lines.push(`Sections: ${result.contract.orderedSections.length}`);
+  lines.push(`Rules: ${result.contract.rules.length}`);
 
   if (result.diagnostics.length === 0) {
     lines.push('Diagnostics: none');

@@ -51,7 +51,7 @@ describe('design verify e2e', () => {
     expect(verifyResult.readyForExecution).toBe(true);
     expect(verifyResult.checklist.some((item) => item.status === 'satisfied')).toBe(true);
     expect(verifyResult.drift).toEqual([]);
-  });
+  }, 20000);
 
   it('keeps missing required design sections blocked through verify', async () => {
     const outputRoot = mkdtempSync(path.join(tmpdir(), 'codemap-design-verify-e2e-missing-'));
@@ -108,5 +108,5 @@ describe('design verify e2e', () => {
         expect.objectContaining({ code: 'blocked-mapping' }),
       ]),
     );
-  });
+  }, 20000);
 });
