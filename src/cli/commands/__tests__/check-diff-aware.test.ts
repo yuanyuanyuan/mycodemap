@@ -194,7 +194,7 @@ describe('check command diff-aware mode', () => {
     const annotationOutput = String(consoleLogSpy.mock.calls[0]?.[0]);
     expect(annotationOutput).toContain('::error');
     expect(annotationOutput).toContain('file=src/core/bad.ts');
-    expect(annotationOutput).toContain('line=1');
+    expect(annotationOutput).toContain('line=3');
     expect(annotationOutput).toContain('title=layer_direction%3A core 不可依赖 cli');
     expect(process.exitCode).toBe(1);
   });
