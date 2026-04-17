@@ -210,12 +210,12 @@ function cmdRoadmapAnalyze(cwd, raw) {
 
   // Extract milestone info
   const milestones = [];
-  const milestonePattern = /##\s*(.*v(\d+(?:\.\d+)+)[^(\n]*)/gi;
+  const milestonePattern = /##\s*(((?:post-)?v(\d+(?:\.\d+)+))[^(\n]*)/gi;
   let mMatch;
   while ((mMatch = milestonePattern.exec(content)) !== null) {
     milestones.push({
       heading: mMatch[1].trim(),
-      version: 'v' + mMatch[2],
+      version: mMatch[2],
     });
   }
 

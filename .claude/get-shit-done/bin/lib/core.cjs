@@ -1414,11 +1414,11 @@ function getMilestoneInfo(cwd) {
     // First: check for list-format roadmaps using 🚧 (in-progress) marker
     // e.g. "- 🚧 **v2.1 Belgium** — Phases 24-28 (in progress)"
     // e.g. "- 🚧 **v1.2.1 Tech Debt** — Phases 1-8 (in progress)"
-    const inProgressMatch = roadmap.match(/🚧\s*\*\*v(\d+(?:\.\d+)+)\s+([^*]+)\*\*/);
+    const inProgressMatch = roadmap.match(/🚧\s*\*\*(((?:post-)?v)(\d+(?:\.\d+)+))\s+([^*]+)\*\*/i);
     if (inProgressMatch) {
       return {
-        version: 'v' + inProgressMatch[1],
-        name: inProgressMatch[2].trim(),
+        version: inProgressMatch[1],
+        name: inProgressMatch[4].trim(),
       };
     }
 
@@ -1426,15 +1426,15 @@ function getMilestoneInfo(cwd) {
     const cleaned = stripShippedMilestones(roadmap);
     // Extract version and name from the same ## heading for consistency
     // Supports 2+ segment versions: v1.2, v1.2.1, v2.0.1, etc.
-    const headingMatch = cleaned.match(/## .*v(\d+(?:\.\d+)+)[:\s]+([^\n(]+)/);
+    const headingMatch = cleaned.match(/## .*?(((?:post-)?v)\d+(?:\.\d+)+)[:\s]+([^\n(]+)/i);
     if (headingMatch) {
       return {
-        version: 'v' + headingMatch[1],
-        name: headingMatch[2].trim(),
+        version: headingMatch[1],
+        name: headingMatch[3].trim(),
       };
     }
     // Fallback: try bare version match (greedy — capture longest version string)
-    const versionMatch = cleaned.match(/v(\d+(?:\.\d+)+)/);
+    const versionMatch = cleaned.match(/((?:post-)?v\d+(?:\.\d+)+)/i);
     return {
       version: versionMatch ? versionMatch[0] : 'v1.0',
       name: 'milestone',

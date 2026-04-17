@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, stripShippedMilestones, extractCurrentMilestone, normalizePhaseName, planningPaths, planningDir, planningRoot, toPosixPath, output, error, checkAgentsInstalled, phaseTokenMatches } = require('./core.cjs');
+const { extractFrontmatter } = require('./frontmatter.cjs');
 
 function getLatestCompletedMilestone(cwd) {
   const milestonesPath = path.join(planningRoot(cwd), 'MILESTONES.md');
@@ -13,7 +14,7 @@ function getLatestCompletedMilestone(cwd) {
 
   try {
     const content = fs.readFileSync(milestonesPath, 'utf-8');
-    const match = content.match(/^##\s+(v[\d.]+)\s+(.+?)\s+\(Shipped:/m);
+    const match = content.match(/^##\s+((?:post-)?v[\d.]+)\s+(.+?)\s+\(Shipped:/mi);
     if (!match) return null;
     return {
       version: match[1],
@@ -22,6 +23,93 @@ function getLatestCompletedMilestone(cwd) {
   } catch {
     return null;
   }
+}
+
+function normalizeSeedTitle(title) {
+  return String(title || '')
+    .replace(/^SEED-[\w-]+:\s*/i, '')
+    .trim();
+}
+
+function listAvailableSeeds(cwd) {
+  const seedsDir = path.join(planningRoot(cwd), 'seeds');
+  if (!fs.existsSync(seedsDir)) return [];
+
+  const allowedStatuses = new Set(['dormant', 'active', 'triggered']);
+  let entries = [];
+  try {
+    entries = fs.readdirSync(seedsDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const seeds = [];
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    if (!entry.name.startsWith('SEED-') || !entry.name.endsWith('.md')) continue;
+
+    const filePath = path.join(seedsDir, entry.name);
+    let content = '';
+    try {
+      content = fs.readFileSync(filePath, 'utf-8');
+    } catch {
+      continue;
+    }
+
+    const fm = extractFrontmatter(content);
+    const status = String(fm.status || 'dormant').trim().toLowerCase();
+    if (!allowedStatuses.has(status)) continue;
+
+    const headingMatch = content.match(/^#\s*(.+)$/m);
+    const title = normalizeSeedTitle(fm.title || headingMatch?.[1] || entry.name.replace(/\.md$/i, ''));
+
+    seeds.push({
+      id: String(fm.id || '').trim() || entry.name.replace(/\.md$/i, '').split('-').slice(0, 2).join('-'),
+      status,
+      title,
+      trigger_when: String(fm.trigger_when || '').trim(),
+      scope: String(fm.scope || '').trim(),
+      planted: String(fm.planted || '').trim(),
+      planted_during: String(fm.planted_during || '').trim(),
+      path: toPosixPath(path.relative(cwd, filePath)),
+    });
+  }
+
+  return seeds.sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function tokenizeSeedQuery(query) {
+  return String(query || '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/g)
+    .filter(Boolean);
+}
+
+function rankMatchingSeeds(seeds, query) {
+  const terms = [...new Set(tokenizeSeedQuery(query))];
+  if (terms.length === 0) return [];
+
+  return seeds
+    .map(seed => {
+      const haystack = [
+        seed.title,
+        seed.trigger_when,
+        seed.scope,
+        seed.planted_during,
+      ].join(' ').toLowerCase();
+      const matched_terms = terms.filter(term => haystack.includes(term));
+      if (matched_terms.length === 0) return null;
+      return {
+        ...seed,
+        matched_terms,
+        match_score: matched_terms.length,
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => (
+      right.match_score - left.match_score
+      || left.id.localeCompare(right.id)
+    ));
 }
 
 /**
@@ -427,10 +515,13 @@ function cmdInitNewProject(cwd, raw) {
   output(withProjectRoot(cwd, result), raw);
 }
 
-function cmdInitNewMilestone(cwd, raw) {
+function cmdInitNewMilestone(cwd, raw, milestoneHintArgs = []) {
   const config = loadConfig(cwd);
   const milestone = getMilestoneInfo(cwd);
   const latestCompleted = getLatestCompletedMilestone(cwd);
+  const availableSeeds = listAvailableSeeds(cwd);
+  const seedMatchQuery = milestoneHintArgs.join(' ').trim();
+  const matchingSeeds = seedMatchQuery ? rankMatchingSeeds(availableSeeds, seedMatchQuery) : [];
   const phasesDir = path.join(planningDir(cwd), 'phases');
   let phaseDirCount = 0;
 
@@ -459,6 +550,11 @@ function cmdInitNewMilestone(cwd, raw) {
     latest_completed_milestone_name: latestCompleted?.name || null,
     phase_dir_count: phaseDirCount,
     phase_archive_path: latestCompleted ? toPosixPath(path.relative(cwd, path.join(planningRoot(cwd), 'milestones', `${latestCompleted.version}-phases`))) : null,
+    available_seed_count: availableSeeds.length,
+    available_seeds: availableSeeds,
+    seed_match_query: seedMatchQuery || null,
+    matching_seed_count: matchingSeeds.length,
+    matching_seeds: matchingSeeds,
 
     // File existence
     project_exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),
@@ -797,6 +893,7 @@ function cmdInitTodos(cwd, area, raw) {
 function cmdInitMilestoneOp(cwd, raw) {
   const config = loadConfig(cwd);
   const milestone = getMilestoneInfo(cwd);
+  const isDirInMilestone = getMilestonePhaseFilter(cwd);
 
   // Count phases
   let phaseCount = 0;
@@ -804,7 +901,7 @@ function cmdInitMilestoneOp(cwd, raw) {
   const phasesDir = path.join(planningDir(cwd), 'phases');
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).filter(isDirInMilestone);
     phaseCount = dirs.length;
 
     // Count phases with summaries (completed)
