@@ -11,7 +11,7 @@ import type { CodeGraph, Module, Symbol, Dependency } from './index.js';
 // ============================================
 
 /** 存储后端类型 */
-export type StorageType = 'filesystem' | 'kuzudb' | 'memory';
+export type StorageType = 'filesystem' | 'kuzudb' | 'sqlite' | 'memory';
 
 // ============================================
 // Section 2: 搜索选项
