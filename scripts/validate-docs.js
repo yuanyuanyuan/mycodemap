@@ -226,6 +226,120 @@ function validateAnalyzeDocs(rootDir, failures) {
   failures.push(...collectAnalyzeDocSyncFailures(rootDir));
 }
 
+function validateHistoryRiskDocs(rootDir, failures) {
+  const readme = readText(rootDir, 'README.md', failures);
+  const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
+  const claudeGuide = readText(rootDir, 'CLAUDE.md', failures);
+  const commandsGuide = readText(rootDir, 'docs/ai-guide/COMMANDS.md', failures);
+  const outputGuide = readText(rootDir, 'docs/ai-guide/OUTPUT.md', failures);
+  const validationRule = readText(rootDir, 'docs/rules/validation.md', failures);
+  const cliIndexSource = readText(rootDir, 'src/cli/index.ts', failures);
+  const historyCommandSource = readText(rootDir, 'src/cli/commands/history.ts', failures);
+
+  if (cliIndexSource) {
+    expectIncludes(cliIndexSource, 'program.addCommand(historyCommand);', 'src/cli/index.ts history command registration', failures);
+  }
+
+  if (historyCommandSource) {
+    validateSnippets(
+      historyCommandSource,
+      'src/cli/commands/history.ts command surface',
+      [
+        "new Command('history')",
+        ".requiredOption('--symbol <name>'",
+        ".option('--human'",
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (readme) {
+    validateSnippets(
+      readme,
+      'README.md history risk baseline',
+      [
+        '# 查询某个符号的历史轨迹与风险摘要\nmycodemap history --symbol createCheckCommand',
+        '### `mycodemap history`\n\n符号级 Git history / risk 查询：\n\n```bash\n# 默认输出 machine-first JSON\nmycodemap history --symbol createCheckCommand',
+        '`--include-git-history` 现在只会在 `read` intent 上附加统一的 Git history enrichment；其他 intent 会显式给出 warning，而不是 silent noop。',
+        '`ci assess-risk` 现在输出 `status/confidence/freshness/source` 与统一 risk level；若 Git history 不可用，会显式打印 `unavailable` / warning，并说明阈值未被应用。'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (aiGuide) {
+    validateSnippets(
+      aiGuide,
+      'AI_GUIDE.md history risk baseline',
+      [
+        '`history --symbol <name>`',
+        '`check` / `ci assess-risk` / `history` 现在共用同一套 Git history risk truth；history unavailable 时会显式给出 `unavailable` / `confidence=low`',
+        'interface HistoryCommandResult {'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (claudeGuide) {
+    validateSnippets(
+      claudeGuide,
+      'CLAUDE.md history risk baseline',
+      [
+        'node dist/cli/index.js history --symbol <name>',
+        '`analyze --include-git-history` 当前仅在 `read` intent 上生效；其余 intent 会显式 warning，不再 silent noop。',
+        'CLI 应返回 `unavailable` / `confidence=low` / warning，而不是伪装成 `low risk`'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (commandsGuide) {
+    validateSnippets(
+      commandsGuide,
+      'docs/ai-guide/COMMANDS.md history risk baseline',
+      [
+        '## history - 符号级 Git history / risk 查询',
+        'Git history risk 是 additive enrichment：会附加 `violations[].risk` 与顶层 `history`，但不会改变 `severity:error` / exit 语义',
+        '`ci assess-risk` 现在输出 `status / confidence / freshness / source / score / level`'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (outputGuide) {
+    validateSnippets(
+      outputGuide,
+      'docs/ai-guide/OUTPUT.md history risk baseline',
+      [
+        'interface HistoryCommandResult {',
+        'Git history risk 是 additive enrichment：它补充 `history` 与 `violations[].risk`',
+        '"git-history-unsupported-intent"'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (validationRule) {
+    validateSnippets(
+      validationRule,
+      'docs/rules/validation.md history risk baseline',
+      [
+        '`check` / `ci assess-risk` / `history` / `analyze --include-git-history` 的统一 risk truth',
+        'node dist/cli/index.js history --symbol createCheckCommand',
+        'node scripts/report-high-risk-files.mjs --top 3'
+      ],
+      [],
+      failures
+    );
+  }
+}
+
 function validateDesignContractDocs(rootDir, failures) {
   const readme = readText(rootDir, 'README.md', failures);
   const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
@@ -240,9 +354,12 @@ function validateDesignContractDocs(rootDir, failures) {
   const designTemplate = readText(rootDir, 'docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md', failures);
   const cliIndexSource = readText(rootDir, 'src/cli/index.ts', failures);
   const designCommandSource = readText(rootDir, 'src/cli/commands/design.ts', failures);
+  const checkCommandSource = readText(rootDir, 'src/cli/commands/check.ts', failures);
+  const repoContract = readText(rootDir, 'mycodemap.design.md', failures);
 
   if (cliIndexSource) {
     expectIncludes(cliIndexSource, 'program.addCommand(designCommand);', 'src/cli/index.ts design command registration', failures);
+    expectIncludes(cliIndexSource, 'program.addCommand(checkCommand);', 'src/cli/index.ts check command registration', failures);
   }
 
   if (designCommandSource) {
@@ -267,6 +384,28 @@ function validateDesignContractDocs(rootDir, failures) {
     );
   }
 
+  if (checkCommandSource) {
+    validateSnippets(
+      checkCommandSource,
+      'src/cli/commands/check.ts command surface',
+      [
+        "new Command('check')",
+        "--contract <file>",
+        "--against <path>",
+        '--base <git-ref>',
+        '--changed-files <paths...>',
+        '--annotation-format <format>',
+        '--annotation-file <file>',
+        'resolveContractDiffScope',
+        'runContractCheck',
+        'renderGitHubAnnotations',
+        'renderGitLabAnnotations',
+      ],
+      [],
+      failures
+    );
+  }
+
   if (readme) {
     validateSnippets(
       readme,
@@ -276,6 +415,13 @@ function validateDesignContractDocs(rootDir, failures) {
         'mycodemap design map mycodemap.design.md --json',
         'mycodemap design handoff mycodemap.design.md --json',
         'mycodemap design verify mycodemap.design.md --json',
+        'mycodemap check --contract mycodemap.design.md --against src',
+        '--annotation-format github',
+        '--annotation-format gitlab --annotation-file gl-code-quality-report.json',
+        'node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10',
+        'changed files <= 10',
+        'warn-only / fallback',
+        'false-positive rate >10%',
         'docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md',
         '`mycodemap.design.md`',
         '`design validate → design map → design handoff → design verify`'
@@ -294,11 +440,17 @@ function validateDesignContractDocs(rootDir, failures) {
         'design map mycodemap.design.md --json',
         'design handoff mycodemap.design.md --json',
         'design verify mycodemap.design.md --json',
+        'check --contract mycodemap.design.md --against src',
+        '--annotation-format github',
+        'node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10',
+        'changed files <= 10',
+        'warn-only / fallback',
         '`mycodemap.design.md`',
         'interface DesignValidateOutput {',
         'interface DesignMapOutput {',
         'interface DesignHandoffOutput {',
-        'interface DesignVerificationOutput {'
+        'interface DesignVerificationOutput {',
+        'interface ContractCheckResult {'
       ],
       [],
       failures
@@ -313,7 +465,13 @@ function validateDesignContractDocs(rootDir, failures) {
         'node dist/cli/index.js design validate [file] --json',
         'node dist/cli/index.js design map [file] --json',
         'node dist/cli/index.js design handoff [file] --json',
-        'node dist/cli/index.js design verify [file] --json'
+        'node dist/cli/index.js design verify [file] --json',
+        'node dist/cli/index.js check --contract mycodemap.design.md --against src',
+        '--annotation-format github|gitlab',
+        'node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10',
+        'changed files <= 10',
+        'warn-only / fallback',
+        'false-positive rate >10%'
       ],
       [],
       failures
@@ -330,6 +488,14 @@ function validateDesignContractDocs(rootDir, failures) {
         'mycodemap design map mycodemap.design.md --json',
         'mycodemap design handoff mycodemap.design.md --json',
         'mycodemap design verify mycodemap.design.md --json',
+        '## check - 执行 contract gate',
+        'mycodemap check --contract mycodemap.design.md --against src',
+        'mycodemap check --contract mycodemap.design.md --against src --base origin/main',
+        '--annotation-format github',
+        '--annotation-format gitlab --annotation-file gl-code-quality-report.json',
+        'node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10',
+        'changed files <= 10',
+        'warn-only / fallback',
         '`mycodemap.design.md`',
         '### 必填 sections',
         '### map',
@@ -348,6 +514,7 @@ function validateDesignContractDocs(rootDir, failures) {
       'docs/ai-guide/OUTPUT.md design validate schema',
       [
         '## design validate 命令输出结构',
+        '## check 命令输出结构',
         '## design map 命令输出结构',
         '## design handoff 命令输出结构',
         '## design verify 命令输出结构',
@@ -356,6 +523,15 @@ function validateDesignContractDocs(rootDir, failures) {
         'interface DesignMapOutput {',
         'interface DesignHandoffOutput {',
         'interface DesignVerificationOutput {',
+        'interface ContractCheckResult {',
+        'details?: Record<string, string | number | boolean | null>;',
+        'rule_type: "layer_direction" | "forbidden_imports" | "module_public_api_only" | "complexity_threshold";',
+        'diagnostic?: {',
+        'scope: "line" | "file" | "general";',
+        'category: "dependency" | "module_boundary" | "complexity";',
+        'Annotation-friendly diagnostics',
+        'gl-code-quality-report.json',
+        'warn-only / fallback',
         'unknowns: string[];',
         'diagnostics: DesignMappingDiagnostic[];',
         'readyForExecution: boolean;',
@@ -364,6 +540,9 @@ function validateDesignContractDocs(rootDir, failures) {
         'openQuestions: DesignHandoffTraceItem[];',
         'type DesignVerificationStatus =',
         'type DesignDriftKind =',
+        '"scan_mode": "diff"',
+        '"rule_type": "layer_direction"',
+        '"code": "hard-gate-window-exceeded"',
         'checklist: Array<{',
         'drift: Array<{',
         '"code": "handoff-missing"',
@@ -385,6 +564,11 @@ function validateDesignContractDocs(rootDir, failures) {
         'node dist/cli/index.js design map mycodemap.design.md --json',
         'node dist/cli/index.js design handoff mycodemap.design.md --json',
         'node dist/cli/index.js design verify mycodemap.design.md --json',
+        'node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10',
+        'node dist/cli/index.js check --contract mycodemap.design.md --against src --base origin/main --annotation-format github',
+        '--annotation-format gitlab --annotation-file gl-code-quality-report.json',
+        'changed files <= 10',
+        'warn-only / fallback',
         '`design validate → design map → design handoff → design verify`',
         '`workflow` 仍只保留 `find` / `read` / `link` / `show` 四阶段'
       ],
@@ -402,7 +586,8 @@ function validateDesignContractDocs(rootDir, failures) {
       'docs/ai-guide/PROMPTS.md design contract prompt',
       [
         'cp docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md mycodemap.design.md',
-        'node dist/cli/index.js design validate mycodemap.design.md --json'
+        'node dist/cli/index.js design validate mycodemap.design.md --json',
+        'node dist/cli/index.js check --contract mycodemap.design.md --against src'
       ],
       [],
       failures
@@ -418,6 +603,7 @@ function validateDesignContractDocs(rootDir, failures) {
         '`node dist/cli/index.js design map mycodemap.design.md --json`',
         '`node dist/cli/index.js design handoff mycodemap.design.md --json`',
         '`node dist/cli/index.js design verify mycodemap.design.md --json`',
+        '`node dist/cli/index.js check --contract mycodemap.design.md --against src`',
         '`candidates` / `unknowns` / `diagnostics`',
         '`readyForExecution` / `approvals` / `assumptions` / `openQuestions`',
         '`checklist` / `drift` / `diagnostics` / `readyForExecution`',
@@ -446,9 +632,11 @@ function validateDesignContractDocs(rootDir, failures) {
       'docs/rules/validation.md design verification baseline',
       [
         '`design validate` / `design map` / `design handoff` / `design verify`',
+        '`check --contract mycodemap.design.md --against src`',
         '`design validate → design map → design handoff → design verify`',
         'design verify mycodemap.design.md --json',
-        'review-needed 与 blocker 退出语义'
+        'review-needed 与 blocker 退出语义',
+        'github.event.pull_request.base.sha'
       ],
       [],
       failures
@@ -461,6 +649,27 @@ function validateDesignContractDocs(rootDir, failures) {
       'docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md',
       [
         '保存为 `mycodemap.design.md`',
+        'rules:',
+        'type: layer_direction',
+        '## Goal',
+        '## Constraints',
+        '## Acceptance Criteria',
+        '## Non-Goals'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (repoContract) {
+    validateSnippets(
+      repoContract,
+      'mycodemap.design.md repo-root contract',
+      [
+        'rules:',
+        'type: layer_direction',
+        'from: "src/core/**"',
+        'to: "src/cli/**"',
         '## Goal',
         '## Constraints',
         '## Acceptance Criteria',
@@ -771,6 +980,7 @@ function validatePluginRuntimeDocs(rootDir, failures) {
 function validateGraphStorageDocs(rootDir, failures) {
   const readme = readText(rootDir, 'README.md', failures);
   const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
+  const claudeGuide = readText(rootDir, 'CLAUDE.md', failures);
   const commandsGuide = readText(rootDir, 'docs/ai-guide/COMMANDS.md', failures);
   const quickstartGuide = readText(rootDir, 'docs/ai-guide/QUICKSTART.md', failures);
   const setupGuide = readText(rootDir, 'docs/SETUP_GUIDE.md', failures);
@@ -783,8 +993,9 @@ function validateGraphStorageDocs(rootDir, failures) {
       'README.md graph storage contract',
       [
         '"storage": {',
-        '| `storage.type` | `"filesystem" \\| "kuzudb" \\| "memory" \\| "auto"` | 图存储后端类型 | `"filesystem"` |',
-        '`neo4j` 已不再是正式支持的 backend；旧配置会返回显式迁移错误，不会静默 fallback 到 `filesystem`。',
+        '| `storage.type` | `"filesystem" \\| "sqlite" \\| "memory" \\| "auto"` | 图存储后端类型 | `"filesystem"` |',
+        '`neo4j` 与 `kuzudb` 已不再是正式支持的 backend；旧配置会返回显式迁移错误，不会静默 fallback 到 `filesystem`。',
+        '`storage.type = "auto"` 当前优先选择 `sqlite`；若运行时缺少 `better-sqlite3` 或 Node.js `<20` 导致 SQLite 不可用，则 warning 后回退到 `filesystem`。',
         '图存储后端生产化不等于重新开放公共 HTTP API 产品面；`Server Layer` 仍是内部架构层。'
       ],
       [],
@@ -799,7 +1010,22 @@ function validateGraphStorageDocs(rootDir, failures) {
       [
         '| "需要切换/排查图存储后端" | 编辑 `mycodemap.config.json.storage` → 运行 `generate` / `export` |',
         '`generate` 会写入配置的图存储后端；`export` 与内部 `Server Layer` handler 会读取同一份后端数据。',
-        '`neo4j` 已不再是正式支持的 backend；旧配置会暴露显式迁移错误，不会静默 fallback。'
+        '`neo4j` 与 `kuzudb` 已不再是正式支持的 backend；旧配置会暴露显式迁移错误，不会静默 fallback。',
+        '`storage.type = "auto"` 当前优先选择 `sqlite`；若运行时缺少 `better-sqlite3` 或 Node.js `<20` 导致 SQLite 不可用，则 warning 后回退到 `filesystem`。'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (claudeGuide) {
+    validateSnippets(
+      claudeGuide,
+      'CLAUDE.md graph storage contract',
+      [
+        '`storage.type` 正式支持 `filesystem` / `sqlite` / `memory` / `auto`。',
+        '`storage.type = "auto"` 当前优先选择 `sqlite`；仅当 `better-sqlite3` 不可用或 Node.js `<20` 时 warning 后回退 `filesystem`。',
+        '旧 `neo4j` / `kuzudb` 配置会返回显式迁移错误；显式 `sqlite` 但运行时不满足条件时返回 `SQLITE_NOT_AVAILABLE`。'
       ],
       [],
       failures
@@ -839,8 +1065,10 @@ function validateGraphStorageDocs(rootDir, failures) {
       'docs/SETUP_GUIDE.md graph storage contract',
       [
         '"storage": {',
-        '| `storage.type` | string | `"filesystem"` | 图存储后端类型：`filesystem` / `kuzudb` / `memory` / `auto` |',
-        '旧的 `neo4j` 配置已不再受支持，会返回显式迁移错误，不会静默 fallback 到 `filesystem`。'
+        '| `storage.type` | string | `"filesystem"` | 图存储后端类型：`filesystem` / `sqlite` / `memory` / `auto` |',
+        '旧的 `neo4j` / `kuzudb` 配置已不再受支持，会返回显式迁移错误，不会静默 fallback 到 `filesystem`。',
+        '显式选择 `sqlite` 且运行时缺少 `better-sqlite3` 或 Node.js `<20` 时，会返回显式错误。',
+        '`storage.type = "auto"` 当前优先选择 `sqlite`；仅当 SQLite 运行时不可用时才 warning 后回退到 `filesystem`。'
       ],
       [],
       failures
@@ -854,7 +1082,9 @@ function validateGraphStorageDocs(rootDir, failures) {
       [
         '若改动涉及 `mycodemap.config.json.storage` 或图数据库适配器',
         'schema / README / AI 文档没同步',
-        '旧的 `neo4j` 配置已经不受支持，但文档还把它写成正式 backend'
+        '旧的 `neo4j` / `kuzudb` 配置已经不受支持，但文档还把它写成正式 backend',
+        'Node.js `>=20`',
+        '`STORAGE_BACKEND_MIGRATED`、`SQLITE_NOT_AVAILABLE`'
       ],
       [],
       failures
@@ -867,7 +1097,7 @@ function validateGraphStorageDocs(rootDir, failures) {
       'mycodemap.config.schema.json storage contract',
       [
         '"storage"',
-        '"enum": ["filesystem", "kuzudb", "memory", "auto"]',
+        '"enum": ["filesystem", "sqlite", "memory", "auto"]',
         '"outputPath"',
         '"databasePath"',
         '"autoThresholds"'
@@ -1040,14 +1270,18 @@ function validateProductSpecsDocs(rootDir, failures) {
       [
         '# MVP3 架构对比：历史设计目标 vs v1.3 已落地基线',
         '`src/server/` 保留为**内部架构层**；公共 `server` 命令已移除',
-        '`filesystem` / `memory` / `kuzudb` / `auto` 为正式 surface；`neo4j` 已退出正式支持',
+        '`filesystem` / `memory` / `sqlite` / `auto` 为正式 surface；`neo4j` 与 `kuzudb` 已退出正式支持',
+        '当前优先选择 `sqlite`；仅当 SQLite 运行时不可用时 warning 后回退 `filesystem`',
+        '`sqlite` 需要 `better-sqlite3` + Node.js `>=20`；否则返回 `SQLITE_NOT_AVAILABLE`',
         '当前公开能力仅保留 analysis-only：`find → read → link → show`',
         'Java / Rust / C/C++ 等更多 parser 实现 | 接口预留，未作为当前 shipped reality |'
       ],
       [
         '# MVP3 架构对比：Before vs After',
         'cli/commands/viz.ts',
-        '支持 14 种语言'
+        '支持 14 种语言',
+        'Kùzu-only',
+        '当前仍保守落到 `filesystem`'
       ],
       failures
     );
@@ -1060,13 +1294,17 @@ function validateProductSpecsDocs(rootDir, failures) {
       [
         '# CodeMap MVP3 架构重构产品需求文档（PRD，v1.3 同步版）',
         '公共 CLI 不再暴露 `server`、`watch`、`report`、`logs`',
-        '| `neo4j` | removed | 不再是正式支持 backend；旧配置返回显式迁移错误 |',
+        '| `auto` | shipped surface | 配置面存在，当前优先选择 `sqlite`；SQLite 不可用时回退 `filesystem` |',
+        '| `neo4j` / `kuzudb` | removed | 不再是正式支持 backend；旧配置返回显式迁移错误 |',
+        '显式 `sqlite` 缺少 `better-sqlite3` 或 Node.js `<20` 时会返回 `SQLITE_NOT_AVAILABLE`',
         '`workflow` 是 **analysis-only** 能力，只编排 `find → read → link → show`',
         '| 公共 HTTP API / `mycodemap server` 产品面 | Deferred |'
       ],
       [
         '支持 14 种语言',
-        'neo4j | shipped'
+        'neo4j | shipped',
+        'Kùzu-only',
+        '当前仍保守落到 `filesystem`'
       ],
       failures
     );
@@ -1078,14 +1316,18 @@ function validateProductSpecsDocs(rootDir, failures) {
       'docs/product-specs/MVP3-ARCHITECTURE-REDESIGN-TECH-PRD.md technical baseline',
       [
         '# CodeMap MVP3 架构重构技术需求文档（Tech-PRD，v1.3 同步版）',
-        '`neo4j` 已不再是正式支持 backend。',
+        '`neo4j` 与 `kuzudb` 已不再是正式支持 backend。',
+        '显式选择 `sqlite` 且运行时缺少 `better-sqlite3` 或 Node.js `<20` 时，`StorageFactory` 会抛出 `SQLITE_NOT_AVAILABLE`',
         '`auto` 是稳定配置面',
+        '`auto` 会先探测 SQLite runtime，可用时返回 `sqlite`，不可用时 warning 后回退 `filesystem`',
         '但“按规模自动切到图数据库”的更强启发式仍是未来候选，而不是当前完成能力',
         '| analyze / refresh / incremental update 作为公共能力 | 明确返回 `501` unsupported |',
         '`workflow` 当前是 analysis-only 能力：'
       ],
       [
-        'TypeScriptParser, GoParser, PythonParser, ParserRegistry'
+        'TypeScriptParser, GoParser, PythonParser, ParserRegistry',
+        '当前仍保守返回 `filesystem`',
+        'Kùzu-native'
       ],
       failures
     );
@@ -1102,7 +1344,8 @@ function validateGuardrailDocs(rootDir, failures) {
   if (readme) {
     const requiredReadmeGuardrails = [
       'npm run docs:check',
-      'mycodemap ci check-docs-sync'
+      'mycodemap ci check-docs-sync',
+      'mycodemap check --contract mycodemap.design.md --against src'
     ];
 
     for (const snippet of requiredReadmeGuardrails) {
@@ -1126,12 +1369,24 @@ function validateGuardrailDocs(rootDir, failures) {
 
   if (validationRule) {
     expectIncludes(validationRule, 'npm run docs:check', 'docs/rules/validation.md', failures);
+    expectIncludes(validationRule, 'node dist/cli/index.js check --contract mycodemap.design.md --against src', 'docs/rules/validation.md', failures);
+    expectIncludes(validationRule, 'node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10', 'docs/rules/validation.md', failures);
+    expectIncludes(validationRule, '--annotation-format github', 'docs/rules/validation.md', failures);
+    expectIncludes(validationRule, 'changed files <= 10', 'docs/rules/validation.md', failures);
+    expectIncludes(validationRule, 'warn-only / fallback', 'docs/rules/validation.md', failures);
   }
 
   if (ciWorkflow) {
     expectIncludes(ciWorkflow, 'run: npm run docs:check', '.github/workflows/ci-gateway.yml', failures);
     expectIncludes(ciWorkflow, 'run: npm run typecheck', '.github/workflows/ci-gateway.yml', failures);
     expectIncludes(ciWorkflow, 'run: npm run build', '.github/workflows/ci-gateway.yml', failures);
+    expectIncludes(ciWorkflow, 'check --contract mycodemap.design.md --against src', '.github/workflows/ci-gateway.yml', failures);
+    expectIncludes(ciWorkflow, 'github.event.pull_request.base.sha', '.github/workflows/ci-gateway.yml', failures);
+    expectIncludes(ciWorkflow, 'scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10', '.github/workflows/ci-gateway.yml', failures);
+    expectIncludes(ciWorkflow, '--annotation-format github', '.github/workflows/ci-gateway.yml', failures);
+    expectIncludes(ciWorkflow, 'contract-gate-calibration.json', '.github/workflows/ci-gateway.yml', failures);
+    expectIncludes(ciWorkflow, 'contract-check-result.json', '.github/workflows/ci-gateway.yml', failures);
+    expectIncludes(ciWorkflow, 'warn-only / fallback', '.github/workflows/ci-gateway.yml', failures);
     expectIncludes(ciWorkflow, 'run: node dist/cli/index.js ci check-docs-sync', '.github/workflows/ci-gateway.yml', failures);
     expectIncludes(ciWorkflow, 'node dist/cli/index.js generate', '.github/workflows/ci-gateway.yml', failures);
   }
@@ -1184,6 +1439,7 @@ function validateDocs(rootDir) {
   validatePluginRuntimeDocs(rootDir, failures);
   validateGraphStorageDocs(rootDir, failures);
   validateAnalyzeDocs(rootDir, failures);
+  validateHistoryRiskDocs(rootDir, failures);
   validateDesignContractDocs(rootDir, failures);
   validateTestingDocs(rootDir, failures);
   validateWorkflowAndDiscoveryDocs(rootDir, failures);

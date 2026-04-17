@@ -47,9 +47,9 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["filesystem", "kuzudb", "memory", "auto"],
+          "enum": ["filesystem", "sqlite", "memory", "auto"],
           "default": "filesystem",
-          "description": "Storage backend type (Neo4j is no longer supported)"
+          "description": "Storage backend type (Neo4j and KùzuDB are no longer supported)"
         },
         "outputPath": {
           "type": "string",
@@ -58,7 +58,7 @@
         },
         "databasePath": {
           "type": "string",
-          "description": "KùzuDB database directory relative to project root"
+          "description": "SQLite database file path relative to project root"
         },
         "autoThresholds": {
           "type": "object",

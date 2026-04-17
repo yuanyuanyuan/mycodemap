@@ -14,6 +14,7 @@ const REQUIRED_FIXTURE_FILES = [
   'AI_GUIDE.md',
   'CLAUDE.md',
   'ARCHITECTURE.md',
+  'mycodemap.design.md',
   'mycodemap.config.schema.json',
   'docs/AI_ASSISTANT_SETUP.md',
   'docs/SETUP_GUIDE.md',
@@ -34,6 +35,8 @@ const REQUIRED_FIXTURE_FILES = [
   'docs/rules/engineering-with-codex-openai.md',
   'src/cli/index.ts',
   'src/cli/commands/design.ts',
+  'src/cli/commands/check.ts',
+  'src/cli/commands/history.ts',
   'src/cli/commands/analyze-options.ts',
   'vitest.config.ts',
   'vitest.benchmark.config.ts',
@@ -339,7 +342,7 @@ describe('validate-docs.js', () => {
 
     const readmePath = path.join(fixtureRoot, 'README.md');
     const updatedReadme = readFileSync(readmePath, 'utf8').replace(
-      '| `storage.type` | `"filesystem" \\| "kuzudb" \\| "memory" \\| "auto"` | 图存储后端类型 | `"filesystem"` |',
+      '| `storage.type` | `"filesystem" \\| "sqlite" \\| "memory" \\| "auto"` | 图存储后端类型 | `"filesystem"` |',
       '| `storage.kind` | `string` | 存储类型 | `"filesystem"` |'
     );
     writeFileSync(readmePath, updatedReadme);

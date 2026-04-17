@@ -63,6 +63,32 @@ function readText(filePath) {
   return readFileSync(absolutePath, 'utf8');
 }
 
+function collectSnippetFailures(
+  content,
+  requiredSnippets,
+  outdatedSnippets,
+) {
+  const snippetFailures = [];
+
+  if (!content) {
+    return snippetFailures;
+  }
+
+  for (const snippet of requiredSnippets) {
+    if (!content.includes(snippet)) {
+      snippetFailures.push(`missing required snippet: ${snippet}`);
+    }
+  }
+
+  for (const snippet of outdatedSnippets) {
+    if (content.includes(snippet)) {
+      snippetFailures.push(`contains outdated snippet: ${snippet}`);
+    }
+  }
+
+  return snippetFailures;
+}
+
 function checkRequiredDocs(failures) {
   console.log('Checking required AI documents...\n');
   
@@ -314,6 +340,199 @@ function checkAnalyzeContractConsistency(failures) {
   }
 }
 
+function checkStorageContractConsistency(failures) {
+  console.log('\nChecking storage contract consistency...\n');
+
+  const storageDocChecks = [
+    {
+      file: 'AI_GUIDE.md',
+      requiredSnippets: [
+        '`storage.type = "auto"` 当前优先选择 `sqlite`；若运行时缺少 `better-sqlite3` 或 Node.js `<20` 导致 SQLite 不可用，则 warning 后回退到 `filesystem`。'
+      ],
+      outdatedSnippets: [],
+    },
+    {
+      file: 'docs/ai-guide/COMMANDS.md',
+      requiredSnippets: [
+        '- `storage.type` 支持 `filesystem`、`sqlite`、`memory`、`auto`；默认是 `filesystem`。',
+        '- 旧的 `neo4j` / `kuzudb` 配置会直接报迁移错误；显式选择 `sqlite` 但运行时缺少 `better-sqlite3` 或 Node.js `<20` 时也会直接报错，不会静默 fallback 到 `filesystem`。',
+      ],
+      outdatedSnippets: [],
+    },
+    {
+      file: 'docs/ai-guide/PATTERNS.md',
+      requiredSnippets: [
+        '- 旧的 `neo4j` / `kuzudb` 配置现在应该直接报迁移错误；显式 `sqlite` 但运行时不满足条件时也应看到显式错误，而不是静默 fallback。',
+        '- `storage.type = "auto"` 当前优先落到 `sqlite`；只有 SQLite 不可用时才回退 `filesystem`，不要把阈值字段误读成更复杂的调度器。',
+      ],
+      outdatedSnippets: [],
+    },
+    {
+      file: 'docs/ai-guide/INTEGRATION.md',
+      requiredSnippets: [
+        '`UNSUPPORTED_STORAGE_TYPE` / `STORAGE_BACKEND_MIGRATED` / `SQLITE_NOT_AVAILABLE`',
+        '`better-sqlite3`',
+        'Node.js `>=20`',
+        'SQLite 不可用时会 warning 后回退 `filesystem`',
+      ],
+      outdatedSnippets: [
+        'KUZU_INIT_FAILED',
+        '安装 `kuzu`',
+      ],
+    },
+  ];
+
+  for (const { file, requiredSnippets, outdatedSnippets } of storageDocChecks) {
+    const content = readText(file);
+    if (!content) {
+      continue;
+    }
+
+    const docFailures = collectSnippetFailures(content, requiredSnippets, outdatedSnippets);
+    if (docFailures.length > 0) {
+      failures.push(`${file}: ${docFailures.join(', ')}`);
+      console.log(`  ❌ ${file}`);
+      for (const docFailure of docFailures) {
+        console.log(`      - ${docFailure}`);
+      }
+      continue;
+    }
+
+    console.log(`  ✅ ${file}`);
+  }
+}
+
+function checkHistoryRiskContractConsistency(failures) {
+  console.log('\nChecking history risk contract consistency...\n');
+
+  const historyRiskChecks = [
+    {
+      file: 'AI_GUIDE.md',
+      requiredSnippets: [
+        '`history --symbol <name>`',
+        '`check` / `ci assess-risk` / `history` 现在共用同一套 Git history risk truth；history unavailable 时会显式给出 `unavailable` / `confidence=low`',
+        'interface HistoryCommandResult {',
+      ],
+      outdatedSnippets: [],
+    },
+    {
+      file: 'docs/ai-guide/COMMANDS.md',
+      requiredSnippets: [
+        '## history - 符号级 Git history / risk 查询',
+        '`ci assess-risk` 现在输出 `status / confidence / freshness / source / score / level`',
+        'history 不可用，会显式给出 `unavailable` / warning',
+      ],
+      outdatedSnippets: [],
+    },
+    {
+      file: 'docs/ai-guide/OUTPUT.md',
+      requiredSnippets: [
+        'interface HistoryCommandResult {',
+        '"git-history-unsupported-intent"',
+        'Git history risk 是 additive enrichment：它补充 `history` 与 `violations[].risk`',
+      ],
+      outdatedSnippets: [],
+    },
+    {
+      file: 'docs/ai-guide/PATTERNS.md',
+      requiredSnippets: [
+        'node dist/cli/index.js history --symbol createCheckCommand',
+        '`ci assess-risk`、`check`、`history` 共用同一套 Git history risk truth',
+      ],
+      outdatedSnippets: [],
+    },
+  ];
+
+  for (const { file, requiredSnippets, outdatedSnippets } of historyRiskChecks) {
+    const content = readText(file);
+    if (!content) {
+      continue;
+    }
+
+    const docFailures = collectSnippetFailures(content, requiredSnippets, outdatedSnippets);
+    if (docFailures.length > 0) {
+      failures.push(`${file}: ${docFailures.join(', ')}`);
+      console.log(`  ❌ ${file}`);
+      for (const docFailure of docFailures) {
+        console.log(`      - ${docFailure}`);
+      }
+      continue;
+    }
+
+    console.log(`  ✅ ${file}`);
+  }
+}
+
+function checkContractGateAnnotationConsistency(failures) {
+  console.log('\nChecking contract gate annotation consistency...\n');
+
+  const contractGateChecks = [
+    {
+      file: 'AI_GUIDE.md',
+      requiredSnippets: [
+        '--annotation-format github',
+        'node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10',
+        'changed files <= 10',
+        'warn-only / fallback',
+      ],
+      outdatedSnippets: [],
+    },
+    {
+      file: 'docs/ai-guide/COMMANDS.md',
+      requiredSnippets: [
+        '--annotation-format github',
+        '--annotation-format gitlab --annotation-file gl-code-quality-report.json',
+        'changed files <= 10',
+        'false-positive rate >10%',
+        'warn-only / fallback',
+      ],
+      outdatedSnippets: [],
+    },
+    {
+      file: 'docs/ai-guide/OUTPUT.md',
+      requiredSnippets: [
+        'details?: Record<string, string | number | boolean | null>;',
+        'diagnostic?: {',
+        'scope: "line" | "file" | "general";',
+        'Annotation-friendly diagnostics',
+        'gl-code-quality-report.json',
+        'warn-only / fallback',
+      ],
+      outdatedSnippets: [],
+    },
+    {
+      file: 'docs/ai-guide/PATTERNS.md',
+      requiredSnippets: [
+        'node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10',
+        '--annotation-format github',
+        '--annotation-format gitlab --annotation-file gl-code-quality-report.json',
+        'changed files <= 10',
+        'warn-only / fallback',
+      ],
+      outdatedSnippets: [],
+    },
+  ];
+
+  for (const { file, requiredSnippets, outdatedSnippets } of contractGateChecks) {
+    const content = readText(file);
+    if (!content) {
+      continue;
+    }
+
+    const docFailures = collectSnippetFailures(content, requiredSnippets, outdatedSnippets);
+    if (docFailures.length > 0) {
+      failures.push(`${file}: ${docFailures.join(', ')}`);
+      console.log(`  ❌ ${file}`);
+      for (const docFailure of docFailures) {
+        console.log(`      - ${docFailure}`);
+      }
+      continue;
+    }
+
+    console.log(`  ✅ ${file}`);
+  }
+}
+
 function validateAIDocs() {
   console.log('========================================');
   console.log('AI Documentation Guardrails Check');
@@ -327,6 +546,9 @@ function validateAIDocs() {
   checkPromptsLibrary(failures);
   checkDecisionTrees(failures);
   checkAnalyzeContractConsistency(failures);
+  checkStorageContractConsistency(failures);
+  checkHistoryRiskContractConsistency(failures);
+  checkContractGateAnnotationConsistency(failures);
   
   console.log('\n========================================');
   

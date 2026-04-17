@@ -41,6 +41,162 @@ jobs:
       - name: Build CLI
         run: npm run build
 
+      - name: Calibrate contract gate (pull request)
+        if: github.event_name == 'pull_request'
+        id: contract_gate_calibration
+        run: |
+          set +e
+          node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10 > contract-gate-calibration.json
+          status=$?
+          if [ ! -s contract-gate-calibration.json ]; then
+            cat <<'JSON' > contract-gate-calibration.json
+          {"ok":false,"thresholds":{"maxChangedFiles":10,"maxFalsePositiveRate":0.1},"summary":{"recommendation":"warn-only"},"warnings":{"windowScope":[],"fallbackScope":[]},"cases":[],"failures":["calibration command did not produce JSON output"]}
+          JSON
+          fi
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Summarize contract gate calibration (pull request)
+        if: github.event_name == 'pull_request'
+        id: contract_gate_mode
+        run: |
+          node - <<'NODE'
+          const { appendFileSync, readFileSync } = require('node:fs');
+
+          const calibration = JSON.parse(readFileSync('contract-gate-calibration.json', 'utf8'));
+          const recommendation = calibration.summary?.recommendation ?? 'warn-only';
+          const maxChangedFiles = calibration.thresholds?.maxChangedFiles ?? 10;
+          const hardGateEnabled = calibration.ok === true && recommendation === 'hard-gate-ok';
+          const lines = [
+            '## Contract gate calibration',
+            `- ok: ${String(calibration.ok)}`,
+            `- recommendation: ${recommendation}`,
+            `- changed files <= ${maxChangedFiles}: ${hardGateEnabled ? 'hard-gate enabled' : 'warn-only / fallback'}`,
+          ];
+
+          for (const failure of calibration.failures ?? []) {
+            lines.push(`- failure: ${failure}`);
+          }
+
+          console.log(lines.join('\n'));
+
+          if (process.env.GITHUB_STEP_SUMMARY) {
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
+          }
+
+          if (process.env.GITHUB_OUTPUT) {
+            appendFileSync(
+              process.env.GITHUB_OUTPUT,
+              `hard_gate_enabled=${hardGateEnabled}\nrecommendation=${recommendation}\nmax_changed_files=${maxChangedFiles}\n`,
+            );
+          }
+          NODE
+
+      - name: Run contract check JSON (pull request)
+        if: github.event_name == 'pull_request'
+        id: contract_check_pr
+        run: |
+          set +e
+          node dist/cli/index.js check --contract mycodemap.design.md --against src --base "${{ github.event.pull_request.base.sha }}" > contract-check-result.json
+          status=$?
+          if [ ! -s contract-check-result.json ]; then
+            cat <<'JSON' > contract-check-result.json
+          {"passed":false,"scan_mode":"full","contract_path":"mycodemap.design.md","against_path":"src","changed_files":[],"scanned_files":[],"warnings":[{"code":"check-command-failed","message":"contract check did not produce JSON output"}],"violations":[],"summary":{"total_violations":0,"error_count":0,"warn_count":0,"scanned_file_count":0,"rule_count":0}}
+          JSON
+          fi
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Render contract check annotations (pull request)
+        if: github.event_name == 'pull_request'
+        run: |
+          set +e
+          node dist/cli/index.js check --contract mycodemap.design.md --against src --base "${{ github.event.pull_request.base.sha }}" --annotation-format github
+          exit 0
+
+      - name: Enforce calibrated contract gate (pull request)
+        if: github.event_name == 'pull_request'
+        run: |
+          node - <<'NODE'
+          const { appendFileSync, readFileSync } = require('node:fs');
+
+          const calibration = JSON.parse(readFileSync('contract-gate-calibration.json', 'utf8'));
+          const result = JSON.parse(readFileSync('contract-check-result.json', 'utf8'));
+          const warningCodes = (result.warnings ?? []).map((warning) => warning.code);
+          const fallbackWarningCodes = ['hard-gate-window-exceeded', 'diff-scope-fallback'];
+          const fallbackTriggered = fallbackWarningCodes.some((code) => warningCodes.includes(code));
+          const toolFailed = warningCodes.includes('check-command-failed');
+          const recommendation = calibration.summary?.recommendation ?? 'warn-only';
+          const hardGateEligible = calibration.ok === true && recommendation === 'hard-gate-ok';
+          const hardGateActive = hardGateEligible && !fallbackTriggered;
+          const lines = [
+            '## Contract gate result',
+            `- mode: ${hardGateActive ? 'calibrated hard-gate' : 'warn-only / fallback'}`,
+            `- recommendation: ${recommendation}`,
+            `- scan mode: ${result.scan_mode}`,
+            `- passed: ${String(result.passed)}`,
+            `- violations: ${result.summary?.total_violations ?? 0}`,
+            `- warnings: ${warningCodes.length > 0 ? warningCodes.join(', ') : 'none'}`,
+          ];
+
+          console.log(lines.join('\n'));
+          if (process.env.GITHUB_STEP_SUMMARY) {
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
+          }
+
+          if (toolFailed) {
+            console.error('Contract check failed before producing canonical JSON output.');
+            process.exit(1);
+          }
+
+          if (hardGateActive && result.passed !== true) {
+            console.error('Contract gate is within the calibrated hard-gate window and found blocking violations.');
+            process.exit(1);
+          }
+
+          if (!hardGateActive && result.passed !== true) {
+            console.log('Contract check found violations, but CI stays warn-only / fallback because this run is outside the calibrated hard-gate window.');
+          }
+          NODE
+
+      - name: Run contract check (push full scan warn-only)
+        if: github.event_name != 'pull_request'
+        run: |
+          set +e
+          node dist/cli/index.js check --contract mycodemap.design.md --against src > contract-check-push.json
+          status=$?
+          if [ ! -s contract-check-push.json ]; then
+            cat <<'JSON' > contract-check-push.json
+          {"passed":false,"scan_mode":"full","contract_path":"mycodemap.design.md","against_path":"src","changed_files":[],"scanned_files":[],"warnings":[{"code":"check-command-failed","message":"contract check did not produce JSON output"}],"violations":[],"summary":{"total_violations":0,"error_count":0,"warn_count":0,"scanned_file_count":0,"rule_count":0}}
+          JSON
+          fi
+          CONTRACT_CHECK_PUSH_EXIT_CODE="$status" node - <<'NODE'
+          const { appendFileSync, readFileSync } = require('node:fs');
+
+          const result = JSON.parse(readFileSync('contract-check-push.json', 'utf8'));
+          const warningCodes = (result.warnings ?? []).map((warning) => warning.code);
+          const lines = [
+            '## Contract gate result (push)',
+            '- mode: warn-only / fallback',
+            '- reason: push path runs full scan, not calibrated diff hard-gate',
+            `- contract check exit code: ${process.env.CONTRACT_CHECK_PUSH_EXIT_CODE ?? 'n/a'}`,
+            `- passed: ${String(result.passed)}`,
+            `- warnings: ${warningCodes.length > 0 ? warningCodes.join(', ') : 'none'}`,
+            `- violations: ${result.summary?.total_violations ?? 0}`,
+          ];
+
+          console.log(lines.join('\n'));
+          if (process.env.GITHUB_STEP_SUMMARY) {
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
+          }
+
+          if (warningCodes.includes('check-command-failed')) {
+            console.error('Contract check failed before producing canonical JSON output.');
+            process.exit(1);
+          }
+          NODE
+          exit 0
+
       - name: Check docs sync via CLI (guardrail + analyze blocks)
         run: node dist/cli/index.js ci check-docs-sync
 
