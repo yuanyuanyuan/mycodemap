@@ -195,17 +195,8 @@ function validateAnalyzeDocs(rootDir, failures) {
     failures
   );
 
-  validateSnippets(
-    claudeGuide,
-    'CLAUDE.md analyze retrieval guidance',
-    [
-      'node dist/cli/index.js analyze -i <find|read|link|show>'
-    ],
-    [
-      'node dist/cli/index.js analyze <intent>'
-    ],
-    failures
-  );
+  // NOTE: CLAUDE.md 已演进为执行手册（路由层），analyze 命令指南已移至 AI_GUIDE.md / docs/ai-guide/
+  // 相关检查已下放至 AI_GUIDE.md 与 docs/ai-guide/*.md 的 validateSnippets 中
 
   validateSnippets(
     engineeringGuide,
@@ -283,19 +274,8 @@ function validateHistoryRiskDocs(rootDir, failures) {
     );
   }
 
-  if (claudeGuide) {
-    validateSnippets(
-      claudeGuide,
-      'CLAUDE.md history risk baseline',
-      [
-        'node dist/cli/index.js history --symbol <name>',
-        '`analyze --include-git-history` 当前仅在 `read` intent 上生效；其余 intent 会显式 warning，不再 silent noop。',
-        'CLI 应返回 `unavailable` / `confidence=low` / warning，而不是伪装成 `low risk`'
-      ],
-      [],
-      failures
-    );
-  }
+  // NOTE: CLAUDE.md 已演进为执行手册（路由层），history 风险基线已移至 AI_GUIDE.md / docs/ai-guide/
+  // 相关检查已下放至 AI_GUIDE.md 与 docs/ai-guide/*.md 的 validateSnippets 中
 
   if (commandsGuide) {
     validateSnippets(
@@ -457,26 +437,8 @@ function validateDesignContractDocs(rootDir, failures) {
     );
   }
 
-  if (claudeGuide) {
-    validateSnippets(
-      claudeGuide,
-      'CLAUDE.md design retrieval guidance',
-      [
-        'node dist/cli/index.js design validate [file] --json',
-        'node dist/cli/index.js design map [file] --json',
-        'node dist/cli/index.js design handoff [file] --json',
-        'node dist/cli/index.js design verify [file] --json',
-        'node dist/cli/index.js check --contract mycodemap.design.md --against src',
-        '--annotation-format github|gitlab',
-        'node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10',
-        'changed files <= 10',
-        'warn-only / fallback',
-        'false-positive rate >10%'
-      ],
-      [],
-      failures
-    );
-  }
+  // NOTE: CLAUDE.md 已演进为执行手册（路由层），design 检索指南已移至 AI_GUIDE.md / docs/ai-guide/
+  // 相关检查已下放至 AI_GUIDE.md 与 docs/ai-guide/*.md 的 validateSnippets 中
 
   if (commandsGuide) {
     validateSnippets(
@@ -1018,19 +980,8 @@ function validateGraphStorageDocs(rootDir, failures) {
     );
   }
 
-  if (claudeGuide) {
-    validateSnippets(
-      claudeGuide,
-      'CLAUDE.md graph storage contract',
-      [
-        '`storage.type` 正式支持 `filesystem` / `sqlite` / `memory` / `auto`。',
-        '`storage.type = "auto"` 当前优先选择 `sqlite`；仅当 `better-sqlite3` 不可用或 Node.js `<20` 时 warning 后回退 `filesystem`。',
-        '旧 `neo4j` / `kuzudb` 配置会返回显式迁移错误；显式 `sqlite` 但运行时不满足条件时返回 `SQLITE_NOT_AVAILABLE`。'
-      ],
-      [],
-      failures
-    );
-  }
+  // NOTE: CLAUDE.md 已演进为执行手册（路由层），graph storage 合约已移至 AI_GUIDE.md / docs/ai-guide/
+  // 相关检查已下放至 AI_GUIDE.md 与 docs/ai-guide/*.md 的 validateSnippets 中
 
   if (commandsGuide) {
     validateSnippets(

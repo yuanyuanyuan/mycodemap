@@ -220,7 +220,7 @@ function checkCrossReferences(failures) {
   // CLAUDE.md 必须链接到 AI 文档
   const claude = readText('CLAUDE.md');
   if (claude) {
-    if (!claude.includes('AI_GUIDE.md') || !claude.includes('docs/ai-guide/')) {
+    if (!claude.includes('AI_GUIDE.md')) {
       failures.push('CLAUDE.md must reference AI docs');
       console.log('  ❌ CLAUDE.md missing AI docs references');
     } else {
@@ -333,6 +333,65 @@ function checkAnalyzeContractConsistency(failures) {
       failures.push(`${file} contains outdated analyze intents: ${uniqueMatches.join(' | ')}`);
       console.log(`  ❌ ${file}`);
       uniqueMatches.forEach(match => console.log(`      - outdated: ${match}`));
+      continue;
+    }
+
+    console.log(`  ✅ ${file}`);
+  }
+}
+
+function checkPhase25DogfoodContractConsistency(failures) {
+  console.log('\nChecking Phase 25 dogfood contract consistency...\n');
+
+  const phase25Checks = [
+    {
+      file: 'AI_GUIDE.md',
+      requiredSnippets: [
+        'query -S "XXX" -j',
+        'partialFailure',
+        '`rtk` 不是 CodeMap 产品功能',
+      ],
+      outdatedSnippets: [],
+    },
+    {
+      file: 'docs/ai-guide/COMMANDS.md',
+      requiredSnippets: [
+        'mycodemap analyze -i find -k "SourceLocation" --json --structured',
+        'mycodemap complexity -f "src/cli/index.ts" -j',
+        'mycodemap ci assess-risk --files "changed.ts" --json',
+        'mycodemap workflow start "inspect analyze find" --json',
+        'JSON 默认包含 `passed` 与 `summary`',
+        '`workflow` 只保留 `find → read → link → show` 四个分析阶段',
+      ],
+      outdatedSnippets: [
+        '`workflow` 同时包含 analyze、实现、CI、ship 等多个阶段',
+      ],
+    },
+    {
+      file: 'docs/ai-guide/OUTPUT.md',
+      requiredSnippets: [
+        'interface AnalyzeDiagnostics',
+        '"partialFailure"',
+        'diagnostics.status = "success"',
+        'diagnostics.status = "failure"',
+      ],
+      outdatedSnippets: [],
+    },
+  ];
+
+  for (const { file, requiredSnippets, outdatedSnippets } of phase25Checks) {
+    const content = readText(file);
+    if (!content) {
+      continue;
+    }
+
+    const docFailures = collectSnippetFailures(content, requiredSnippets, outdatedSnippets);
+    if (docFailures.length > 0) {
+      failures.push(`${file}: ${docFailures.join(', ')}`);
+      console.log(`  ❌ ${file}`);
+      for (const docFailure of docFailures) {
+        console.log(`      - ${docFailure}`);
+      }
       continue;
     }
 
@@ -546,6 +605,7 @@ function validateAIDocs() {
   checkPromptsLibrary(failures);
   checkDecisionTrees(failures);
   checkAnalyzeContractConsistency(failures);
+  checkPhase25DogfoodContractConsistency(failures);
   checkStorageContractConsistency(failures);
   checkHistoryRiskContractConsistency(failures);
   checkContractGateAnnotationConsistency(failures);
