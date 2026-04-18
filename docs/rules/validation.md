@@ -99,6 +99,13 @@ npm run build
 npm run validate-pack
 ```
 
+## Rule Control QA
+
+| 命令 | 目的 |
+|---|---|
+| `bash scripts/qa-rule-control.sh --scenario all` | 一键覆盖 capability、P0/P1/unavailable、disabled soft gate、rule-context、CI backstop 七个场景 |
+| `python3 -m unittest scripts/tests/test_rule_control_workflow.py` | 锁住 helper scope、workflow `<rule_context>` 注入和 CI backstop 文本契约 |
+
 ## 强约束
 
 - 没有验证，不得声称“已解决”。
