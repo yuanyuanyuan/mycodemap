@@ -92,6 +92,7 @@ function renderCommandsAnalyzeIntentExamples() {
       title: '1. find - 查找符号 / 文本',
       commands: [
         'mycodemap analyze -i find -k "UnifiedResult"',
+        'mycodemap analyze -i find -k "SourceLocation" --json --structured',
         'mycodemap analyze -i find -t "src/orchestrator" -k "IntentRouter" --topK 20',
       ],
     },
