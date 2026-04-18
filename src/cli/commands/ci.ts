@@ -66,6 +66,19 @@ export interface CIGateCheckResult {
   branch?: string;
 }
 
+export interface AssessRiskCommandOutput {
+  status: 'passed' | 'failed' | 'skipped';
+  files: string[];
+  threshold: number;
+  risk: {
+    level: string;
+    score: number | null;
+    factors: string[];
+  };
+  diagnostics: FileHistoryAnalysisResult['diagnostics'];
+  message: string;
+}
+
 function extractCommandError(error: unknown): string {
   if (!error || typeof error !== 'object') {
     return String(error);
@@ -501,13 +514,23 @@ async function checkHeadersAction(options: { directory?: string; files?: string 
 /**
  * assess-risk 子命令 - 评估危险置信度
  */
-async function assessRiskAction(options: { files?: string; threshold?: string }): Promise<void> {
+async function assessRiskAction(options: { files?: string; threshold?: string; json?: boolean }): Promise<void> {
   const threshold = parseFloat(options.threshold ?? '0.7');
   const changedFiles = await getChangedFiles(options);
   const assessment = await assessHistoryRisk({
     files: changedFiles,
     threshold,
   });
+
+  if (options.json) {
+    const output = buildAssessRiskCommandOutput(assessment);
+    console.log(JSON.stringify(output, null, 2));
+
+    if (output.status === 'failed') {
+      process.exitCode = 1;
+    }
+    return;
+  }
 
   if (assessment.files.length === 0) {
     console.log('No changed TypeScript source files detected.');
@@ -544,6 +567,56 @@ async function assessRiskAction(options: { files?: string; threshold?: string })
   }
 
   console.log('Risk assessment passed.');
+}
+
+function buildAssessRiskCommandOutput(assessment: AssessHistoryRiskResult): AssessRiskCommandOutput {
+  const score = assessment.result.aggregatedRisk.score;
+  const riskScoreExceeded = typeof score === 'number' && score > assessment.threshold;
+
+  if (assessment.files.length === 0) {
+    return {
+      status: 'skipped',
+      files: assessment.files,
+      threshold: assessment.threshold,
+      risk: {
+        level: assessment.result.aggregatedRisk.level,
+        score,
+        factors: assessment.result.aggregatedRisk.riskFactors,
+      },
+      diagnostics: assessment.result.diagnostics,
+      message: 'No changed TypeScript source files detected.',
+    };
+  }
+
+  if (riskScoreExceeded) {
+    return {
+      status: 'failed',
+      files: assessment.files,
+      threshold: assessment.threshold,
+      risk: {
+        level: assessment.result.aggregatedRisk.level,
+        score,
+        factors: assessment.result.aggregatedRisk.riskFactors,
+      },
+      diagnostics: assessment.result.diagnostics,
+      message: `Risk score ${score.toFixed(2)} exceeds threshold ${assessment.threshold.toFixed(2)}.`,
+    };
+  }
+
+  return {
+    status: 'passed',
+    files: assessment.files,
+    threshold: assessment.threshold,
+    risk: {
+      level: assessment.result.aggregatedRisk.level,
+      score,
+      factors: assessment.result.aggregatedRisk.riskFactors,
+    },
+    diagnostics: assessment.result.diagnostics,
+    message: score == null
+      ? 'Risk assessment passed with unavailable history signals; threshold was not applied.'
+      : 'Risk assessment passed.',
+  };
 }
 
 function isHistoryRiskCandidateFile(file: string): boolean {
@@ -893,6 +966,7 @@ export function createCICommand(): Command {
     .description('评估代码变更的危险置信度')
     .option('-f, --files <files>', '逗号分隔的变更文件列表')
     .option('-t, --threshold <number>', '风险阈值 (0-1)', '0.7')
+    .option('-j, --json', 'JSON 格式输出')
     .action(assessRiskAction);
 
   ci

@@ -110,6 +110,7 @@ mycodemap impact -f "src/cli/index.ts" -j   # JSON 输出
 ```bash
 mycodemap complexity                        # 项目整体
 mycodemap complexity -f "src/cli/index.ts"  # 指定文件
+mycodemap complexity -f "src/cli/index.ts" -j  # 单文件 JSON，顶层返回 file
 mycodemap complexity -d                     # 函数级详情
 mycodemap complexity -j                     # JSON 输出
 ```
@@ -120,6 +121,8 @@ mycodemap complexity -j                     # JSON 输出
 | `-d, --detail` | 函数级详情 | - |
 | `-j, --json` | JSON 格式输出 | - |
 | `--structured` | 纯结构化输出 | - |
+
+> `complexity -f "src/file.ts" -j` 的 JSON 顶层只返回 `file`；不会返回全项目 `modules` 数组。
 
 ---
 
@@ -148,10 +151,13 @@ mycodemap cycles -j                         # JSON 输出
 | 输出契约 | 多数命令显式 `--json`，`analyze` 额外提供 `--output-mode machine|human` | `--structured --json` 会移除自然语言 `content` |
 | analyze 意图 | `find` / `read` / `link` / `show` | legacy alias 会在输出中返回 `warnings[]`；`refactor` 直接报 `E0001_INVALID_INTENT` |
 
+> 通用搜索仍优先使用 `query -S "XXX" -j`。需要统一 analyze schema 时使用 `analyze -i find -k "XXX" --json --structured`，并读取 stdout JSON 的 `diagnostics.status` 区分真实 0 命中、`partialFailure` 降级与 `failure`。
+
 <!-- BEGIN GENERATED: analyze-commands-intents -->
 ```bash
 # 1. find - 查找符号 / 文本
 mycodemap analyze -i find -k "UnifiedResult"
+mycodemap analyze -i find -k "SourceLocation" --json --structured
 mycodemap analyze -i find -t "src/orchestrator" -k "IntentRouter" --topK 20
 
 # 2. read - 阅读文件（影响 + 复杂度）
@@ -313,6 +319,7 @@ node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-posi
 ```
 
 - 默认输出 `ContractCheckResult` JSON；`--human` 只改变渲染，不改变底层 truth
+- JSON 默认包含 `passed` 与 `summary`，Agent 不需要解析 prose 判断通过状态
 - `severity:error` 返回非零退出码，`severity:warn` 不阻断
 - diff-aware 只在显式提供 `--base` 或 `--changed-files` 时启用
 - 坏掉的 diff base 或越界 changed files 会回退 full scan，并把原因写进 `warnings[]`
@@ -354,6 +361,7 @@ mycodemap ci check-headers -f "file1.ts,file2.ts"
 mycodemap ci assess-risk
 mycodemap ci assess-risk -t 0.5             # 设置阈值 0.5
 mycodemap ci assess-risk -f "changed.ts"
+mycodemap ci assess-risk --files "changed.ts" --json
 
 # 验证文档同步
 mycodemap ci check-docs-sync
@@ -373,6 +381,7 @@ mycodemap ci check-commit-size -m 15
 > `ship` 的 CHECK 阶段会复用 `ci check-working-tree`、`ci check-branch`、`ci check-scripts` 这三条发布前 gate checks。
 > `ci check-branch --allow` 支持 `*` 通配；`ci check-headers -d` 与 `generate` / `analyze` 共享同一套 `.gitignore` 感知排除规则，在没有 `.gitignore` 时回退到默认 `exclude`。
 > `ci assess-risk` 现在输出 `status / confidence / freshness / source / score / level`；若 Git history 不可用，会显式给出 `unavailable` / warning，并说明阈值未被应用。
+> `ci assess-risk --json` 顶层输出 `status: "passed" | "failed" | "skipped"`；`failed` 会设置非零 exit code，但 stdout 保持可解析 JSON。
 
 ---
 
@@ -415,6 +424,7 @@ mycodemap history --symbol createCheckCommand --human
 # 启动工作流
 mycodemap workflow start "实现用户认证模块"
 mycodemap workflow start "修复登录接口" --template bugfix
+mycodemap workflow start "inspect analyze find" --json
 
 # 查看状态
 mycodemap workflow status
@@ -439,6 +449,8 @@ mycodemap workflow delete "workflow-id"
 mycodemap workflow resume
 mycodemap workflow resume "workflow-id"
 ```
+
+> `workflow start --json` 输出 `{ status, task, id, currentPhase, template, nextSteps }`，不改变 workflow 的 analysis-only 边界。
 
 ### 模板管理
 

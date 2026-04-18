@@ -52,6 +52,10 @@
   - `node dist/cli/index.js check --contract mycodemap.design.md --against src` 的 JSON / `--human` / exit code 语义与文档一致；
   - `node dist/cli/index.js analyze --help` 与文档示例一致；
   - `find` / `read` / `link` / `show` 中受影响的 public intent 可以在当前仓库运行；
+  - `analyze -i find -k <keyword> --json --structured` 的 stdout JSON 必须包含 `diagnostics.status`，可区分 true zero-hit、`partialFailure` 与 `failure`；
+  - `complexity -f <file> --json` 必须只返回目标 `file`，不得返回全项目 `modules`；
+  - `ci assess-risk --json` 必须输出 `status: passed | failed | skipped`，且 failed path 保持 stdout JSON 可解析；
+  - `workflow start "<task>" --json` 必须输出纯 JSON，但 workflow 边界仍限于 `find → read → link → show` analysis-only 阶段；
   - 若文档保留 legacy alias 说明，真实输出仍会返回 `warnings[]`；
   - 若涉及机器输出，`--json` 与 `--structured --json` 仍保持纯 JSON 契约。
 - 修改 `README.md`、`AI_GUIDE.md`、`docs/ai-guide/OUTPUT.md`、`ARCHITECTURE.md` 这类入口文档时，必须明确区分“目标产品基线”和“当前 CLI 现实”，尤其是 `Server Layer` / `mycodemap server` 的命名边界。

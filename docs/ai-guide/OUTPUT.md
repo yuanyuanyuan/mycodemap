@@ -211,12 +211,29 @@ interface AnalyzeOutput {
   };
   results: AnalyzeResult[];
   warnings?: AnalyzeWarning[];
+  diagnostics?: AnalyzeDiagnostics;
   analysis?: ReadAnalysis | LinkAnalysis | ShowAnalysis;
   metadata: {
     total: number;
     scope: "direct" | "transitive";
     resultCount: number;
   };
+}
+
+interface AnalyzeDiagnostics {
+  status: "success" | "partialFailure" | "failure";
+  items: AnalyzeDiagnostic[];
+  failedTools?: string[];
+  degradedTools?: string[];
+}
+
+interface AnalyzeDiagnostic {
+  code: string;
+  severity: "info" | "warning" | "error";
+  message: string;
+  source: string;
+  recoverable: boolean;
+  details?: Record<string, unknown>;
 }
 
 interface AnalyzeWarning {
@@ -331,6 +348,13 @@ interface ShowAnalysis {
   }>;
 }
 ```
+
+### analyze find failure semantics
+
+- `diagnostics.status = "success"` 且 `results=[]`：扫描链路可信完成，表示真实 0 命中。
+- `diagnostics.status = "partialFailure"`：主扫描退化，但配置感知 fallback 已返回可用结果；读取 `degradedTools[]` 和 `items[]`。
+- `diagnostics.status = "failure"`：主扫描与 fallback 都失败，不能把 `results=[]` 当作“代码不存在”；JSON/machine 模式会设置非零 exit code。
+- 通用查找默认仍推荐 `query -S "XXX" -j`；`analyze -i find -k "XXX" --json --structured` 用于需要统一 analyze schema 与 diagnostics 的 Agent 流程。
 
 ### 纯结构化输出 (--structured --json)
 

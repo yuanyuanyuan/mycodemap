@@ -496,7 +496,7 @@ describe('UnifiedResult 接口 (R6.1)', () => {
   });
 
   it('应支持所有 source 类型', () => {
-    const sources: UnifiedResult['source'][] = ['codemap', 'ast-grep', 'rg-internal', 'ai-feed'];
+    const sources: UnifiedResult['source'][] = ['codemap', 'ast-grep', 'rg-internal', 'ai-feed', 'codemap-fallback'];
     
     for (const source of sources) {
       const result = createMockUnifiedResult({ source });

@@ -375,3 +375,61 @@ rtk --version         # 验证 rtk 已安装
 - 若需对内置工具的输出做 token 优化，应改用对应的 `rtk` 命令（如 `rtk read`、`rtk grep`、`rtk find`）。
 
 @RTK.md
+
+
+<claude-mem-context>
+# Memory Context
+
+# [codemap] recent context, 2026-04-18 7:19pm GMT+8
+
+Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision
+Format: ID TIME TYPE TITLE
+Fetch details: get_observations([IDs]) | Search: mem-search skill
+
+Stats: 26 obs (8,907t read) | 1,247,410t work | 99% savings
+
+### Apr 18, 2026
+3 6:14p 🔵 Primary session awaiting input after sandbox blockage
+4 6:15p 🔵 QueryHandler.ts implements four core analysis methods
+5 " 🔵 SQLiteStorage adapter implements callers, callees, and impact primitives
+6 " 🔵 QueryHandler tests assert storage-mode parity for impact analysis
+7 " ⚖️ 规则控制系统重构计划制定完成
+8 6:18p 🔵 bwrap 沙箱完全阻断所有文件和命令执行
+10 6:22p ⚖️ 设计文档重写为两速路线，大幅缩小首期范围
+11 6:26p 🔵 plan-eng-review skill audits existing code reuse surfaces
+17 " 🔵 MCP TypeScript SDK stdio transport confirmed for local child-process integrations
+19 6:33p ⚖️ User rejected scope reduction for thin-slice implementation
+20 6:41p 🔵 MCP commands planned as experimental public surface in design doc
+23 6:42p 🔵 Design document defines two-speed roadmap with explicit deferred scope ledger
+27 6:45p 🔵 Symbol-level callers/callees query infrastructure already exists in codebase
+28 6:48p 🔵 SQLite schema already contains most of Tranche 1 proposed fields
+33 6:49p 🔵 Domain Symbol and Dependency types need extension for Tranche 1 schema changes
+34 6:52p 🔵 Existing server layer is HTTP-based Hono server with Query/Analysis handlers
+35 6:53p ⚖️ Rule control system plan revised to 6-phase incremental approach
+36 6:55p 🔵 CodeGraphBuilder creates only module-level dependencies, ignores callGraph data
+37 " 🔵 Sandbox execution blocked by bwrap RTM_NEWADDR permission denial
+41 7:01p 🔵 MCP stdio transport requires stderr for all server logging
+**45** 7:03p 🔵 **Native MCP server implementation is absent despite documentation references**
+The primary session investigated the gap between documented and implemented MCP support. While the AI guide presents an "MCP integration" section to users, it actually describes wrapping existing CLI commands as external tools rather than implementing a native MCP stdio server. A comprehensive grep across the entire codebase confirmed that codemap_query, codemap_impact, mcp start, and mcp install exist only in documentation and design documents, with no actual TypeScript server implementation, tool handlers, or CLI command registration in src/cli or src/cli-new. This establishes the implementation baseline: the MCP server must be built from scratch rather than extended from existing code.
+~385t 🔍 47,510
+
+46 " 🔵 SmartParser and SQLiteStorage already validate symbol-level call graph extraction and querying
+**47** 7:06p 🔵 **Existing server and CLI already define error code patterns matching MCP design**
+The primary session searched the codebase for error code patterns relevant to the MCP server design and discovered that many of the proposed error semantics already have precedent in the existing code. The HTTP server layer (CodeMapServer.ts) returns structured errors with 'NOT_FOUND' and 'INTERNAL_ERROR' codes. The AnalysisHandler uses UnsupportedAnalysisOperationError to signal unsupported operations with an explicit statusCode. The CLI and history-risk service already classify query results into 'ok', 'ambiguous', 'not_found', and 'unavailable' statuses. This means the MCP tool error contract can be modeled consistently with existing conventions rather than inventing a new taxonomy.
+~364t 🔍 62,655
+
+**52** 7:11p 🔵 **Graph traversal algorithms in graph-helpers.ts operate at module level for impact analysis**
+The primary session read the shared graph-helpers.ts file that underpins all storage backends. The impact analysis algorithm performs a breadth-first search using a queue, but it traverses module-level dependency edges (targetId → sourceId) rather than symbol-level call edges. In contrast, findCallersInGraph and findCalleesInGraph do operate at symbol granularity by filtering dependencies with type === 'call' and resolving matched IDs against the symbols array. Cycle detection uses recursive DFS with visited/inStack tracking at the module level. All helpers return cloned objects via spread operators to maintain immutability. This establishes that the MCP server can reuse findCallers/findCallees for symbol queries directly, but impact analysis for symbols would require either a new symbol-level BFS variant or adapting the existing module-level algorithm.
+~413t 🔍 86,270
+
+**53** 7:14p ⚖️ **Engineering review locks 12 architecture decisions for first-phase MCP implementation**
+The primary session completed the engineering review of the symbol-level graph + MCP design and wrote the conclusions back to the design document. Twelve decisions were locked, covering parser authority (smart-parser only), experimental MCP surface designation, schema minimalism, transport isolation, and documentation hierarchy. The review also established a failure modes table mapping each new path to its real failure mode, test coverage requirement, error handling requirement, and criticality rating. Two gaps were rated critical: parser failure isolation (to prevent silent edge loss) and stdout protocol purity (to prevent JSON-RPC corruption). The test coverage diagram shows that while existing parser, SQLite, and QueryHandler tests provide baseline coverage, the new symbol materializer, generate --symbol-level, MCP stdio transport, and error contracts all require new tests.
+~501t ⚖️ 91,865
+
+**55** 7:15p ✅ **Engineering review completed with test plan artifact written**
+The primary session completed the engineering review phase and produced two durable artifacts. First, the design document was updated with twelve locked architectural decisions covering parser authority, experimental surface designation, schema minimalism, transport isolation, documentation hierarchy, and test requirements. The document now explicitly lists what is NOT in scope (incremental generation, hook install, community algorithms, HTTP MCP, export --symbol-level, eager cache) and what already exists (smart-parser callGraph, SQLite findCallers/findCallees, QueryHandler read semantics, governance cache patterns). Second, a standalone test plan artifact was written to the gstack projects directory, containing affected pages/routes, key interactions to verify, edge cases, and critical end-to-end paths. This test plan is formatted for consumption by downstream QA skills.
+~404t 🛠️ 96,142
+
+
+Access 1247k tokens of past work via get_observations([IDs]) or mem-search skill.
+</claude-mem-context>

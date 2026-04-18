@@ -52,10 +52,10 @@ cat .mycodemap/AI_MAP.md
 | "XXX 模块依赖什么" | `deps -m "XXX" -j` |
 | "代码质量如何" | `complexity -f "src/file.ts" -j` |
 | "查找与 XXX 相关的代码" | `query -S "XXX" -j` |
-| "这个改动安全吗" | `ci assess-risk` |
+| "这个改动安全吗" | `ci assess-risk --json` |
 | "这个符号最近为什么危险 / 谁改过" | `history --symbol <name>` |
 | "发布前是否满足门禁" | `ci check-working-tree → ci check-branch → ci check-scripts` |
-| "需要执行复杂的多步骤分析" | `workflow start "任务描述"` |
+| "需要执行复杂的多步骤分析" | `workflow start "任务描述" --json` |
 | "需要验证文档/契约是否同步" | `ci check-docs-sync`（含 analyze generated block 校验） |
 | "需要先把人类设计写成可验证输入" | `design validate mycodemap.design.md --json` |
 | "需要把 design contract 映射成代码范围" | `design map mycodemap.design.md --json` |
@@ -68,6 +68,8 @@ cat .mycodemap/AI_MAP.md
 | "需要切换/排查图存储后端" | 编辑 `mycodemap.config.json.storage` → 运行 `generate` / `export` |
 
 **完整决策树**: 见 [docs/ai-guide/QUICKSTART.md](./docs/ai-guide/QUICKSTART.md)
+
+> 运行环境提示：仓库内 Agent shell 可能使用 `rtk` 作为 token 节省 wrapper；`rtk` 不是 CodeMap 产品功能、CLI 依赖或用户可见能力。
 
 ---
 
@@ -205,6 +207,8 @@ node dist/cli/index.js check --contract mycodemap.design.md --against src
 - `design verify` 会输出 `checklist`、`drift`、`diagnostics` 与 `readyForExecution`
 - `check` 会输出 `ContractCheckResult`，默认 JSON，`severity:error` 返回非零退出码
 - `check` / `ci assess-risk` / `history` 现在共用同一套 Git history risk truth；history unavailable 时会显式给出 `unavailable` / `confidence=low`，而不是伪装成低风险
+- 通用代码查找默认仍推荐 `query -S "XXX" -j`；`analyze -i find -k "XXX" --json --structured` 适合需要统一 analyze schema 的 Agent 流程
+- `analyze find` 如果 scanner degraded，会在 stdout JSON 的 `diagnostics.status` 暴露 `partialFailure` 或 `failure`，不要只看 `results=[]`
 - 失败时返回结构化 diagnostics，供后续 handoff / mapping 流程阻断使用
 
 ---
@@ -218,6 +222,7 @@ interface AnalyzeOutput {
   intent: "find" | "read" | "link" | "show";
   tool: string;
   confidence: { score: number; level: "high" | "medium" | "low"; };
+  diagnostics?: AnalyzeDiagnostics;
   warnings?: Array<{
     code:
       | "deprecated-intent"
@@ -242,6 +247,21 @@ interface AnalyzeOutput {
       };
     };
   }>;
+}
+
+interface AnalyzeDiagnostics {
+  status: "success" | "partialFailure" | "failure";
+  items: AnalyzeDiagnostic[];
+  failedTools?: string[];
+  degradedTools?: string[];
+}
+
+interface AnalyzeDiagnostic {
+  code: string;
+  severity: "info" | "warning" | "error";
+  message: string;
+  source: string;
+  recoverable: boolean;
 }
 
 interface DesignValidateOutput {

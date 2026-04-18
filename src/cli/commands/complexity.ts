@@ -588,6 +588,11 @@ export async function complexityCommand(options: ComplexityOptions) {
         complexity: astComplexity
       });
       targetModule = undefined; // 使用 allComplexities 输出
+    } else {
+      allComplexities.push({
+        module: targetModule,
+        complexity: getModuleComplexity(targetModule)
+      });
     }
   } else {
     // 计算所有模块的复杂度

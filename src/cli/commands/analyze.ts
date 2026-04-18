@@ -23,6 +23,8 @@ import {
   type Confidence,
   type CodemapIntent,
   type AnalyzeWarning,
+  type AnalyzeDiagnostic,
+  type AnalyzeDiagnostics,
   type IntentCompatibility,
   type ReadAnalysis,
   type LinkAnalysis,
@@ -39,6 +41,8 @@ import { CodemapAdapter } from '../../orchestrator/adapters/codemap-adapter.js';
 import { AstGrepAdapter } from '../../orchestrator/adapters/ast-grep-adapter.js';
 import { IntentRouter } from '../../orchestrator/intent-router.js';
 import { resolveDataPath, resolveOutputDir } from '../paths.js';
+import { discoverProjectFiles } from '../../core/file-discovery.js';
+import { loadCodemapConfig } from '../config-loader.js';
 
 /**
  * 错误码定义
@@ -186,13 +190,39 @@ export class AnalyzeCommand {
    */
   private async executeFindWithFallback(intentObj: CodemapIntent, topK: number): Promise<CodemapOutput> {
     try {
+      const orchestratedOutput = await this.executeWithOrchestrator(intentObj, topK);
+
+      if (orchestratedOutput.results.length > 0) {
+        return this.withCompatibility(
+          this.withDiagnostics(orchestratedOutput, this.createSuccessDiagnostics()),
+          intentObj.compatibility
+        );
+      }
+
+      try {
+        await this.executeFind(intentObj, topK, { failOnScanError: true });
+      } catch (scanError) {
+        return this.withCompatibility(
+          await this.executeConfigAwareTextFallback(intentObj, topK, scanError, undefined),
+          intentObj.compatibility
+        );
+      }
+
       return this.withCompatibility(
-        await this.executeWithOrchestrator(intentObj, topK),
+        this.withDiagnostics(orchestratedOutput, this.createSuccessDiagnostics()),
         intentObj.compatibility
       );
-    } catch {
+    } catch (orchestratorError) {
       console.warn('[Analyze] Orchestrator not available, falling back to AstGrep search');
-      return this.executeFind(intentObj, topK);
+
+      try {
+        return await this.executeFind(intentObj, topK, { failOnScanError: true });
+      } catch (scanError) {
+        return this.withCompatibility(
+          await this.executeConfigAwareTextFallback(intentObj, topK, scanError, orchestratorError),
+          intentObj.compatibility
+        );
+      }
     }
   }
 
@@ -204,7 +234,7 @@ export class AnalyzeCommand {
 
     // 注册适配器
     const codemapAdapter = new CodemapAdapter({ codemapPath: resolveOutputDir().outputDir });
-    const astGrepAdapter = new AstGrepAdapter();
+    const astGrepAdapter = new AstGrepAdapter({ includeTests: this.args.includeTests ?? true });
     orchestrator.registerAdapter(codemapAdapter);
     orchestrator.registerAdapter(astGrepAdapter);
 
@@ -301,9 +331,16 @@ export class AnalyzeCommand {
   /**
    * find fallback
    */
-  private async executeFind(intentObj: CodemapIntent, topK: number): Promise<CodemapOutput> {
+  private async executeFind(
+    intentObj: CodemapIntent,
+    topK: number,
+    options: { failOnScanError?: boolean } = {}
+  ): Promise<CodemapOutput> {
     const searchTerms = intentObj.keywords.length > 0 ? intentObj.keywords : intentObj.targets;
-    const adapter = new AstGrepAdapter({ includeTests: this.args.includeTests ?? true });
+    const adapter = new AstGrepAdapter({
+      includeTests: this.args.includeTests ?? true,
+      failOnScanError: options.failOnScanError ?? false
+    });
     const rawResults = await adapter.execute(searchTerms, {
       topK,
       includeTests: this.args.includeTests,
@@ -318,12 +355,322 @@ export class AnalyzeCommand {
       tool: 'ast-grep-find',
       confidence,
       results,
+      diagnostics: this.createSuccessDiagnostics(),
       metadata: {
         total: results.length,
         resultCount: results.length,
         scope: intentObj.scope
       }
     }, intentObj.compatibility);
+  }
+
+  private async executeConfigAwareTextFallback(
+    intentObj: CodemapIntent,
+    topK: number,
+    scanError: unknown,
+    orchestratorError: unknown
+  ): Promise<CodemapOutput> {
+    try {
+      const results = await this.runConfigAwareTextFallback(intentObj, topK);
+      const diagnostics = this.createPartialFailureDiagnostics(scanError, orchestratorError);
+
+      return {
+        schemaVersion: 'v1.0.0',
+        intent: 'find',
+        tool: 'codemap-find-fallback',
+        confidence: this.buildConfidence(results.length > 0 ? 0.65 : 0),
+        results,
+        diagnostics,
+        metadata: {
+          total: results.length,
+          resultCount: results.length,
+          scope: intentObj.scope
+        }
+      };
+    } catch (fallbackError) {
+      if (this.isMachineOutputMode()) {
+        process.exitCode = 1;
+      }
+
+      return {
+        schemaVersion: 'v1.0.0',
+        intent: 'find',
+        tool: 'codemap-find-fallback',
+        confidence: this.buildConfidence(0),
+        results: [],
+        diagnostics: this.createFailureDiagnostics(scanError, fallbackError, orchestratorError),
+        metadata: {
+          total: 0,
+          resultCount: 0,
+          scope: intentObj.scope
+        }
+      };
+    }
+  }
+
+  private async runConfigAwareTextFallback(
+    intentObj: CodemapIntent,
+    topK: number
+  ): Promise<UnifiedResult[]> {
+    const { config } = await loadCodemapConfig(process.cwd());
+    const discoveredFiles = await discoverProjectFiles({
+      rootDir: process.cwd(),
+      include: config.include,
+      exclude: config.exclude,
+      absolute: true,
+      gitignore: true
+    });
+    const { files, searchTerms, explicitPathMode } = this.resolveFallbackSearchScope(discoveredFiles, intentObj);
+    const results: UnifiedResult[] = [];
+
+    for (const file of files) {
+      const fileResults = await this.searchFileWithFallback(file, searchTerms, topK - results.length);
+      results.push(...fileResults);
+
+      if (results.length >= topK) {
+        return results.slice(0, topK);
+      }
+    }
+
+    if (explicitPathMode && intentObj.keywords.length === 0 && results.length === 0) {
+      const anchoredResults = await this.createExplicitPathFallbackResults(files, searchTerms, topK);
+      results.push(...anchoredResults);
+    }
+
+    return results.slice(0, topK);
+  }
+
+  private resolveFallbackSearchScope(
+    discoveredFiles: string[],
+    intentObj: CodemapIntent
+  ): { files: string[]; searchTerms: string[]; explicitPathMode: boolean } {
+    const explicitPathTargets = intentObj.targets.filter(target => this.isPathLikeTarget(target));
+    const matchedTargetFiles = this.matchDiscoveredTargetFiles(discoveredFiles, explicitPathTargets);
+
+    if (matchedTargetFiles.length > 0) {
+      const pathTerms = explicitPathTargets.flatMap(target => {
+        const basename = path.basename(target);
+        return [basename, this.stripModuleExtension(basename)];
+      });
+      return {
+        files: matchedTargetFiles,
+        searchTerms: this.uniqueNonEmptyStrings(intentObj.keywords.length > 0 ? intentObj.keywords : pathTerms),
+        explicitPathMode: true
+      };
+    }
+
+    return {
+      files: discoveredFiles,
+      searchTerms: this.uniqueNonEmptyStrings(intentObj.keywords.length > 0 ? intentObj.keywords : intentObj.targets),
+      explicitPathMode: false
+    };
+  }
+
+  private async searchFileWithFallback(
+    file: string,
+    searchTerms: string[],
+    remainingSlots: number
+  ): Promise<UnifiedResult[]> {
+    if (remainingSlots <= 0 || searchTerms.length === 0) {
+      return [];
+    }
+
+    const content = await readFile(file, 'utf-8');
+    const lines = content.split(/\r?\n/);
+    const results: UnifiedResult[] = [];
+
+    for (const [index, line] of lines.entries()) {
+      const matchedTerms = searchTerms.filter(term => line.includes(term));
+      if (matchedTerms.length === 0) {
+        continue;
+      }
+
+      const relativeFile = this.toProjectRelativePath(file);
+      const lineNumber = index + 1;
+      results.push(this.createFallbackResult(relativeFile, lineNumber, line, matchedTerms));
+
+      if (results.length >= remainingSlots) {
+        break;
+      }
+    }
+
+    return results;
+  }
+
+  private async createExplicitPathFallbackResults(
+    files: string[],
+    searchTerms: string[],
+    topK: number
+  ): Promise<UnifiedResult[]> {
+    const results: UnifiedResult[] = [];
+
+    for (const file of files) {
+      const content = await readFile(file, 'utf-8');
+      const firstLine = content.split(/\r?\n/, 1)[0] ?? '';
+      const relativeFile = this.toProjectRelativePath(file);
+      results.push(this.createFallbackResult(
+        relativeFile,
+        1,
+        firstLine || `Matched file path ${relativeFile}`,
+        searchTerms
+      ));
+
+      if (results.length >= topK) {
+        break;
+      }
+    }
+
+    return results;
+  }
+
+  private createFallbackResult(
+    relativeFile: string,
+    lineNumber: number,
+    content: string,
+    keywords: string[]
+  ): UnifiedResult {
+    return {
+      id: `codemap-fallback:${relativeFile}:${lineNumber}`,
+      source: 'codemap-fallback',
+      toolScore: 0.65,
+      type: 'code',
+      file: relativeFile,
+      line: lineNumber,
+      location: {
+        file: relativeFile,
+        line: lineNumber,
+        column: 1
+      },
+      content: content.substring(0, 200),
+      relevance: 0.65,
+      keywords,
+      metadata: {
+        stability: true,
+        riskLevel: 'low'
+      }
+    };
+  }
+
+  private matchDiscoveredTargetFiles(discoveredFiles: string[], targets: string[]): string[] {
+    const normalizedTargets = new Set(targets.flatMap(target => {
+      const absoluteTarget = path.resolve(process.cwd(), target);
+      return [
+        this.toPosixPath(absoluteTarget),
+        this.toPosixPath(path.relative(process.cwd(), absoluteTarget)),
+        this.toPosixPath(target)
+      ];
+    }));
+
+    return discoveredFiles.filter(file => {
+      const absoluteFile = path.resolve(file);
+      const relativeFile = path.relative(process.cwd(), absoluteFile);
+      return normalizedTargets.has(this.toPosixPath(absoluteFile))
+        || normalizedTargets.has(this.toPosixPath(relativeFile));
+    });
+  }
+
+  private isPathLikeTarget(target: string): boolean {
+    return target.includes('/') || target.includes('\\') || /\.[cm]?[jt]sx?$/i.test(target);
+  }
+
+  private uniqueNonEmptyStrings(values: string[]): string[] {
+    return Array.from(new Set(values.map(value => value.trim()).filter(Boolean)));
+  }
+
+  private toProjectRelativePath(file: string): string {
+    return this.toPosixPath(path.relative(process.cwd(), path.resolve(file)));
+  }
+
+  private toPosixPath(filePath: string): string {
+    return filePath.replace(/\\/g, '/');
+  }
+
+  private withDiagnostics(output: CodemapOutput, diagnostics: AnalyzeDiagnostics): CodemapOutput {
+    return {
+      ...output,
+      diagnostics
+    };
+  }
+
+  private createSuccessDiagnostics(): AnalyzeDiagnostics {
+    return {
+      status: 'success',
+      items: []
+    };
+  }
+
+  private createPartialFailureDiagnostics(
+    scanError: unknown,
+    orchestratorError: unknown
+  ): AnalyzeDiagnostics {
+    return {
+      status: 'partialFailure',
+      items: [
+        this.createDiagnostic(
+          'find-scanner-degraded',
+          'warning',
+          `find 主扫描退化，已使用配置感知文本 fallback: ${this.errorMessage(scanError)}`,
+          'ast-grep',
+          true,
+          { orchestratorError: this.errorMessage(orchestratorError) }
+        )
+      ],
+      degradedTools: ['ast-grep']
+    };
+  }
+
+  private createFailureDiagnostics(
+    scanError: unknown,
+    fallbackError: unknown,
+    orchestratorError: unknown
+  ): AnalyzeDiagnostics {
+    return {
+      status: 'failure',
+      items: [
+        this.createDiagnostic(
+          'find-scanner-failed',
+          'error',
+          `find 主扫描失败: ${this.errorMessage(scanError)}`,
+          'ast-grep',
+          false,
+          { orchestratorError: this.errorMessage(orchestratorError) }
+        ),
+        this.createDiagnostic(
+          'find-fallback-failed',
+          'error',
+          `配置感知文本 fallback 失败: ${this.errorMessage(fallbackError)}`,
+          'codemap-find-fallback',
+          false
+        )
+      ],
+      failedTools: ['ast-grep', 'codemap-find-fallback']
+    };
+  }
+
+  private createDiagnostic(
+    code: string,
+    severity: AnalyzeDiagnostic['severity'],
+    message: string,
+    source: string,
+    recoverable: boolean,
+    details?: Record<string, unknown>
+  ): AnalyzeDiagnostic {
+    return {
+      code,
+      severity,
+      message,
+      source,
+      recoverable,
+      ...(details ? { details } : {})
+    };
+  }
+
+  private errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+  }
+
+  private isMachineOutputMode(): boolean {
+    return this.args.json === true || this.args.structured === true || this.args.outputMode === 'machine';
   }
 
   /**

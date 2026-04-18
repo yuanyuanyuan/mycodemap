@@ -170,6 +170,36 @@ describe('Workflow CLI', () => {
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('wf-123'));
     });
 
+    it('should output parseable JSON when starting with --json', async () => {
+      const mockOrchestrator = vi.mocked(WorkflowOrchestrator);
+      const mockStart = vi.fn().mockResolvedValue({
+        id: 'wf-json-123',
+        currentPhase: 'discovery',
+      });
+      mockOrchestrator.mockImplementation(() => ({
+        start: mockStart,
+      } as unknown as InstanceType<typeof WorkflowOrchestrator>));
+
+      await workflowCommand.parseAsync(['node', 'workflow', 'start', 'refactor analyze', '--json']);
+
+      expect(consoleLogSpy).toHaveBeenCalledTimes(1);
+      const outputText = String(consoleLogSpy.mock.calls[0]?.[0]);
+      const output = JSON.parse(outputText) as {
+        status: string;
+        id: string;
+        currentPhase: string;
+        template: { recommended: string | null };
+        nextSteps: string[];
+      };
+
+      expect(output.status).toBe('started');
+      expect(output.id).toBe('wf-json-123');
+      expect(output.currentPhase).toBe('discovery');
+      expect(output.template.recommended).toBeTruthy();
+      expect(output.nextSteps).toContain('codemap workflow status');
+      expect(outputText).not.toContain('[WORKFLOW STARTED]');
+    });
+
     it('should handle workflow creation failure', async () => {
       const mockOrchestrator = vi.mocked(WorkflowOrchestrator);
       mockOrchestrator.mockImplementation(() => ({

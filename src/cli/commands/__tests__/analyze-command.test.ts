@@ -5,6 +5,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import type { CodeMap, ModuleInfo } from '../../../interface/types/index.js';
 import type { CodemapOutput, UnifiedResult } from '../../../orchestrator/types.js';
 import { ANALYZE_HELP_EXAMPLES, getAnalyzeHelpText } from '../analyze-options.js';
@@ -15,6 +16,8 @@ const mockComplexityRunEnhanced = vi.fn<() => Promise<UnifiedResult[]>>();
 const mockResolveTestFile = vi.fn<() => Promise<string | null>>();
 const mockExecuteWithFallback = vi.fn();
 const mockAstGrepExecute = vi.fn();
+const mockLoadCodemapConfig = vi.fn();
+const mockDiscoverProjectFiles = vi.fn();
 
 vi.mock('chalk', () => ({
   default: {
@@ -29,6 +32,14 @@ vi.mock('chalk', () => ({
 
 vi.mock('node:fs/promises', () => ({
   readFile: vi.fn(),
+}));
+
+vi.mock('../../config-loader.js', () => ({
+  loadCodemapConfig: (...args: unknown[]) => mockLoadCodemapConfig(...args),
+}));
+
+vi.mock('../../../core/file-discovery.js', () => ({
+  discoverProjectFiles: (...args: unknown[]) => mockDiscoverProjectFiles(...args),
 }));
 
 vi.mock('../impact.js', () => ({
@@ -173,6 +184,7 @@ describe('Analyze CLI Command', () => {
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockExitCode = undefined;
+    process.exitCode = undefined;
     originalArgv = [...process.argv];
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number | string | null) => {
       mockExitCode = typeof code === 'number' ? code : 1;
@@ -211,6 +223,13 @@ describe('Analyze CLI Command', () => {
         level: 'high',
       },
     });
+    mockLoadCodemapConfig.mockResolvedValue({
+      config: {
+        include: ['src/**/*.ts'],
+        exclude: ['dist/**'],
+      },
+    });
+    mockDiscoverProjectFiles.mockResolvedValue([path.join(process.cwd(), 'src/interface/types.ts')]);
     vi.mocked(readFile).mockRejectedValue(new Error('ENOENT'));
   });
 
@@ -270,6 +289,7 @@ describe('Analyze CLI Command', () => {
 
     expect(output.intent).toBe('find');
     expect(output.tool).toBe('codemap-orchestrated');
+    expect(output.diagnostics?.status).toBe('success');
     expect(output.results[0]?.file).toBe('src/interface/types.ts');
     expect(output.results[0]?.location).toEqual({
       file: 'src/interface/types.ts',
@@ -291,7 +311,115 @@ describe('Analyze CLI Command', () => {
     );
     expect(output.intent).toBe('find');
     expect(output.tool).toBe('ast-grep-find');
+    expect(output.diagnostics?.status).toBe('success');
     expect(output.results[0]?.file).toBe('src/interface/types.ts');
+  });
+
+  it('scanner failure 后有文本 fallback 命中时输出 partialFailure diagnostics', async () => {
+    mockExecuteWithFallback.mockResolvedValueOnce({
+      results: [],
+      confidence: {
+        score: 0,
+        level: 'low',
+      },
+    });
+    mockAstGrepExecute.mockRejectedValueOnce(new Error('ast-grep scan failed'));
+    mockDiscoverProjectFiles.mockResolvedValueOnce([path.join(process.cwd(), 'src/interface/types.ts')]);
+    vi.mocked(readFile).mockResolvedValueOnce('export interface SourceLocation {\n  line: number;\n}');
+
+    const output = await new AnalyzeCommand({
+      intent: 'find',
+      keywords: ['SourceLocation'],
+      json: true,
+      structured: true,
+    }).execute() as CodemapOutput;
+
+    expect(output.tool).toBe('codemap-find-fallback');
+    expect(output.diagnostics?.status).toBe('partialFailure');
+    expect(output.diagnostics?.degradedTools).toContain('ast-grep');
+    expect(output.results[0]?.source).toBe('codemap-fallback');
+    expect(output.results[0]?.file).toBe('src/interface/types.ts');
+  });
+
+  it('scanner 与 fallback 都失败时输出 failure diagnostics 并设置 machine exitCode', async () => {
+    mockExecuteWithFallback.mockResolvedValueOnce({
+      results: [],
+      confidence: {
+        score: 0,
+        level: 'low',
+      },
+    });
+    mockAstGrepExecute.mockRejectedValueOnce(new Error('ast-grep scan failed'));
+    mockDiscoverProjectFiles.mockRejectedValueOnce(new Error('discovery failed'));
+
+    const output = await new AnalyzeCommand({
+      intent: 'find',
+      keywords: ['SourceLocation'],
+      json: true,
+      structured: true,
+    }).execute() as CodemapOutput;
+
+    expect(output.tool).toBe('codemap-find-fallback');
+    expect(output.confidence.score).toBe(0);
+    expect(output.results).toEqual([]);
+    expect(output.diagnostics?.status).toBe('failure');
+    expect(output.diagnostics?.failedTools).toEqual(['ast-grep', 'codemap-find-fallback']);
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('scanner 成功但真实 0 命中时输出 success diagnostics', async () => {
+    mockExecuteWithFallback.mockResolvedValueOnce({
+      results: [],
+      confidence: {
+        score: 0,
+        level: 'low',
+      },
+    });
+    mockAstGrepExecute.mockResolvedValueOnce([]);
+
+    const output = await new AnalyzeCommand({
+      intent: 'find',
+      keywords: ['DefinitelyMissingSymbol'],
+      json: true,
+      structured: true,
+    }).execute() as CodemapOutput;
+
+    expect(output.tool).toBe('codemap-orchestrated');
+    expect(output.results).toEqual([]);
+    expect(output.diagnostics?.status).toBe('success');
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('显式文件路径输入在 scanner 失败时按 path anchor fallback', async () => {
+    mockExecuteWithFallback.mockResolvedValueOnce({
+      results: [],
+      confidence: {
+        score: 0,
+        level: 'low',
+      },
+    });
+    mockAstGrepExecute.mockRejectedValueOnce(new Error('ast-grep scan failed'));
+    mockDiscoverProjectFiles.mockResolvedValueOnce([
+      path.join(process.cwd(), 'src/interface/types.ts'),
+      path.join(process.cwd(), 'src/cli/index.ts'),
+    ]);
+    vi.mocked(readFile)
+      .mockResolvedValueOnce('export interface SourceLocation {\n  line: number;\n}')
+      .mockResolvedValueOnce('export interface SourceLocation {\n  line: number;\n}');
+
+    const output = await new AnalyzeCommand({
+      intent: 'find',
+      targets: ['src/interface/types.ts'],
+      json: true,
+      structured: true,
+    }).execute() as CodemapOutput;
+
+    expect(output.tool).toBe('codemap-find-fallback');
+    expect(output.diagnostics?.status).toBe('partialFailure');
+    expect(output.results).toHaveLength(1);
+    expect(output.results[0]?.file).toBe('src/interface/types.ts');
+    expect(readFile).toHaveBeenCalledTimes(2);
+    expect(readFile).toHaveBeenCalledWith(path.join(process.cwd(), 'src/interface/types.ts'), 'utf-8');
   });
 
   it('覆盖 public read intent', async () => {

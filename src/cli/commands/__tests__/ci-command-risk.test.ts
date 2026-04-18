@@ -40,6 +40,7 @@ describe('ci assess-risk', () => {
     consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockExitCode = undefined;
+    process.exitCode = undefined;
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number | string | null) => {
       mockExitCode = typeof code === 'number' ? code : 1;
       throw new Error(`process.exit:${code ?? 0}`);
@@ -249,5 +250,149 @@ describe('ci assess-risk', () => {
     const output = consoleLogSpy.mock.calls.map((call) => String(call[0])).join('\n');
     expect(output).toContain('score=unavailable');
     expect(output).toContain('Risk assessment passed with unavailable history signals; threshold was not applied.');
+  });
+
+  it('JSON skipped path 输出 status=skipped', async () => {
+    await command.parseAsync([
+      'node',
+      'ci',
+      'assess-risk',
+      '--files',
+      'src/types.d.ts',
+      '--json',
+    ]);
+
+    const output = JSON.parse(String(consoleLogSpy.mock.calls[0]?.[0])) as {
+      status: string;
+      message: string;
+      risk: { score: number | null };
+    };
+    expect(output.status).toBe('skipped');
+    expect(output.message).toBe('No changed TypeScript source files detected.');
+    expect(output.risk.score).toBeNull();
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('JSON failed path 输出 status=failed 并设置 exitCode', async () => {
+    mockAnalyzeFiles.mockResolvedValue({
+      requestedFiles: ['src/cli/index.ts'],
+      files: [],
+      aggregatedRisk: {
+        level: 'high',
+        score: 0.91,
+        gravity: 0.8,
+        heat: {
+          freq30d: 9,
+          lastType: 'BUGFIX',
+          lastDate: '2026-04-15T00:00:00.000Z',
+          stability: false,
+        },
+        impact: 0.9,
+        riskFactors: ['rollback-heavy'],
+      },
+      diagnostics: {
+        status: 'ok',
+        confidence: 'high',
+        freshness: 'fresh',
+        source: 'git-live',
+        reasons: ['canonical history risk service completed live materialization'],
+        analyzedAt: '2026-04-15T00:00:00.000Z',
+        scopeMode: 'full',
+        requestedFiles: 1,
+        analyzedFiles: 1,
+        requiresPrecompute: false,
+      },
+    });
+
+    await command.parseAsync([
+      'node',
+      'ci',
+      'assess-risk',
+      '--files',
+      'src/cli/index.ts',
+      '--threshold',
+      '0.7',
+      '--json',
+    ]);
+
+    const output = JSON.parse(String(consoleLogSpy.mock.calls[0]?.[0])) as {
+      status: string;
+      risk: { score: number | null };
+    };
+    expect(output.status).toBe('failed');
+    expect(output.risk.score).toBe(0.91);
+    expect(process.exitCode).toBe(1);
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+  });
+
+  it('JSON passed path 输出 status=passed', async () => {
+    mockAnalyzeFiles.mockResolvedValue({
+      requestedFiles: ['src/cli/index.ts'],
+      files: [{
+        file: 'src/cli/index.ts',
+        risk: {
+          level: 'medium',
+          score: 0.54,
+          gravity: 0.4,
+          heat: null,
+          impact: 0.7,
+          riskFactors: ['recent bugfixes'],
+        },
+        timeline: [],
+        diagnostics: {
+          status: 'ok',
+          confidence: 'high',
+          freshness: 'fresh',
+          source: 'git-live',
+          reasons: ['git history materialized from live repository'],
+          analyzedAt: '2026-04-15T00:00:00.000Z',
+          scopeMode: 'full',
+          requestedFiles: 1,
+          analyzedFiles: 1,
+          requiresPrecompute: false,
+        },
+      }],
+      aggregatedRisk: {
+        level: 'medium',
+        score: 0.54,
+        gravity: 0.4,
+        heat: null,
+        impact: 0.7,
+        riskFactors: ['recent bugfixes'],
+      },
+      diagnostics: {
+        status: 'ok',
+        confidence: 'high',
+        freshness: 'fresh',
+        source: 'git-live',
+        reasons: ['canonical history risk service completed live materialization'],
+        analyzedAt: '2026-04-15T00:00:00.000Z',
+        scopeMode: 'full',
+        requestedFiles: 1,
+        analyzedFiles: 1,
+        requiresPrecompute: false,
+      },
+    });
+
+    await command.parseAsync([
+      'node',
+      'ci',
+      'assess-risk',
+      '--files',
+      'src/cli/index.ts',
+      '--threshold',
+      '0.7',
+      '--json',
+    ]);
+
+    const output = JSON.parse(String(consoleLogSpy.mock.calls[0]?.[0])) as {
+      status: string;
+      files: string[];
+      threshold: number;
+    };
+    expect(output.status).toBe('passed');
+    expect(output.files).toEqual(['src/cli/index.ts']);
+    expect(output.threshold).toBe(0.7);
+    expect(process.exitCode).toBeUndefined();
   });
 });

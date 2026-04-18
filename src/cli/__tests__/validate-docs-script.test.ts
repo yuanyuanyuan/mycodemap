@@ -11,7 +11,10 @@ const repoRoot = path.resolve(__dirname, '../../..');
 const REQUIRED_FIXTURE_FILES = [
   'package.json',
   'README.md',
+  'llms.txt',
   'AI_GUIDE.md',
+  'AI_DISCOVERY.md',
+  'ai-document-index.yaml',
   'CLAUDE.md',
   'ARCHITECTURE.md',
   'mycodemap.design.md',
@@ -201,6 +204,25 @@ describe('validate-docs.js', () => {
         stdio: 'pipe'
       });
     }).toThrow(/documentation guardrails failed/);
+  });
+
+  it('fails when AI docs drop analyze diagnostics guardrail', () => {
+    const fixtureRoot = createFixtureRoot();
+    tempRoots.push(fixtureRoot);
+
+    const outputPath = path.join(fixtureRoot, 'docs/ai-guide/OUTPUT.md');
+    const updatedOutput = readFileSync(outputPath, 'utf8').replace(
+      'interface AnalyzeDiagnostics',
+      'interface AnalyzeDiagnosticEnvelope'
+    );
+    writeFileSync(outputPath, updatedOutput);
+
+    expect(() => {
+      execFileSync('node', ['scripts/validate-ai-docs.js', '--root', fixtureRoot], {
+        cwd: repoRoot,
+        stdio: 'pipe'
+      });
+    }).toThrow(/AI documentation guardrails failed/);
   });
 
   it('fails when README drops the documented docs guardrail commands', () => {

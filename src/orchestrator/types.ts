@@ -23,7 +23,7 @@ export interface UnifiedResult {
   /** 唯一标识 */
   id: string;
   /** 来源工具 */
-  source: 'codemap' | 'ast-grep' | 'rg-internal' | 'ai-feed';
+  source: 'codemap' | 'ast-grep' | 'rg-internal' | 'ai-feed' | 'codemap-fallback';
   /** 工具返回的原始分数（0-1） */
   toolScore: number;
   /** 结果类型 */
@@ -151,6 +151,26 @@ export interface AnalyzeWarning {
   deprecatedIntent: CompatibleLegacyIntentType;
   replacementIntent: IntentType;
   sunsetPolicy: '2-minor-window';
+}
+
+export type AnalyzeDiagnosticStatus = 'success' | 'partialFailure' | 'failure';
+
+export type AnalyzeDiagnosticSeverity = 'info' | 'warning' | 'error';
+
+export interface AnalyzeDiagnostic {
+  code: string;
+  severity: AnalyzeDiagnosticSeverity;
+  message: string;
+  source: string;
+  recoverable: boolean;
+  details?: Record<string, unknown>;
+}
+
+export interface AnalyzeDiagnostics {
+  status: AnalyzeDiagnosticStatus;
+  items: AnalyzeDiagnostic[];
+  failedTools?: string[];
+  degradedTools?: string[];
 }
 
 export interface ReadImpactAnalysisItem {
@@ -294,6 +314,8 @@ export interface CodemapOutput {
   results: UnifiedResult[];
   /** 结构化 warning（兼容期弃用提示等） */
   warnings?: AnalyzeWarning[];
+  /** 机器可读诊断，区分成功、降级和失败 */
+  diagnostics?: AnalyzeDiagnostics;
   /** intent 特定的 machine-readable 聚合分析 */
   analysis?: CodemapAnalysis;
   /** 可选的元数据 */
@@ -330,6 +352,34 @@ export function isCodemapOutput(obj: unknown): obj is CodemapOutput {
   if (!['high', 'medium', 'low'].includes(confidence.level as string)) return false;
 
   if (!Array.isArray(output.results)) return false;
+
+  if (output.diagnostics !== undefined) {
+    if (typeof output.diagnostics !== 'object' || output.diagnostics === null) return false;
+
+    const diagnostics = output.diagnostics as Record<string, unknown>;
+    if (!['success', 'partialFailure', 'failure'].includes(diagnostics.status as string)) return false;
+    if (!Array.isArray(diagnostics.items)) return false;
+
+    if (
+      diagnostics.failedTools !== undefined &&
+      !(
+        Array.isArray(diagnostics.failedTools) &&
+        diagnostics.failedTools.every(item => typeof item === 'string')
+      )
+    ) {
+      return false;
+    }
+
+    if (
+      diagnostics.degradedTools !== undefined &&
+      !(
+        Array.isArray(diagnostics.degradedTools) &&
+        diagnostics.degradedTools.every(item => typeof item === 'string')
+      )
+    ) {
+      return false;
+    }
+  }
 
   return true;
 }

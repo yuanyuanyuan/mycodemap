@@ -18,6 +18,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+const mockLoadCodemapConfig = vi.fn();
+const mockDiscoverProjectFiles = vi.fn();
+
 // ============================================================
 // Mock 外部依赖 - 必须使用 node: 前缀
 // ============================================================
@@ -26,8 +29,12 @@ vi.mock('node:child_process', () => ({
   spawn: vi.fn()
 }));
 
-vi.mock('globby', () => ({
-  globby: vi.fn()
+vi.mock('../../../cli/config-loader.js', () => ({
+  loadCodemapConfig: (...args: unknown[]) => mockLoadCodemapConfig(...args)
+}));
+
+vi.mock('../../../core/file-discovery.js', () => ({
+  discoverProjectFiles: (...args: unknown[]) => mockDiscoverProjectFiles(...args)
 }));
 
 // ============================================================
@@ -35,8 +42,7 @@ vi.mock('globby', () => ({
 // ============================================================
 
 import { spawn } from 'node:child_process';
-import { globby } from 'globby';
-import { AstGrepAdapter, createAstGrepAdapter } from '../ast-grep-adapter.js';
+import { AstGrepAdapter, AstGrepAdapterError, createAstGrepAdapter } from '../ast-grep-adapter.js';
 import type { ToolOptions } from '../../types.js';
 
 // ============================================================
@@ -111,6 +117,13 @@ describe('AstGrepAdapter', () => {
   beforeEach(() => {
     adapter = new AstGrepAdapter();
     vi.clearAllMocks();
+    mockLoadCodemapConfig.mockResolvedValue({
+      config: {
+        include: ['src/**/*.ts'],
+        exclude: ['dist/**']
+      }
+    });
+    mockDiscoverProjectFiles.mockResolvedValue(['/test/file.ts']);
   });
 
   afterEach(() => {
@@ -210,7 +223,7 @@ describe('AstGrepAdapter', () => {
       ]);
       const { mockProc } = createMockSpawn(mockOutput);
       vi.mocked(spawn).mockReturnValue(mockProc as any);
-      vi.mocked(globby).mockResolvedValue(['/test/file.ts']);
+      mockDiscoverProjectFiles.mockResolvedValue(['/test/file.ts']);
 
       // Act
       const results = await adapter.execute(['function'], defaultOptions);
@@ -227,7 +240,7 @@ describe('AstGrepAdapter', () => {
       ]);
       const { mockProc } = createMockSpawn(mockOutput);
       vi.mocked(spawn).mockReturnValue(mockProc as any);
-      vi.mocked(globby).mockResolvedValue(['/test/file.ts']);
+      mockDiscoverProjectFiles.mockResolvedValue(['/test/file.ts']);
 
       // Act
       const results = await adapter.execute(['function', 'class'], defaultOptions);
@@ -247,7 +260,7 @@ describe('AstGrepAdapter', () => {
       const mockOutput = JSON.stringify(mockResults);
       const { mockProc } = createMockSpawn(mockOutput);
       vi.mocked(spawn).mockReturnValue(mockProc as any);
-      vi.mocked(globby).mockResolvedValue(['/test/file.ts']);
+      mockDiscoverProjectFiles.mockResolvedValue(['/test/file.ts']);
 
       // Act
       const results = await adapter.execute(['function'], { topK: 5 });
@@ -276,7 +289,7 @@ describe('AstGrepAdapter', () => {
       ]);
       const { mockProc } = createMockSpawn(mockOutput);
       vi.mocked(spawn).mockReturnValue(mockProc as any);
-      vi.mocked(globby).mockResolvedValue(['/test/file.ts']);
+      mockDiscoverProjectFiles.mockResolvedValue(['/test/file.ts']);
 
       // Act
       const results = await adapter.execute(['test'], {});
@@ -297,7 +310,7 @@ describe('AstGrepAdapter', () => {
 
     it('should return empty array when no files found', async () => {
       // Arrange
-      vi.mocked(globby).mockResolvedValue([]);
+      mockDiscoverProjectFiles.mockResolvedValue([]);
 
       // Act
       const results = await (adapter as any).search('pattern');
@@ -308,7 +321,7 @@ describe('AstGrepAdapter', () => {
 
     it('should handle globby errors gracefully', async () => {
       // Arrange
-      vi.mocked(globby).mockRejectedValue(new Error('globby error'));
+      mockDiscoverProjectFiles.mockRejectedValue(new Error('discovery error'));
 
       // Act
       const results = await (adapter as any).search('pattern');
@@ -432,9 +445,15 @@ describe('AstGrepAdapter', () => {
   });
 
   describe('getTargetFiles', () => {
-    it('should include TypeScript and JavaScript files', async () => {
+    it('should use config-aware discovery include and exclude patterns', async () => {
       // Arrange
-      vi.mocked(globby).mockResolvedValue(['/test/file.ts', '/test/file.js']);
+      mockLoadCodemapConfig.mockResolvedValue({
+        config: {
+          include: ['packages/**/*.ts', 'scripts/**/*.js'],
+          exclude: ['dist/**', 'coverage/**']
+        }
+      });
+      mockDiscoverProjectFiles.mockResolvedValue(['/test/file.ts', '/test/file.js']);
 
       // Act
       const files = await (adapter as any).getTargetFiles();
@@ -442,30 +461,79 @@ describe('AstGrepAdapter', () => {
       // Assert
       expect(files).toContain('/test/file.ts');
       expect(files).toContain('/test/file.js');
+      expect(mockLoadCodemapConfig).toHaveBeenCalledWith(process.cwd());
+      expect(mockDiscoverProjectFiles).toHaveBeenCalledWith({
+        rootDir: process.cwd(),
+        include: ['packages/**/*.ts', 'scripts/**/*.js'],
+        exclude: ['dist/**', 'coverage/**'],
+        absolute: true,
+        gitignore: true
+      });
     });
 
     it('should exclude test files when includeTests is false', async () => {
       // Arrange
       const adapterNoTests = new AstGrepAdapter({ includeTests: false });
-      vi.mocked(globby).mockResolvedValue(['/test/file.ts']);
+      mockDiscoverProjectFiles.mockResolvedValue(['/test/file.ts']);
 
       // Act
       await (adapterNoTests as any).getTargetFiles();
 
       // Assert
-      const patterns = vi.mocked(globby).mock.calls[0][0] as string[];
-      expect(patterns).toContain('!src/**/*.test.ts');
+      const discoveryOptions = mockDiscoverProjectFiles.mock.calls[0]?.[0] as { exclude: string[] };
+      expect(discoveryOptions.exclude).toContain('**/*.test.ts');
+      expect(discoveryOptions.exclude).toContain('**/*.spec.tsx');
     });
 
     it('should handle globby errors gracefully', async () => {
       // Arrange
-      vi.mocked(globby).mockRejectedValue(new Error('globby error'));
+      mockDiscoverProjectFiles.mockRejectedValue(new Error('discovery error'));
 
       // Act
       const files = await (adapter as any).getTargetFiles();
 
       // Assert
       expect(files).toEqual([]);
+    });
+
+    it('should reject discovery errors in strict mode', async () => {
+      // Arrange
+      const strictAdapter = new AstGrepAdapter({ failOnScanError: true });
+      mockDiscoverProjectFiles.mockRejectedValue(new Error('discovery error'));
+
+      // Act & Assert
+      await expect((strictAdapter as any).getTargetFiles()).rejects.toMatchObject({
+        code: 'file-discovery-failed'
+      });
+    });
+  });
+
+  describe('strict failure mode', () => {
+    it('should return empty results on scan error by default', async () => {
+      // Arrange
+      const { mockProc } = createMockSpawn('', 'syntax error', 1);
+      vi.mocked(spawn).mockReturnValue(mockProc as any);
+      mockDiscoverProjectFiles.mockResolvedValue(['/test/file.ts']);
+
+      // Act
+      const results = await adapter.execute(['SourceLocation'], { topK: 5 });
+
+      // Assert
+      expect(results).toEqual([]);
+    });
+
+    it('should reject scan errors with scan-failed code in strict mode', async () => {
+      // Arrange
+      const strictAdapter = new AstGrepAdapter({ failOnScanError: true });
+      const { mockProc } = createMockSpawn('', 'syntax error', 1);
+      vi.mocked(spawn).mockReturnValue(mockProc as any);
+      mockDiscoverProjectFiles.mockResolvedValue(['/test/file.ts']);
+
+      // Act & Assert
+      await expect(strictAdapter.execute(['SourceLocation'], { topK: 5 })).rejects.toMatchObject({
+        code: 'scan-failed'
+      });
+      await expect(strictAdapter.execute(['SourceLocation'], { topK: 5 })).rejects.toBeInstanceOf(AstGrepAdapterError);
     });
   });
 

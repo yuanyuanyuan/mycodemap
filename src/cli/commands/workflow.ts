@@ -58,7 +58,8 @@ workflow.command('start')
   .description('Start a new analysis workflow')
   .argument('<task>', 'Task description')
   .option('-t, --template <name>', 'Use workflow template (refactoring|bugfix|feature|hotfix)')
-  .action(async (task: string, options: { template?: string }) => {
+  .option('-j, --json', 'JSON 格式输出')
+  .action(async (task: string, options: { template?: string; json?: boolean }) => {
     try {
       const orchestrator = new WorkflowOrchestrator();
       const templateManager = new WorkflowTemplateManager();
@@ -84,13 +85,34 @@ workflow.command('start')
       const context = await orchestrator.start(task, {
         template: selectedTemplate?.name
       });
+
+      const recommended = selectedTemplate ? undefined : recommendTemplate(task);
+
+      if (options.json) {
+        console.log(JSON.stringify({
+          status: 'started',
+          task,
+          id: context.id,
+          currentPhase: context.currentPhase,
+          template: {
+            selected: selectedTemplate?.name ?? null,
+            recommended: selectedTemplate ? null : recommended?.name ?? null,
+          },
+          nextSteps: [
+            'codemap workflow status',
+            'codemap workflow visualize',
+            'codemap analyze --intent find --keywords ...',
+            'codemap workflow proceed',
+          ],
+        }, null, 2));
+        return;
+      }
       
       let templateNote = '';
       if (selectedTemplate) {
         templateNote = `\nUsing template: ${selectedTemplate.name} (${selectedTemplate.type})`;
       } else {
-        const recommended = recommendTemplate(task);
-        templateNote = `\nRecommended template: ${recommended.name} (use --template ${recommended.name})`;
+        templateNote = `\nRecommended template: ${recommended?.name ?? 'none'} (use --template ${recommended?.name ?? 'none'})`;
       }
 
       console.log(`

@@ -6,9 +6,24 @@
  */
 
 import { spawn } from 'node:child_process';
-import { globby } from 'globby';
 import type { UnifiedResult, ToolOptions } from '../types.js';
 import type { ToolAdapter } from './base-adapter.js';
+import { discoverProjectFiles } from '../../core/file-discovery.js';
+import { loadCodemapConfig } from '../../cli/config-loader.js';
+
+export type AstGrepAdapterErrorCode = 'file-discovery-failed' | 'scan-failed' | 'parse-failed';
+
+export class AstGrepAdapterError extends Error {
+  readonly code: AstGrepAdapterErrorCode;
+  override readonly cause?: unknown;
+
+  constructor(code: AstGrepAdapterErrorCode, message: string, cause?: unknown) {
+    super(message);
+    this.name = 'AstGrepAdapterError';
+    this.code = code;
+    this.cause = cause;
+  }
+}
 
 /**
  * AstGrepAdapter 配置选项
@@ -20,6 +35,8 @@ export interface AstGrepAdapterOptions {
   includeTests?: boolean;
   /** 超时时间（毫秒） */
   timeout?: number;
+  /** 是否在扫描错误时抛出错误 */
+  failOnScanError?: boolean;
 }
 
 /**
@@ -36,11 +53,13 @@ export class AstGrepAdapter implements ToolAdapter {
   private cwd: string;
   private includeTests: boolean;
   private timeout: number;
+  private failOnScanError: boolean;
 
   constructor(options: AstGrepAdapterOptions = {}) {
     this.cwd = options.cwd || process.cwd();
     this.includeTests = options.includeTests ?? true;
     this.timeout = options.timeout ?? 30000;
+    this.failOnScanError = options.failOnScanError ?? false;
   }
 
   /**
@@ -78,6 +97,9 @@ export class AstGrepAdapter implements ToolAdapter {
       // 限制返回结果数量
       return results.slice(0, topK);
     } catch (error) {
+      if (this.failOnScanError) {
+        throw this.toAdapterError(error, 'scan-failed', 'ast-grep 执行失败');
+      }
       console.error(`ast-grep 执行失败: ${error}`);
       return [];
     }
@@ -105,6 +127,9 @@ export class AstGrepAdapter implements ToolAdapter {
       const results = await this.runAstGrepSearch(pattern, files);
       return results;
     } catch (error) {
+      if (this.failOnScanError) {
+        throw this.toAdapterError(error, 'scan-failed', 'ast-grep search 失败');
+      }
       console.warn(`ast-grep search 失败: ${error}`);
       return [];
     }
@@ -134,6 +159,9 @@ export class AstGrepAdapter implements ToolAdapter {
       const parsedResults = this.parseAstGrepOutput(output, pattern);
       results.push(...parsedResults);
     } catch (error) {
+      if (this.failOnScanError) {
+        throw this.toAdapterError(error, 'scan-failed', 'ast-grep scan 命令失败');
+      }
       console.warn(`ast-grep scan 命令失败: ${error}`);
     }
 
@@ -225,6 +253,13 @@ export class AstGrepAdapter implements ToolAdapter {
         results.push(result);
       }
     } catch (error) {
+      if (this.failOnScanError) {
+        throw new AstGrepAdapterError(
+          'parse-failed',
+          `解析 ast-grep 输出失败: ${error instanceof Error ? error.message : String(error)}`,
+          error
+        );
+      }
       console.warn(`解析 ast-grep 输出失败: ${error}`);
     }
 
@@ -246,32 +281,56 @@ export class AstGrepAdapter implements ToolAdapter {
    * 获取目标文件列表
    */
   private async getTargetFiles(): Promise<string[]> {
-    const patterns: string[] = [];
-
-    // 搜索 TypeScript/JavaScript 文件
-    patterns.push('src/**/*.ts');
-    patterns.push('src/**/*.js');
-    patterns.push('src/**/*.tsx');
-    patterns.push('src/**/*.jsx');
-
-    // 根据 includeTests 配置过滤
-    if (!this.includeTests) {
-      patterns.push('!src/**/*.test.ts');
-      patterns.push('!src/**/*.spec.ts');
-      patterns.push('!src/**/*.test.js');
-      patterns.push('!src/**/*.spec.js');
-    }
-
     try {
-      const files = await globby(patterns, {
-        cwd: this.cwd,
-        absolute: true
+      const { config } = await loadCodemapConfig(this.cwd);
+      const effectiveExclude = [...config.exclude];
+
+      if (!this.includeTests) {
+        effectiveExclude.push(
+          '**/*.test.ts',
+          '**/*.spec.ts',
+          '**/*.test.js',
+          '**/*.spec.js',
+          '**/*.test.tsx',
+          '**/*.spec.tsx'
+        );
+      }
+
+      const files = await discoverProjectFiles({
+        rootDir: this.cwd,
+        include: config.include,
+        exclude: effectiveExclude,
+        absolute: true,
+        gitignore: true
       });
       return files;
     } catch (error) {
+      if (this.failOnScanError) {
+        throw new AstGrepAdapterError(
+          'file-discovery-failed',
+          `获取文件列表失败: ${error instanceof Error ? error.message : String(error)}`,
+          error
+        );
+      }
       console.warn(`获取文件列表失败: ${error}`);
       return [];
     }
+  }
+
+  private toAdapterError(
+    error: unknown,
+    fallbackCode: AstGrepAdapterErrorCode,
+    fallbackMessage: string
+  ): AstGrepAdapterError {
+    if (error instanceof AstGrepAdapterError) {
+      return error;
+    }
+
+    return new AstGrepAdapterError(
+      fallbackCode,
+      `${fallbackMessage}: ${error instanceof Error ? error.message : String(error)}`,
+      error
+    );
   }
 }
 
