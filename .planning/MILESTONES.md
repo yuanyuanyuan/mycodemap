@@ -1,5 +1,30 @@
 # Project Milestones: CodeMap
 
+## v1.6 CodeMap CLI dogfood reliability hardening (Completed: 2026-04-18)
+
+**Delivered:** 将 2026-04-17 eatdogfood 直接暴露的 Agent-facing CLI 可靠性缺口收口为正式产品契约：`analyze find` 不再静默伪装成功，相邻 CLI 子命令也提供稳定机器输出与文档真相。
+
+**Phases completed:** 25 (3 plans total)
+
+**Key accomplishments:**
+
+- 为 `analyze -i find` 增加 stdout-visible diagnostics，并把失败 / 部分失败语义显式建模
+- 让 `find` discovery boundary 与现有 config-aware scanning truth 对齐
+- 收口 `complexity -f --json`、`ci assess-risk --json`、`workflow start --json` 的机器输出
+- 同步 `AI_GUIDE.md`、`docs/ai-guide/COMMANDS.md`、`docs/ai-guide/OUTPUT.md` 与 docs guardrail
+
+**Stats:**
+
+- `9/9` milestone requirements satisfied，`1/1` phase complete
+- 3 个 plans 全部完成并验证
+- milestone 在 2026-04-18 与历史 `v1.5` Docker / ArcadeDB 分支切开，成为独立版本线
+
+**Git range:** 未单独捕获（当前运行约束禁止自动 commit / tag / push）
+
+**What's next:** 当前没有 active milestone。若继续新工作，应新开 phase / milestone；不要回补已关闭的 `Phase 22-24`。
+
+---
+
 ## post-v1.4 ArcadeDB Node feasibility follow-up (Shipped: 2026-03-28)
 
 **Delivered:** 在不改动当前 storage public surface 的前提下，完成 ArcadeDB Node feasibility follow-up，锁定官方支持矩阵、isolated smoke path、blast radius、validation strategy 与 decision package，并以 direct replacement `NO-GO` 收尾。

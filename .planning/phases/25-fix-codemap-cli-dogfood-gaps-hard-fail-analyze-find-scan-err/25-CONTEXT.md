@@ -1,46 +1,64 @@
 # Phase 25: CodeMap CLI dogfood reliability hardening - Context
 
-**Gathered:** 2026-04-17
-**Status:** Ready for planning
-**Source:** PRD Express Path (`docs/eatdogfood-reports/2026-04-17-eatdogfood-agent-experience.md`)
+**Gathered:** 2026-04-18
+**Status:** Ready for re-planning
+**Source:** 2026-04-17 dogfood report + 2026-04-18 reopen audit
 
 <domain>
 ## Phase Boundary
 
-本阶段聚焦 **CodeMap CLI 面向 AI / Agent 的可靠性与机器消费契约**。目标不是新增大功能，而是把 2026-04-17 dogfood 报告里已经暴露出来的“看起来成功、实则不可靠”的 CLI 行为收敛成可验证、可诊断、可文档化的契约。
+本阶段只处理 **2026-04-17 eatdogfood 报告直接暴露的 Agent-facing CLI 可靠性问题**，目标是把“看起来成功、实际上会误导 Agent”的行为收敛成可验证的机器契约。
 
-因此本阶段只允许交付：
-1. 与 dogfood 报告直接对应的 CLI 行为修复或契约澄清；
-2. 机器可读输出、显式失败/警告信号、参数语义一致性的补强；
-3. 为受影响命令补齐最小验证与必要文档同步依据。
+P0 是修复 `analyze -i find` 的静默失败与配置边界漂移；同一 phase 里可以继续处理同一份报告中的相邻契约缺口（如 `complexity <file>`、`check` / `ci assess-risk` 状态表达、`workflow start` 机器输出），但前提是这些工作仍然属于 **机器消费真相** 的收口，而不是顺手扩产品。
 
-本阶段**不**推进 ArcadeDB prototype、**不**把 `rtk` 纳入产品依赖、**不**顺手重构整个 analyze 架构、**不**扩写与报告无直接关系的 shipped surface。
+本阶段**不**重构整个 `analyze` 产品面、**不**把所有 CLI 命令一次性统一、**不**恢复 `workflow` 的更大编排语义、**不**把 `rtk` 纳入产品能力、**不**触碰任何 ArcadeDB milestone 任务。
 
 </domain>
 
 <decisions>
 ## Implementation Decisions
 
-### Failure Signaling Is Product Surface
-- `analyze -i find` 在底层扫描链路失败时，不能再把失败伪装成可信的 0 结果；机器消费方必须能从 stdout JSON 区分真实 0 命中、部分失败与硬失败。
-- 仅在 stderr 打印错误不足以构成 Agent 可依赖契约；需要有结构化 failure / warning / partialFailure 信号。
+### Scope packaging
+- **D-01:** `analyze -i find` 可靠性是本 phase 的入场门槛；在 stdout-only 消费方仍无法区分“真实 0 命中”和“扫描链路退化/失败”之前，Phase 25 不得再次声明完成。
+- **D-02:** dogfood 报告中的相邻缺口（`complexity <file>`、`check` / `ci assess-risk` 状态摘要、`workflow start` 机器输出）继续保留在本 phase 的讨论范围内，但 planner 必须对每项给出“纳入本 phase 的具体 plan”或“显式延期”的书面结论，不能静默丢项。
+- **D-03:** `history --symbol` 不作为本 phase 主目标；dogfood 已证明其默认输出对 Agent 足够稳定，本 phase 不应膨胀成全面 CLI surface unification。
 
-### CLI Contract Consistency Matters
-- 这次规划必须审视 dogfood 报告中列出的 Agent 体验断点：`--json` 支持不统一、`complexity <file>` 忽略目标文件、`check` / `ci assess-risk` 静默通过、`analyze -i find` 对显式路径低置信度、`workflow start` 缺少机器可读输出。
-- 若这些问题不能在同一 phase 内高质量落地，planner 必须显式提出拆分方案，而不是默默丢项。
+### Failure contract
+- **D-04:** `analyze find` 需要显式的三态机器契约：真实 success / zero-hit、`partialFailure`、`failure`。仅把错误打到 stderr 不构成 Agent 可依赖的产品面。
+- **D-05:** `failure` 应尽可能保留 machine-readable stdout truth，再用非零 exit code 补充 shell 语义；`partialFailure` 只有在 stdout 已明确暴露 degraded truth 时才允许保持零退出码。
+- **D-06:** 这份 failure truth 必须挂在正式的 analyze 输出契约（`CodemapOutput` 或等价公共 schema）上，而不是埋在 undocumented metadata、human-only prose 或测试私货里。
 
-### Scanner Boundaries Must Match Config-Aware Paths
-- `analyze` 涉及的 include / exclude、TypeScript 解析与配置感知边界，不能偏离 `generate` / `query` 已经证明可用的扫描策略。
-- 当用户给出显式文件路径时，CLI 不应再把它当作模糊关键词处理并返回误导性的超低 confidence。
+### Discovery & target semantics
+- **D-07:** `analyze find` 的文件发现边界必须与 `generate` / `query` 已经使用的 config-aware include / exclude 与 `.gitignore` 语义对齐，不能继续依赖 adapter 内部手写 glob。
+- **D-08:** 当用户传入显式文件路径时，CLI 必须先按 path anchor 解析，而不是把它当弱关键词走模糊搜索；显式路径却返回 `confidence=low` 的空结果，视为本 phase 失败。
+- **D-09:** 即使主扫描器退化，fallback 也必须留在同一 discovery boundary 内，不能通过“扩大搜索宇宙”换取看似有结果的假阳性。
 
-### Docs Sync Is Conditional but Explicit
-- 如果本阶段改变了 CLI 输出契约、默认推荐路径或 AI 使用方式，必须同步 `AI_GUIDE.md`、`docs/ai-guide/COMMANDS.md`、`docs/ai-guide/OUTPUT.md`；如果不改，也必须在交付中明确写出“不需要更新”的原因。
+### Secondary contract consistency
+- **D-10:** `complexity <file>` 必须要么真正按文件收缩 JSON 输出，要么同步收紧 CLI / 文档契约；“参数存在但结果仍是全量”不可接受。
+- **D-11:** 存在“通过 / 跳过 / 未执行”语义的命令（至少 `check`、`ci assess-risk`）必须在 stdout 中暴露明确状态 truth，而不是让 Agent 从空输出或 prose 猜测。
+- **D-12:** `workflow start` 只有在能够用最小改动补出机器可读状态/ID surface、且不重开 workflow 产品边界时，才允许并入本 phase；否则必须在计划中显式延期。
+
+### Docs truth & verification
+- **D-13:** 只要 analyze/CLI 输出契约、默认推荐路径或 AI 使用方式发生变化，就必须同步 `AI_GUIDE.md`、`docs/ai-guide/COMMANDS.md`、`docs/ai-guide/OUTPUT.md`，并走现有 docs guardrail；若最终不改文档，也必须在交付中写明原因。
+- **D-14:** 回归验证必须是 dogfood-shaped：至少复现一次扫描失败场景并证明新的结构化结果，再补一条真实 0 命中路径，避免 diagnostics 永远等于 failure。
 
 ### the agent's Discretion
-- 可以自行决定这些问题应该合并为一个实现包还是拆成多个 plan，但每个 plan 都必须能回溯到 dogfood 报告中的具体失败模式。
-- 可以在 `query` / `analyze` / `complexity` / `ci` / `workflow` 等相关命令之间选择最小变更路径，但不得用“降级到人工判断”替代机器可读修复。
+- diagnostics 字段命名与状态枚举的具体拼写
+- 相邻 CLI 缺口是拆成一个 plan 还是多个 plans
+- fallback 的具体实现路线，只要复用现有 config-aware discovery seam
+- `check` / `ci` / `workflow` 是本 phase 实做还是显式延期，只要结论可追溯且不静默丢项
 
 </decisions>
+
+<specifics>
+## Specific Ideas
+
+- 2026-04-18 重开审计已经证明：之前的完成声明与代码事实漂移，原因不是 scope 扩张，而是 `analyze -i find` 仍把 scanner failure 包装成 `confidence=low` 的空 JSON 成功返回。
+- `query --search SourceLocation --json --structured` 目前仍是稳定对照组；replan 应保留这条已验证路径，而不是强迫所有查找流量走尚未修好的 `analyze find`。
+- 前序 CLI / design phases 已经锁定三个可复用产品原则：机器模式必须是纯结构化输出、blocker/diagnostics 必须显式暴露、public command 变化必须同步 docs + guardrail。
+- 本次 re-discuss 采用“更新现有 CONTEXT”路径，并把剩余 gray areas 全部视为已审阅：`analyze find` 为 P0，其余 dogfood 缺口必须被计划化处理或显式延期，而不是继续模糊漂浮。
+
+</specifics>
 
 <canonical_refs>
 ## Canonical References
@@ -48,52 +66,82 @@
 **Downstream agents MUST read these before planning or implementing.**
 
 ### Roadmap / state
-- `.planning/ROADMAP.md` — Phase 25 的正式目标、成功标准与与其他 milestone 的边界
-- `.planning/STATE.md` — 当前 milestone 状态与 Phase 25 的历史挂载点
-- `.planning/REQUIREMENTS.md` — 项目级 requirements 基线
+- `.planning/PROJECT.md` — 项目级产品边界、AI-first core value 与“不要扩大错误 scope”的总原则
+- `.planning/REQUIREMENTS.md` — 当前 active milestone 约束；Phase 25 虽为 out-of-band follow-up，但不能反向污染主线 milestone truth
+- `.planning/ROADMAP.md` — Phase 25 的正式 goal、success criteria、reopened 状态与 failure rehearsal
+- `.planning/STATE.md` — 2026-04-18 重开背景、审计结论与当前 planning 状态
 
 ### Dogfood evidence
-- `docs/eatdogfood-reports/2026-04-17-eatdogfood-agent-experience.md` — 本次 PRD express path 的直接输入，定义 Agent 视角问题与建议
-- `docs/exec-plans/completed/2026-04-17-eatdogfood-codemap-cli.md` — 已被 roadmap 绑定为 Phase 25 依赖的首份 dogfood 基线
+- `docs/eatdogfood-reports/2026-04-17-eatdogfood-agent-experience.md` — 原始 Agent 体验报告，定义 P0/P1 契约缺口
+- `docs/exec-plans/completed/2026-04-17-eatdogfood-codemap-cli.md` — 首份 eatdogfood 执行记录；可作历史输入，但不能再被当作“已交付事实”
 
-### Contract / docs
-- `AI_GUIDE.md` — 当前 AI 推荐入口与命令定位
-- `docs/ai-guide/COMMANDS.md` — CLI 命令面、参数与推荐用法
-- `docs/ai-guide/OUTPUT.md` — 输出契约与机器消费说明
-- `.planning/codebase/CONVENTIONS.md` — 仓库内关于机器可读输出与文档同步的既有约定
+### Prior CLI contract decisions
+- `.planning/phases/17-design-contract-surface/17-CONTEXT.md` — 纯结构化 JSON、显式 diagnostics、CLI-owned contract seam 的既有先例
+- `.planning/phases/19-handoff-package-human-gates/19-CONTEXT.md` — public command human/json 双面输出、artifact truth 单源、docs sync 原则
+- `.planning/phases/20-design-drift-verification-docs-sync/20-CONTEXT.md` — failure-first verification、docs closure 与 analysis/workflow scope 边界
+- `.planning/codebase/CONVENTIONS.md` — CLI/output/type discipline 与 public command docs sync 约束
+- `.planning/codebase/STRUCTURE.md` — 相关实现、tests、guardrail 的自然落点
 
-### Config / implementation anchors
-- `mycodemap.config.json` — include / exclude / output 目录的实际配置边界
-- `src/cli/commands/analyze.ts` — `analyze` 统一入口与 intent 路由
-- `src/cli/commands/query.ts` — 当前稳定查询路径
-- `src/cli/commands/complexity.ts` — `complexity <file>` 行为来源
-- `src/cli/commands/check.ts` — 契约检查输出与状态表达
-- `src/cli/commands/ci.ts` — `ci assess-risk` 输出路径
-- `src/cli/commands/workflow.ts` — `workflow start` 行为与输出格式
+### AI/public docs
+- `AI_GUIDE.md` — AI 速查入口，当前仍把 `query -S` 作为“查找相关代码”的默认路径
+- `docs/ai-guide/COMMANDS.md` — CLI 命令面、参数语义与机器输出入口说明
+- `docs/ai-guide/OUTPUT.md` — analyze/check/history 等正式 machine-readable contract
+
+### Implementation anchors
+- `mycodemap.config.json` — include / exclude / output truth
+- `src/core/file-discovery.ts` — config-aware discovery 与 `.gitignore` 感知 truth
+- `src/cli/config-loader.ts` — CLI-owned config normalization seam
+- `src/orchestrator/types.ts` — `CodemapOutput` 与 analyze machine contract 定义
+- `src/cli/commands/analyze.ts` — `find` 路由、fallback、`CodemapOutput` 组装入口
+- `src/orchestrator/adapters/ast-grep-adapter.ts` — 当前 silent degradation、hard-coded glob 与 scanner fallback seam
+- `src/cli/commands/complexity.ts` — `complexity <file>` 参数语义与 JSON 输出事实源
+- `src/cli/commands/check.ts` — contract gate stdout shape 与 annotation-adjacent diagnostics
+- `src/cli/commands/ci.ts` — `ci assess-risk` 当前输出与状态表达入口
+- `src/cli/commands/workflow.ts` — `workflow start` 当前 human-only 行为与边界
+
+### Regression anchors
+- `src/cli/commands/__tests__/analyze-command.test.ts` — analyze contract/fallback regression harness
+- `src/orchestrator/adapters/__tests__/ast-grep-adapter.test.ts` — adapter error handling 与 discovery pattern tests
+- `src/cli/commands/__tests__/ci-docs-sync.test.ts` — public command docs sync guardrail harness
 
 </canonical_refs>
 
-<specifics>
-## Specific Ideas
+<code_context>
+## Existing Code Insights
 
-- 优先把“误导 Agent 的失败模式”排在前面：`analyze -i find` 静默失败、结构化输出缺少失败信号、路径输入被误判、参数语义与行为不一致。
-- 评估是否需要统一补齐 `history --symbol`、`ci assess-risk`、`workflow start` 的机器可读输出，避免调用方为不同命令维护不同解析器。
-- `complexity` 若接受文件参数，就应只返回目标文件的复杂度；否则必须改变 CLI 契约文案，不能保留误导性参数语义。
-- `check` / `ci assess-risk` 若结果为通过、跳过或未执行，stdout 里应存在明确状态字段或摘要，而不是要求调用方从 exit code 与空输出猜测。
-- 如果本 phase 发现 scope 已超出单 phase 的保真度上限，应优先建议拆成子 phase，而不是压缩成含混计划。
+### Reusable Assets
+- `src/core/file-discovery.ts` 已提供 config-aware `discoverProjectFiles` / ignore pattern seam，可作为 `analyze find` discovery 对齐的现成 truth。
+- `src/cli/config-loader.ts` 已把 include/exclude 默认值与配置归一化固定下来，避免新逻辑重复解析 `mycodemap.config.json`。
+- `src/cli/commands/analyze.ts` 已经是 `CodemapOutput` 的集中组装点，也已有兼容 warning 先例，适合挂 diagnostics/failure truth。
+- `src/cli/commands/__tests__/analyze-command.test.ts` 与 `src/orchestrator/adapters/__tests__/ast-grep-adapter.test.ts` 已覆盖 fallback / adapter seam，是最自然的回归落点。
+- `src/cli/commands/__tests__/ci-docs-sync.test.ts` 已经锁住 public docs guardrail 执行路径，适合为契约改动兜底。
 
-</specifics>
+### Established Patterns
+- public analysis/design commands 偏好“human mode + 纯结构化 machine mode”双面输出，而不是混合 prose JSON。
+- blocker / degraded truth 应显式建模，而不是靠 stderr、人类经验或 exit code 单独表达。
+- public command 变化必须同步 AI docs、rules 与 guardrail tests，避免再次出现文档真相漂移。
+
+### Integration Points
+- `src/orchestrator/types.ts` 是 analyze contract 扩展的首要接入点。
+- `src/orchestrator/adapters/ast-grep-adapter.ts` 是 scanner 错误处理与 target file discovery 的根因位点。
+- `src/cli/commands/analyze.ts` 是 `find` 诊断上浮、path-target 语义和 fallback 编排入口。
+- `src/cli/commands/complexity.ts`、`src/cli/commands/check.ts`、`src/cli/commands/ci.ts`、`src/cli/commands/workflow.ts` 是 Phase 25 次级一致性收口位点。
+- `AI_GUIDE.md`、`docs/ai-guide/COMMANDS.md`、`docs/ai-guide/OUTPUT.md`、`scripts/validate-docs.js` / docs sync tests 构成契约改动后的真相护栏。
+
+</code_context>
 
 <deferred>
 ## Deferred Ideas
 
-- `analyze` 全面重构为唯一统一入口、以及对独立 `query` / `deps` / `impact` / `complexity` 命令的产品面收敛
-- 与 `rtk` 相关的 shell 输出优化、过滤器信任与运行时包装体验
-- 与 ArcadeDB prototype（Phase 22-24）相关的任何实验、验证或文档动作
+- 把 `analyze` 全面重构成唯一统一查询入口，并替代 `query` / `deps` / `impact` / `complexity`
+- 超出 dogfood 报告的 CLI surface 大一统（例如所有命令统一旗标体系）
+- `workflow` 的自动推进、执行编排或更大产品化语义
+- 将 `rtk` 变成 CodeMap 产品功能或官方 CLI 依赖
+- 与 ArcadeDB prototype / storage 路线相关的任何工作
 
 </deferred>
 
 ---
 
 *Phase: 25-fix-codemap-cli-dogfood-gaps-hard-fail-analyze-find-scan-err*
-*Context gathered: 2026-04-17 via PRD Express Path*
+*Context gathered: 2026-04-18 after reopen audit*

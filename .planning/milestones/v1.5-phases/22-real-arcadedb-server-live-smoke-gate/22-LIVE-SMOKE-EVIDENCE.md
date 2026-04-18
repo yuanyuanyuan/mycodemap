@@ -58,6 +58,16 @@ Observed outcome: blocked
 - `timeout 20s docker pull arcadedata/arcadedb:latest` exited with `124`, which means the pull did not complete within the timeout window
 - No local ArcadeDB container became available during this revalidation, so the gate remains blocked on external provisioning / reachability
 
+## 2026-04-18 Revalidation
+
+- Revalidation date: 2026-04-18
+- `node --check scripts/experiments/arcadedb-http-smoke.mjs` and `node scripts/experiments/arcadedb-http-smoke.mjs --help` still pass
+- `ARCADEDB_*` environment variables are still absent from the current shell
+- `curl http://127.0.0.1:2480/` still exits with `7`, so no local loopback ArcadeDB server is reachable
+- `docker info` now succeeds, which proves the Docker daemon itself is reachable again
+- `timeout 180s docker pull arcadedata/arcadedb:latest` still fails with `proxyconnect tcp: dial tcp 192.168.3.74:7890: i/o timeout`
+- No local ArcadeDB container became available during this revalidation either, so the gate remains blocked on external provisioning / reachability
+
 ## Guardrail Check
 
 - No shipped runtime/config changes were made during Phase 22 execution.

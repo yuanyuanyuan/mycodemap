@@ -2,43 +2,33 @@
 
 ## What This Is
 
-CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `design validate → design map → design handoff → design verify` 收口为正式 public collaboration chain；`post-v1.4` follow-up 又进一步证伪了“ArcadeDB 可以直接作为当前 local-first storage surface 替代品”这个薄弱前提。当前 active planning 已切到 `v1.5`，但只允许验证一个 isolated server-backed prototype，而不是把 remote backend 偷渡进 shipped runtime。
+CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `design validate → design map → design handoff → design verify` 收口为正式 public collaboration chain；`Phase 25` 则把 Agent-facing CLI 的机器契约真相继续收口：扫描退化不能再伪装成成功 JSON，相邻 CLI 子命令也需要稳定的 stdout state / diagnostics。
 
-仓库仍是 brownfield：legacy CLI / workflow / analyzer 管线与 MVP3 分层架构并存。因此任何 ArcadeDB 后续都必须优先保护已 shipped 的 public contract、docs truth 与 storage 边界；如果真实 server smoke、auth/TLS 或 setup friction 站不住脚，就应该尽早停在 prototype，而不是继续扩大 blast radius。
+2026-04-18 起，规划边界已经调整：**Docker / ArcadeDB 原型线不再属于当前版本范围**。此前 `v1.5` 的 22-24 phase 保留为历史工件，但不会继续作为 active work。当前版本线从 `Phase 25` 起算，视为 `v1.6`。
 
 ## Core Value
 
 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
 
-## Latest Shipped Milestone: v1.4 设计契约与 Agent Handoff
+## Latest Completed Milestone: v1.6 CodeMap CLI dogfood reliability hardening
 
-**Goal:** 把 CodeMap 从“AI-first 代码分析工具”推进到“人类设计 → AI 执行”的桥接基础设施，但不把产品扩成通用项目管理器、自动执行器或公共 HTTP 平台。
-
-**Delivered outcome:**
-- 人类可以通过 design contract 明确定义目标、约束、验收标准与 non-goals
-- CodeMap 可以输出 candidate scope、dependencies、risk、unknowns、tests，并生成 human/json handoff
-- `design verify` 已把 acceptance criteria 映射为 checklist / drift report，full-chain ready/blocker evidence 已闭环
-- README、AI docs、rules、guardrail tests 与 workflow truth 已同步收口
-
-## Latest Completed Follow-up: post-v1.4 ArcadeDB Node feasibility follow-up
-
-**Goal:** 在不污染当前 storage public surface 与已交付 design chain 的前提下，先验证 ArcadeDB 官方 Node 支持面、实验路径、blast radius 与 Go/No-Go。
+**Goal:** 把 2026-04-17 dogfood 直接暴露的 Agent-facing CLI 可靠性缺口收敛成机器可验证的产品契约，而不是继续让 stderr / 人工经验承担真相来源。
 
 **Delivered outcome:**
-- 已明确 ArcadeDB 在 Node.js 下“官方支持什么 / 不支持什么”，并排除 embedded 作为当前 repo 的 Node runtime 路径
-- 已交付不污染现有 public storage surface 的最小实验路径，而不是直接承诺 backend 实现
-- 已量化若推进为正式 backend 需要改动的配置、CLI、schema、docs 与 fallback blast radius
-- 已输出可复核的 validation / benchmark strategy 与 Go/No-Go 建议，主结论为 direct replacement `NO-GO`
+- `analyze -i find` 现在会在 stdout JSON 中显式暴露 `diagnostics.status`
+- `find` 的 discovery boundary 与现有 config-aware scanning truth 对齐
+- `complexity -f --json`、`ci assess-risk --json`、`workflow start --json` 提供稳定机器输出
+- AI docs、command docs、output schema 与 guardrail tests 已同步
 
-## Current Milestone: v1.5 Isolated ArcadeDB Server-backed Prototype
+## Historical Closed Branch: v1.5 Isolated ArcadeDB Server-backed Prototype
 
-**Goal:** 验证一个不进入 shipped runtime 的 isolated ArcadeDB server-backed prototype 能否完成真实 live smoke，并在不改写当前 storage public surface 的前提下收集 `handshake latency`、`query latency`、`setup complexity` 与 approval evidence。
+**Status:** Closed on 2026-04-18 by user direction
 
-**Target features:**
-- 基于真实 ArcadeDB server 的 isolated live smoke gate
-- 成功 smoke 后的 `handshake latency` / `query latency` / `setup complexity` evidence pack
-- `remote config` / `auth` / `TLS` / `lifecycle` / `docs` blast radius 的显式审批输入
-- evidence-backed `continue / pause / close` 决策包，而不是含糊的“理论可行”
+**Closure rule:**
+- 不需要 Docker
+- 不需要 ArcadeDB
+- `Phase 22-24` 不再继续处理
+- 如未来真的要重开类似方向，必须以全新 milestone 重新定 scope，而不是恢复旧 blocker
 
 ## Requirements
 
@@ -55,59 +45,49 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 - ✓ CodeMap 可把 design contract 与代码图对齐，输出 candidate files/modules、dependencies、test impact、risk 与 unknowns —— v1.4 / Phase 18
 - ✓ 系统可生成同时面向人类审核和机器消费的 handoff package，并保留 assumptions / approvals / open questions —— v1.4 / Phase 19
 - ✓ design / workflow / docs drift 可被 guardrail 明确检出，且 `design verify` 已把 acceptance criteria 映射为 checklist / drift report —— v1.4 / Phase 20
-- ✓ 已基于官方支持面完成 ArcadeDB Node feasibility、blast radius 与 Go/No-Go 决策，并锁定 direct replacement `NO-GO` / isolated follow-up `CONDITIONAL` —— post-v1.4 / Phase 21
+- ✓ `analyze find` 现在能在 stdout 中区分 success / `partialFailure` / failure truth，而不是静默返回可信空结果 —— v1.6 / Phase 25
+- ✓ 相邻 dogfood CLI 契约（`complexity` / `ci assess-risk` / `workflow start`）与 AI docs truth 已同步收口 —— v1.6 / Phase 25
 
 ### Active
 
-- [ ] 真实 ArcadeDB server live smoke 必须在 isolated harness / prototype seam 下跑通，并记录 env / auth / TLS 前置条件 —— v1.5 / Phase 22
-- [ ] latency 证据只能在 live smoke 成功后记录，最少包含 `handshake latency`、`query latency`、`setup complexity` —— v1.5 / Phase 23
-- [ ] prototype 只能存在于 isolated experiment surface，不得提前改 `storage.type`、公开 schema 或 shipped runtime contract —— v1.5 / Phase 23
-- [ ] `remote config` / `auth` / `TLS` / `lifecycle` / `docs` blast radius 必须先量化并显式审批，不能被包装成 adapter 细节 —— v1.5 / Phase 23
-- [ ] milestone 必须以 evidence-backed `continue / pause / close` 决策收尾，而不是留下“理论上可行”的模糊结论 —— v1.5 / Phase 24
+- 当前没有 active milestone requirement；`Phase 25` 已完成，下一步需重新定 scope
 
 ### Out of Scope
 
-- 把 `storage.type = arcadedb` 重新打开为 shipped 任务 —— direct replacement 已被 `post-v1.4` `NO-GO` 否定
-- 在没有真实 live smoke 的前提下给出 benchmark / performance claims —— 会把占位数字伪装成证据
-- 将 isolated experiment script 演变为 shipped runtime integration —— 会提前污染当前 storage public surface
-- 为 prototype 顺手公开 `mycodemap server` / HTTP API 产品面 —— 与当前 milestone 的价值验证不等价
-- 借 prototype 修改 `workflow` 已收口的 analysis-only 语义 —— 会把 backend 试验偷渡成 workflow 扩张
+- 恢复 `Phase 22-24` 作为当前版本待办
+- 重新引入 Docker / ArcadeDB 作为默认下一步
+- 把 `rtk` 扩写成 CodeMap 产品能力
+- 借 Phase 25 顺手把所有 CLI 命令一次性统一成单一旗标 / schema 体系
 
 ## Context
 
-- `SEED-001` 已记录未来 isolated prototype 的触发条件；用户现已批准按该方向正式开新 milestone，而不是继续维持“无 active milestone”状态
-- `Phase 21` 只留下一个条件性继续路径：isolated server-backed prototype；它没有为 `storage.type = arcadedb` 提供任何 shipped 级背书
-- 当前 README / AI_GUIDE / rules / workflow truth 仍围绕 design chain 与 local-first storage surface 收口；新 milestone 不能反向破坏这些既有边界
-- `scripts/experiments/arcadedb-http-smoke.mjs` 已提供 isolated smoke seam，但尚未对真实 ArcadeDB server 成功执行 live smoke
-- `Phase 22` 必须失败优先：若没有可达 server、凭证、TLS/auth 前提或 setup 成本过高，应尽早停止，而不是推进到“先接到产品里再看看”
+- `Phase 25` 源于 2026-04-17 eatdogfood 报告，是一条独立于 ArcadeDB 原型线的新版本收口工作
+- 2026-04-18 用户明确决定：旧版本遗漏不再继续，因此 active planning 不能再把 22-24 当 blocker
+- 当前 README / AI docs / rules / workflow truth 仍围绕 design chain、analysis-first CLI 与 local-first storage surface 收口
 
 ## Constraints
 
-- **Decision Integrity**: `Phase 21` 的 `NO-GO for direct replacement / CONDITIONAL for isolated follow-up` 结论不可被重写成“默认继续实现”
-- **Prototype Isolation**: 任何 prototype 代码、脚本或文档都必须保持在 isolated experiment surface，不能直接改写 shipped runtime/config contract
-- **Evidence Gate**: 没有真实 live smoke，就不能记录 benchmark，也不能声称已经证明 ArcadeDB 值得产品化
-- **Approval Surface**: `remote config`、`auth`、`TLS`、`lifecycle`、`docs/runtime guidance` 都是产品面变化，不是内部实现细节
-- **Docs Truth**: 若 milestone 结论进入更正式的后续路线，README、AI docs、rules 与验证规则必须同步
-- **Architecture Reality**: legacy 与 MVP3 并存 —— 任何 server-backed 方向都要先量化 blast radius，再讨论实现
+- **Machine Truth First**: 只要 CLI 命令会被 Agent 消费，stdout 必须表达可机读真相
+- **Docs Truth**: 输出契约变化必须同步 AI docs 与 guardrail
+- **Scope Integrity**: 已关闭的历史分支不能被自动当成当前版本待办
+- **Wrapper Boundary**: `rtk` 只是执行包装层，不属于 CodeMap 产品面
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| `v1.4` 以 `Phase 17 → 18 → 19 → 20` 完成并归档 | 该主线已经通过 milestone audit，不应继续停留在 active planning surface | Shipped 2026-03-26 |
-| `Phase 21` 从 backlog `1000` 升级为正式后续 phase | 用户已确认它不是 backlog，而是顺序排在 `Phase 20` 之后的确定 phase | Approved |
-| ArcadeDB follow-up 先做官方 Node feasibility，而不是先写适配器 | 这样能避免把错误支持面或高成本实验路径包装成既定实现 | Completed 2026-03-28 |
-| `post-v1.4` follow-up 以 direct replacement `NO-GO` 收尾 | milestone audit 已确认 requirements 满足，但 live smoke 仍需新 milestone 显式处理 | Archived 2026-03-28 |
-| `SEED-001` 只保留“isolated server-backed prototype”这条条件性继续路径 | 这样能防止团队重新回到“先写 adapter 再证明”的旧错误 | Planted 2026-03-28 |
-| 启动 `v1.5` 只验证 isolated prototype，而不默认进入 shipped backend | 用户已批准按建议继续，但边界仍需保持 evidence-first 与 prototype-only | Active 2026-03-30 |
+| `v1.4` 以 `Phase 17 → 18 → 19 → 20` 完成并归档 | 设计链主线已经闭环，不应继续停留在 active planning surface | Shipped 2026-03-26 |
+| `Phase 21` 以 direct replacement `NO-GO` 收尾 | 避免把错误的 storage 假设包装成实现前提 | Archived 2026-03-28 |
+| `v1.5` Docker / ArcadeDB 原型线关闭 | 用户明确表示不再继续该方向，也不需要补旧遗漏 | Closed 2026-04-18 |
+| `Phase 25` 起算为 `v1.6` | 该 phase 属于新的 CLI reliability / docs truth 版本线，而不是旧原型线尾巴 | Completed 2026-04-18 |
 
 ## Current State
 
-- **Completed milestones / follow-ups:** `v1.0 AI-first 重构`、`v1.1 插件扩展点产品化`、`v1.2 图数据库后端生产化`、`v1.3 Kùzu-only 收敛与高信号债务清理`、`v1.4 设计契约与 Agent Handoff`、`post-v1.4 ArcadeDB Node feasibility follow-up`
-- **Milestone archive:** `.planning/MILESTONES.md`, `.planning/milestones/v1.4-ROADMAP.md`, `.planning/milestones/v1.4-REQUIREMENTS.md`, `.planning/milestones/v1.4-MILESTONE-AUDIT.md`, `.planning/milestones/post-v1.4-ROADMAP.md`, `.planning/milestones/post-v1.4-REQUIREMENTS.md`, `.planning/milestones/post-v1.4-MILESTONE-AUDIT.md`
-- **Active milestone:** `v1.5 Isolated ArcadeDB Server-backed Prototype`
-- **Current planning status:** `Phase 22` 尚未开始；下一步是先完成 discuss / plan，并把真实 server live smoke 作为第一阻断门
-- **Known remaining debt:** repo-wide ESLint warnings 仍是 warning-only 历史基线；hybrid architecture 仍带来 implementation seam 成本；`Phase 17` 的 Nyquist debt 仍是非阻断遗留；若 `v1.5` 失败，也必须把 failure evidence 写清楚，防止以后再次在错误前提上重开
+- **Completed milestones / follow-ups:** `v1.0`、`v1.1`、`v1.2`、`v1.3`、`v1.4`、`post-v1.4`、`v1.6`
+- **Historical closed branch:** `v1.5 Isolated ArcadeDB Server-backed Prototype`（22-24 不再继续）
+- **Active milestone:** none
+- **Current planning status:** `Phase 25` complete；等待新的 scope，而不是回补旧版本
+- **Known remaining debt:** repo-wide ESLint warnings 仍是 warning-only 历史基线；hybrid architecture 仍有 seam 成本；未来若再改 CLI 契约，仍需保持 docs / tests / machine output 同步
 
 ## Evolution
 
@@ -127,4 +107,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. 更新 Current State / Context / Key Decisions
 
 ---
-*Last updated: 2026-03-30 after starting v1.5 milestone*
+*Last updated: 2026-04-18 after reclassifying Phase 25 as v1.6 and closing v1.5*

@@ -10,7 +10,7 @@ Gate outcome: blocked
 2. 这次阻断首先出现在 provisioning 层：本机 Docker daemon 在拉取官方 `arcadedata/arcadedb:latest` 镜像时，因为代理超时而失败。
 3. 在没有 server 成功启动的情况下，直接对 `http://127.0.0.1:2480/api/v1/command/Imported` 的 smoke 重试得到 `ECONNREFUSED`，进一步确认当前环境不存在 reachable server。
 4. 当前证据没有表明必须先改 `StorageType` / `StorageFactory` / public schema 才能 smoke，因此它更符合 `blocked`，而不是 `fail`。
-5. 2026-03-31 的再验证没有改变结论：Docker daemon 仍挂在 `192.168.3.74:7890` 代理上，`timeout 20s docker pull arcadedata/arcadedb:latest` 仍未完成，因此 blocker 依旧成立。
+5. 2026-03-31 与 2026-04-18 的再验证都没有改变结论：虽然 2026-04-18 的 `docker info` 已恢复可用，但官方镜像拉取仍卡在 `192.168.3.74:7890` 代理超时，且 `127.0.0.1:2480` 仍无 reachable server，因此 blocker 依旧成立。
 
 ## Unlock Decision
 

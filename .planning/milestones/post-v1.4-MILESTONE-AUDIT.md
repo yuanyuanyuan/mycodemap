@@ -35,10 +35,10 @@ tech_debt:
 - Phases: `21`
 - Plans: `2`
 - Audit sources:
-  - `.planning/phases/21-evaluate-arcadedb-node-integration-feasibility/21-UAT.md`
-  - `.planning/phases/21-evaluate-arcadedb-node-integration-feasibility/21-01-SUMMARY.md`
-  - `.planning/phases/21-evaluate-arcadedb-node-integration-feasibility/21-02-SUMMARY.md`
-  - `.planning/phases/21-evaluate-arcadedb-node-integration-feasibility/21-VALIDATION.md`
+- `.planning/milestones/post-v1.4-phases/21-evaluate-arcadedb-node-integration-feasibility/21-UAT.md`
+- `.planning/milestones/post-v1.4-phases/21-evaluate-arcadedb-node-integration-feasibility/21-01-SUMMARY.md`
+- `.planning/milestones/post-v1.4-phases/21-evaluate-arcadedb-node-integration-feasibility/21-02-SUMMARY.md`
+- `.planning/milestones/post-v1.4-phases/21-evaluate-arcadedb-node-integration-feasibility/21-VALIDATION.md`
   - `.planning/ROADMAP.md`
   - `.planning/REQUIREMENTS.md`
   - `.planning/PROJECT.md`
