@@ -1,29 +1,14 @@
 # CLAUDE.md — CodeMap 执行手册
 
-> 本文件是 Claude Code 执行手册。规则细节按下方路由加载 `docs/rules/*.md`。
-> 不与 `AGENTS.md`（Codex 专用）交叉引用。
+> 本文件只做入口路由；细节下沉到 `docs/rules/*.md`、`ARCHITECTURE.md`、`AI_GUIDE.md`。
 
 ## 加载顺序
 
+```text
+CLAUDE.md → docs/rules/<最相关 1-2 份> → ARCHITECTURE.md → AI_GUIDE.md → 代码事实
 ```
-本文件 → docs/rules/*.md → ARCHITECTURE.md → AI_GUIDE.md → 代码事实
-```
 
-## 渐进加载协议
-
-按 T0→T1→T2 加载，不超出当前决策所需。
-
-| 层级 | 加载时机 | 内容 |
-|------|---------|------|
-| **T0-契约** | 每会话 | `CLAUDE.md`（本文件）、`RTK.md` |
-| **T1-规则** | 任务开始时 | `docs/rules/` 中与当前任务相关的 1-2 个文件 |
-| **T2-知识** | 明确需要时 | `ARCHITECTURE.md`、`AI_GUIDE.md`、具体代码/测试 |
-
-> **禁止**：不要一次性加载所有规则文件。每次只加载与当前任务相关的规则。
-
-## 启动模板
-
-AI 接受任务时输出：
+## 执行回路
 
 ```markdown
 ## 任务分析
@@ -32,102 +17,72 @@ AI 接受任务时输出：
 **等级**：[L0/L1/L2/L3]
 
 ## 执行计划
-1. [Plan] 设计接口 → verify: [类型检查]
-2. [Build] 核心逻辑 + 测试 → verify: [测试通过]
-3. [Verify] 全量检查 → verify: [npm run check:all]
+1. [Plan] 明确边界 → verify: [最小相关检查]
+2. [Build] 落地改动 → verify: [定点测试/命令]
+3. [Verify] 扩大验证 → verify: [typecheck/lint/test/docs]
 ```
 
-## 验证速查
+## 修改后必须执行
 
 ```bash
-# 基础检查
-npm run typecheck          # TypeScript
-npm test                   # 单元测试
-npm run lint               # ESLint
-npm run check:all          # 全部
+# repo-local rule control 默认先 report-only
+python3 scripts/validate-rules.py code --report-only
 
-# CLI 调试（输出目录是 dist/，不是 build/）
-npm run build
-node dist/cli/index.js <cmd>
+# 代码基础检查
+npm run typecheck
+npm run lint
+npm test
 
-# 文档检查
+# 文档/入口/规则改动
 npm run docs:check
+node dist/cli/index.js ci check-docs-sync
 ```
 
-## 规则路由
+> `python3 scripts/validate-rules.py code --report-only` 是 post-edit 默认验证命令。只有在后续 gate 明确切到 enforce 时，才允许把它当 blocker。
 
-| 你的任务涉及… | 先读这个文件 |
-|--------------|-------------|
-| 代码质量红线 | `docs/rules/code-quality-redlines.md` |
-| 架构分层/依赖 | `docs/rules/architecture-guardrails.md` |
-| 测试规则 | `docs/rules/testing.md` |
-| CI / hooks / 验证 | `docs/rules/validation.md` |
-| 发布/部署 | `docs/rules/deployment.md` |
-| Agent 工程规则 | `docs/rules/engineering-with-codex-openai.md` |
-| 发布前检查 | `docs/rules/pre-release-checklist.md` |
+## 路径路由
+
+| 编辑路径 | 先读规则 |
+|---|---|
+| `src/cli/*` | `docs/rules/code-quality-redlines.md` + `docs/rules/architecture-guardrails.md` |
+| `src/domain/*` | `docs/rules/code-quality-redlines.md` + `docs/rules/architecture-guardrails.md` |
+| `src/server/*` | `docs/rules/code-quality-redlines.md` + `docs/rules/architecture-guardrails.md` |
+| `src/infrastructure/*` | `docs/rules/code-quality-redlines.md` + `docs/rules/architecture-guardrails.md` |
+| `src/interface/*` | `docs/rules/architecture-guardrails.md` |
+| `*.test.ts` | `docs/rules/testing.md` |
+| `docs/*` | `docs/rules/validation.md` |
+| `.githooks/*` | `docs/rules/validation.md` + `docs/rules/engineering-with-codex-openai.md` |
+| `.github/workflows/*` | `docs/rules/validation.md` + `docs/rules/engineering-with-codex-openai.md` |
+
+## Rule-system 默认值
+
+- 配置文件：`.claude/rule-system.config.json`
+- 默认开启：`enabled: true`
+- 默认按编辑路径路由：`route_by_edit_path: true`
+- 默认 soft gate：`soft_gate.change_analyzer: true`
+- 默认 hard gate：`hard_gate.mode: "report-only"`
 
 ## CodeMap CLI Dogfood
 
-用 CodeMap CLI 分析 CodeMap 自身：
-
 ```bash
-# 查找符号定义
 node dist/cli/index.js query -s "<symbol>"
-
-# 生成 symbol-level 调用依赖（实验性首期切片）
-node dist/cli/index.js generate --symbol-level
-# 若 stdout / codemap.json 出现 graphStatus=partial，先处理失败文件再信任图结果
-
-# 查找模块依赖
 node dist/cli/index.js deps -m "<module>"
-
-# 分析文件影响
 node dist/cli/index.js impact -f "<file>"
-
-# Experimental MCP（本地 stdio，只读）
-node dist/cli/index.js mcp install
-# 由 MCP host 启动，不要在普通终端期待人类输出
-node dist/cli/index.js mcp start
-
-# 通用搜索
 node dist/cli/index.js query -S "<keyword>" -j
+
+# Experimental MCP
+node dist/cli/index.js mcp install
+node dist/cli/index.js mcp start
 ```
 
-> 若 CLI 不可用，先运行 `npm run build`。CodeMap 不足时回退到 `rg` / `find`。
-> `mcp start` 的 `stdout` 专供 MCP 协议使用；欢迎信息、迁移提示和 runtime log 不应混入这个 transport。
+> 若 CLI 不可用，先运行 `npm run build`。`mcp start` 的 `stdout` 只能用于 MCP 协议，不能混入欢迎信息或 runtime log。
 
 ## 交付清单
 
-任务完成前自检：
+- [ ] 只改与任务直接相关的文件
+- [ ] 改后已执行 `python3 scripts/validate-rules.py code --report-only`
+- [ ] 已补最小相关验证，再扩大到 `typecheck/lint/test/docs`
+- [ ] 若改入口、规则、契约，已检查 `AI_GUIDE.md`
+- [ ] 交付中包含失败场景与可信度自评
 
-- [ ] 代码实现完整，符合需求
-- [ ] 架构合规（无跨层依赖）
-- [ ] `npm run typecheck` 通过
-- [ ] `npm test` 通过
-- [ ] 无 `console.log` / 未使用 import
-- [ ] 可信度自评
-
-**提交流程**：L0 → 直接 commit；L1+ → 生成 PR 描述，暂停等待审查。
-
-## 交付格式
-
-```markdown
-## 改了什么
-- 文件清单 + 变更摘要
-
-## 为什么改
-- 需求背景 + 设计决策 + 边界说明
-
-## 验证
-- 执行的检查命令及结果
-
-## 失败场景
-- 至少一个预演的失败模式
-
-## 可信度自评
-- 确定 / 推测 / 需验证 / 风险
-```
-
--- -
-
-**生效标志**：入口文件保持短小，规则只存于一处，知识按需加载。
+**生效标志**：入口文件短、路由明确、验证命令可复制、规则只在一处维护。

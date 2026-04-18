@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "enabled": true,
+  "route_by_edit_path": true,
+  "soft_gate": {
+    "change_analyzer": true,
+    "rule_injector": false,
+    "human_escalation": false
+  },
+  "hard_gate": {
+    "mode": "report-only"
+  }
+}
