@@ -22,7 +22,7 @@ tech-stack:
 key-files:
   created:
     - src/cli/commands/__tests__/complexity-command.test.ts
-    - .planning/phases/25-fix-codemap-cli-dogfood-gaps-hard-fail-analyze-find-scan-err/25-02-SUMMARY.md
+    - .planning/milestones/v1.6-phases/25-fix-codemap-cli-dogfood-gaps-hard-fail-analyze-find-scan-err/25-02-SUMMARY.md
   modified:
     - src/cli/commands/complexity.ts
     - src/cli/commands/ci.ts
@@ -99,7 +99,7 @@ No commits were created in this Codex run because the active developer instructi
 - **Found during:** Summary creation
 - **Issue:** GSD execute-plan normally commits task and metadata changes, but Codex developer instructions prohibit commits unless explicitly requested.
 - **Fix:** Left changes uncommitted and documented the deviation.
-- **Files modified:** `.planning/phases/25-fix-codemap-cli-dogfood-gaps-hard-fail-analyze-find-scan-err/25-02-SUMMARY.md`
+- **Files modified:** `.planning/milestones/v1.6-phases/25-fix-codemap-cli-dogfood-gaps-hard-fail-analyze-find-scan-err/25-02-SUMMARY.md`
 - **Verification:** `rtk git status --short` shows changes are present but uncommitted.
 - **Committed in:** Not committed
 

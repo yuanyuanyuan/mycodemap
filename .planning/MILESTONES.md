@@ -1,5 +1,32 @@
 # Project Milestones: CodeMap
 
+## post-v1.6 Symbol-level graph and experimental MCP thin slice (Completed: 2026-04-19)
+
+**Delivered:** 在不改变默认模块级 surface 的前提下，完成 `generate --symbol-level` → partial graph truth → experimental local MCP stdio query / impact 的最小纵向切片，并用真实 dist smoke 证明协议输出干净可消费。
+
+**Phases completed:** 26 (3 plans total)
+
+**Key accomplishments:**
+
+- 打通 opt-in `generate --symbol-level`，把 `smart-parser` 的 symbol-level 调用真相落到 CodeGraph / SQLite
+- 把 `graph_status` / `generated_at` / `failed_file_count` / `parse_failure_files` 固定为正式 truth，而不是依赖日志猜测
+- 引入 experimental `mycodemap mcp start` / `mycodemap mcp install`，暴露 `codemap_query` / `codemap_impact`
+- 同步 `README.md`、`AI_GUIDE.md`、`docs/ai-guide/COMMANDS.md`、`docs/ai-guide/OUTPUT.md`、`docs/ai-guide/INTEGRATION.md` 的真实 stdio MCP path
+- 真实 dogfood 抓到 filesystem 日期反序列化缺口，并以 regression test 固定修复
+
+**Stats:**
+
+- `5/5` follow-up requirements satisfied，`1/1` phase complete
+- 3 个 plans 全部完成并验证
+- real `dist` CLI + MCP stdio smoke 已通过；`stderrPreview = null`
+- 当前 active milestone 再次回到 none
+
+**Git range:** 未单独捕获（当前运行约束禁止自动 commit / tag / push）
+
+**What's next:** `TODOS.md` 中仍保留首期后复盘项：query 质量基线、graph freshness identity、`mcp install` host support matrix，以及是否继续保留 MCP 在首期 surface。
+
+---
+
 ## v1.6 CodeMap CLI dogfood reliability hardening (Completed: 2026-04-18)
 
 **Delivered:** 将 2026-04-17 eatdogfood 直接暴露的 Agent-facing CLI 可靠性缺口收口为正式产品契约：`analyze find` 不再静默伪装成功，相邻 CLI 子命令也提供稳定机器输出与文档真相。

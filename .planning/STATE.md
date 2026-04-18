@@ -1,13 +1,13 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.6
-milestone_name: CodeMap CLI dogfood reliability hardening
-current_phase: 25
-current_phase_name: fix-codemap-cli-dogfood-gaps-hard-fail-analyze-find-scan-err
+milestone: post-v1.6
+milestone_name: Symbol-level graph and experimental MCP thin slice
+current_phase: 26
+current_phase_name: implement-symbol-level-graph-and-experimental-mcp-thin-slice
 current_plan: 3
 status: completed
-last_updated: "2026-04-18T06:49:13Z"
-last_activity: 2026-04-18
+last_updated: "2026-04-18T16:52:39Z"
+last_activity: 2026-04-19
 progress:
   total_phases: 1
   completed_phases: 1
@@ -20,24 +20,24 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-04-18)
+See: `.planning/PROJECT.md` (updated 2026-04-19)
 
 **Core Value:** 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
-**Current Focus:** Phase 25 complete — this is `v1.6`; the old Docker / ArcadeDB line is explicitly closed and no longer pending
+**Current Focus:** `post-v1.6 / Phase 26` 已完成；active planning surface 当前为空，保留的只是后续 TODO，不是未完成 phase
 
 ## Position
 
-**Milestone:** v1.6 CodeMap CLI dogfood reliability hardening
-**Current Phase:** 25
-**Current Phase Name:** fix-codemap-cli-dogfood-gaps-hard-fail-analyze-find-scan-err
+**Milestone:** post-v1.6 Symbol-level graph and experimental MCP thin slice
+**Current Phase:** 26
+**Current Phase Name:** implement-symbol-level-graph-and-experimental-mcp-thin-slice
 **Current Plan:** 3
 **Total Phases:** 1
 **Total Plans in Milestone:** 3
 **Total Plans in Phase:** 3
-**Status:** Phase 25 complete; waiting for next milestone scope
+**Status:** Phase 26 complete; waiting for next milestone scope
 **Progress:** [██████████] 100%
-**Last Activity:** 2026-04-18
-**Last Activity Description:** Reconciled planning truth so `Phase 25` stands as `v1.6` and `Phase 22-24` no longer route as pending work
+**Last Activity:** 2026-04-19
+**Last Activity Description:** Verified `Phase 26` end-to-end, wrote `26-VERIFICATION.md`, and reconciled roadmap / project truth as `post-v1.6`
 
 ## Decisions Made
 
@@ -45,6 +45,8 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 |------|---------|-----------|
 | 2026-04-18 | `v1.5` closed without continuation | User explicitly said Docker / ArcadeDB are no longer needed and prior unfinished work should not continue |
 | 2026-04-18 | `Phase 25` reclassified as `v1.6` | Phase 25 is the start of the new version rather than an out-of-band tail under v1.5 |
+| 2026-04-19 | `Phase 26` classified as `post-v1.6` thin slice follow-up | Scope is real new work after `v1.6`, but still a single-phase follow-up rather than a reopened old milestone |
+| 2026-04-19 | `Phase 26` completed | All 3 plans now have implementation summaries plus a formal verification artifact and real dist smoke evidence |
 | 2026-04-18 | `Phase 25` completed | All 3 plans passed focused tests, typecheck, docs:check, build, and dogfood-shaped `dist` CLI verification |
 | 2026-04-18 | `Phase 25 Plan 03` completed | AI-facing docs and guardrails now document analyze diagnostics, adjacent JSON status contracts, `query -S` guidance, and `rtk` wrapper-only scope |
 | 2026-04-18 | `Phase 25 Plan 02` completed | `complexity -f --json`, `ci assess-risk --json`, and `workflow start --json` now provide bounded machine-readable outputs |
@@ -55,7 +57,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 
 - 当前 active planning surface 无 blocker
 - 若要继续新工作，必须新开 phase / milestone；不要自动恢复 `Phase 22-24`
-- `Phase 25` 已完成；除非用户重新定 scope，否则不要默认扩写下一个版本
+- `Phase 26` 已完成；`TODOS.md` 中的项属于后续 scope，不要直接混回首期
 
 ## Accumulated Context
 
@@ -66,15 +68,22 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 - 2026-03-30: 曾启动 `v1.5` isolated prototype 主线；该分支现仅保留历史工件
 - 2026-04-17: Phase 25 added from eatdogfood report
 - 2026-04-18: 用户明确关闭旧版 Docker / ArcadeDB continuation，并将 `Phase 25` 视为 `v1.6`
+- 2026-04-18: Phase 26 added: Implement symbol-level graph and experimental MCP thin slice
+- 2026-04-18: Phase 26 Plan 01 completed: opt-in symbol-level generate + sqlite path + schema v3 round-trip
+- 2026-04-18: Phase 26 Plan 02 completed: `graphStatus` / partial graph truth landed through analyzer, storage, and docs
+- 2026-04-19: Phase 26 Plan 03 completed: experimental MCP stdio thin slice landed and passed real dist smoke
+- 2026-04-19: Phase 26 verification completed and planning truth reconciled as `post-v1.6`
 
 ### Verified Existing Capabilities
 
 - `design validate → design map → design handoff → design verify` 已作为正式协作链路 shipped
 - graph storage 当前 shipped surface 仍是 `filesystem` / `memory` / `kuzudb` / `auto`
 - `Phase 25` 已收口 `analyze find` diagnostics truth、相邻 CLI JSON status contract 与 AI docs guardrails
+- `Phase 26` 已收口 opt-in symbol-level generate、partial graph truth 与 experimental local MCP query / impact
 
 ### Risks To Watch
 
 - 不要再把已关闭的 `v1.5` 历史分支误当成 active blocker
 - 未来若再改 CLI / JSON contract，必须同步更新 AI docs 与 guardrail
 - 不要把 `rtk` 从执行包装层误写成 CodeMap 产品能力
+- `TODOS.md` 中的 MCP 去留、freshness identity 与 host support matrix 仍需未来 scope 单独决策

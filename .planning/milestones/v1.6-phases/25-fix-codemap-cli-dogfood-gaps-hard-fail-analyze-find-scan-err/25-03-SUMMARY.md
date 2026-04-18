@@ -22,7 +22,7 @@ tech-stack:
 
 key-files:
   created:
-    - .planning/phases/25-fix-codemap-cli-dogfood-gaps-hard-fail-analyze-find-scan-err/25-03-SUMMARY.md
+    - .planning/milestones/v1.6-phases/25-fix-codemap-cli-dogfood-gaps-hard-fail-analyze-find-scan-err/25-03-SUMMARY.md
   modified:
     - AI_GUIDE.md
     - CLAUDE.md
@@ -106,7 +106,7 @@ No commits were created in this Codex run because the active developer instructi
 - **Found during:** Summary creation
 - **Issue:** GSD execute-plan normally commits task and metadata changes, but Codex developer instructions prohibit commits unless explicitly requested.
 - **Fix:** Left changes uncommitted and documented the deviation.
-- **Files modified:** `.planning/phases/25-fix-codemap-cli-dogfood-gaps-hard-fail-analyze-find-scan-err/25-03-SUMMARY.md`
+- **Files modified:** `.planning/milestones/v1.6-phases/25-fix-codemap-cli-dogfood-gaps-hard-fail-analyze-find-scan-err/25-03-SUMMARY.md`
 - **Verification:** `rtk git status --short` shows changes are present but uncommitted.
 - **Committed in:** Not committed
 
