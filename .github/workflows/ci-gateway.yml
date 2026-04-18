@@ -26,6 +26,33 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Rule validation backstop
+        run: |
+          set +e
+          python3 scripts/validate-rules.py code
+          VALIDATE_EXIT=$?
+          set -e
+
+          case "$VALIDATE_EXIT" in
+            0)
+              echo "Rule validation passed."
+              ;;
+            1|4)
+              echo "Rule validation returned blocking exit code: $VALIDATE_EXIT"
+              exit 1
+              ;;
+            2)
+              echo "Rule validation returned warn-only (P1); continuing CI backstop."
+              ;;
+            3)
+              echo "Rule validation returned notice-only (P2); continuing CI backstop."
+              ;;
+            *)
+              echo "Rule validation returned unexpected exit code: $VALIDATE_EXIT"
+              exit 1
+              ;;
+          esac
+
       - name: Validate documentation guardrails
         run: npm run docs:check
 
