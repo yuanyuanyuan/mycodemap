@@ -850,7 +850,7 @@ async function runCommand(command, args, cwd, raw, defaultValue) {
           init.cmdInitNewProject(cwd, raw);
           break;
         case 'new-milestone':
-          init.cmdInitNewMilestone(cwd, raw);
+          init.cmdInitNewMilestone(cwd, raw, args.slice(2).join(' '));
           break;
         case 'quick':
           init.cmdInitQuick(cwd, args.slice(2).join(' '), raw);

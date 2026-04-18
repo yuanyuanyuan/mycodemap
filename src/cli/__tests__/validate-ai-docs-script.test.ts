@@ -97,14 +97,14 @@ describe('validate-ai-docs.js', () => {
     }).toThrow(/AI documentation guardrails failed/);
   });
 
-  it('fails when INTEGRATION reintroduces legacy analyze intent in argv-array form', () => {
+  it('fails when INTEGRATION reintroduces legacy analyze intent in shell form', () => {
     const fixtureRoot = createFixtureRoot();
     tempRoots.push(fixtureRoot);
 
     const integrationPath = path.join(fixtureRoot, 'docs/ai-guide/INTEGRATION.md');
     const updatedIntegration = readFileSync(integrationPath, 'utf8').replace(
-      "'analyze', '-i', 'find'",
-      "'analyze', '-i', 'search'"
+      'mycodemap analyze -i find -k "SymbolName" --json --structured',
+      'mycodemap analyze -i search -k "SymbolName" --json --structured'
     );
     writeFileSync(integrationPath, updatedIntegration);
 
