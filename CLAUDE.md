@@ -74,17 +74,27 @@ npm run docs:check
 # 查找符号定义
 node dist/cli/index.js query -s "<symbol>"
 
+# 生成 symbol-level 调用依赖（实验性首期切片）
+node dist/cli/index.js generate --symbol-level
+# 若 stdout / codemap.json 出现 graphStatus=partial，先处理失败文件再信任图结果
+
 # 查找模块依赖
 node dist/cli/index.js deps -m "<module>"
 
 # 分析文件影响
 node dist/cli/index.js impact -f "<file>"
 
+# Experimental MCP（本地 stdio，只读）
+node dist/cli/index.js mcp install
+# 由 MCP host 启动，不要在普通终端期待人类输出
+node dist/cli/index.js mcp start
+
 # 通用搜索
 node dist/cli/index.js query -S "<keyword>" -j
 ```
 
 > 若 CLI 不可用，先运行 `npm run build`。CodeMap 不足时回退到 `rg` / `find`。
+> `mcp start` 的 `stdout` 专供 MCP 协议使用；欢迎信息、迁移提示和 runtime log 不应混入这个 transport。
 
 ## 交付清单
 
