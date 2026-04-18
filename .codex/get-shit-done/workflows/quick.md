@@ -570,6 +570,24 @@ EXPECTED_BASE=$(git rev-parse HEAD)
 
 Spawn gsd-executor with plan reference:
 
+Resolve scoped rule context first. Use explicit target files from the quick task
+plan when available.
+
+```bash
+RULE_CONTEXT="No scoped rules inferred"
+QUICK_RULE_FILES="{explicit target files parsed from the quick task plan}"
+if [ -n "$QUICK_RULE_FILES" ]; then
+  CANDIDATE_RULE_CONTEXT=$(node scripts/rule-context.mjs --files ${QUICK_RULE_FILES} --format prompt 2>/dev/null || true)
+  if [ -n "$CANDIDATE_RULE_CONTEXT" ]; then
+    RULE_CONTEXT="$CANDIDATE_RULE_CONTEXT"
+  fi
+fi
+```
+
+Only inject matched rules. Do NOT inject all rules documents as a fallback.
+If there are no explicit target files, `<rule_context>` must be exactly
+`No scoped rules inferred`.
+
 ```
 Task(
   prompt="
@@ -589,11 +607,15 @@ This corrects a known issue where EnterWorktree creates branches from main inste
 <files_to_read>
 - ${QUICK_DIR}/${quick_id}-PLAN.md (Plan)
 - .planning/STATE.md (Project state)
-- ./AGENTS.md (Project instructions, if exists)
-- .codex/skills/ or .agents/skills/ (Project skills, if either exists — list skills, read SKILL.md for each, follow relevant rules during implementation)
-</files_to_read>
+  - ./AGENTS.md (Project instructions, if exists)
+  - .codex/skills/ or .agents/skills/ (Project skills, if either exists — list skills, read SKILL.md for each, follow relevant rules during implementation)
+  </files_to_read>
 
-${AGENT_SKILLS_EXECUTOR}
+  <rule_context>
+  ${RULE_CONTEXT}
+  </rule_context>
+
+  ${AGENT_SKILLS_EXECUTOR}
 
 <constraints>
 - Execute all tasks in the plan

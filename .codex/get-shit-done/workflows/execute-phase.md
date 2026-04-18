@@ -388,7 +388,27 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
    - Bad: "Executing terrain generation plan"
    - Good: "Procedural terrain generator using Perlin noise — creates height maps, biome zones, and collision meshes. Required before vehicle physics can interact with ground."
 
-3. **Spawn executor agents:**
+3. **Derive scoped rule context (BEFORE each executor spawn):**
+
+   Before spawning an executor, resolve a scoped `<rule_context>` from the target
+   plan's `files_modified` frontmatter entries.
+
+   ```bash
+   RULE_CONTEXT="No scoped rules inferred"
+   PLAN_RULE_FILES="{space-separated files_modified entries from the target PLAN.md}"
+   if [ -n "$PLAN_RULE_FILES" ]; then
+     CANDIDATE_RULE_CONTEXT=$(node scripts/rule-context.mjs --files ${PLAN_RULE_FILES} --format prompt 2>/dev/null || true)
+     if [ -n "$CANDIDATE_RULE_CONTEXT" ]; then
+       RULE_CONTEXT="$CANDIDATE_RULE_CONTEXT"
+     fi
+   fi
+   ```
+
+   Only inject matched rules. Do NOT inject all rules documents as a fallback.
+   If the plan has no parseable target file list, `<rule_context>` must be exactly
+   `No scoped rules inferred`.
+
+4. **Spawn executor agents:**
 
    Pass paths only — executors read files themselves with their fresh context window.
    For 200k models, this keeps orchestrator context lean (~10-15%).
@@ -482,12 +502,16 @@ Execute each selected wave in sequence. Within a wave: parallel if `PARALLELIZAT
        @/data/codemap/.codex/get-shit-done/workflows/execute-plan.md
        @/data/codemap/.codex/get-shit-done/templates/summary.md
        @/data/codemap/.codex/get-shit-done/references/checkpoints.md
-       @/data/codemap/.codex/get-shit-done/references/tdd.md
-       ${CONTEXT_WINDOW < 200000 ? '' : '@/data/codemap/.codex/get-shit-done/references/executor-examples.md'}
-       </execution_context>
+        @/data/codemap/.codex/get-shit-done/references/tdd.md
+        ${CONTEXT_WINDOW < 200000 ? '' : '@/data/codemap/.codex/get-shit-done/references/executor-examples.md'}
+        </execution_context>
 
-       <files_to_read>
-       Read these files at execution start using the Read tool:
+        <rule_context>
+        ${RULE_CONTEXT}
+        </rule_context>
+
+        <files_to_read>
+        Read these files at execution start using the Read tool:
        - {phase_dir}/{plan_file} (Plan)
        - .planning/PROJECT.md (Project context — core value, requirements, evolution rules)
        - .planning/STATE.md (State)
