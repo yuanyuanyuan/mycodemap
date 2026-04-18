@@ -1,35 +1,19 @@
 {
-  "backed_up_at": "2026-04-15T08:48:12.612Z",
-  "from_version": "1.30.0",
-  "from_manifest_timestamp": "2026-03-28T07:05:16.004Z",
+  "backed_up_at": "2026-04-18T07:46:11.706Z",
+  "from_version": "1.36.0",
+  "from_manifest_timestamp": "2026-04-15T08:48:12.652Z",
   "files": [
     "get-shit-done/bin/gsd-tools.cjs",
     "get-shit-done/bin/lib/commands.cjs",
     "get-shit-done/bin/lib/core.cjs",
     "get-shit-done/bin/lib/init.cjs",
-    "get-shit-done/bin/lib/milestone.cjs",
-    "get-shit-done/bin/lib/roadmap.cjs",
-    "get-shit-done/workflows/audit-milestone.md",
-    "get-shit-done/workflows/autonomous.md",
-    "get-shit-done/workflows/complete-milestone.md",
-    "get-shit-done/workflows/help.md",
-    "get-shit-done/workflows/milestone-summary.md",
-    "get-shit-done/workflows/new-milestone.md",
-    "get-shit-done/workflows/plan-milestone-gaps.md"
+    "get-shit-done/bin/lib/roadmap.cjs"
   ],
   "pristine_hashes": {
-    "get-shit-done/bin/gsd-tools.cjs": "af10545eae9b4339a12dee0b30048830f52788e62aefb3cba489d67c3236ab74",
-    "get-shit-done/bin/lib/commands.cjs": "95a7ff9eda6a8099aa26dbc4b3cc97d1d8c414bf106540b274c7e871dd73fdb7",
-    "get-shit-done/bin/lib/core.cjs": "a5fe1881148394eb84df62e223392e94bba61a4dd090d6ba348a5cff2368e707",
-    "get-shit-done/bin/lib/init.cjs": "34064df829bedad2345b9d41302b7f49e1ee8e8eadb0783d108e1f74c5a19e46",
-    "get-shit-done/bin/lib/milestone.cjs": "9d8a9bdb4623c981c272771c185ee5fd8babbe0ed99800cf2376e8f8d3b3b6b6",
-    "get-shit-done/bin/lib/roadmap.cjs": "0fdc875ca221710be2b129b1751cd3b4a4fa75361d23b3ef48950462b18aea08",
-    "get-shit-done/workflows/audit-milestone.md": "f9f4dc57124599441242cc7f11eb7c970509ad3d27bab30f78eb72a21ff23be4",
-    "get-shit-done/workflows/autonomous.md": "d5f27922bdabe0bab5051dd65900ef8ad8700ff7c22a27584685be695fea0800",
-    "get-shit-done/workflows/complete-milestone.md": "833f196e80ef47d0e0272090148e0dea85a5336318dc5990078c98a6d91fdf23",
-    "get-shit-done/workflows/help.md": "d4dfaf16cd48611ad1c4624e12564f4a9f6e2b858bb3961f9041d0d97afc5005",
-    "get-shit-done/workflows/milestone-summary.md": "537954cbffa420ac6f8577a5922ba8146f6c43391b9383307d79f05caa73dea8",
-    "get-shit-done/workflows/new-milestone.md": "de20c1b67bac5fd808636a89f6adfee309593f702e4cc35b0cc1d70811581d41",
-    "get-shit-done/workflows/plan-milestone-gaps.md": "e9790c5823195c3221aa7f2539d48871e0194a7ec4cd5ffe6f65801a0ec2f547"
+    "get-shit-done/bin/gsd-tools.cjs": "4972be26ba611dde1487d71b17e390e94c60be8c0aa80e798496195c25549517",
+    "get-shit-done/bin/lib/commands.cjs": "41422db74878df6ef72cb4f4a5410a68dae42ca202cda36908e4b2723e707f15",
+    "get-shit-done/bin/lib/core.cjs": "42a188529baeb56e15620ca3840278e9b378a7ff06ab550c214db72c7e37fa8a",
+    "get-shit-done/bin/lib/init.cjs": "c4d698e58554ca14658ed7b87444ca05d3a3553ab34cbc89533ddc5e551f81ba",
+    "get-shit-done/bin/lib/roadmap.cjs": "c0d5c9ae872c5182f13bcb32157bbfc8903c379342e994d57f04b2a4d3262027"
   }
 }
