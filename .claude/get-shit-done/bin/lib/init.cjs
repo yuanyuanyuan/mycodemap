@@ -6,7 +6,6 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, stripShippedMilestones, extractCurrentMilestone, normalizePhaseName, planningPaths, planningDir, planningRoot, toPosixPath, output, error, checkAgentsInstalled, phaseTokenMatches } = require('./core.cjs');
-const { extractFrontmatter } = require('./frontmatter.cjs');
 
 function getLatestCompletedMilestone(cwd) {
   const milestonesPath = path.join(planningRoot(cwd), 'MILESTONES.md');
@@ -14,7 +13,7 @@ function getLatestCompletedMilestone(cwd) {
 
   try {
     const content = fs.readFileSync(milestonesPath, 'utf-8');
-    const match = content.match(/^##\s+((?:post-)?v[\d.]+)\s+(.+?)\s+\(Shipped:/mi);
+    const match = content.match(/^##\s+(v[\d.]+)\s+(.+?)\s+\(Shipped:/m);
     if (!match) return null;
     return {
       version: match[1],
@@ -23,93 +22,6 @@ function getLatestCompletedMilestone(cwd) {
   } catch {
     return null;
   }
-}
-
-function normalizeSeedTitle(title) {
-  return String(title || '')
-    .replace(/^SEED-[\w-]+:\s*/i, '')
-    .trim();
-}
-
-function listAvailableSeeds(cwd) {
-  const seedsDir = path.join(planningRoot(cwd), 'seeds');
-  if (!fs.existsSync(seedsDir)) return [];
-
-  const allowedStatuses = new Set(['dormant', 'active', 'triggered']);
-  let entries = [];
-  try {
-    entries = fs.readdirSync(seedsDir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-
-  const seeds = [];
-  for (const entry of entries) {
-    if (!entry.isFile()) continue;
-    if (!entry.name.startsWith('SEED-') || !entry.name.endsWith('.md')) continue;
-
-    const filePath = path.join(seedsDir, entry.name);
-    let content = '';
-    try {
-      content = fs.readFileSync(filePath, 'utf-8');
-    } catch {
-      continue;
-    }
-
-    const fm = extractFrontmatter(content);
-    const status = String(fm.status || 'dormant').trim().toLowerCase();
-    if (!allowedStatuses.has(status)) continue;
-
-    const headingMatch = content.match(/^#\s*(.+)$/m);
-    const title = normalizeSeedTitle(fm.title || headingMatch?.[1] || entry.name.replace(/\.md$/i, ''));
-
-    seeds.push({
-      id: String(fm.id || '').trim() || entry.name.replace(/\.md$/i, '').split('-').slice(0, 2).join('-'),
-      status,
-      title,
-      trigger_when: String(fm.trigger_when || '').trim(),
-      scope: String(fm.scope || '').trim(),
-      planted: String(fm.planted || '').trim(),
-      planted_during: String(fm.planted_during || '').trim(),
-      path: toPosixPath(path.relative(cwd, filePath)),
-    });
-  }
-
-  return seeds.sort((left, right) => left.id.localeCompare(right.id));
-}
-
-function tokenizeSeedQuery(query) {
-  return String(query || '')
-    .toLowerCase()
-    .split(/[^a-z0-9]+/g)
-    .filter(Boolean);
-}
-
-function rankMatchingSeeds(seeds, query) {
-  const terms = [...new Set(tokenizeSeedQuery(query))];
-  if (terms.length === 0) return [];
-
-  return seeds
-    .map(seed => {
-      const haystack = [
-        seed.title,
-        seed.trigger_when,
-        seed.scope,
-        seed.planted_during,
-      ].join(' ').toLowerCase();
-      const matched_terms = terms.filter(term => haystack.includes(term));
-      if (matched_terms.length === 0) return null;
-      return {
-        ...seed,
-        matched_terms,
-        match_score: matched_terms.length,
-      };
-    })
-    .filter(Boolean)
-    .sort((left, right) => (
-      right.match_score - left.match_score
-      || left.id.localeCompare(right.id)
-    ));
 }
 
 /**
@@ -132,6 +44,22 @@ function withProjectRoot(cwd, result) {
   if (config.response_language) {
     result.response_language = config.response_language;
   }
+  // Inject project identity into all init outputs so handoff blocks
+  // can include project context for cross-session continuity.
+  if (config.project_code) {
+    result.project_code = config.project_code;
+  }
+  // Extract project title from PROJECT.md first H1 heading.
+  const projectMdPath = path.join(planningDir(cwd), 'PROJECT.md');
+  try {
+    if (fs.existsSync(projectMdPath)) {
+      const content = fs.readFileSync(projectMdPath, 'utf8');
+      const h1Match = content.match(/^#\s+(.+)$/m);
+      if (h1Match) {
+        result.project_title = h1Match[1].trim();
+      }
+    }
+  } catch { /* intentionally empty */ }
   return result;
 }
 
@@ -326,6 +254,12 @@ function cmdInitPlanPhase(cwd, phase, raw, options = {}) {
     nyquist_validation_enabled: config.nyquist_validation,
     commit_docs: config.commit_docs,
     text_mode: config.text_mode,
+    // Auto-advance config — included so workflows don't need separate config-get
+    // calls for these values, which causes infinite config-read loops on some models
+    // (e.g. Kimi K2.5). See #2192.
+    auto_advance: !!(config.auto_advance),
+    auto_chain_active: !!(config._auto_chain_active),
+    mode: config.mode || 'interactive',
 
     // Phase info
     phase_found: !!phaseInfo,
@@ -515,13 +449,10 @@ function cmdInitNewProject(cwd, raw) {
   output(withProjectRoot(cwd, result), raw);
 }
 
-function cmdInitNewMilestone(cwd, raw, milestoneHintArgs = []) {
+function cmdInitNewMilestone(cwd, raw) {
   const config = loadConfig(cwd);
   const milestone = getMilestoneInfo(cwd);
   const latestCompleted = getLatestCompletedMilestone(cwd);
-  const availableSeeds = listAvailableSeeds(cwd);
-  const seedMatchQuery = milestoneHintArgs.join(' ').trim();
-  const matchingSeeds = seedMatchQuery ? rankMatchingSeeds(availableSeeds, seedMatchQuery) : [];
   const phasesDir = path.join(planningDir(cwd), 'phases');
   let phaseDirCount = 0;
 
@@ -550,11 +481,6 @@ function cmdInitNewMilestone(cwd, raw, milestoneHintArgs = []) {
     latest_completed_milestone_name: latestCompleted?.name || null,
     phase_dir_count: phaseDirCount,
     phase_archive_path: latestCompleted ? toPosixPath(path.relative(cwd, path.join(planningRoot(cwd), 'milestones', `${latestCompleted.version}-phases`))) : null,
-    available_seed_count: availableSeeds.length,
-    available_seeds: availableSeeds,
-    seed_match_query: seedMatchQuery || null,
-    matching_seed_count: matchingSeeds.length,
-    matching_seeds: matchingSeeds,
 
     // File existence
     project_exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),
@@ -893,7 +819,6 @@ function cmdInitTodos(cwd, area, raw) {
 function cmdInitMilestoneOp(cwd, raw) {
   const config = loadConfig(cwd);
   const milestone = getMilestoneInfo(cwd);
-  const isDirInMilestone = getMilestonePhaseFilter(cwd);
 
   // Count phases
   let phaseCount = 0;
@@ -901,7 +826,7 @@ function cmdInitMilestoneOp(cwd, raw) {
   const phasesDir = path.join(planningDir(cwd), 'phases');
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).filter(isDirInMilestone);
+    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
     phaseCount = dirs.length;
 
     // Count phases with summaries (completed)
@@ -954,6 +879,7 @@ function cmdInitMilestoneOp(cwd, raw) {
 
 function cmdInitMapCodebase(cwd, raw) {
   const config = loadConfig(cwd);
+  const now = new Date();
 
   // Check for existing codebase maps
   const codebaseDir = path.join(planningRoot(cwd), 'codebase');
@@ -971,6 +897,10 @@ function cmdInitMapCodebase(cwd, raw) {
     search_gitignored: config.search_gitignored,
     parallelization: config.parallelization,
     subagent_timeout: config.subagent_timeout,
+
+    // Timestamps
+    date: now.toISOString().split('T')[0],
+    timestamp: now.toISOString(),
 
     // Paths
     codebase_dir: '.planning/codebase',
@@ -1121,6 +1051,17 @@ function cmdInitManager(cwd, raw) {
 
   // Dependency satisfaction: check if all depends_on phases are complete
   const completedNums = new Set(phases.filter(p => p.disk_status === 'complete').map(p => p.number));
+
+  // Also include phases from previously shipped milestones — they are all
+  // complete by definition (a milestone only ships when all phases are done).
+  // rawContent is the full ROADMAP.md (including <details>-wrapped shipped
+  // milestone sections that extractCurrentMilestone strips out).
+  const _allCompletedPattern = /-\s*\[x\]\s*.*Phase\s+(\d+[A-Z]?(?:\.\d+)*)[:\s]/gi;
+  let _allMatch;
+  while ((_allMatch = _allCompletedPattern.exec(rawContent)) !== null) {
+    completedNums.add(_allMatch[1]);
+  }
+
   for (const phase of phases) {
     if (!phase.depends_on || /^none$/i.test(phase.depends_on.trim())) {
       phase.deps_satisfied = true;
@@ -1139,15 +1080,10 @@ function cmdInitManager(cwd, raw) {
       : '—';
   }
 
-  // Sliding window: discuss is sequential — only the first undiscussed phase is available
-  let foundNextToDiscuss = false;
   for (const phase of phases) {
-    if (!foundNextToDiscuss && (phase.disk_status === 'empty' || phase.disk_status === 'no_directory')) {
-      phase.is_next_to_discuss = true;
-      foundNextToDiscuss = true;
-    } else {
-      phase.is_next_to_discuss = false;
-    }
+    phase.is_next_to_discuss =
+      (phase.disk_status === 'empty' || phase.disk_status === 'no_directory') &&
+      phase.deps_satisfied;
   }
 
   // Check for WAITING.json signal
@@ -1275,6 +1211,10 @@ function cmdInitManager(cwd, raw) {
 }
 
 function cmdInitProgress(cwd, raw) {
+  try {
+    const { pruneOrphanedWorktrees } = require('./core.cjs');
+    pruneOrphanedWorktrees(cwd);
+  } catch (_) {}
   const config = loadConfig(cwd);
   const milestone = getMilestoneInfo(cwd);
 
@@ -1687,75 +1627,207 @@ function cmdAgentSkills(cwd, agentType, raw) {
 /**
  * Generate a skill manifest from a skills directory.
  *
- * Scans the given skills directory for subdirectories containing SKILL.md,
- * extracts frontmatter (name, description) and trigger conditions from the
- * body text, and returns an array of skill descriptors.
+ * Scans the canonical skill discovery roots and returns a normalized
+ * inventory object with discovered skills, root metadata, and installation
+ * summary flags. A legacy `skillsDir` override is still accepted for focused
+ * scans, but the default mode is multi-root discovery.
  *
- * @param {string} skillsDir - Absolute path to the skills directory
- * @returns {Array<{name: string, description: string, triggers: string[], path: string}>}
+ * @param {string} cwd - Project root directory
+ * @param {string|null} [skillsDir] - Optional absolute path to a specific skills directory
+ * @returns {{
+ *   skills: Array<{name: string, description: string, triggers: string[], path: string, file_path: string, root: string, scope: string, installed: boolean, deprecated: boolean}>,
+ *   roots: Array<{root: string, path: string, scope: string, present: boolean, skill_count?: number, command_count?: number, deprecated?: boolean}>,
+ *   installation: { gsd_skills_installed: boolean, legacy_claude_commands_installed: boolean },
+ *   counts: { skills: number, roots: number }
+ * }}
  */
-function buildSkillManifest(skillsDir) {
+function buildSkillManifest(cwd, skillsDir = null) {
   const { extractFrontmatter } = require('./frontmatter.cjs');
+  const os = require('os');
 
-  if (!fs.existsSync(skillsDir)) return [];
+  const canonicalRoots = skillsDir ? [{
+    root: path.resolve(skillsDir),
+    path: path.resolve(skillsDir),
+    scope: 'custom',
+    present: fs.existsSync(skillsDir),
+    kind: 'skills',
+  }] : [
+    {
+      root: '.claude/skills',
+      path: path.join(cwd, '.claude', 'skills'),
+      scope: 'project',
+      kind: 'skills',
+    },
+    {
+      root: '.agents/skills',
+      path: path.join(cwd, '.agents', 'skills'),
+      scope: 'project',
+      kind: 'skills',
+    },
+    {
+      root: '.cursor/skills',
+      path: path.join(cwd, '.cursor', 'skills'),
+      scope: 'project',
+      kind: 'skills',
+    },
+    {
+      root: '.github/skills',
+      path: path.join(cwd, '.github', 'skills'),
+      scope: 'project',
+      kind: 'skills',
+    },
+    {
+      root: '.codex/skills',
+      path: path.join(cwd, '.codex', 'skills'),
+      scope: 'project',
+      kind: 'skills',
+    },
+    {
+      root: '~/.claude/skills',
+      path: path.join(os.homedir(), '.claude', 'skills'),
+      scope: 'global',
+      kind: 'skills',
+    },
+    {
+      root: '~/.codex/skills',
+      path: path.join(os.homedir(), '.codex', 'skills'),
+      scope: 'global',
+      kind: 'skills',
+    },
+    {
+      root: '.claude/get-shit-done/skills',
+      path: path.join(os.homedir(), '.claude', 'get-shit-done', 'skills'),
+      scope: 'import-only',
+      kind: 'skills',
+      deprecated: true,
+    },
+    {
+      root: '.claude/commands/gsd',
+      path: path.join(os.homedir(), '.claude', 'commands', 'gsd'),
+      scope: 'legacy-commands',
+      kind: 'commands',
+      deprecated: true,
+    },
+  ];
 
-  let entries;
-  try {
-    entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
+  const skills = [];
+  const roots = [];
+  let legacyClaudeCommandsInstalled = false;
+  for (const rootInfo of canonicalRoots) {
+    const rootPath = rootInfo.path;
+    const rootSummary = {
+      root: rootInfo.root,
+      path: rootPath,
+      scope: rootInfo.scope,
+      present: fs.existsSync(rootPath),
+      deprecated: !!rootInfo.deprecated,
+    };
 
-  const manifest = [];
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-
-    const skillMdPath = path.join(skillsDir, entry.name, 'SKILL.md');
-    if (!fs.existsSync(skillMdPath)) continue;
-
-    let content;
-    try {
-      content = fs.readFileSync(skillMdPath, 'utf-8');
-    } catch {
+    if (!rootSummary.present) {
+      roots.push(rootSummary);
       continue;
     }
 
-    const frontmatter = extractFrontmatter(content);
-    const name = frontmatter.name || entry.name;
-    const description = frontmatter.description || '';
-
-    // Extract trigger lines from body text (after frontmatter)
-    const triggers = [];
-    const bodyMatch = content.match(/^---[\s\S]*?---\s*\n([\s\S]*)$/);
-    if (bodyMatch) {
-      const body = bodyMatch[1];
-      const triggerLines = body.match(/^TRIGGER\s+when:\s*(.+)$/gmi);
-      if (triggerLines) {
-        for (const line of triggerLines) {
-          const m = line.match(/^TRIGGER\s+when:\s*(.+)$/i);
-          if (m) triggers.push(m[1].trim());
-        }
+    if (rootInfo.kind === 'commands') {
+      let entries = [];
+      try {
+        entries = fs.readdirSync(rootPath, { withFileTypes: true });
+      } catch {
+        roots.push(rootSummary);
+        continue;
       }
+
+      const commandFiles = entries.filter(entry => entry.isFile() && entry.name.endsWith('.md'));
+      rootSummary.command_count = commandFiles.length;
+      if (rootSummary.command_count > 0) legacyClaudeCommandsInstalled = true;
+      roots.push(rootSummary);
+      continue;
     }
 
-    manifest.push({
-      name,
-      description,
-      triggers,
-      path: entry.name,
-    });
+    let entries;
+    try {
+      entries = fs.readdirSync(rootPath, { withFileTypes: true });
+    } catch {
+      roots.push(rootSummary);
+      continue;
+    }
+
+    let skillCount = 0;
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+
+      const skillMdPath = path.join(rootPath, entry.name, 'SKILL.md');
+      if (!fs.existsSync(skillMdPath)) continue;
+
+      let content;
+      try {
+        content = fs.readFileSync(skillMdPath, 'utf-8');
+      } catch {
+        continue;
+      }
+
+      const frontmatter = extractFrontmatter(content);
+      const name = frontmatter.name || entry.name;
+      const description = frontmatter.description || '';
+
+      // Extract trigger lines from body text (after frontmatter)
+      const triggers = [];
+      const bodyMatch = content.match(/^---[\s\S]*?---\s*\n([\s\S]*)$/);
+      if (bodyMatch) {
+        const body = bodyMatch[1];
+        const triggerLines = body.match(/^TRIGGER\s+when:\s*(.+)$/gmi);
+        if (triggerLines) {
+          for (const line of triggerLines) {
+            const m = line.match(/^TRIGGER\s+when:\s*(.+)$/i);
+            if (m) triggers.push(m[1].trim());
+          }
+        }
+      }
+
+      skills.push({
+        name,
+        description,
+        triggers,
+        path: entry.name,
+        file_path: `${entry.name}/SKILL.md`,
+        root: rootInfo.root,
+        scope: rootInfo.scope,
+        installed: rootInfo.scope !== 'import-only',
+        deprecated: !!rootInfo.deprecated,
+      });
+      skillCount++;
+    }
+
+    rootSummary.skill_count = skillCount;
+    roots.push(rootSummary);
   }
 
-  // Sort by name for deterministic output
-  manifest.sort((a, b) => a.name.localeCompare(b.name));
-  return manifest;
+  skills.sort((a, b) => {
+    const rootCmp = a.root.localeCompare(b.root);
+    return rootCmp !== 0 ? rootCmp : a.name.localeCompare(b.name);
+  });
+
+  const gsdSkillsInstalled = skills.some(skill => skill.name.startsWith('gsd-'));
+
+  return {
+    skills,
+    roots,
+    installation: {
+      gsd_skills_installed: gsdSkillsInstalled,
+      legacy_claude_commands_installed: legacyClaudeCommandsInstalled,
+    },
+    counts: {
+      skills: skills.length,
+      roots: roots.length,
+    },
+  };
 }
 
 /**
  * Command: generate skill manifest JSON.
  *
  * Options:
- *   --skills-dir <path>  Path to skills directory (required)
+ *   --skills-dir <path>  Optional absolute path to a single skills directory
  *   --write              Also write to .planning/skill-manifest.json
  */
 function cmdSkillManifest(cwd, args, raw) {
@@ -1764,12 +1836,7 @@ function cmdSkillManifest(cwd, args, raw) {
     ? args[skillsDirIdx + 1]
     : null;
 
-  if (!skillsDir) {
-    output([], raw);
-    return;
-  }
-
-  const manifest = buildSkillManifest(skillsDir);
+  const manifest = buildSkillManifest(cwd, skillsDir);
 
   // Optionally write to .planning/skill-manifest.json
   if (args.includes('--write')) {

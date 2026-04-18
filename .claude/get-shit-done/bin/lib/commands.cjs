@@ -544,7 +544,6 @@ function cmdProgressRender(cwd, format, raw) {
   const phasesDir = planningPaths(cwd).phases;
   const roadmapPath = planningPaths(cwd).roadmap;
   const milestone = getMilestoneInfo(cwd);
-  const isDirInMilestone = getMilestonePhaseFilter(cwd);
 
   const phases = [];
   let totalPlans = 0;
@@ -552,11 +551,7 @@ function cmdProgressRender(cwd, format, raw) {
 
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-    const dirs = entries
-      .filter(e => e.isDirectory())
-      .map(e => e.name)
-      .filter(isDirInMilestone)
-      .sort((a, b) => comparePhaseNum(a, b));
+    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => comparePhaseNum(a, b));
 
     for (const dir of dirs) {
       const dm = dir.match(/^(\d+(?:\.\d+)*)-?(.*)/);
@@ -836,8 +831,9 @@ function cmdStats(cwd, format, raw) {
     const headingPattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
     let match;
     while ((match = headingPattern.exec(roadmapContent)) !== null) {
-      phasesByNumber.set(match[1], {
-        number: match[1],
+      const key = normalizePhaseName(match[1]);
+      phasesByNumber.set(key, {
+        number: key,
         name: match[2].replace(/\(INSERTED\)/i, '').trim(),
         plans: 0,
         summaries: 0,
@@ -867,9 +863,10 @@ function cmdStats(cwd, format, raw) {
 
       const status = determinePhaseStatus(plans, summaries, path.join(phasesDir, dir), 'Not Started');
 
-      const existing = phasesByNumber.get(phaseNum);
-      phasesByNumber.set(phaseNum, {
-        number: phaseNum,
+      const normalizedNum = normalizePhaseName(phaseNum);
+      const existing = phasesByNumber.get(normalizedNum);
+      phasesByNumber.set(normalizedNum, {
+        number: normalizedNum,
         name: existing?.name || phaseName,
         plans: (existing?.plans || 0) + plans,
         summaries: (existing?.summaries || 0) + summaries,
