@@ -18,6 +18,7 @@ import { randomUUID } from 'crypto';
 import { PluginSystem } from '../../plugins/index.js';
 import type { AnalysisOptions, DependencyEdge, PluginDiagnostic, PluginExecutionReport } from '../../types/index.js';
 import type { ModuleInfo } from '../../types/index.js';
+import type { ModuleSymbol, SourceLocation } from '../../interface/types/index.js';
 import type { StorageConfig } from '../../interface/types/storage.js';
 import { loadCodemapConfig } from '../config-loader.js';
 
@@ -32,7 +33,21 @@ export interface GenerateCommandOptions {
   watch?: boolean;
   ai?: boolean;
   'ai-context'?: boolean;
+  symbolLevel?: boolean;
   __optionSources?: GenerateCommandOptionSources;
+}
+
+interface SymbolRegistryEntry {
+  id: string;
+  name: string;
+  fileKey: string;
+  line: number;
+}
+
+interface SymbolCallSite {
+  callee: string;
+  line: number;
+  column?: number;
 }
 
 function hasExplicitOverride(value: unknown, source?: string): boolean {
@@ -107,6 +122,107 @@ async function writePluginGeneratedFiles(
   }
 
   return { writtenFiles, diagnostics };
+}
+
+function createGeneratedId(prefix: 'proj' | 'mod' | 'sym' | 'dep'): string {
+  return `${prefix}_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+}
+
+function normalizeFileKey(rootDir: string, filePath: string): string {
+  const absolutePath = path.isAbsolute(filePath)
+    ? filePath
+    : path.resolve(rootDir, filePath);
+
+  return path.relative(rootDir, absolutePath).replace(/\\/g, '/');
+}
+
+function normalizeSymbolLocation(modulePath: string, location: SourceLocation): SourceLocation {
+  const shouldUseModulePath = !location.file
+    || location.file === path.basename(modulePath)
+    || !location.file.includes('/');
+
+  return {
+    ...location,
+    file: shouldUseModulePath ? modulePath : location.file,
+  };
+}
+
+function formatSymbolSignature(symbol: ModuleSymbol): string | undefined {
+  if (!symbol.signature) {
+    return undefined;
+  }
+
+  const parameters = symbol.signature.parameters
+    .map((parameter) => `${parameter.name}${parameter.optional ? '?' : ''}: ${parameter.type}`)
+    .join(', ');
+  const genericParams = symbol.signature.genericParams?.length
+    ? `<${symbol.signature.genericParams.join(', ')}>`
+    : '';
+  const asyncPrefix = symbol.signature.async ? 'async ' : '';
+
+  return `${asyncPrefix}${symbol.name}${genericParams}(${parameters}) => ${symbol.signature.returnType}`;
+}
+
+function getRegistryKey(fileKey: string, name: string): string {
+  return `${fileKey}::${name}`;
+}
+
+function registerSymbolEntry(
+  registryByFileAndName: Map<string, SymbolRegistryEntry[]>,
+  registryByName: Map<string, SymbolRegistryEntry[]>,
+  registryByFileAndLine: Map<string, SymbolRegistryEntry[]>,
+  entry: SymbolRegistryEntry
+): void {
+  const fileAndNameKey = getRegistryKey(entry.fileKey, entry.name);
+  const fileAndLineKey = `${entry.fileKey}:${entry.line}`;
+
+  registryByFileAndName.set(fileAndNameKey, [
+    ...(registryByFileAndName.get(fileAndNameKey) ?? []),
+    entry,
+  ]);
+  registryByName.set(entry.name, [
+    ...(registryByName.get(entry.name) ?? []),
+    entry,
+  ]);
+  registryByFileAndLine.set(fileAndLineKey, [
+    ...(registryByFileAndLine.get(fileAndLineKey) ?? []),
+    entry,
+  ]);
+}
+
+function resolveCallTarget(
+  moduleInfo: ModuleInfo,
+  call: SymbolCallSite,
+  rootDir: string,
+  registryByFileAndName: Map<string, SymbolRegistryEntry[]>,
+  registryByName: Map<string, SymbolRegistryEntry[]>,
+  registryByFileAndLine: Map<string, SymbolRegistryEntry[]>
+): SymbolRegistryEntry | null {
+  const currentFileKey = normalizeFileKey(rootDir, moduleInfo.path);
+  const localCandidates = registryByFileAndName.get(getRegistryKey(currentFileKey, call.callee)) ?? [];
+  if (localCandidates.length === 1) {
+    return localCandidates[0];
+  }
+
+  const crossFileMatches = moduleInfo.callGraph?.crossFileCalls?.filter(
+    (candidate) => candidate.resolved && candidate.callee === call.callee
+  ) ?? [];
+
+  const crossFileCandidates = crossFileMatches.flatMap((candidate) => {
+    const fileKey = normalizeFileKey(rootDir, candidate.calleeLocation.file);
+    const byLine = registryByFileAndLine.get(`${fileKey}:${candidate.calleeLocation.line}`) ?? [];
+    if (byLine.length > 0) {
+      return byLine;
+    }
+    return registryByFileAndName.get(getRegistryKey(fileKey, call.callee)) ?? [];
+  });
+
+  if (crossFileCandidates.length === 1) {
+    return crossFileCandidates[0];
+  }
+
+  const globalCandidates = registryByName.get(call.callee) ?? [];
+  return globalCandidates.length === 1 ? globalCandidates[0] : null;
 }
 
 export async function generateCommand(options: GenerateCommandOptions) {
@@ -208,7 +324,11 @@ export async function generateCommand(options: GenerateCommandOptions) {
 
     // 保存到 MVP3 storage
     spinner.text = '保存到代码图存储...';
-    const storageSaveResult = await saveToCodeGraphStorage(codeMap, loadedConfig.config.storage);
+    const storageSaveResult = await saveToCodeGraphStorage(
+      codeMap,
+      loadedConfig.config.storage,
+      options.symbolLevel === true
+    );
 
     spinner.succeed(chalk.green('✅ 代码地图生成完成！'));
 
@@ -218,6 +338,12 @@ export async function generateCommand(options: GenerateCommandOptions) {
     console.log(chalk.gray(`   代码行数: ${codeMap.summary.totalLines}`));
     console.log(chalk.gray(`   模块数量: ${codeMap.summary.totalModules}`));
     console.log(chalk.gray(`   导出符号: ${codeMap.summary.totalExports}`));
+    console.log(chalk.gray(
+      `   图状态: ${codeMap.graphStatus ?? 'complete'}`
+      + (codeMap.failedFileCount && codeMap.failedFileCount > 0
+        ? ` (${codeMap.failedFileCount} 个文件失败)`
+        : '')
+    ));
 
     // 显示实际使用的模式（Hybrid 模式下）
     if (codeMap.actualMode) {
@@ -258,14 +384,17 @@ export async function generateCommand(options: GenerateCommandOptions) {
 async function saveToCodeGraphStorage(codeMap: {
   project: { name: string; rootDir: string };
   modules: ModuleInfo[];
-}, storageConfig: StorageConfig): Promise<{ storageType: string }> {
+  graphStatus?: 'complete' | 'partial';
+  failedFileCount?: number;
+  parseFailureFiles?: string[];
+}, storageConfig: StorageConfig, symbolLevel: boolean): Promise<{ storageType: string }> {
   const storage = await storageFactory.createForProject(
     process.cwd(),
     storageConfig
   );
 
   try {
-    const codeGraph = convertToCodeGraph(codeMap);
+    const codeGraph = convertToCodeGraph(codeMap, { symbolLevel });
     const repository = new CodeGraphRepositoryImpl(storage);
     await repository.save(codeGraph);
 
@@ -283,20 +412,29 @@ async function saveToCodeGraphStorage(codeMap: {
 function convertToCodeGraph(codeMap: {
   project: { name: string; rootDir: string };
   modules: ModuleInfo[];
-}): CodeGraph {
+  graphStatus?: 'complete' | 'partial';
+  failedFileCount?: number;
+  parseFailureFiles?: string[];
+}, options: { symbolLevel: boolean }): CodeGraph {
   // 创建项目
   const project = new Project(
-    `proj_${randomUUID().replace(/-/g, '').slice(0, 16)}`,
+    createGeneratedId('proj'),
     codeMap.project.name,
     codeMap.project.rootDir
   );
 
   const codeGraph = new CodeGraph(project);
+  codeGraph.graphStatus = codeMap.graphStatus ?? 'complete';
+  codeGraph.failedFileCount = codeMap.failedFileCount ?? 0;
+  codeGraph.parseFailureFiles = [...(codeMap.parseFailureFiles ?? [])];
   const moduleIdMap = new Map<string, string>(); // path -> id
+  const symbolRegistryByFileAndName = new Map<string, SymbolRegistryEntry[]>();
+  const symbolRegistryByName = new Map<string, SymbolRegistryEntry[]>();
+  const symbolRegistryByFileAndLine = new Map<string, SymbolRegistryEntry[]>();
 
   // 第一遍：创建模块
   for (const mod of codeMap.modules) {
-    const moduleId = `mod_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+    const moduleId = createGeneratedId('mod');
     moduleIdMap.set(mod.path, moduleId);
 
     const module = new Module(
@@ -321,15 +459,30 @@ function convertToCodeGraph(codeMap: {
     if (!moduleId) continue;
 
     for (const symbol of mod.symbols) {
+      const normalizedLocation = normalizeSymbolLocation(mod.path, symbol.location);
       const symbolEntity = new SymbolEntity(
-        `sym_${randomUUID().replace(/-/g, '').slice(0, 16)}`,
+        createGeneratedId('sym'),
         moduleId,
         symbol.name,
         symbol.kind,
-        symbol.location,
-        symbol.visibility
+        normalizedLocation,
+        symbol.visibility,
+        formatSymbolSignature(symbol)
       );
       codeGraph.addSymbol(symbolEntity);
+
+      const registryEntry: SymbolRegistryEntry = {
+        id: symbolEntity.id,
+        name: symbolEntity.name,
+        fileKey: normalizeFileKey(codeMap.project.rootDir, normalizedLocation.file),
+        line: normalizedLocation.line,
+      };
+      registerSymbolEntry(
+        symbolRegistryByFileAndName,
+        symbolRegistryByName,
+        symbolRegistryByFileAndLine,
+        registryEntry
+      );
     }
   }
 
@@ -343,7 +496,7 @@ function convertToCodeGraph(codeMap: {
       if (!targetId) continue; // 外部依赖，跳过
 
       const dependency = new Dependency(
-        `dep_${randomUUID().replace(/-/g, '').slice(0, 16)}`,
+        createGeneratedId('dep'),
         sourceId,
         targetId,
         'import'
@@ -353,6 +506,51 @@ function convertToCodeGraph(codeMap: {
         codeGraph.addDependency(dependency);
       } catch {
         // 依赖已存在，忽略
+      }
+    }
+  }
+
+  if (options.symbolLevel) {
+    for (const mod of codeMap.modules) {
+      const currentFileKey = normalizeFileKey(codeMap.project.rootDir, mod.path);
+
+      for (const symbol of mod.symbols) {
+        const sourceCandidates = symbolRegistryByFileAndName.get(getRegistryKey(currentFileKey, symbol.name)) ?? [];
+        if (sourceCandidates.length !== 1 || !symbol.signature?.calls) {
+          continue;
+        }
+
+        const sourceEntry = sourceCandidates[0];
+        for (const call of symbol.signature.calls) {
+          const targetEntry = resolveCallTarget(
+            mod,
+            call,
+            codeMap.project.rootDir,
+            symbolRegistryByFileAndName,
+            symbolRegistryByName,
+            symbolRegistryByFileAndLine
+          );
+
+          if (!targetEntry || targetEntry.id === sourceEntry.id) {
+            continue;
+          }
+
+          try {
+            codeGraph.addDependency(new Dependency(
+              createGeneratedId('dep'),
+              sourceEntry.id,
+              targetEntry.id,
+              'call',
+              'symbol',
+              'symbol',
+              'high',
+              mod.path,
+              call.line
+            ));
+          } catch {
+            // 跳过重复或无法验证的调用边
+          }
+        }
       }
     }
   }

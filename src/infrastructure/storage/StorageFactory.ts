@@ -10,9 +10,10 @@ import type {
   StorageConfig,
   StorageType,
 } from '../../interface/types/storage.js';
-import { StorageBase, StorageError } from './interfaces/StorageBase.js';
+import { StorageError } from './interfaces/StorageBase.js';
 import { FileSystemStorage } from './adapters/FileSystemStorage.js';
 import { MemoryStorage } from './adapters/MemoryStorage.js';
+import { SQLiteStorage } from './adapters/SQLiteStorage.js';
 
 // 延迟加载可选依赖
 let KuzuDBStorage: typeof import('./adapters/KuzuDBStorage.js').KuzuDBStorage | null = null;
@@ -34,6 +35,7 @@ async function loadKuzuDBStorage(): Promise<typeof KuzuDBStorage> {
  * 根据配置自动选择合适的存储后端：
  * - filesystem: 文件系统存储（默认，无需额外依赖）
  * - memory: 内存存储（用于测试）
+ * - sqlite: SQLite 治理图存储
  * - kuzudb: KùzuDB 图数据库
  * - auto: 根据项目规模自动选择
  */
@@ -66,6 +68,9 @@ export class StorageFactory implements IStorageFactory {
       
       case 'memory':
         return new MemoryStorage();
+
+      case 'sqlite':
+        return new SQLiteStorage(config);
       
       case 'kuzudb': {
         const KuzuStorage = await loadKuzuDBStorage();
@@ -81,7 +86,7 @@ export class StorageFactory implements IStorageFactory {
       default:
         if (String(storageType) === 'neo4j') {
           throw new StorageError(
-            'Neo4j backend is no longer supported. Use filesystem, kuzudb, memory, or auto instead.',
+            'Neo4j backend is no longer supported. Use filesystem, sqlite, kuzudb, memory, or auto instead.',
             'UNSUPPORTED_STORAGE_TYPE'
           );
         }
@@ -167,6 +172,7 @@ export class StorageFactory implements IStorageFactory {
     switch (type) {
       case 'filesystem':
       case 'memory':
+      case 'sqlite':
         return true;
       case 'kuzudb':
         // 检查 kuzu 包是否可用
@@ -186,7 +192,7 @@ export class StorageFactory implements IStorageFactory {
    * @returns 可用存储类型数组
    */
   static getAvailableStorageTypes(): StorageType[] {
-    const allTypes: StorageType[] = ['filesystem', 'memory', 'kuzudb'];
+    const allTypes: StorageType[] = ['filesystem', 'memory', 'sqlite', 'kuzudb'];
     return allTypes.filter(type => StorageFactory.isStorageTypeAvailable(type));
   }
 }

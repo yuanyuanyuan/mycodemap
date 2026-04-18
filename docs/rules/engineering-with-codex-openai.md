@@ -45,11 +45,15 @@
 - 仓库内调试与验证优先使用 `node dist/cli/index.js <command>`，因为当前真实 CLI 入口是 `dist/cli/index.js`。
 - 需求澄清、影响分析、引用定位优先走 `query`、`analyze`、`deps`、`impact`，不要直接全仓漫游。
 - 修改 `design`、`analyze`、`query`、`ci`、`workflow` 等高影响命令时，至少验证：
+  - `node dist/cli/index.js generate --symbol-level` 只在显式开启时新增 symbol-level `call` 依赖；默认 `generate` 路径不得被悄悄改变；
   - `node dist/cli/index.js design validate mycodemap.design.md --json` 的成功/失败路径符合文档；
   - `node dist/cli/index.js design map mycodemap.design.md --json` 的 success/blocker 路径、`candidates` / `unknowns` / `diagnostics` 与文档一致；
   - `node dist/cli/index.js design handoff mycodemap.design.md --json` 的 `readyForExecution` / `approvals` / `assumptions` / `openQuestions` 与文档一致；
   - `node dist/cli/index.js design verify mycodemap.design.md --json` 的 `checklist` / `drift` / `diagnostics` / `readyForExecution` 与文档一致，并保持 review-needed / blocker 分离语义；
   - `node dist/cli/index.js check --contract mycodemap.design.md --against src` 的 JSON / `--human` / exit code 语义与文档一致；
+  - `node dist/cli/index.js mcp install` 必须显式标记 experimental，且只更新当前仓库 `.mcp.json`；
+  - `node dist/cli/index.js mcp start` 必须保持 `stdout` 协议纯净，不能混入欢迎信息、迁移提示或 runtime log；
+  - `codemap_query` / `codemap_impact` 必须返回显式 `graph_status` / `error.code`，并覆盖 `GRAPH_NOT_FOUND`、`SYMBOL_NOT_FOUND`、`AMBIGUOUS_EDGE`；
   - `node dist/cli/index.js analyze --help` 与文档示例一致；
   - `find` / `read` / `link` / `show` 中受影响的 public intent 可以在当前仓库运行；
   - `analyze -i find -k <keyword> --json --structured` 的 stdout JSON 必须包含 `diagnostics.status`，可区分 true zero-hit、`partialFailure` 与 `failure`；

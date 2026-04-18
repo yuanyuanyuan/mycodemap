@@ -9,8 +9,10 @@ import { dirname, join } from 'node:path';
 import type {
   StorageConfig,
   Cycle,
+  GraphMetadata,
   ImpactResult,
   ProjectStatistics,
+  SymbolImpactResult,
 } from '../../../interface/types/storage.js';
 import type {
   CodeGraph,
@@ -86,6 +88,11 @@ interface SymbolHistorySignalMetadata {
   diagnostics: HistorySignalDiagnostics;
 }
 
+const GRAPH_STATUS_METADATA_KEY = 'graph_status';
+const FAILED_FILE_COUNT_METADATA_KEY = 'failed_file_count';
+const PARSE_FAILURE_FILES_METADATA_KEY = 'parse_failure_files_json';
+const LAST_GRAPH_SYNC_AT_METADATA_KEY = 'last_graph_sync_at';
+
 export interface SQLiteStorageRuntimeOptions {
   readonly governanceGraphThresholds?: GovernanceGraphPerfThresholds;
 }
@@ -128,6 +135,93 @@ function parseJsonValue<T>(value: unknown): T | null {
   }
 }
 
+function toGraphStatus(value: unknown): NonNullable<CodeGraph['graphStatus']> {
+  return toStringValue(value) === 'partial' ? 'partial' : 'complete';
+}
+
+function normalizeParseFailureFiles(value: unknown): string[] {
+  const parsedValue = parseJsonValue<unknown>(value);
+  if (!Array.isArray(parsedValue)) {
+    return [];
+  }
+
+  return parsedValue.filter((item): item is string => typeof item === 'string');
+}
+
+function readGraphIntegrityMetadata(database: SQLiteDatabaseLike): Required<
+  Pick<CodeGraph, 'graphStatus' | 'failedFileCount' | 'parseFailureFiles'>
+> {
+  const metadataRows = database.prepare(`
+    SELECT key, value
+    FROM metadata
+    WHERE key IN (?, ?, ?)
+  `).all(
+    GRAPH_STATUS_METADATA_KEY,
+    FAILED_FILE_COUNT_METADATA_KEY,
+    PARSE_FAILURE_FILES_METADATA_KEY
+  );
+  const metadataMap = new Map(
+    metadataRows.map(row => [toStringValue(row.key), row.value])
+  );
+  const parseFailureFiles = normalizeParseFailureFiles(
+    metadataMap.get(PARSE_FAILURE_FILES_METADATA_KEY)
+  );
+
+  return {
+    graphStatus: toGraphStatus(metadataMap.get(GRAPH_STATUS_METADATA_KEY)),
+    failedFileCount: toNumberValue(
+      metadataMap.get(FAILED_FILE_COUNT_METADATA_KEY),
+      parseFailureFiles.length
+    ),
+    parseFailureFiles,
+  };
+}
+
+function readGraphMetadata(database: SQLiteDatabaseLike): GraphMetadata {
+  const countsRow = database
+    .prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM modules) AS module_count,
+        (SELECT COUNT(*) FROM symbols) AS symbol_count
+    `)
+    .get();
+  const metadataRows = database
+    .prepare(`
+      SELECT key, value
+      FROM metadata
+      WHERE key IN (?, ?, ?, ?)
+    `)
+    .all(
+      GRAPH_STATUS_METADATA_KEY,
+      FAILED_FILE_COUNT_METADATA_KEY,
+      PARSE_FAILURE_FILES_METADATA_KEY,
+      LAST_GRAPH_SYNC_AT_METADATA_KEY
+    );
+  const metadataMap = new Map(
+    metadataRows.map(row => [toStringValue(row.key), row.value])
+  );
+  const parseFailureFiles = normalizeParseFailureFiles(
+    metadataMap.get(PARSE_FAILURE_FILES_METADATA_KEY)
+  );
+  const moduleCount = toNumberValue(countsRow?.module_count);
+  const symbolCount = toNumberValue(countsRow?.symbol_count);
+  const hasMaterializedGraph = moduleCount > 0 || symbolCount > 0;
+
+  return {
+    generatedAt: hasMaterializedGraph
+      ? toStringValue(metadataMap.get(LAST_GRAPH_SYNC_AT_METADATA_KEY)) || null
+      : null,
+    graphStatus: toGraphStatus(metadataMap.get(GRAPH_STATUS_METADATA_KEY)),
+    failedFileCount: toNumberValue(
+      metadataMap.get(FAILED_FILE_COUNT_METADATA_KEY),
+      parseFailureFiles.length
+    ),
+    parseFailureFiles,
+    moduleCount,
+    symbolCount,
+  };
+}
+
 function createHistorySnapshotId(recordedAt: string): string {
   const compactTimestamp = recordedAt.replace(/[^0-9]/g, '');
   const entropy = Math.random().toString(16).slice(2, 10);
@@ -136,6 +230,30 @@ function createHistorySnapshotId(recordedAt: string): string {
 
 function inferEntityType(entityId: string, symbolIds: ReadonlySet<string>): SQLiteEntityType {
   return symbolIds.has(entityId) ? 'symbol' : 'module';
+}
+
+function resolveEntityType(
+  entityType: SQLiteEntityType | undefined,
+  entityId: string,
+  symbolIds: ReadonlySet<string>
+): SQLiteEntityType {
+  return entityType ?? inferEntityType(entityId, symbolIds);
+}
+
+function hasColumn(database: SQLiteDatabaseLike, tableName: string, columnName: string): boolean {
+  const rows = database.prepare(`PRAGMA table_info(${tableName})`).all();
+  return rows.some((row) => toStringValue(row.name) === columnName);
+}
+
+function addColumnIfMissing(
+  database: SQLiteDatabaseLike,
+  tableName: string,
+  columnName: string,
+  definition: string
+): void {
+  if (!hasColumn(database, tableName, columnName)) {
+    database.exec(`ALTER TABLE ${tableName} ADD COLUMN ${definition}`);
+  }
 }
 
 function createUnavailableHistoryDiagnostics(reason: string): HistorySignalDiagnostics {
@@ -226,6 +344,7 @@ export class SQLiteStorage extends StorageBase {
       this.database.pragma?.('journal_mode = WAL');
       this.database.pragma?.('foreign_keys = ON');
       this.database.exec(SQLITE_GOVERNANCE_SCHEMA_SQL);
+      this.ensureSchemaColumns(this.database);
       this.database
         .prepare(SQLITE_SCHEMA_VERSION_UPSERT_SQL)
         .run('schema_version', CURRENT_SQLITE_SCHEMA_VERSION);
@@ -256,6 +375,10 @@ export class SQLiteStorage extends StorageBase {
 
   async loadCodeGraph(): Promise<CodeGraph> {
     return this.readCodeGraph(this.getDatabase());
+  }
+
+  async loadGraphMetadata(): Promise<GraphMetadata> {
+    return readGraphMetadata(this.getDatabase());
   }
 
   async deleteProject(): Promise<void> {
@@ -311,7 +434,7 @@ export class SQLiteStorage extends StorageBase {
   async findSymbolByName(name: string): Promise<Symbol[]> {
     const rows = this.getDatabase()
       .prepare(`
-        SELECT id, module_id, name, kind, file_path, line, column_number, end_line, end_column, visibility
+        SELECT id, module_id, name, kind, signature, file_path, line, column_number, end_line, end_column, visibility
         FROM symbols
         WHERE instr(name, ?) > 0
         ORDER BY name, id
@@ -324,7 +447,7 @@ export class SQLiteStorage extends StorageBase {
   async findSymbolById(id: string): Promise<Symbol | null> {
     const row = this.getDatabase()
       .prepare(`
-        SELECT id, module_id, name, kind, file_path, line, column_number, end_line, end_column, visibility
+        SELECT id, module_id, name, kind, signature, file_path, line, column_number, end_line, end_column, visibility
         FROM symbols
         WHERE id = ?
         LIMIT 1
@@ -342,7 +465,7 @@ export class SQLiteStorage extends StorageBase {
 
     const rows = this.getDatabase()
       .prepare(`
-        SELECT id, source_id, target_id, dependency_type
+        SELECT id, source_id, source_entity_type, target_id, target_entity_type, dependency_type, file_path, line, confidence
         FROM dependencies
         WHERE source_id = ?
         ORDER BY id
@@ -360,7 +483,7 @@ export class SQLiteStorage extends StorageBase {
 
     const rows = this.getDatabase()
       .prepare(`
-        SELECT id, source_id, target_id, dependency_type
+        SELECT id, source_id, source_entity_type, target_id, target_entity_type, dependency_type, file_path, line, confidence
         FROM dependencies
         WHERE target_id = ?
         ORDER BY id
@@ -373,7 +496,7 @@ export class SQLiteStorage extends StorageBase {
   async findCallers(functionId: string): Promise<Symbol[]> {
     const rows = this.getDatabase()
       .prepare(`
-        SELECT s.id, s.module_id, s.name, s.kind, s.file_path, s.line, s.column_number, s.end_line, s.end_column, s.visibility
+        SELECT s.id, s.module_id, s.name, s.kind, s.signature, s.file_path, s.line, s.column_number, s.end_line, s.end_column, s.visibility
         FROM dependencies d
         INNER JOIN symbols s ON s.id = d.source_id
         WHERE d.target_id = ?
@@ -388,7 +511,7 @@ export class SQLiteStorage extends StorageBase {
   async findCallees(functionId: string): Promise<Symbol[]> {
     const rows = this.getDatabase()
       .prepare(`
-        SELECT s.id, s.module_id, s.name, s.kind, s.file_path, s.line, s.column_number, s.end_line, s.end_column, s.visibility
+        SELECT s.id, s.module_id, s.name, s.kind, s.signature, s.file_path, s.line, s.column_number, s.end_line, s.end_column, s.visibility
         FROM dependencies d
         INNER JOIN symbols s ON s.id = d.target_id
         WHERE d.source_id = ?
@@ -420,6 +543,89 @@ export class SQLiteStorage extends StorageBase {
       moduleId,
       depth
     );
+  }
+
+  async calculateSymbolImpact(
+    symbolId: string,
+    depth: number,
+    limit: number
+  ): Promise<SymbolImpactResult> {
+    const database = this.getDatabase();
+    const rootSymbol = await this.findSymbolById(symbolId);
+    if (!rootSymbol) {
+      throw new StorageError(
+        `Symbol ${symbolId} not found`,
+        'SYMBOL_NOT_FOUND'
+      );
+    }
+
+    const selectCallers = database.prepare(`
+      SELECT s.id, s.module_id, s.name, s.kind, s.signature, s.file_path, s.line, s.column_number, s.end_line, s.end_column, s.visibility
+      FROM dependencies d
+      INNER JOIN symbols s ON s.id = d.source_id
+      WHERE d.target_id = ?
+        AND d.dependency_type = 'call'
+      ORDER BY d.id, s.id
+    `);
+
+    const affectedSymbols: SymbolImpactResult['affectedSymbols'] = [];
+    const visited = new Set<string>([symbolId]);
+    const queue: Array<{ id: string; level: number; path: string[] }> = [{
+      id: symbolId,
+      level: 0,
+      path: [symbolId],
+    }];
+    let truncated = false;
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (!current) {
+        continue;
+      }
+
+      if (current.level >= depth) {
+        continue;
+      }
+
+      const callerRows = selectCallers.all(current.id);
+      for (const row of callerRows) {
+        if (affectedSymbols.length >= limit) {
+          truncated = true;
+          queue.length = 0;
+          break;
+        }
+
+        const callerId = toStringValue(row.id);
+        if (visited.has(callerId)) {
+          continue;
+        }
+
+        visited.add(callerId);
+        const callerSymbol = this.mapSymbolRow(row);
+        const nextLevel = current.level + 1;
+        const nextPath = [...current.path, callerId];
+
+        affectedSymbols.push({
+          symbol: callerSymbol,
+          depth: nextLevel,
+          path: nextPath,
+        });
+
+        queue.push({
+          id: callerId,
+          level: nextLevel,
+          path: nextPath,
+        });
+      }
+    }
+
+    return {
+      rootSymbol,
+      affectedSymbols,
+      depth,
+      limit,
+      truncated,
+    };
   }
 
   async getStatistics(): Promise<ProjectStatistics> {
@@ -695,6 +901,13 @@ export class SQLiteStorage extends StorageBase {
     };
   }
 
+  private ensureSchemaColumns(database: SQLiteDatabaseLike): void {
+    addColumnIfMissing(database, 'symbols', 'signature', 'signature TEXT');
+    addColumnIfMissing(database, 'dependencies', 'file_path', 'file_path TEXT');
+    addColumnIfMissing(database, 'dependencies', 'line', 'line INTEGER');
+    addColumnIfMissing(database, 'dependencies', 'confidence', 'confidence TEXT');
+  }
+
   private backfillLegacySnapshotIfNeeded(database: SQLiteDatabaseLike): void {
     const hasCurrentProject = toNumberValue(
       database.prepare('SELECT COUNT(*) AS count FROM projects').get()?.count
@@ -734,6 +947,7 @@ export class SQLiteStorage extends StorageBase {
   ): void {
     const normalizedGraph = this.normalizeGraph(graph);
     const symbolIds = new Set(normalizedGraph.symbols.map(symbol => symbol.id));
+    const upsertMetadata = database.prepare(SQLITE_SCHEMA_VERSION_UPSERT_SQL);
     const insertProject = database.prepare(`
       INSERT INTO projects (id, name, root_path, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
@@ -746,15 +960,15 @@ export class SQLiteStorage extends StorageBase {
     `);
     const insertSymbol = database.prepare(`
       INSERT INTO symbols (
-        id, module_id, name, kind, file_path, line, column_number, end_line, end_column, visibility
+        id, module_id, name, kind, signature, file_path, line, column_number, end_line, end_column, visibility
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertDependency = database.prepare(`
       INSERT INTO dependencies (
-        id, source_id, source_entity_type, target_id, target_entity_type, dependency_type
+        id, source_id, source_entity_type, target_id, target_entity_type, dependency_type, file_path, line, confidence
       )
-      VALUES (?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertSnapshotMirror = database.prepare(`
       INSERT INTO snapshots (id, project_id, graph_json, updated_at)
@@ -808,6 +1022,7 @@ export class SQLiteStorage extends StorageBase {
           symbol.moduleId,
           symbol.name,
           symbol.kind,
+          symbol.signature ?? null,
           symbol.location.file,
           symbol.location.line,
           symbol.location.column,
@@ -818,13 +1033,18 @@ export class SQLiteStorage extends StorageBase {
       }
 
       for (const dependency of normalizedGraph.dependencies) {
+        const sourceEntityType = resolveEntityType(dependency.sourceEntityType, dependency.sourceId, symbolIds);
+        const targetEntityType = resolveEntityType(dependency.targetEntityType, dependency.targetId, symbolIds);
         insertDependency.run(
           dependency.id,
           dependency.sourceId,
-          inferEntityType(dependency.sourceId, symbolIds),
+          sourceEntityType,
           dependency.targetId,
-          inferEntityType(dependency.targetId, symbolIds),
-          dependency.type
+          targetEntityType,
+          dependency.type,
+          dependency.filePath ?? null,
+          dependency.line ?? null,
+          dependency.confidence ?? null
         );
       }
 
@@ -875,30 +1095,43 @@ export class SQLiteStorage extends StorageBase {
           JSON.stringify({
             name: symbol.name,
             kind: symbol.kind,
+            signature: symbol.signature ?? null,
           })
         );
       }
 
       for (const dependency of normalizedGraph.dependencies) {
+        const sourceEntityType = resolveEntityType(dependency.sourceEntityType, dependency.sourceId, symbolIds);
+        const targetEntityType = resolveEntityType(dependency.targetEntityType, dependency.targetId, symbolIds);
         insertHistoryRelation.run(
           `${snapshotId}:dependency:${dependency.id}`,
           snapshotId,
           'dependency_snapshot',
           dependency.sourceId,
-          inferEntityType(dependency.sourceId, symbolIds),
+          sourceEntityType,
           dependency.targetId,
-          inferEntityType(dependency.targetId, symbolIds),
+          targetEntityType,
           recordedAt,
           JSON.stringify({
             dependencyId: dependency.id,
             dependencyType: dependency.type,
+            confidence: dependency.confidence ?? null,
+            filePath: dependency.filePath ?? null,
+            line: dependency.line ?? null,
           })
         );
       }
 
-      database
-        .prepare(SQLITE_SCHEMA_VERSION_UPSERT_SQL)
-        .run('last_graph_sync_at', recordedAt);
+      upsertMetadata.run(GRAPH_STATUS_METADATA_KEY, normalizedGraph.graphStatus ?? 'complete');
+      upsertMetadata.run(
+        FAILED_FILE_COUNT_METADATA_KEY,
+        String(normalizedGraph.failedFileCount ?? 0)
+      );
+      upsertMetadata.run(
+        PARSE_FAILURE_FILES_METADATA_KEY,
+        JSON.stringify(normalizedGraph.parseFailureFiles ?? [])
+      );
+      upsertMetadata.run(LAST_GRAPH_SYNC_AT_METADATA_KEY, recordedAt);
     });
 
     this.refreshGovernanceGraphCache(database);
@@ -923,6 +1156,9 @@ export class SQLiteStorage extends StorageBase {
         location: { ...symbol.location },
       })),
       dependencies: graph.dependencies.map(dependency => ({ ...dependency })),
+      graphStatus: graph.graphStatus ?? 'complete',
+      failedFileCount: graph.failedFileCount ?? 0,
+      parseFailureFiles: [...(graph.parseFailureFiles ?? [])],
     };
   }
 
@@ -949,7 +1185,7 @@ export class SQLiteStorage extends StorageBase {
       .map(row => this.mapModuleRow(row));
     const symbols = database
       .prepare(`
-        SELECT id, module_id, name, kind, file_path, line, column_number, end_line, end_column, visibility
+        SELECT id, module_id, name, kind, signature, file_path, line, column_number, end_line, end_column, visibility
         FROM symbols
         ORDER BY file_path, line, column_number, id
       `)
@@ -957,12 +1193,13 @@ export class SQLiteStorage extends StorageBase {
       .map(row => this.mapSymbolRow(row));
     const dependencies = database
       .prepare(`
-        SELECT id, source_id, target_id, dependency_type
+        SELECT id, source_id, source_entity_type, target_id, target_entity_type, dependency_type, file_path, line, confidence
         FROM dependencies
         ORDER BY id
       `)
       .all()
       .map(row => this.mapDependencyRow(row));
+    const graphIntegrity = readGraphIntegrityMetadata(database);
 
     return {
       project: {
@@ -975,6 +1212,9 @@ export class SQLiteStorage extends StorageBase {
       modules,
       symbols,
       dependencies,
+      graphStatus: graphIntegrity.graphStatus,
+      failedFileCount: graphIntegrity.failedFileCount,
+      parseFailureFiles: graphIntegrity.parseFailureFiles,
     };
   }
 
@@ -999,6 +1239,7 @@ export class SQLiteStorage extends StorageBase {
       moduleId: toStringValue(row.module_id),
       name: toStringValue(row.name),
       kind: toStringValue(row.kind) as Symbol['kind'],
+      signature: toStringValue(row.signature) || undefined,
       location: {
         file: toStringValue(row.file_path),
         line: toNumberValue(row.line),
@@ -1014,8 +1255,13 @@ export class SQLiteStorage extends StorageBase {
     return {
       id: toStringValue(row.id),
       sourceId: toStringValue(row.source_id),
+      sourceEntityType: toStringValue(row.source_entity_type, 'module') as Dependency['sourceEntityType'],
       targetId: toStringValue(row.target_id),
+      targetEntityType: toStringValue(row.target_entity_type, 'module') as Dependency['targetEntityType'],
       type: toStringValue(row.dependency_type) as Dependency['type'],
+      filePath: toStringValue(row.file_path) || undefined,
+      line: toOptionalNumberValue(row.line),
+      confidence: toStringValue(row.confidence) === '' ? undefined : toStringValue(row.confidence) as Dependency['confidence'],
     };
   }
 

@@ -77,15 +77,33 @@ interface CodeMap {
   summary: ProjectSummary;
   modules: ModuleInfo[];
   dependencies: DependencyGraph;
+  graphStatus?: "complete" | "partial";
+  failedFileCount?: number;
+  parseFailureFiles?: string[];
   actualMode?: "fast" | "smart";
   pluginReport?: PluginExecutionReport;
 }
 ```
 
+### graph integrity 语义
+
+| 字段 | 含义 | 何时出现 |
+|------|------|----------|
+| `graphStatus` | 当前图是否完整：`complete` / `partial` | `generate` 输出总会写入 |
+| `failedFileCount` | 发现到但未成功进入最终图的文件数 | `generate` 输出总会写入 |
+| `parseFailureFiles` | 失败文件路径列表 | 仅当 `failedFileCount > 0` 时出现 |
+
+- `summary.totalFiles` 仍表示**成功进入最终图**的模块数，不代表发现阶段的总文件数。
+- 若 `graphStatus = "partial"`，Agent / 自动化流程必须把图视为**降级结果**，不能伪装成完整 truth。
+- `generate --symbol-level` 与默认 generate 都遵守同一套 `graphStatus` 语义；差别只在是否 materialize symbol-level `call` 依赖。
+
 ### 示例
 
 ```json
 {
+  "graphStatus": "partial",
+  "failedFileCount": 1,
+  "parseFailureFiles": ["src/broken.ts"],
   "pluginReport": {
     "loadedPlugins": ["complexity-analyzer", "my-local-plugin"],
     "generatedFiles": ["plugins/good.txt"],
@@ -105,6 +123,144 @@ interface CodeMap {
       }
     ]
   }
+}
+```
+
+---
+
+## experimental MCP tool 输出结构
+
+> canonical MCP path 是 `generate --symbol-level → mcp install → host 启动 mcp start`。当前只暴露 `codemap_query` / `codemap_impact` 两个工具。
+
+```typescript
+type McpToolStatus = "ok" | "not_found" | "ambiguous" | "unavailable";
+type McpToolConfidence = "high" | "ambiguous" | "unavailable";
+type McpGraphStatus = "complete" | "partial" | "missing";
+type McpErrorCode = "GRAPH_NOT_FOUND" | "SYMBOL_NOT_FOUND" | "AMBIGUOUS_EDGE";
+
+interface McpSymbolRef {
+  id: string;
+  module_id: string;
+  name: string;
+  kind: string;
+  visibility: "public" | "private" | "protected" | "internal";
+  file_path: string;
+  line: number;
+  column: number;
+  signature?: string;
+}
+
+interface McpQueryResult {
+  status: McpToolStatus;
+  confidence: McpToolConfidence;
+  graph_status: McpGraphStatus;
+  generated_at: string | null;
+  failed_file_count: number;
+  parse_failure_files: string[];
+  symbol?: McpSymbolRef;
+  callers: McpSymbolRef[];
+  callees: McpSymbolRef[];
+  error?: {
+    code: McpErrorCode;
+    message: string;
+    details?: Record<string, unknown>;
+  };
+}
+
+interface McpImpactResult {
+  status: McpToolStatus;
+  confidence: McpToolConfidence;
+  graph_status: McpGraphStatus;
+  generated_at: string | null;
+  failed_file_count: number;
+  parse_failure_files: string[];
+  root_symbol?: McpSymbolRef;
+  affected_symbols: Array<{
+    symbol: McpSymbolRef;
+    depth: number;
+    path: string[];
+  }>;
+  depth: number;
+  limit: number;
+  truncated: boolean;
+  error?: {
+    code: McpErrorCode;
+    message: string;
+    details?: Record<string, unknown>;
+  };
+}
+```
+
+### `codemap_query`
+
+输入：
+
+```typescript
+interface CodemapQueryInput {
+  symbol: string;
+  filePath?: string;
+}
+```
+
+语义：
+- `status = "ok"`：返回 `symbol`、`callers`、`callees`
+- `status = "unavailable"` + `GRAPH_NOT_FOUND`：还没生成 symbol-level 图
+- `status = "not_found"` + `SYMBOL_NOT_FOUND`：目标符号不存在
+- `status = "ambiguous"` + `AMBIGUOUS_EDGE`：同名符号无法仅靠 `symbol` / `filePath` 消歧
+
+### `codemap_impact`
+
+输入：
+
+```typescript
+interface CodemapImpactInput {
+  symbol: string;
+  filePath?: string;
+  depth?: number;
+  limit?: number;
+}
+```
+
+语义：
+- `affected_symbols` 按 caller impact 链返回，`path` 从 root symbol id 开始
+- `depth` / `limit` 会被收敛到首期限额，防止 host 挂起
+- `truncated = true` 说明结果已命中 `limit`
+
+### MCP 结果示例
+
+```json
+{
+  "status": "ok",
+  "confidence": "high",
+  "graph_status": "partial",
+  "generated_at": "2026-04-19T00:00:00.000Z",
+  "failed_file_count": 1,
+  "parse_failure_files": ["src/broken.ts"],
+  "symbol": {
+    "id": "sym-target",
+    "module_id": "mod-target",
+    "name": "target",
+    "kind": "function",
+    "visibility": "public",
+    "file_path": "src/target.ts",
+    "line": 1,
+    "column": 1,
+    "signature": "target() => void"
+  },
+  "callers": [
+    {
+      "id": "sym-caller",
+      "module_id": "mod-caller",
+      "name": "caller",
+      "kind": "function",
+      "visibility": "public",
+      "file_path": "src/caller.ts",
+      "line": 1,
+      "column": 1,
+      "signature": "caller() => void"
+    }
+  ],
+  "callees": []
 }
 ```
 

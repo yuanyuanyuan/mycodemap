@@ -307,6 +307,8 @@ export interface ProjectInfo {
   packageManager: 'npm' | 'yarn' | 'pnpm' | 'bun';
 }
 
+export type GraphStatus = 'complete' | 'partial';
+
 // ============================================
 // Section 8: 依赖图
 // ============================================
@@ -358,6 +360,9 @@ export interface CodeMap {
   summary: ProjectSummary;
   modules: ModuleInfo[];
   dependencies: DependencyGraph;
+  graphStatus?: GraphStatus;
+  failedFileCount?: number;
+  parseFailureFiles?: string[];
   actualMode?: 'fast' | 'smart'; // Hybrid 模式下实际使用的模式
   pluginReport?: PluginExecutionReport;
 }
@@ -609,6 +614,7 @@ export interface Symbol {
   kind: SymbolKind;
   location: SourceLocation;
   visibility: 'public' | 'private' | 'protected' | 'internal';
+  signature?: string;
 }
 
 // 领域实体: 依赖
@@ -616,7 +622,12 @@ export interface Dependency {
   id: string;
   sourceId: string;  // 模块ID
   targetId: string;  // 模块ID
+  sourceEntityType?: 'module' | 'symbol';
+  targetEntityType?: 'module' | 'symbol';
   type: 'import' | 'inherit' | 'implement' | 'call' | 'type-ref';
+  confidence?: 'high' | 'ambiguous';
+  filePath?: string;
+  line?: number;
 }
 
 // 领域实体: 代码图
@@ -625,6 +636,9 @@ export interface CodeGraph {
   modules: Module[];
   symbols: Symbol[];
   dependencies: Dependency[];
+  graphStatus?: GraphStatus;
+  failedFileCount?: number;
+  parseFailureFiles?: string[];
 }
 
 // ============================================
@@ -649,6 +663,9 @@ export type {
   SearchResult,
   Cycle,
   ImpactResult,
+  GraphMetadata,
+  SymbolImpactNode,
+  SymbolImpactResult,
   ProjectStatistics,
   IStorage,
   IStorageFactory,

@@ -110,6 +110,8 @@ export async function analyze(options: AnalysisOptions): Promise<CodeMap> {
   // 6. 计算摘要
   const summary = calculateSummary(modules);
 
+  const graphIntegrity = calculateGraphIntegrity(files, modules);
+
   // 7. 获取项目信息
   const project = await getProjectInfo(rootDir);
 
@@ -120,6 +122,9 @@ export async function analyze(options: AnalysisOptions): Promise<CodeMap> {
     summary,
     modules,
     dependencies,
+    graphStatus: graphIntegrity.graphStatus,
+    failedFileCount: graphIntegrity.failedFileCount,
+    parseFailureFiles: graphIntegrity.parseFailureFiles,
     actualMode
   };
 }
@@ -141,6 +146,23 @@ function convertToModuleInfo(result: ParseResult): ModuleInfo {
     complexity: result.complexity,
     callGraph: result.callGraph,
     typeInfo: result.typeInfo
+  };
+}
+
+function calculateGraphIntegrity(
+  discoveredFiles: string[],
+  modules: ModuleInfo[]
+): Pick<CodeMap, 'graphStatus' | 'failedFileCount' | 'parseFailureFiles'> {
+  const discoveredSet = new Set(discoveredFiles.map(filePath => normalizePath(filePath)));
+  const parsedSet = new Set(modules.map(moduleInfo => normalizePath(moduleInfo.path)));
+  const parseFailureFiles = [...discoveredSet]
+    .filter(filePath => !parsedSet.has(filePath))
+    .sort();
+
+  return {
+    graphStatus: parseFailureFiles.length > 0 ? 'partial' : 'complete',
+    failedFileCount: parseFailureFiles.length,
+    parseFailureFiles: parseFailureFiles.length > 0 ? parseFailureFiles : undefined,
   };
 }
 

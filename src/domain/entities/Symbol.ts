@@ -30,6 +30,7 @@ export class Symbol implements SymbolInterface {
   kind: SymbolKind;
   location: SourceLocation;
   visibility: SymbolVisibility;
+  signature?: string;
 
   constructor(
     id: string,
@@ -37,7 +38,8 @@ export class Symbol implements SymbolInterface {
     name: string,
     kind: SymbolKind,
     location: SourceLocation,
-    visibility: SymbolVisibility = 'public'
+    visibility: SymbolVisibility = 'public',
+    signature?: string
   ) {
     this.id = id;
     this.moduleId = moduleId;
@@ -45,6 +47,7 @@ export class Symbol implements SymbolInterface {
     this.kind = kind;
     this.location = location;
     this.visibility = visibility;
+    this.signature = signature;
 
     this.validate();
   }
@@ -59,7 +62,8 @@ export class Symbol implements SymbolInterface {
       data.name,
       data.kind,
       data.location,
-      data.visibility
+      data.visibility,
+      data.signature
     );
   }
 
@@ -74,6 +78,7 @@ export class Symbol implements SymbolInterface {
       kind: this.kind,
       location: this.location,
       visibility: this.visibility,
+      signature: this.signature,
     };
   }
 
@@ -171,7 +176,8 @@ export class Symbol implements SymbolInterface {
       this.name,
       this.kind,
       { ...this.location },
-      this.visibility
+      this.visibility,
+      this.signature
     );
   }
 }

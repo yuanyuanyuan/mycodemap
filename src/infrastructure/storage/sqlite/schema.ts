@@ -4,7 +4,7 @@
 // SQLite 治理存储 schema 定义与版本管理
 // ============================================
 
-export const CURRENT_SQLITE_SCHEMA_VERSION = 'governance-v2';
+export const CURRENT_SQLITE_SCHEMA_VERSION = 'governance-v3';
 
 export const SQLITE_SCHEMA_VERSION_UPSERT_SQL = `
   INSERT INTO metadata (key, value)
@@ -42,6 +42,7 @@ export const SQLITE_GOVERNANCE_SCHEMA_SQL = `
     module_id TEXT NOT NULL,
     name TEXT NOT NULL,
     kind TEXT NOT NULL,
+    signature TEXT,
     file_path TEXT NOT NULL,
     line INTEGER NOT NULL,
     column_number INTEGER NOT NULL,
@@ -56,7 +57,10 @@ export const SQLITE_GOVERNANCE_SCHEMA_SQL = `
     source_entity_type TEXT NOT NULL,
     target_id TEXT NOT NULL,
     target_entity_type TEXT NOT NULL,
-    dependency_type TEXT NOT NULL
+    dependency_type TEXT NOT NULL,
+    file_path TEXT,
+    line INTEGER,
+    confidence TEXT
   );
 
   CREATE TABLE IF NOT EXISTS history_snapshots (

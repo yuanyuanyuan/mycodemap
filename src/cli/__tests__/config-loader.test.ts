@@ -131,6 +131,27 @@ describe('config-loader', () => {
     });
   });
 
+  it('accepts sqlite as an explicit storage backend', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+
+    writeJson(rootDir, 'mycodemap.config.json', {
+      storage: {
+        type: 'sqlite',
+        databasePath: '.codemap/governance.sqlite',
+      },
+    });
+
+    const result = await loadCodemapConfig(rootDir);
+
+    expect(result.config.storage).toEqual({
+      type: 'sqlite',
+      outputPath: '.codemap/storage',
+      databasePath: '.codemap/governance.sqlite',
+      autoThresholds: undefined,
+    });
+  });
+
   it('rejects invalid plugin config types', async () => {
     const rootDir = createTempRoot();
     tempRoots.push(rootDir);

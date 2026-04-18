@@ -58,6 +58,7 @@ function createGraphFixture(): CodeGraph {
         moduleId: 'mod-a',
         name: 'callA',
         kind: 'function',
+        signature: 'callA() => void',
         location: { file: 'src/a.ts', line: 1, column: 1 },
         visibility: 'public',
       },
@@ -66,15 +67,43 @@ function createGraphFixture(): CodeGraph {
         moduleId: 'mod-b',
         name: 'callB',
         kind: 'function',
+        signature: 'callB() => string',
         location: { file: 'src/b.ts', line: 1, column: 1 },
         visibility: 'public',
       },
     ],
     dependencies: [
-      { id: 'dep-1', sourceId: 'mod-a', targetId: 'mod-b', type: 'import' },
-      { id: 'dep-2', sourceId: 'mod-b', targetId: 'mod-a', type: 'import' },
-      { id: 'dep-3', sourceId: 'sym-a', targetId: 'sym-b', type: 'call' },
+      {
+        id: 'dep-1',
+        sourceId: 'mod-a',
+        sourceEntityType: 'module',
+        targetId: 'mod-b',
+        targetEntityType: 'module',
+        type: 'import',
+      },
+      {
+        id: 'dep-2',
+        sourceId: 'mod-b',
+        sourceEntityType: 'module',
+        targetId: 'mod-a',
+        targetEntityType: 'module',
+        type: 'import',
+      },
+      {
+        id: 'dep-3',
+        sourceId: 'sym-a',
+        sourceEntityType: 'symbol',
+        targetId: 'sym-b',
+        targetEntityType: 'symbol',
+        type: 'call',
+        confidence: 'high',
+        filePath: 'src/a.ts',
+        line: 1,
+      },
     ],
+    graphStatus: 'partial',
+    failedFileCount: 1,
+    parseFailureFiles: ['src/missing.ts'],
   };
 }
 
@@ -101,13 +130,26 @@ describe('SQLiteStorage', () => {
     const loadedGraph = await storage.loadCodeGraph();
     expect(loadedGraph.modules).toHaveLength(2);
     expect(loadedGraph.project.createdAt).toBeInstanceOf(Date);
+    expect(loadedGraph.graphStatus).toBe('partial');
+    expect(loadedGraph.failedFileCount).toBe(1);
+    expect(loadedGraph.parseFailureFiles).toEqual(['src/missing.ts']);
 
     const inspector = await createSQLiteInspector(rootDir);
     expect(inspector.prepare('SELECT value FROM metadata WHERE key = ?').get('schema_version')?.value)
-      .toBe('governance-v2');
+      .toBe('governance-v3');
     expect(inspector.prepare('SELECT COUNT(*) AS count FROM modules').get()?.count).toBe(2);
     expect(inspector.prepare('SELECT COUNT(*) AS count FROM symbols').get()?.count).toBe(2);
     expect(inspector.prepare('SELECT COUNT(*) AS count FROM dependencies').get()?.count).toBe(3);
+    expect(inspector.prepare('SELECT signature FROM symbols WHERE id = ?').get('sym-a')?.signature)
+      .toBe('callA() => void');
+    expect(inspector.prepare('SELECT confidence FROM dependencies WHERE id = ?').get('dep-3')?.confidence)
+      .toBe('high');
+    expect(inspector.prepare('SELECT value FROM metadata WHERE key = ?').get('graph_status')?.value)
+      .toBe('partial');
+    expect(inspector.prepare('SELECT value FROM metadata WHERE key = ?').get('failed_file_count')?.value)
+      .toBe('1');
+    expect(inspector.prepare('SELECT value FROM metadata WHERE key = ?').get('parse_failure_files_json')?.value)
+      .toBe('["src/missing.ts"]');
     expect(inspector.prepare('SELECT snapshot_source FROM history_snapshots LIMIT 1').get()?.snapshot_source)
       .toBe('save-code-graph');
     expect(inspector.prepare('SELECT COUNT(*) AS count FROM history_relations').get()?.count).toBe(7);
@@ -126,6 +168,17 @@ describe('SQLiteStorage', () => {
 
     expect(await storage.findModuleById('mod-a')).toEqual(expect.objectContaining({ id: 'mod-a' }));
     expect((await storage.findDependencies('mod-a')).map((dependency) => dependency.id)).toEqual(['dep-1']);
+    expect(await storage.findSymbolById('sym-a')).toEqual(expect.objectContaining({ signature: 'callA() => void' }));
+    expect(await storage.findDependencies('sym-a')).toEqual([
+      expect.objectContaining({
+        id: 'dep-3',
+        sourceEntityType: 'symbol',
+        targetEntityType: 'symbol',
+        confidence: 'high',
+        filePath: 'src/a.ts',
+        line: 1,
+      }),
+    ]);
     expect((await storage.findCallers('sym-b')).map((symbol) => symbol.id)).toEqual(['sym-a']);
     expect(await storage.detectCycles()).toEqual([
       {
@@ -134,6 +187,25 @@ describe('SQLiteStorage', () => {
       },
     ]);
     expect((await storage.calculateImpact('mod-a', 2)).affectedModules.map((module) => module.id)).toEqual(['mod-b']);
+    expect(await storage.loadGraphMetadata()).toEqual(expect.objectContaining({
+      generatedAt: expect.any(String),
+      graphStatus: 'partial',
+      failedFileCount: 1,
+      parseFailureFiles: ['src/missing.ts'],
+      moduleCount: 2,
+      symbolCount: 2,
+    }));
+    expect(await storage.calculateSymbolImpact('sym-b', 2, 10)).toEqual({
+      rootSymbol: expect.objectContaining({ id: 'sym-b' }),
+      affectedSymbols: [{
+        symbol: expect.objectContaining({ id: 'sym-a' }),
+        depth: 1,
+        path: ['sym-b', 'sym-a'],
+      }],
+      depth: 2,
+      limit: 10,
+      truncated: false,
+    });
 
     await storage.updateModule({
       id: 'mod-c',
@@ -195,6 +267,8 @@ describe('SQLiteStorage', () => {
     const loadedGraph = await storage.loadCodeGraph();
     expect(loadedGraph.project.id).toBe('proj-1');
     expect(loadedGraph.modules).toHaveLength(2);
+    expect(loadedGraph.graphStatus).toBe('partial');
+    expect(loadedGraph.failedFileCount).toBe(1);
 
     const inspector = await createSQLiteInspector(rootDir, databasePath);
     expect(inspector.prepare('SELECT COUNT(*) AS count FROM modules').get()?.count).toBe(2);

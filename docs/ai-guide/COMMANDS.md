@@ -16,6 +16,7 @@ mycodemap generate                          # hybrid 模式（推荐）
 mycodemap generate -m smart                 # AST 深度分析
 mycodemap generate -m fast                  # 快速正则分析
 mycodemap generate -o ./output              # 指定输出目录
+mycodemap generate --symbol-level           # 额外 materialize symbol-level call 依赖
 mycodemap generate --ai-context             # 生成 AI 描述
 ```
 
@@ -23,12 +24,15 @@ mycodemap generate --ai-context             # 生成 AI 描述
 |------|------|--------|
 | `-m, --mode <mode>` | 分析模式: fast/smart/hybrid | `hybrid` |
 | `-o, --output <dir>` | 输出目录 | `.mycodemap` |
+| `--symbol-level` | 仅在显式开启时把可解析的 symbol-level `call` 依赖写入图存储 | `false` |
 | `--ai-context` | 为每个文件生成描述 | - |
 
 **模式说明**:
 - `fast`: 正则匹配，极快，适合大型项目
 - `smart`: AST 分析，较慢，信息完整
 - `hybrid`: 自动选择，文件<50用fast，≥50用smart
+- `--symbol-level` 是首期实验性切片；默认 generate 仍只保证现有模块级行为兼容
+- `generate` 完成后，`codemap.json` 会带 `graphStatus`、`failedFileCount` 与可选 `parseFailureFiles`；若 `graphStatus = "partial"`，不要把结果当成完整图。
 
 **插件运行时说明**:
 - `generate` 不提供独立 `--plugin` flags；插件通过 `mycodemap.config.json` 的 `plugins` 段声明。
@@ -102,6 +106,29 @@ mycodemap impact -f "src/cli/index.ts" -j   # JSON 输出
 | `-t, --transitive` | 包含传递依赖 | - |
 | `-j, --json` | JSON 格式输出 | - |
 | `--structured` | 纯结构化输出 | - |
+
+---
+
+### mcp - experimental 本地 MCP 集成
+
+```bash
+mycodemap mcp install                     # 把当前仓库写入 .mcp.json
+mycodemap mcp start                       # 启动本地 stdio MCP server
+mycodemap generate --symbol-level         # 使用前必须先生成 symbol-level 图
+```
+
+| 子命令 | 说明 |
+|--------|------|
+| `install` | 更新当前仓库根目录 `.mcp.json`，追加 `mycodemap-experimental` server entry |
+| `start` | 启动 local-only / read-only / stdio-first experimental MCP server |
+
+**首期规则**:
+- `mcp` 是 experimental surface，不要把它当成稳定长期 public API。
+- `mcp start` 的 `stdout` 只能承载 MCP 协议帧；欢迎信息、迁移提示与 runtime log 不会走这条流。
+- 当前只暴露两个工具：`codemap_query`、`codemap_impact`。
+- `codemap_query` / `codemap_impact` 都会返回 `graph_status`、`generated_at` 与显式 `error.code`。
+- 若图尚未生成，会返回 `GRAPH_NOT_FOUND`；若符号不存在，返回 `SYMBOL_NOT_FOUND`；若同名符号无法消歧，返回 `AMBIGUOUS_EDGE`。
+- 详细安装步骤见 `docs/ai-guide/INTEGRATION.md`；完整 output contract 见 `docs/ai-guide/OUTPUT.md`。
 
 ---
 

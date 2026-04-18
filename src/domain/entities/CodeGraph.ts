@@ -24,17 +24,26 @@ export class CodeGraph implements CodeGraphInterface {
   modules: Module[];
   symbols: Symbol[];
   dependencies: Dependency[];
+  graphStatus?: CodeGraphInterface['graphStatus'];
+  failedFileCount?: number;
+  parseFailureFiles?: string[];
 
   constructor(
     project: Project,
     modules: Module[] = [],
     symbols: Symbol[] = [],
-    dependencies: Dependency[] = []
+    dependencies: Dependency[] = [],
+    graphStatus: CodeGraphInterface['graphStatus'] = 'complete',
+    failedFileCount = 0,
+    parseFailureFiles: string[] = []
   ) {
     this.project = project;
     this.modules = [...modules];
     this.symbols = [...symbols];
     this.dependencies = [...dependencies];
+    this.graphStatus = graphStatus;
+    this.failedFileCount = failedFileCount;
+    this.parseFailureFiles = [...parseFailureFiles];
   }
 
   /**
@@ -45,7 +54,10 @@ export class CodeGraph implements CodeGraphInterface {
       Project.fromInterface(data.project),
       data.modules.map(m => Module.fromInterface(m)),
       data.symbols.map(s => Symbol.fromInterface(s)),
-      data.dependencies.map(d => Dependency.fromInterface(d))
+      data.dependencies.map(d => Dependency.fromInterface(d)),
+      data.graphStatus ?? 'complete',
+      data.failedFileCount ?? 0,
+      data.parseFailureFiles ?? []
     );
   }
 
@@ -58,6 +70,9 @@ export class CodeGraph implements CodeGraphInterface {
       modules: this.modules.map(m => m.toInterface()),
       symbols: this.symbols.map(s => s.toInterface()),
       dependencies: this.dependencies.map(d => d.toInterface()),
+      graphStatus: this.graphStatus ?? 'complete',
+      failedFileCount: this.failedFileCount ?? 0,
+      parseFailureFiles: [...(this.parseFailureFiles ?? [])],
     };
   }
 
@@ -178,12 +193,11 @@ export class CodeGraph implements CodeGraphInterface {
    * 添加依赖
    */
   addDependency(dependency: Dependency): void {
-    // 验证源和目标模块存在
-    if (!this.findModuleById(dependency.sourceId)) {
-      throw new Error(`Source module ${dependency.sourceId} does not exist`);
+    if (!this.hasDependencyEntity(dependency.sourceId, dependency.sourceEntityType)) {
+      throw new Error(`Source ${dependency.sourceEntityType} ${dependency.sourceId} does not exist`);
     }
-    if (!this.findModuleById(dependency.targetId)) {
-      throw new Error(`Target module ${dependency.targetId} does not exist`);
+    if (!this.hasDependencyEntity(dependency.targetId, dependency.targetEntityType)) {
+      throw new Error(`Target ${dependency.targetEntityType} ${dependency.targetId} does not exist`);
     }
     
     // 检查是否已存在相同依赖
@@ -355,7 +369,10 @@ export class CodeGraph implements CodeGraphInterface {
       this.project.snapshot(),
       this.modules.map(m => m.snapshot()),
       this.symbols.map(s => s.snapshot()),
-      this.dependencies.map(d => d.snapshot())
+      this.dependencies.map(d => d.snapshot()),
+      this.graphStatus ?? 'complete',
+      this.failedFileCount ?? 0,
+      [...(this.parseFailureFiles ?? [])]
     );
   }
 
@@ -366,6 +383,9 @@ export class CodeGraph implements CodeGraphInterface {
     this.modules = [];
     this.symbols = [];
     this.dependencies = [];
+    this.graphStatus = 'complete';
+    this.failedFileCount = 0;
+    this.parseFailureFiles = [];
   }
 
   /**
@@ -383,14 +403,22 @@ export class CodeGraph implements CodeGraphInterface {
 
     // 验证所有依赖引用的模块存在
     for (const dep of this.dependencies) {
-      if (!this.findModuleById(dep.sourceId)) {
-        errors.push(`Dependency ${dep.id} references non-existent source module ${dep.sourceId}`);
+      if (!this.hasDependencyEntity(dep.sourceId, dep.sourceEntityType)) {
+        errors.push(`Dependency ${dep.id} references non-existent source ${dep.sourceEntityType} ${dep.sourceId}`);
       }
-      if (!this.findModuleById(dep.targetId)) {
-        errors.push(`Dependency ${dep.id} references non-existent target module ${dep.targetId}`);
+      if (!this.hasDependencyEntity(dep.targetId, dep.targetEntityType)) {
+        errors.push(`Dependency ${dep.id} references non-existent target ${dep.targetEntityType} ${dep.targetId}`);
       }
     }
 
     return errors;
+  }
+
+  private hasDependencyEntity(id: string, entityType: Dependency['sourceEntityType']): boolean {
+    if (entityType === 'symbol') {
+      return Boolean(this.findSymbolById(id));
+    }
+
+    return Boolean(this.findModuleById(id));
   }
 }

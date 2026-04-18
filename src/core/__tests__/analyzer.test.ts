@@ -1,8 +1,9 @@
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { analyze } from "../analyzer.js";
+import { SmartParser } from "../../parser/implementations/smart-parser.js";
 
 const tempDirs: string[] = [];
 
@@ -108,5 +109,29 @@ describe("analyze", () => {
     );
     expect(edgesToB).toHaveLength(1);
     expect(moduleB!.dependents).toContain(moduleA!.id);
+  });
+
+  it("marks graph as partial when smart parser silently skips a discovered file", async () => {
+    const rootDir = await createTempProject();
+    const parserErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const parseFilesSpy = vi.spyOn(SmartParser.prototype, "parseFiles").mockImplementation(
+      async function (filePaths: string[]) {
+        const successfulFiles = filePaths.filter((filePath) => !filePath.endsWith("/src/b.ts"));
+        return Promise.all(successfulFiles.map((filePath) => this.parseFile(filePath)));
+      },
+    );
+
+    const codeMap = await analyze({
+      rootDir,
+      mode: "smart",
+      include: ["src/**/*.ts"],
+    });
+
+    expect(codeMap.graphStatus).toBe("partial");
+    expect(codeMap.failedFileCount).toBe(1);
+    expect(codeMap.parseFailureFiles).toEqual([expect.stringMatching(/src\/b\.ts$/)]);
+
+    parseFilesSpy.mockRestore();
+    parserErrorSpy.mockRestore();
   });
 });

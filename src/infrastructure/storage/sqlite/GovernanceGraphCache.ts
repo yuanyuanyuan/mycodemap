@@ -34,6 +34,10 @@ export interface GovernanceGraphDatabaseLike {
   prepare: (sql: string) => GovernanceGraphStatementLike;
 }
 
+const GRAPH_STATUS_METADATA_KEY = 'graph_status';
+const FAILED_FILE_COUNT_METADATA_KEY = 'failed_file_count';
+const PARSE_FAILURE_FILES_METADATA_KEY = 'parse_failure_files_json';
+
 function toStringValue(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
 }
@@ -48,6 +52,56 @@ function toDateValue(value: unknown, fallback: Date): Date {
     : new Date(toStringValue(value, fallback.toISOString()));
 
   return Number.isNaN(candidate.getTime()) ? fallback : candidate;
+}
+
+function toGraphStatus(value: unknown): NonNullable<CodeGraph['graphStatus']> {
+  return toStringValue(value) === 'partial' ? 'partial' : 'complete';
+}
+
+function parseStringArrayValue(value: unknown): string[] {
+  if (typeof value !== 'string' || value.length === 0) {
+    return [];
+  }
+
+  try {
+    const parsedValue = JSON.parse(value) as unknown;
+    return Array.isArray(parsedValue)
+      ? parsedValue.filter((item): item is string => typeof item === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function readGraphIntegrityMetadata(
+  database: GovernanceGraphDatabaseLike
+): Required<Pick<CodeGraph, 'graphStatus' | 'failedFileCount' | 'parseFailureFiles'>> {
+  const metadataRows = database
+    .prepare(`
+      SELECT key, value
+      FROM metadata
+      WHERE key IN (?, ?, ?)
+    `)
+    .all(
+      GRAPH_STATUS_METADATA_KEY,
+      FAILED_FILE_COUNT_METADATA_KEY,
+      PARSE_FAILURE_FILES_METADATA_KEY
+    );
+  const metadataMap = new Map(
+    metadataRows.map((row) => [toStringValue(row.key), row.value])
+  );
+  const parseFailureFiles = parseStringArrayValue(
+    metadataMap.get(PARSE_FAILURE_FILES_METADATA_KEY)
+  );
+
+  return {
+    graphStatus: toGraphStatus(metadataMap.get(GRAPH_STATUS_METADATA_KEY)),
+    failedFileCount: toNumberValue(
+      metadataMap.get(FAILED_FILE_COUNT_METADATA_KEY),
+      parseFailureFiles.length
+    ),
+    parseFailureFiles,
+  };
 }
 
 export function readGovernanceGraphFromSQLite(
@@ -88,7 +142,7 @@ export function readGovernanceGraphFromSQLite(
     }));
   const dependencies = database
     .prepare(`
-      SELECT id, source_id, target_id, dependency_type
+      SELECT id, source_id, source_entity_type, target_id, target_entity_type, dependency_type, file_path, line, confidence
       FROM dependencies
       ORDER BY id
     `)
@@ -96,9 +150,15 @@ export function readGovernanceGraphFromSQLite(
     .map((row): Dependency => ({
       id: toStringValue(row.id),
       sourceId: toStringValue(row.source_id),
+      sourceEntityType: toStringValue(row.source_entity_type, 'module') as Dependency['sourceEntityType'],
       targetId: toStringValue(row.target_id),
+      targetEntityType: toStringValue(row.target_entity_type, 'module') as Dependency['targetEntityType'],
       type: toStringValue(row.dependency_type) as Dependency['type'],
+      filePath: toStringValue(row.file_path) || undefined,
+      line: row.line === null || row.line === undefined ? undefined : toNumberValue(row.line),
+      confidence: toStringValue(row.confidence) === '' ? undefined : toStringValue(row.confidence) as Dependency['confidence'],
     }));
+  const graphIntegrity = readGraphIntegrityMetadata(database);
 
   return {
     project: {
@@ -111,6 +171,9 @@ export function readGovernanceGraphFromSQLite(
     modules,
     symbols: [],
     dependencies,
+    graphStatus: graphIntegrity.graphStatus,
+    failedFileCount: graphIntegrity.failedFileCount,
+    parseFailureFiles: graphIntegrity.parseFailureFiles,
   };
 }
 

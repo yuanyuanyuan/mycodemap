@@ -7,7 +7,7 @@ CodeMap 是一个面向 TypeScript/JavaScript/Go 项目的 AI-first 代码地图
 ## 特性
 
 - **AI-first 代码地图** - 生成 `AI_MAP.md`、`CONTEXT.md`、`codemap.json` 等 AI/Agent 可直接消费的上下文
-- **核心分析命令** - 提供 `generate`、`query`、`deps`、`impact`、`complexity`、`cycles`、`analyze`、`design`、`export`、`ci`
+- **核心分析命令** - 提供 `generate`、`query`、`deps`、`impact`、`complexity`、`cycles`、`analyze`、`design`、`export`、`ci`，并提供 experimental `mcp`
 - **机器可读优先** - 结构化输出是产品基线；当前 CLI 过渡期仍主要通过 `--json` 暴露机器可读结果
 - **分层架构 (MVP3)** - 保持 `Interface → Infrastructure → Domain → Server → CLI` 的明确边界
 - **双层解析模式** - 提供 `fast`（快速正则）和 `smart`（TypeScript AST）两种解析模式
@@ -25,7 +25,7 @@ CodeMap 是一个面向 TypeScript/JavaScript/Go 项目的 AI-first 代码地图
 | 输出契约 | 目标是机器可读优先；`当前 CLI 现实` 是多数命令通过 `--json` 提供结构化结果，`analyze` 额外支持 `--output-mode machine|human` |
 | 架构边界 | `Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令 |
 
-当前公共 CLI 聚焦 `init`、`generate`、`query`、`deps`、`cycles`、`complexity`、`impact`、`analyze`、`design`、`ci`、`workflow`、`export`、`ship`；`server`、`watch`、`report`、`logs` 已从 public CLI 移除，并在调用时给出迁移提示。
+当前公共 CLI 聚焦 `init`、`generate`、`query`、`deps`、`cycles`、`complexity`、`impact`、`analyze`、`design`、`ci`、`workflow`、`export`、`ship`，以及 experimental 的 `mcp`；`server`、`watch`、`report`、`logs` 已从 public CLI 移除，并在调用时给出迁移提示。
 
 ## 安装
 
@@ -145,6 +145,7 @@ mycodemap init -y       # 使用默认配置直接创建
 mycodemap generate                    # 使用默认 hybrid 模式
 mycodemap generate -m smart           # 使用 smart 模式（AST 深度分析）
 mycodemap generate -o ./docs/codemap  # 指定输出目录
+mycodemap generate --symbol-level     # 额外 materialize symbol-level 调用依赖（实验性首期切片）
 
 # 别名：codemap generate 也可以使用
 ```
@@ -153,7 +154,11 @@ mycodemap generate -o ./docs/codemap  # 指定输出目录
 |------|------|--------|
 | `-m, --mode <mode>` | 分析模式：`fast`（正则匹配）、`smart`（TypeScript AST）或 `hybrid`（自动选择） | `hybrid` |
 | `-o, --output <dir>` | 输出目录 | `.mycodemap` |
+| `--symbol-level` | 额外把可解析的 symbol-level `call` 依赖写入图存储；默认 generate 行为不变 | `false` |
 | `--ai-context` | 为每个文件生成描述 | - |
+
+- `codemap.json` 现在会显式写出 `graphStatus`、`failedFileCount` 与可选 `parseFailureFiles`。
+- 当某些发现到的文件没有成功进入最终图时，`graphStatus` 会降级为 `partial`；不要把这种结果当成完整图继续做自动化决策。
 
 **模式说明：**
 
@@ -240,6 +245,30 @@ mycodemap impact -f src/cli/index.ts -j     # JSON 格式输出
 | `-f, --file <path>` | **必填** 指定要分析的文件 | - |
 | `-t, --transitive` | 包含传递依赖（间接影响） | - |
 | `-j, --json` | 以 JSON 格式输出 | - |
+
+### `mycodemap mcp`（experimental）
+
+本地只读的 stdio MCP 薄切片。当前只提供两个工具：`codemap_query`、`codemap_impact`。
+
+```bash
+# 先生成 symbol-level 图
+mycodemap generate --symbol-level
+
+# 把当前仓库写入本地 MCP host 配置
+mycodemap mcp install
+
+# 由 MCP host 启动 stdio server
+mycodemap mcp start
+```
+
+| 子命令 | 说明 |
+|--------|------|
+| `mcp install` | 把 experimental 本地 server 写入当前仓库 `.mcp.json` |
+| `mcp start` | 启动本地 stdio MCP server；`stdout` 仅承载协议帧 |
+
+- `mcp` 当前是 **experimental / local-only / read-only** surface，不是稳定长期 public API。
+- 使用前必须先执行 `mycodemap generate --symbol-level`；否则工具会返回 `GRAPH_NOT_FOUND`。
+- canonical 集成文档见 `docs/ai-guide/INTEGRATION.md`；若宿主暂时不支持真正 MCP，可先回退到传统 CLI wrapper 方式。
 
 ### 已移除的公共 CLI 命令
 

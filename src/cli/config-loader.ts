@@ -45,6 +45,7 @@ const DEFAULT_CONFIG_SCHEMA_URL = 'https://mycodemap.dev/schema/config.json';
 const VALID_MODES = new Set<NormalizedCodemapConfig['mode']>(['fast', 'smart', 'hybrid']);
 const VALID_STORAGE_TYPES = new Set<NormalizedStorageConfig['type']>([
   'filesystem',
+  'sqlite',
   'kuzudb',
   'memory',
   'auto',
@@ -137,7 +138,7 @@ function normalizeStorageType(value: unknown): NormalizedStorageConfig['type'] {
   const storageType = normalizeString(value, 'storage.type') as NormalizedStorageConfig['type'];
 
   if (!VALID_STORAGE_TYPES.has(storageType)) {
-    throw new Error('配置文件中的 "storage.type" 仅支持 filesystem、kuzudb、memory、auto');
+    throw new Error('配置文件中的 "storage.type" 仅支持 filesystem、sqlite、kuzudb、memory、auto');
   }
 
   return storageType;
@@ -151,7 +152,7 @@ function assertNoDeprecatedNeo4jConfig(rawStorageConfig: Record<string, unknown>
 
   if (containsLegacyNeo4jFields) {
     throw new Error(
-      '配置文件中的 Neo4j storage 已不再受支持；请改用 filesystem、kuzudb、memory 或 auto，并移除 storage.uri / storage.username / storage.password'
+      '配置文件中的 Neo4j storage 已不再受支持；请改用 filesystem、sqlite、kuzudb、memory 或 auto，并移除 storage.uri / storage.username / storage.password'
     );
   }
 }

@@ -10,6 +10,8 @@ import type { Dependency as DependencyInterface } from '../../interface/types/in
  * 依赖类型
  */
 export type DependencyType = 'import' | 'inherit' | 'implement' | 'call' | 'type-ref';
+export type DependencyEntityType = 'module' | 'symbol';
+export type DependencyConfidence = 'high' | 'ambiguous';
 
 /**
  * 依赖领域实体
@@ -23,18 +25,33 @@ export class Dependency implements DependencyInterface {
   readonly id: string;
   readonly sourceId: string;
   readonly targetId: string;
+  sourceEntityType: DependencyEntityType;
+  targetEntityType: DependencyEntityType;
   type: DependencyType;
+  confidence?: DependencyConfidence;
+  filePath?: string;
+  line?: number;
 
   constructor(
     id: string,
     sourceId: string,
     targetId: string,
-    type: DependencyType = 'import'
+    type: DependencyType = 'import',
+    sourceEntityType: DependencyEntityType = 'module',
+    targetEntityType: DependencyEntityType = 'module',
+    confidence?: DependencyConfidence,
+    filePath?: string,
+    line?: number
   ) {
     this.id = id;
     this.sourceId = sourceId;
     this.targetId = targetId;
+    this.sourceEntityType = sourceEntityType;
+    this.targetEntityType = targetEntityType;
     this.type = type;
+    this.confidence = confidence;
+    this.filePath = filePath;
+    this.line = line;
 
     this.validate();
   }
@@ -47,7 +64,12 @@ export class Dependency implements DependencyInterface {
       data.id,
       data.sourceId,
       data.targetId,
-      data.type
+      data.type,
+      data.sourceEntityType ?? 'module',
+      data.targetEntityType ?? 'module',
+      data.confidence,
+      data.filePath,
+      data.line
     );
   }
 
@@ -59,7 +81,12 @@ export class Dependency implements DependencyInterface {
       id: this.id,
       sourceId: this.sourceId,
       targetId: this.targetId,
+      sourceEntityType: this.sourceEntityType,
+      targetEntityType: this.targetEntityType,
       type: this.type,
+      confidence: this.confidence,
+      filePath: this.filePath,
+      line: this.line,
     };
   }
 
@@ -137,14 +164,34 @@ export class Dependency implements DependencyInterface {
    * 创建反向依赖（交换源和目标）
    */
   createReverse(newId: string): Dependency {
-    return new Dependency(newId, this.targetId, this.sourceId, this.type);
+    return new Dependency(
+      newId,
+      this.targetId,
+      this.sourceId,
+      this.type,
+      this.targetEntityType,
+      this.sourceEntityType,
+      this.confidence,
+      this.filePath,
+      this.line
+    );
   }
 
   /**
    * 创建依赖快照（克隆）
    */
   snapshot(): Dependency {
-    return new Dependency(this.id, this.sourceId, this.targetId, this.type);
+    return new Dependency(
+      this.id,
+      this.sourceId,
+      this.targetId,
+      this.type,
+      this.sourceEntityType,
+      this.targetEntityType,
+      this.confidence,
+      this.filePath,
+      this.line
+    );
   }
 
   /**

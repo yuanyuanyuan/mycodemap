@@ -66,6 +66,7 @@ cat .mycodemap/AI_MAP.md
 | "需要导出结构化结果" | `export json -o ./output.json` |
 | "需要插件诊断/扩展结果" | `generate` → 读 `AI_MAP.md` 的 `Plugin Summary` 或解析 `codemap.json.pluginReport` |
 | "需要切换/排查图存储后端" | 编辑 `mycodemap.config.json.storage` → 运行 `generate` / `export` |
+| "需要把 symbol-level 关系暴露给 MCP host" | `generate --symbol-level` → `mcp install` → 让 host 启动 `mcp start` |
 
 **完整决策树**: 见 [docs/ai-guide/QUICKSTART.md](./docs/ai-guide/QUICKSTART.md)
 
@@ -113,10 +114,33 @@ cat .mycodemap/AI_MAP.md
 ```
 
 - `generate` 会写入配置的图存储后端；`export` 与内部 `Server Layer` handler 会读取同一份后端数据。
+- `generate --symbol-level` 只在显式开启时额外 materialize symbol-level `call` 依赖；未开启时默认 generate 行为保持兼容。
+- `generate` 产出的 `codemap.json` / 图存储会携带 `graphStatus`、`failedFileCount` 与可选 `parseFailureFiles`；若 `graphStatus = "partial"`，说明发现到的文件没有全部成功进入最终图。
 - `neo4j` 与 `kuzudb` 已不再是正式支持的 backend；旧配置会暴露显式迁移错误，不会静默 fallback。
 - 选择 `sqlite` 时默认落盘到 `.codemap/governance.sqlite`；也可通过 `storage.databasePath` 覆盖。
 - `storage.type = "auto"` 当前优先选择 `sqlite`；若运行时缺少 `better-sqlite3` 或 Node.js `<20` 导致 SQLite 不可用，则 warning 后回退到 `filesystem`。
 - 图存储后端是存储面收口，不是重新开放公共 HTTP API 产品面。
+
+---
+
+## 🔌 Experimental MCP 薄切片
+
+```bash
+# 1. 先生成 symbol-level 图
+node dist/cli/index.js generate --symbol-level
+
+# 2. 把当前仓库安装到本地 MCP host 配置
+node dist/cli/index.js mcp install
+
+# 3. 由 MCP host 启动本地 stdio server
+node dist/cli/index.js mcp start
+```
+
+- 当前 canonical path 是**本地、只读、stdio first** 的 experimental MCP server。
+- 首期只暴露两个工具：`codemap_query`、`codemap_impact`。
+- 两个工具都会返回 `graph_status`、`generated_at`、`error.code`；若图不存在，返回 `GRAPH_NOT_FOUND`，不会伪装成空结果。
+- `mcp install` 当前只维护**当前仓库根目录**的 `.mcp.json`，不承诺全局安装/卸载生命周期。
+- 详细集成步骤见 `docs/ai-guide/INTEGRATION.md`；完整 output contract 见 `docs/ai-guide/OUTPUT.md`。
 
 ---
 

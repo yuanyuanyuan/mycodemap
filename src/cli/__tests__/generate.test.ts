@@ -13,6 +13,101 @@ const mockCreateForProject = vi.fn();
 const mockStorageSaveCodeGraph = vi.fn();
 const mockStorageClose = vi.fn();
 
+function createSymbolLevelAnalyzeResult() {
+  return {
+    version: '1.0.0',
+    generatedAt: '2026-04-18T00:00:00.000Z',
+    project: {
+      name: 'test-project',
+      rootDir: '/test',
+    },
+    summary: {
+      totalFiles: 2,
+      totalLines: 20,
+      totalModules: 2,
+      totalExports: 2,
+    },
+    modules: [
+      {
+        id: 'module-a',
+        path: '/test/src/a.ts',
+        absolutePath: '/test/src/a.ts',
+        type: 'source',
+        stats: { lines: 10, codeLines: 8, commentLines: 1, blankLines: 1 },
+        exports: [],
+        imports: [],
+        symbols: [
+          {
+            id: 'sym-source',
+            name: 'caller',
+            kind: 'function',
+            location: { file: 'a.ts', line: 1, column: 1 },
+            visibility: 'public',
+            relatedSymbols: [],
+            signature: {
+              parameters: [],
+              returnType: 'void',
+              async: false,
+              calls: [{ callee: 'callee', line: 2, column: 3 }],
+            },
+          },
+        ],
+        dependencies: [],
+        dependents: [],
+        callGraph: {
+          calls: [{ caller: 'caller', callee: 'callee', line: 2 }],
+          recursive: [],
+          callCounts: { caller: 1 },
+          crossFileCalls: [
+            {
+              callee: 'callee',
+              calleeLocation: { file: 'src/b.ts', line: 1, column: 1 },
+              callerLocation: { file: 'src/a.ts', line: 2, column: 3 },
+              resolved: true,
+              importPath: './b',
+            },
+          ],
+        },
+      },
+      {
+        id: 'module-b',
+        path: '/test/src/b.ts',
+        absolutePath: '/test/src/b.ts',
+        type: 'source',
+        stats: { lines: 10, codeLines: 8, commentLines: 1, blankLines: 1 },
+        exports: [],
+        imports: [],
+        symbols: [
+          {
+            id: 'sym-target',
+            name: 'callee',
+            kind: 'function',
+            location: { file: 'b.ts', line: 1, column: 1 },
+            visibility: 'public',
+            relatedSymbols: [],
+            signature: {
+              parameters: [],
+              returnType: 'string',
+              async: false,
+            },
+          },
+        ],
+        dependencies: [],
+        dependents: [],
+        callGraph: {
+          calls: [],
+          recursive: [],
+          callCounts: {},
+        },
+      },
+    ],
+    dependencies: { nodes: [], edges: [] },
+    graphStatus: 'complete',
+    failedFileCount: 0,
+    actualMode: 'smart',
+  };
+}
+
 // Mock dependencies
 vi.mock('../../core/analyzer.js', () => ({
   analyze: vi.fn().mockResolvedValue({
@@ -177,6 +272,69 @@ describe('generate command', () => {
     expect(generateJSON).toHaveBeenCalled();
     expect(generateMermaidGraph).toHaveBeenCalled();
     expect(generateContext).toHaveBeenCalled();
+  });
+
+  it('should materialize symbol call dependencies when --symbol-level is enabled', async () => {
+    const { generateCommand } = await import('../commands/generate.js');
+    vi.mocked(analyze).mockResolvedValueOnce(createSymbolLevelAnalyzeResult());
+
+    await generateCommand({
+      mode: 'smart',
+      output: outputDir,
+      symbolLevel: true,
+    });
+
+    const savedGraph = mockStorageSaveCodeGraph.mock.calls.at(-1)?.[0];
+    expect(savedGraph).toBeDefined();
+    expect(savedGraph.symbols.find((symbol: { name: string }) => symbol.name === 'caller')?.signature)
+      .toContain('caller() => void');
+
+    const callDependencies = savedGraph.dependencies.filter((dependency: { type: string }) => dependency.type === 'call');
+    expect(callDependencies).toHaveLength(1);
+    expect(callDependencies[0]).toEqual(expect.objectContaining({
+      sourceEntityType: 'symbol',
+      targetEntityType: 'symbol',
+      confidence: 'high',
+      filePath: '/test/src/a.ts',
+      line: 2,
+    }));
+  });
+
+    it('should keep default generate behavior module-only when --symbol-level is omitted', async () => {
+    const { generateCommand } = await import('../commands/generate.js');
+    vi.mocked(analyze).mockResolvedValueOnce(createSymbolLevelAnalyzeResult());
+
+    await generateCommand({
+      mode: 'smart',
+      output: outputDir,
+    });
+
+    const savedGraph = mockStorageSaveCodeGraph.mock.calls.at(-1)?.[0];
+    expect(savedGraph).toBeDefined();
+    expect(savedGraph.dependencies.filter((dependency: { type: string }) => dependency.type === 'call')).toEqual([]);
+  });
+
+  it('should persist partial graph metadata into storage when analyze degrades', async () => {
+    const { generateCommand } = await import('../commands/generate.js');
+    vi.mocked(analyze).mockResolvedValueOnce({
+      ...createSymbolLevelAnalyzeResult(),
+      graphStatus: 'partial',
+      failedFileCount: 1,
+      parseFailureFiles: ['/test/src/b.ts'],
+    });
+
+    await generateCommand({
+      mode: 'smart',
+      output: outputDir,
+      symbolLevel: true,
+    });
+
+    const savedGraph = mockStorageSaveCodeGraph.mock.calls.at(-1)?.[0];
+    expect(savedGraph).toEqual(expect.objectContaining({
+      graphStatus: 'partial',
+      failedFileCount: 1,
+      parseFailureFiles: ['/test/src/b.ts'],
+    }));
   });
 });
 
