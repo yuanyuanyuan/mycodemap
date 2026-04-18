@@ -38,7 +38,71 @@ fi
 
 echo "Tests passed"
 
-# 2. 检查 staged 文件数量（初始化 commit 除外）
+# 2. repo-local 规则校验（按 hard_gate.mode 决定 report-only / enforce）
+RULE_CONFIG_PATH=".claude/rule-system.config.json"
+RULE_HARD_GATE_MODE="report-only"
+
+if [ -f "$RULE_CONFIG_PATH" ]; then
+    RULE_HARD_GATE_MODE=$(python3 - <<'PY'
+import json
+from pathlib import Path
+
+config_path = Path(".claude/rule-system.config.json")
+
+try:
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+except Exception:
+    print("report-only")
+else:
+    print(config.get("hard_gate", {}).get("mode", "report-only"))
+PY
+)
+fi
+
+echo "Running repo-local rule validation (mode: $RULE_HARD_GATE_MODE)..."
+case "$RULE_HARD_GATE_MODE" in
+    enforce)
+        python3 scripts/validate-rules.py code
+        VALIDATE_EXIT=$?
+        case "$VALIDATE_EXIT" in
+            0)
+                echo "Rule validation passed"
+                ;;
+            1)
+                echo "ERROR: Rule validation found blocking P0 failures, commit rejected"
+                exit 1
+                ;;
+            2)
+                echo "WARNING: Rule validation reported warn-only P1 findings, continuing commit"
+                ;;
+            3)
+                echo "WARNING: Rule validation reported notice-only P2 findings, continuing commit"
+                ;;
+            4)
+                echo "ERROR: Rule validation dependencies unavailable, commit rejected"
+                exit 1
+                ;;
+            *)
+                echo "ERROR: Rule validation returned unexpected exit code ($VALIDATE_EXIT), commit rejected"
+                exit 1
+                ;;
+        esac
+        ;;
+    report-only|*)
+        if [ "$RULE_HARD_GATE_MODE" != "report-only" ]; then
+            echo "WARNING: Unknown hard gate mode '$RULE_HARD_GATE_MODE', defaulting to report-only"
+        fi
+        python3 scripts/validate-rules.py code --report-only >/dev/null
+        VALIDATE_EXIT=$?
+        if [ "$VALIDATE_EXIT" -ne 0 ]; then
+            echo "WARNING: Rule validation report-only command exited with $VALIDATE_EXIT, continuing commit"
+        else
+            echo "Rule validation report-only completed"
+        fi
+        ;;
+esac
+
+# 3. 检查 staged 文件数量（初始化 commit 除外）
 # 规则: 单 commit 文件数量不能超过 10 个
 # 例外: 如果包含文档类型文件，限制放宽到 20 个
 MAX_FILES_PER_COMMIT=10
@@ -103,7 +167,7 @@ elif [ "$STAGED_FILE_COUNT" -gt "$CURRENT_LIMIT" ] && [ "$IS_INITIAL_COMMIT" = "
     exit 1
 fi
 
-# 3. 检查文件头注释（只检查 staged 的 TS 源文件，豁免 . 开头目录）
+# 4. 检查文件头注释（只检查 staged 的 TS 源文件，豁免 . 开头目录）
 echo "Checking file headers..."
 if [ "$ONLY_DOT_DIRS" = "true" ]; then
     echo "Note: Only dot-directory files staged, skipping header check"
@@ -144,7 +208,7 @@ fi
 
 echo "File headers passed"
 
-# 4. 检查文档与 CLI 护栏（仅在相关文件变更时阻断）
+# 5. 检查文档与 CLI 护栏（仅在相关文件变更时阻断）
 DOC_GUARDRAIL_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(README\.md|package\.json|docs/|src/cli/index\.ts|vitest\.config\.ts|vitest\.benchmark\.config\.ts|\.github/workflows/ci-gateway\.yml)$' || true)
 
 if [ -n "$DOC_GUARDRAIL_FILES" ]; then
@@ -158,7 +222,7 @@ fi
 
 echo "Documentation guardrails passed"
 
-# 5. 生成 AI 饲料（警告级，不阻断）
+# 6. 生成 AI 饲料（警告级，不阻断）
 echo "Generating AI feed..."
 npx mycodemap generate --quiet >/dev/null 2>&1 &
 if [ $? -ne 0 ]; then

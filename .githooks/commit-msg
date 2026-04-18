@@ -1,5 +1,5 @@
 #!/bin/sh
-# Commit-msg hook: 验证 Commit 消息格式和文件数量
+# Commit-msg hook: 仅验证 Commit 消息格式
 
 MSG_FILE=$1
 MSG=$(head -1 "$MSG_FILE")
@@ -35,68 +35,6 @@ elif ! echo "$MSG" | grep -qE '^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]
     echo "ERROR: scope and message are required."
     echo "Format: [TAG] scope: message"
     echo "Example: [FEATURE] cli: add new command"
-    exit 1
-fi
-
-# 2. 检查 commit 文件数量（初始化 commit 除外，豁免 . 开头目录）
-# 规则: 单 commit 文件数量不能超过 10 个
-# 例外: 如果包含文档类型文件，限制放宽到 20 个
-# 例外: 如果只包含 . 开头目录下的文件，豁免数量限制
-MAX_FILES_PER_COMMIT=10
-MAX_FILES_WITH_DOCS=20
-
-# 获取当前提交（index）中的文件列表
-if [ -z "$(git rev-parse --verify HEAD 2>/dev/null)" ]; then
-    IS_INITIAL_COMMIT=true
-else
-    IS_INITIAL_COMMIT=false
-fi
-
-COMMIT_FILE_COUNT=$(printf '%s\n' "$COMMIT_FILES" | awk 'NF { count++ } END { print count + 0 }')
-
-# 检查是否包含文档类型文件
-# 文档类型: *.md, docs/* 目录下文件, README*, CHANGELOG*, LICENSE*
-CONTAINS_DOC_FILES=false
-if [ -n "$COMMIT_FILES" ]; then
-    DOC_FILES=$(echo "$COMMIT_FILES" | grep -E '(\.md$|^docs/|^README|^CHANGELOG|^LICENSE)' || true)
-    if [ -n "$DOC_FILES" ]; then
-        CONTAINS_DOC_FILES=true
-    fi
-fi
-
-# 根据是否包含文档类型文件设置限制
-if [ "$CONTAINS_DOC_FILES" = "true" ]; then
-    CURRENT_LIMIT=$MAX_FILES_WITH_DOCS
-else
-    CURRENT_LIMIT=$MAX_FILES_PER_COMMIT
-fi
-
-if [ "$ONLY_DOT_DIRS" = "true" ]; then
-    echo "Note: Commit only contains files in dot-directories, skipping file count check"
-elif [ "$COMMIT_FILE_COUNT" -gt "$CURRENT_LIMIT" ] && [ "$IS_INITIAL_COMMIT" = "false" ]; then
-    echo ""
-    echo "ERROR: Commit contains $COMMIT_FILE_COUNT files, exceeding limit of $CURRENT_LIMIT"
-    echo ""
-    if [ "$CONTAINS_DOC_FILES" = "true" ]; then
-        echo "Note: This commit contains documentation files, so the limit is increased to $MAX_FILES_WITH_DOCS."
-    else
-        echo "Single commit should not contain more than $MAX_FILES_PER_COMMIT files."
-    fi
-    echo "Large commits make code review difficult and increase rollback risk."
-    echo ""
-    echo "Please split your changes into smaller, focused commits:"
-    echo "  git reset HEAD~1"
-    echo "  git add -p        # 选择性添加文件"
-    echo "  git commit -m '[TAG] scope: message'"
-    echo ""
-    echo "Exceptions (requires strong justification):"
-    echo "  - Bulk dependency updates with lock file changes"
-    echo "  - Automated code generation results"
-    echo "  - Mass refactoring with no logic changes"
-    echo "  - Documentation updates with multiple related doc files"
-    echo ""
-    echo "If you have a very good reason, use: git commit --no-verify"
-    echo ""
     exit 1
 fi
 
