@@ -6,8 +6,10 @@
 
 import type {
   Cycle,
+  GraphMetadata,
   ImpactResult,
   ProjectStatistics,
+  SymbolImpactResult,
 } from '../../../interface/types/storage.js';
 import type {
   CodeGraph,
@@ -18,6 +20,7 @@ import type {
 import { StorageBase } from '../interfaces/StorageBase.js';
 import {
   calculateImpactInGraph,
+  calculateSymbolImpactInGraph,
   cloneCodeGraph,
   createEmptyCodeGraph,
   deleteModuleFromGraph,
@@ -26,6 +29,7 @@ import {
   findCallersInGraph,
   findDependenciesInGraph,
   findDependentsInGraph,
+  getGraphMetadataFromGraph,
   getProjectStatisticsFromGraph,
   upsertModuleInGraph,
 } from '../graph-helpers.js';
@@ -71,6 +75,11 @@ export class MemoryStorage extends StorageBase {
   async loadCodeGraph(): Promise<CodeGraph> {
     this.ensureInitialized();
     return cloneCodeGraph(this.graph);
+  }
+
+  async loadGraphMetadata(): Promise<GraphMetadata> {
+    this.ensureInitialized();
+    return getGraphMetadataFromGraph(this.graph);
   }
 
   async deleteProject(): Promise<void> {
@@ -148,6 +157,15 @@ export class MemoryStorage extends StorageBase {
   async calculateImpact(moduleId: string, depth: number): Promise<ImpactResult> {
     this.ensureInitialized();
     return calculateImpactInGraph(this.graph, moduleId, depth);
+  }
+
+  async calculateSymbolImpact(
+    symbolId: string,
+    depth: number,
+    limit: number
+  ): Promise<SymbolImpactResult> {
+    this.ensureInitialized();
+    return calculateSymbolImpactInGraph(this.graph, symbolId, depth, limit);
   }
 
   async getStatistics(): Promise<ProjectStatistics> {

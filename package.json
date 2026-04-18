@@ -60,6 +60,8 @@
   "license": "MIT",
   "dependencies": {
     "@hono/node-server": "^1.19.11",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "better-sqlite3": "^12.9.0",
     "chalk": "^5.3.0",
     "chokidar": "^3.5.3",
     "commander": "^11.1.0",
@@ -69,14 +71,17 @@
     "tree-sitter": "^0.21.1",
     "tree-sitter-typescript": "^0.23.2",
     "typescript": "^5.3.3",
-    "typhonjs-escomplex": "^0.1.0"
+    "typhonjs-escomplex": "^0.1.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/glob": "^8.1.0",
     "@types/node": "^20.10.0",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "@vitest/coverage-v8": "^1.6.1",
+    "dependency-cruiser": "^17.3.10",
     "eslint": "^8.57.1",
     "vitest": "^1.1.0"
   },

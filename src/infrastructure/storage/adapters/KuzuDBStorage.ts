@@ -8,8 +8,10 @@ import { join } from 'path';
 import type {
   StorageConfig,
   Cycle,
+  GraphMetadata,
   ImpactResult,
   ProjectStatistics,
+  SymbolImpactResult,
 } from '../../../interface/types/storage.js';
 import type {
   CodeGraph,
@@ -20,6 +22,7 @@ import type {
 import { StorageBase, StorageError } from '../interfaces/StorageBase.js';
 import {
   calculateImpactInGraph,
+  calculateSymbolImpactInGraph,
   createEmptyCodeGraph,
   deleteModuleFromGraph,
   deserializeCodeGraphSnapshot,
@@ -28,6 +31,7 @@ import {
   findCallersInGraph,
   findDependenciesInGraph,
   findDependentsInGraph,
+  getGraphMetadataFromGraph,
   getProjectStatisticsFromGraph,
   serializeCodeGraphSnapshot,
   upsertModuleInGraph,
@@ -174,6 +178,11 @@ export class KuzuDBStorage extends StorageBase {
     return deserializeCodeGraphSnapshot(snapshot, this.projectPath ?? '');
   }
 
+  async loadGraphMetadata(): Promise<GraphMetadata> {
+    this.ensureInitialized();
+    return getGraphMetadataFromGraph(await this.loadCodeGraph());
+  }
+
   async deleteProject(): Promise<void> {
     this.ensureInitialized();
     await this.runQuery('MATCH (s:Snapshot) DELETE s;');
@@ -243,6 +252,15 @@ export class KuzuDBStorage extends StorageBase {
   async calculateImpact(moduleId: string, depth: number): Promise<ImpactResult> {
     this.ensureInitialized();
     return calculateImpactInGraph(await this.loadCodeGraph(), moduleId, depth);
+  }
+
+  async calculateSymbolImpact(
+    symbolId: string,
+    depth: number,
+    limit: number
+  ): Promise<SymbolImpactResult> {
+    this.ensureInitialized();
+    return calculateSymbolImpactInGraph(await this.loadCodeGraph(), symbolId, depth, limit);
   }
 
   async getStatistics(): Promise<ProjectStatistics> {

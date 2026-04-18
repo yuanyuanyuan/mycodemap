@@ -59,6 +59,7 @@ describe('cli help surface', () => {
     expect(output).toContain('ci');
     expect(output).toContain('workflow');
     expect(output).toContain('export');
+    expect(output).toContain('mcp');
     expect(output).toContain('ship');
     expect(output).not.toContain('watch');
     expect(output).not.toContain('report');

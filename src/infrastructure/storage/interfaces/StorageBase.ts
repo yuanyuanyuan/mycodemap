@@ -12,7 +12,9 @@ import type {
   SearchResult,
   Cycle,
   ImpactResult,
+  GraphMetadata,
   ProjectStatistics,
+  SymbolImpactResult,
 } from '../../../interface/types/storage.js';
 import type { CodeGraph, Module, Symbol, Dependency } from '../../../interface/types/index.js';
 
@@ -106,6 +108,7 @@ export abstract class StorageBase implements IStorage {
 
   abstract saveCodeGraph(graph: CodeGraph): Promise<void>;
   abstract loadCodeGraph(): Promise<CodeGraph>;
+  abstract loadGraphMetadata(): Promise<GraphMetadata>;
   abstract deleteProject(): Promise<void>;
 
   // ============================================
@@ -186,5 +189,6 @@ export abstract class StorageBase implements IStorage {
 
   abstract detectCycles(): Promise<Cycle[]>;
   abstract calculateImpact(moduleId: string, depth: number): Promise<ImpactResult>;
+  abstract calculateSymbolImpact(symbolId: string, depth: number, limit: number): Promise<SymbolImpactResult>;
   abstract getStatistics(): Promise<ProjectStatistics>;
 }

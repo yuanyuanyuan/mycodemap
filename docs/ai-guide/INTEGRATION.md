@@ -1,515 +1,219 @@
-# AI Guide - 集成与错误处理
+# AI Guide - MCP / Agent 集成
 
-> 与 AI 工作流的集成方式和常见错误处理
+> 当前 canonical integration path：**真实本地 stdio MCP server**。旧 CLI wrapper 只作为 fallback。
 
 ---
 
-## 与 AI 工作流的集成
+## 1. 当前事实边界
 
-### MCP (Model Context Protocol) 集成
+| 维度 | 当前基线 |
+|------|----------|
+| transport | 本地 `stdio` |
+| 读写权限 | **只读** |
+| public surface | `mycodemap mcp install`、`mycodemap mcp start` |
+| MCP tools | `codemap_query`、`codemap_impact` |
+| 图前置条件 | 先执行 `mycodemap generate --symbol-level` |
+| 稳定性 | **experimental** |
+| 非目标 | HTTP MCP、远程 transport、写操作、全局 host lifecycle |
 
-将 CodeMap 注册为 MCP 工具：
+---
+
+## 1.1 速查表
+
+| 你遇到的问题 | 先看什么 |
+|--------------|----------|
+| 想让 host 真正通过 MCP 调 CodeMap | 本文第 2-4 节 |
+| host 只会跑命令，不会连 MCP | 本文第 6 节 fallback |
+| 想判断 storage / 运行时是否满足 | 本文第 7 节故障排查 |
+
+---
+
+## 2. canonical 集成步骤
+
+### Step 1: 生成 symbol-level 图
+
+```bash
+mycodemap generate --symbol-level
+```
+
+如果输出里的 `graphStatus = "partial"`，说明图是降级结果；MCP tools 仍可返回结果，但会显式带 `graph_status: "partial"`。
+
+### Step 2: 安装到当前仓库 `.mcp.json`
+
+```bash
+mycodemap mcp install
+```
+
+该命令当前只做一件事：在**当前仓库根目录**的 `.mcp.json` 里写入一个 experimental server entry。
+
+### Step 3: 让 MCP host 启动 stdio server
+
+```bash
+mycodemap mcp start
+```
+
+注意：
+- 这是给 MCP host 启动的 `stdio` server，不是给人类终端交互的命令
+- `stdout` 只承载 MCP 协议帧
+- 欢迎信息、迁移提示、runtime log 不会混入 `stdout`
+
+---
+
+## 3. `.mcp.json` 参考配置
+
+`mcp install` 会写入与下列 shape 等价的配置：
 
 ```json
 {
-  "tools": [
-    {
-      "name": "codemap_generate",
-      "description": "生成代码地图，必须在其他命令之前执行",
-      "command": "mycodemap generate",
-      "timeout": 60000
-    },
-    {
-      "name": "codemap_query_symbol",
-      "description": "查询符号定义位置",
-      "command": "mycodemap query -s {symbol} -j",
-      "parameters": {
-        "symbol": { "type": "string", "description": "符号名称" }
-      }
-    },
-    {
-      "name": "codemap_read",
-      "description": "分析文件变更的影响范围",
-      "command": "mycodemap analyze -i read -t {target} --scope transitive --json",
-      "parameters": {
-        "target": { "type": "string", "description": "目标文件路径" }
-      }
-    },
-    {
-      "name": "codemap_find",
-      "description": "搜索与关键词相关的代码",
-      "command": "mycodemap analyze -i find -k {keyword} --json",
-      "parameters": {
-        "keyword": { "type": "string", "description": "搜索关键词" }
-      }
-    },
-    {
-      "name": "codemap_check_ci",
-      "description": "执行 CI 门禁检查",
-      "command": "mycodemap ci {check_type}",
-      "parameters": {
-        "check_type": { 
-          "type": "string", 
-          "enum": ["check-commits", "check-headers", "assess-risk"],
-          "description": "检查类型"
-        }
+  "mcpServers": {
+    "mycodemap-experimental": {
+      "command": "node",
+      "args": ["dist/cli/index.js", "mcp", "start"],
+      "cwd": "/absolute/path/to/repo",
+      "env": {
+        "MYCODEMAP_RUNTIME_LOG_ENABLED": "false"
       }
     }
-  ]
+  }
 }
 ```
 
+### 当前宿主支持边界
+
+- 当前文档只保证**repo-local `.mcp.json`** 这一路径
+- 不承诺全局安装、升级覆盖策略或卸载命令
+- 若你的 host 不读取 `.mcp.json`，请手动拷贝上面的 server entry 到宿主自己的 MCP 配置文件
+
 ---
 
-### Skill/Knowledge 集成
+## 4. MCP tool contract
 
-#### Kimi CLI Skill
+### `codemap_query`
 
-```markdown
+输入：
+
+```typescript
+interface CodemapQueryInput {
+  symbol: string;
+  filePath?: string;
+}
+```
+
+返回：
+- symbol 定义
+- callers
+- callees
+- `graph_status`
+- `generated_at`
+- `error.code`（若失败）
+
+### `codemap_impact`
+
+输入：
+
+```typescript
+interface CodemapImpactInput {
+  symbol: string;
+  filePath?: string;
+  depth?: number;
+  limit?: number;
+}
+```
+
+返回：
+- `root_symbol`
+- symbol-level caller impact 链
+- `depth` / `limit` / `truncated`
+- `graph_status`
+- `generated_at`
+- `error.code`（若失败）
+
+> 完整输出类型见 `docs/ai-guide/OUTPUT.md`。
+
 ---
-name: codemap
-description: CodeMap 代码分析工具，用于项目结构分析、符号查询、依赖分析和影响评估
+
+## 5. 错误语义
+
+| `error.code` | 何时出现 | 应对方式 |
+|--------------|----------|----------|
+| `GRAPH_NOT_FOUND` | 还没生成 symbol-level 图 | 先跑 `mycodemap generate --symbol-level` |
+| `SYMBOL_NOT_FOUND` | 请求的 symbol 不存在 | 检查拼写，或先用 `query -S` / `analyze -i find` 搜索 |
+| `AMBIGUOUS_EDGE` | 同名 symbol 无法仅靠 `symbol` / `filePath` 消歧 | 补充更具体的 `filePath` |
+
+### `graph_status` 解读
+
+| 值 | 含义 |
+|----|------|
+| `complete` | 图完整，可正常消费 |
+| `partial` | 图降级，结果可用但不应伪装成完整 truth |
+| `missing` | 图不存在，工具会返回 `GRAPH_NOT_FOUND` |
+
 ---
 
-## 环境检测
+## 6. fallback：旧 CLI wrapper
 
-首先检测 CLI 是否可用：
+如果你的宿主暂时**不支持真正 MCP server**，可以临时回退到直接调用 CLI：
 
-```bash
-if command -v mycodemap &> /dev/null; then
-    CODEMAP="mycodemap"
-elif [ -f "./node_modules/.bin/mycodemap" ]; then
-    CODEMAP="./node_modules/.bin/mycodemap"
-else
-    CODEMAP="npx @mycodemap/mycodemap"
-fi
-```
-
-## 使用原则
-
-1. **首次使用必须先执行 generate**
-   ```bash
-   $CODEMAP generate
-   ```
-
-2. **查询符号定义**
-   ```bash
-   $CODEMAP query -s "SymbolName" -j
-   ```
-
-3. **分析变更影响**
-   ```bash
-   $CODEMAP analyze -i read -t "file.ts" --scope transitive --json
-   ```
-
-4. **搜索代码**
-   ```bash
-   $CODEMAP analyze -i find -k "keyword" --json
-   ```
-
-## 完整文档
-
-参考项目根目录的 `AI_GUIDE.md` 和 `docs/ai-guide/` 目录。
-```
-
-#### Claude Code Skill
-
-```markdown
-# CodeMap Code Analysis
-
-## Overview
-
-Use CodeMap CLI for TypeScript/JavaScript project analysis.
-
-## Commands
-
-### Generate Code Map (Required First Step)
-```bash
-mycodemap generate
-```
-
-### Query Symbol
 ```bash
 mycodemap query -s "SymbolName" -j
+mycodemap impact -f "src/file.ts" -j
+mycodemap analyze -i find -k "SymbolName" --json --structured
 ```
 
-### Analyze Impact
-```bash
-mycodemap analyze -i read -t "file.ts" --scope transitive --json
-```
-
-### Search Code
-```bash
-mycodemap analyze -i find -k "keyword" --json
-```
-
-## Decision Tree
-
-1. Understanding project structure → `generate` + read `AI_MAP.md`
-2. Finding symbol location → `query -s`
-3. Assessing change impact → `analyze -i read`
-4. Searching related code → `analyze -i find`
-
-## Reference
-
-See `AI_GUIDE.md` in project root for complete documentation.
-```
-
-#### Codex CLI Agent
-
-```markdown
-# CodeMap Agent
-
-## Description
-
-Code analysis tool for TypeScript projects.
-
-## Available Tools
-
-- `codemap_generate`: Generate code map
-- `codemap_query`: Query symbols
-- `codemap_read`: Analyze change impact and surrounding context
-- `codemap_find`: Search code
-
-## Workflow
-
-1. Always start with `codemap_generate`
-2. Use `codemap_query` to find definitions
-3. Use `codemap_read` before making changes
-4. Use `codemap_find` to find related code
-
-## Documentation
-
-Full guide: `AI_GUIDE.md`
-```
+但要注意：
+- 这不是原生 MCP
+- 你需要自己做命令拼装、stdout JSON 解析和错误分类
+- canonical path 仍然是 `mcp install` + `mcp start`
 
 ---
 
-## 错误处理
+## 7. 故障排查
 
-### 常见错误及处理
-
-| 错误 | 原因 | 解决方案 |
-|------|------|----------|
-| `代码地图不存在，请先运行 codemap generate` | 未生成代码地图 | 执行 `mycodemap generate` |
-| `符号未找到` | 拼写错误或不存在 | 使用 `query -S` 模糊搜索 |
-| `模块未找到` | 路径错误或已删除 | 检查路径或使用 `query -m` 部分匹配 |
-| `tree-sitter 不可用` | 原生模块未编译 | 安装构建工具后重新安装 |
-| `文件头缺少 [META]` | 新文件未加头 | 添加标准文件头注释 |
-| `提交格式错误` | 不符合 [TAG] 格式 | 修改为 `[TAG] scope: message` |
-| `风险评分过高` | 变更文件太多 | 拆分提交或添加解释 |
-| `输出契约验证失败` | analyze 输出格式变更 | 检查 schemaVersion 和字段 |
-| `pluginReport.diagnostics` 出现 `initialize` / `generate` 错误 | 插件加载或执行失败 | 检查 `mycodemap.config.json` 的 `plugins` 段、插件导出格式和生成路径 |
-| `UNSUPPORTED_STORAGE_TYPE` / `STORAGE_BACKEND_MIGRATED` / `SQLITE_NOT_AVAILABLE` | 图存储后端配置不受支持、仍在使用旧 `neo4j` / `kuzudb` 配置，或显式 `sqlite` 时运行时不满足条件 | 检查 `mycodemap.config.json.storage`；把旧配置迁移到 `filesystem` / `sqlite` / `memory` / `auto`；确认已安装 `better-sqlite3` 且 Node.js `>=20`；若使用 `auto`，SQLite 不可用时会 warning 后回退 `filesystem` |
-
----
-
-### 错误处理代码模式
-
-#### TypeScript
-
-```typescript
-// 模式 1: 代码地图过期/不存在
-async function ensureCodeMap(): Promise<boolean> {
-  const codemapPath = '.mycodemap/codemap.json';
-  
-  if (!existsSync(codemapPath)) {
-    console.log('代码地图不存在，正在生成...');
-    await exec('mycodemap generate');
-    return true;
-  }
-  
-  // 检查是否过期（超过 1 小时）
-  const stat = statSync(codemapPath);
-  const age = Date.now() - stat.mtimeMs;
-  if (age > 3600000) {
-    console.log('代码地图已过期，正在更新...');
-    await exec('mycodemap generate');
-  }
-  
-  return true;
-}
-
-// 模式 2: 查询无结果，逐级回退
-async function findSymbol(symbolName: string): Promise<any[]> {
-  // 尝试 1: 精确查询
-  let result = await exec(`mycodemap query -s "${symbolName}" -j`);
-  let data = JSON.parse(result);
-  
-  if (data.count > 0) {
-    return data.results;
-  }
-  
-  // 尝试 2: 模糊搜索
-  console.log('精确查询无结果，尝试模糊搜索...');
-  result = await exec(`mycodemap query -S "${symbolName}" -l 20 -j`);
-  data = JSON.parse(result);
-  
-  if (data.count > 0) {
-    return data.results;
-  }
-  
-  // 尝试 3: 统一搜索
-  console.log('模糊搜索无结果，尝试统一搜索...');
-  result = await exec(`mycodemap analyze -i find -k "${symbolName}" --topK 20 --json`);
-  data = JSON.parse(result);
-  
-  return data.results || [];
-}
-
-// 模式 3: 影响范围太大，缩小范围
-async function analyzeImpact(file: string, maxFiles: number = 50): Promise<any> {
-  // 先尝试不包含传递依赖
-  let result = await exec(`mycodemap impact -f "${file}" -j`);
-  let data = JSON.parse(result);
-  
-  const totalFiles = (data.direct?.length || 0) + (data.transitive?.length || 0);
-  
-  if (totalFiles > maxFiles) {
-    console.warn(`影响范围过大 (${totalFiles} 个文件)，仅返回直接依赖`);
-    return {
-      ...data,
-      transitive: [],
-      warning: '影响范围过大，仅显示直接依赖'
-    };
-  }
-  
-  return data;
-}
-
-// 模式 4: 置信度太低，扩大搜索
-async function searchWithFallback(keyword: string): Promise<any[]> {
-  let result = await exec(`mycodemap analyze -i find -k "${keyword}" --topK 8 --json`);
-  let data = JSON.parse(result);
-  
-  if (data.confidence?.level === 'low') {
-    console.log('置信度较低，扩大搜索范围...');
-    result = await exec(`mycodemap analyze -i find -k "${keyword}" --topK 20 --json`);
-    data = JSON.parse(result);
-  }
-  
-  return data.results || [];
-}
-
-// 模式 5: 安全的 JSON 解析
-function safeParseJSON<T>(json: string, defaultValue: T): T {
-  try {
-    return JSON.parse(json) as T;
-  } catch {
-    console.error('JSON 解析失败，使用默认值');
-    return defaultValue;
-  }
-}
-```
-
-#### Python
-
-```python
-import json
-import subprocess
-import os
-from typing import List, Dict, Any, Optional
-
-def ensure_code_map() -> bool:
-    """确保代码地图存在"""
-    codemap_path = '.mycodemap/codemap.json'
-    
-    if not os.path.exists(codemap_path):
-        print('代码地图不存在，正在生成...')
-        subprocess.run(['mycodemap', 'generate'], check=True)
-        return True
-    
-    # 检查是否过期（超过 1 小时）
-    import time
-    mtime = os.path.getmtime(codemap_path)
-    if time.time() - mtime > 3600:
-        print('代码地图已过期，正在更新...')
-        subprocess.run(['mycodemap', 'generate'], check=True)
-    
-    return True
-
-def find_symbol(symbol_name: str) -> List[Dict[str, Any]]:
-    """查找符号，逐级回退"""
-    # 尝试 1: 精确查询
-    result = subprocess.run(
-        ['mycodemap', 'query', '-s', symbol_name, '-j'],
-        capture_output=True, text=True
-    )
-    data = json.loads(result.stdout)
-    
-    if data.get('count', 0) > 0:
-        return data['results']
-    
-    # 尝试 2: 模糊搜索
-    print('精确查询无结果，尝试模糊搜索...')
-    result = subprocess.run(
-        ['mycodemap', 'query', '-S', symbol_name, '-l', '20', '-j'],
-        capture_output=True, text=True
-    )
-    data = json.loads(result.stdout)
-    
-    if data.get('count', 0) > 0:
-        return data['results']
-    
-    # 尝试 3: 统一搜索
-    print('模糊搜索无结果，尝试统一搜索...')
-    result = subprocess.run(
-        ['mycodemap', 'analyze', '-i', 'find', '-k', symbol_name, '--topK', '20', '--json'],
-        capture_output=True, text=True
-    )
-    data = json.loads(result.stdout)
-    
-    return data.get('results', [])
-
-def safe_parse_json(json_str: str, default_value: Any) -> Any:
-    """安全的 JSON 解析"""
-    try:
-        return json.loads(json_str)
-    except json.JSONDecodeError:
-        print('JSON 解析失败，使用默认值')
-        return default_value
-```
-
----
-
-### 边界情况处理
-
-```typescript
-// 情况 1: 大项目处理
-async function handleLargeProject() {
-  // 使用 fast 模式
-  await exec('mycodemap generate -m fast');
-  
-  // 分块查询
-  const modules = ['src/cli', 'src/core', 'src/domain'];
-  for (const module of modules) {
-    await exec(`mycodemap analyze -i show -t "${module}" --json`);
-  }
-}
-
-// 情况 2: 并发查询控制
-async function batchQuery(symbols: string[], concurrency: number = 5) {
-  const results = [];
-  for (let i = 0; i < symbols.length; i += concurrency) {
-    const batch = symbols.slice(i, i + concurrency);
-    const batchResults = await Promise.all(
-      batch.map(s => exec(`mycodemap query -s "${s}" -j`).catch(() => null))
-    );
-    results.push(...batchResults.filter(Boolean));
-  }
-  return results;
-}
-
-// 情况 3: 超时处理
-async function execWithTimeout(command: string, timeoutMs: number = 30000) {
-  return new Promise((resolve, reject) => {
-    const child = exec(command, (err, stdout) => {
-      if (err) reject(err);
-      else resolve(stdout);
-    });
-    
-    setTimeout(() => {
-      child.kill();
-      reject(new Error('Command timeout'));
-    }, timeoutMs);
-  });
-}
-```
-
----
-
-## 性能优化
-
-### 缓存策略
-
-```typescript
-// 利用 CodeMap 内置缓存（60秒 TTL）
-// 第一次查询后，后续查询会自动使用缓存
-
-// 如果需要清除缓存
-function clearCodeMapCache() {
-  // 删除索引缓存文件
-  const cacheDir = '.mycodemap/cache';
-  if (existsSync(cacheDir)) {
-    rmSync(cacheDir, { recursive: true });
-  }
-}
-```
-
-### 批量处理
-
-```typescript
-// 不好的做法：串行执行
-for (const file of files) {
-  await exec(`mycodemap impact -f "${file}"`);
-}
-
-// 好的做法：先生成，再批量查询
-await exec('mycodemap generate');
-const results = await Promise.all(
-  files.map(f => exec(`mycodemap impact -f "${f}" -j`))
-);
-```
-
----
-
-## 安全注意事项
-
-1. **命令注入防护**: 始终对用户输入进行转义
-   ```typescript
-   const safeSymbol = symbolName.replace(/["'`]/g, '');
-   await exec(`mycodemap query -s "${safeSymbol}"`);
-   ```
-
-2. **路径遍历防护**: 验证文件路径
-   ```typescript
-   if (!filePath.startsWith('src/')) {
-     throw new Error('Invalid path');
-   }
-   ```
-
-3. **敏感信息**: 输出中可能包含文件路径，注意隐私
-
----
-
-## 故障排除
-
-### CLI 未找到
+### host 能启动 server，但工具返回 `GRAPH_NOT_FOUND`
 
 ```bash
-# 检查安装
-which mycodemap || echo "未安装"
-
-# 解决方案 1: 全局安装
-npm install -g @mycodemap/mycodemap
-
-# 解决方案 2: 使用 npx
-alias mycodemap='npx @mycodemap/mycodemap'
-
-# 解决方案 3: 本地安装
-npm install --save-dev @mycodemap/mycodemap
-./node_modules/.bin/mycodemap
+mycodemap generate --symbol-level
 ```
 
-### tree-sitter 构建失败
+### `mcp install` 后看不到 server
+
+- 确认 host 会读取当前仓库根目录的 `.mcp.json`
+- 不会读取的话，手动复制 `mycodemap-experimental` entry 到宿主配置
+
+### `mcp start` 无法启动
+
+先确认：
 
 ```bash
-# Ubuntu/Debian
-sudo apt-get install build-essential
-
-# macOS
-xcode-select --install
-
-# 然后重新安装
-npm rebuild
+npm run build
+node dist/cli/index.js mcp start
 ```
 
-### 代码地图过期
+若宿主要求依赖 symbol-level / SQLite 路径，还需确认：
 
 ```bash
-# 强制重新生成
-mycodemap generate --force
-
-# 或重新运行一次 generate 刷新输出
-mycodemap generate
+npm ls better-sqlite3
 ```
+
+### 结果为空但不是错误
+
+- 先检查 `graph_status` 是否为 `partial`
+- 再检查 symbol 是否真的唯一；必要时补 `filePath`
+
+### storage 运行时错误速查表
+
+| 错误 / 信号 | 含义 | 处理方式 |
+|-------------|------|----------|
+| `UNSUPPORTED_STORAGE_TYPE` / `STORAGE_BACKEND_MIGRATED` / `SQLITE_NOT_AVAILABLE` | 当前 storage 配置不受支持，或显式 `sqlite` 但运行时条件不满足 | 检查 `mycodemap.config.json.storage`，确认是否仍在使用旧 backend，或当前机器是否满足 SQLite 运行时要求 |
+| `better-sqlite3` 缺失 | 显式 `sqlite` 需要本地 SQLite binding | 安装 `better-sqlite3` |
+| Node.js `>=20` 不满足 | SQLite 路径需要较新的 Node 运行时 | 升级 Node.js |
+| SQLite 不可用时会 warning 后回退 `filesystem` | 仅 `storage.type = "auto"` 会这么做 | 若你要强制 SQLite，请改用显式 `storage.type = "sqlite"` 并补齐依赖 |
+
+---
+
+## 8. 交叉引用
+
+- 命令参考：`docs/ai-guide/COMMANDS.md`
+- 输出契约：`docs/ai-guide/OUTPUT.md`
+- 主索引：`AI_GUIDE.md`
+- 执行手册：`CLAUDE.md`

@@ -3,8 +3,10 @@
 
 import type {
   Cycle,
+  GraphMetadata,
   ImpactResult,
   ProjectStatistics,
+  SymbolImpactResult,
 } from '../../interface/types/storage.js';
 import type {
   CodeGraph,
@@ -40,6 +42,9 @@ export function deserializeCodeGraphSnapshot(
       createdAt: new Date(parsedGraph.project.createdAt),
       updatedAt: new Date(parsedGraph.project.updatedAt),
     },
+    graphStatus: parsedGraph.graphStatus ?? 'complete',
+    failedFileCount: parsedGraph.failedFileCount ?? 0,
+    parseFailureFiles: parsedGraph.parseFailureFiles ?? [],
   };
 }
 
@@ -57,6 +62,27 @@ export function createEmptyCodeGraph(projectPath: string = ''): CodeGraph {
     modules: [],
     symbols: [],
     dependencies: [],
+    graphStatus: 'complete',
+    failedFileCount: 0,
+    parseFailureFiles: [],
+  };
+}
+
+export function getGraphMetadataFromGraph(
+  graph: CodeGraph,
+  generatedAt: string | null = null
+): GraphMetadata {
+  const hasMaterializedGraph = graph.modules.length > 0 || graph.symbols.length > 0;
+  const graphGeneratedAt = generatedAt
+    ?? (hasMaterializedGraph ? graph.project.updatedAt.toISOString() : null);
+
+  return {
+    generatedAt: graphGeneratedAt,
+    graphStatus: graph.graphStatus ?? 'complete',
+    failedFileCount: graph.failedFileCount ?? 0,
+    parseFailureFiles: [...(graph.parseFailureFiles ?? [])],
+    moduleCount: graph.modules.length,
+    symbolCount: graph.symbols.length,
   };
 }
 
@@ -207,6 +233,100 @@ export function calculateImpactInGraph(
     rootModule: moduleId,
     affectedModules,
     depth,
+  };
+}
+
+export function calculateSymbolImpactInGraph(
+  graph: CodeGraph,
+  symbolId: string,
+  depth: number,
+  limit: number
+): SymbolImpactResult {
+  const rootSymbol = graph.symbols.find(symbol => symbol.id === symbolId);
+  if (!rootSymbol) {
+    throw new Error(`Symbol ${symbolId} not found`);
+  }
+
+  const symbolMap = new Map(
+    graph.symbols.map(symbol => [symbol.id, symbol] as const)
+  );
+  const callerMap = new Map<string, Dependency[]>();
+
+  for (const dependency of graph.dependencies) {
+    if (
+      dependency.type !== 'call'
+      || dependency.sourceEntityType !== 'symbol'
+      || dependency.targetEntityType !== 'symbol'
+    ) {
+      continue;
+    }
+
+    const existing = callerMap.get(dependency.targetId) ?? [];
+    existing.push(dependency);
+    callerMap.set(dependency.targetId, existing);
+  }
+
+  const affectedSymbols: SymbolImpactResult['affectedSymbols'] = [];
+  const visited = new Set<string>([symbolId]);
+  const queue: Array<{ id: string; level: number; path: string[] }> = [{
+    id: symbolId,
+    level: 0,
+    path: [symbolId],
+  }];
+  let truncated = false;
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) {
+      continue;
+    }
+
+    if (current.level >= depth) {
+      continue;
+    }
+
+    const callers = callerMap.get(current.id) ?? [];
+    for (const dependency of callers) {
+      if (affectedSymbols.length >= limit) {
+        truncated = true;
+        queue.length = 0;
+        break;
+      }
+
+      const callerId = dependency.sourceId;
+      if (visited.has(callerId)) {
+        continue;
+      }
+
+      const callerSymbol = symbolMap.get(callerId);
+      if (!callerSymbol) {
+        continue;
+      }
+
+      visited.add(callerId);
+      const nextPath = [...current.path, callerId];
+      const nextLevel = current.level + 1;
+
+      affectedSymbols.push({
+        symbol: { ...callerSymbol },
+        depth: nextLevel,
+        path: nextPath,
+      });
+
+      queue.push({
+        id: callerId,
+        level: nextLevel,
+        path: nextPath,
+      });
+    }
+  }
+
+  return {
+    rootSymbol: { ...rootSymbol },
+    affectedSymbols,
+    depth,
+    limit,
+    truncated,
   };
 }
 

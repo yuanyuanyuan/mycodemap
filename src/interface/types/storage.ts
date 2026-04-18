@@ -51,6 +51,32 @@ export interface ImpactResult {
   depth: number;
 }
 
+/** 图元数据 */
+export interface GraphMetadata {
+  generatedAt: string | null;
+  graphStatus: 'complete' | 'partial';
+  failedFileCount: number;
+  parseFailureFiles: string[];
+  moduleCount: number;
+  symbolCount: number;
+}
+
+/** 符号级影响节点 */
+export interface SymbolImpactNode {
+  symbol: Symbol;
+  depth: number;
+  path: string[];
+}
+
+/** 符号级影响分析结果 */
+export interface SymbolImpactResult {
+  rootSymbol: Symbol;
+  affectedSymbols: SymbolImpactNode[];
+  depth: number;
+  limit: number;
+  truncated: boolean;
+}
+
 /** 项目统计 */
 export interface ProjectStatistics {
   totalModules: number;
@@ -106,6 +132,9 @@ export interface IStorage {
   
   /** 加载完整代码图 */
   loadCodeGraph(): Promise<CodeGraph>;
+
+  /** 读取图元数据 */
+  loadGraphMetadata(): Promise<GraphMetadata>;
   
   /** 删除项目数据 */
   deleteProject(): Promise<void>;
@@ -146,6 +175,9 @@ export interface IStorage {
   
   /** 计算影响范围 */
   calculateImpact(moduleId: string, depth: number): Promise<ImpactResult>;
+
+  /** 计算符号级影响范围 */
+  calculateSymbolImpact(symbolId: string, depth: number, limit: number): Promise<SymbolImpactResult>;
   
   /** 获取项目统计 */
   getStatistics(): Promise<ProjectStatistics>;

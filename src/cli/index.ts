@@ -17,6 +17,7 @@ import { workflowCommand } from './commands/workflow.js';
 import { exportCommand } from './commands/export.js';
 import { checkCommand } from './commands/check.js';
 import { historyCommand } from './commands/history.js';
+import { mcpCommand, isMcpStartInvocation } from './commands/mcp.js';
 import { shipCommand } from './commands/ship/index.js';
 import { ANALYZE_COMMAND_DESCRIPTION, configureAnalyzeCommand } from './commands/analyze-options.js';
 import { setupRuntimeLogging } from './runtime-logger.js';
@@ -27,20 +28,20 @@ import { formatRemovedCommandMessage, getRemovedTopLevelCommand } from './remove
 import { commandRequiresTreeSitter, validateTreeSitter } from './tree-sitter-check.js';
 
 const program = new Command();
+const cliArgs = process.argv.slice(2);
+const shouldBypassHumanStartupSideEffects = isMcpStartInvocation(cliArgs);
 
-const removedCommand = getRemovedTopLevelCommand(process.argv.slice(2));
+const removedCommand = getRemovedTopLevelCommand(cliArgs);
 if (removedCommand) {
   console.error(formatRemovedCommandMessage(removedCommand));
   process.exit(1);
 }
 
-// 检测并显示迁移提示（需要在 runtime-logging 之前执行，避免创建 .mycodemap 影响检测）
-printMigrationWarning();
-
-// 检测并显示首次运行引导（需要在 runtime-logging 之前执行，避免创建 .mycodemap 影响检测）
-runFirstRunGuide();
-
-setupRuntimeLogging(process.argv.slice(2));
+if (!shouldBypassHumanStartupSideEffects) {
+  printMigrationWarning();
+  runFirstRunGuide();
+  setupRuntimeLogging(cliArgs);
+}
 
 // 验证平台支持（CLI 启动时执行）
 try {
@@ -88,6 +89,7 @@ program
   .description('生成代码地图')
   .option('-m, --mode <mode>', '分析模式 (fast|smart|hybrid)', 'hybrid')
   .option('-o, --output <dir>', '输出目录', '.mycodemap')
+  .option('--symbol-level', '额外 materialize symbol-level 调用依赖到代码图存储', false)
   .option('--ai-context', '为每个文件生成 AI 描述（需要 AI Provider）', false)
   .action(async (options, command: Command) => {
     await generateCommand({
@@ -172,6 +174,9 @@ program.addCommand(checkCommand);
 
 // History risk 命令
 program.addCommand(historyCommand);
+
+// Experimental MCP 命令
+program.addCommand(mcpCommand);
 
 // Workflow 命令
 program.addCommand(workflowCommand);

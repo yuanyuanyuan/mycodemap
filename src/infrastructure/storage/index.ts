@@ -27,6 +27,9 @@ export type {
   SearchOptions,
   SearchResult,
   Cycle,
+  GraphMetadata,
   ImpactResult,
   ProjectStatistics,
+  SymbolImpactNode,
+  SymbolImpactResult,
 } from '../../interface/types/storage.js';

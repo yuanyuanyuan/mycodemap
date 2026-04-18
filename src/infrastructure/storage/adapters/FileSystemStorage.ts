@@ -9,8 +9,10 @@ import { join } from 'path';
 import type {
   StorageConfig,
   Cycle,
+  GraphMetadata,
   ImpactResult,
   ProjectStatistics,
+  SymbolImpactResult,
 } from '../../../interface/types/storage.js';
 import type {
   CodeGraph,
@@ -21,14 +23,17 @@ import type {
 import { StorageBase, StorageError } from '../interfaces/StorageBase.js';
 import {
   calculateImpactInGraph,
+  calculateSymbolImpactInGraph,
   cloneCodeGraph,
   createEmptyCodeGraph,
+  deserializeCodeGraphSnapshot,
   deleteModuleFromGraph,
   detectCyclesInGraph,
   findCalleesInGraph,
   findCallersInGraph,
   findDependenciesInGraph,
   findDependentsInGraph,
+  getGraphMetadataFromGraph,
   getProjectStatisticsFromGraph,
   upsertModuleInGraph,
 } from '../graph-helpers.js';
@@ -123,7 +128,7 @@ export class FileSystemStorage extends StorageBase {
       }
 
       const data = await readFile(this.dataFilePath, 'utf-8');
-      this.cachedGraph = JSON.parse(data) as CodeGraph;
+      this.cachedGraph = deserializeCodeGraphSnapshot(data, this.projectPath ?? '');
       return cloneCodeGraph(this.cachedGraph);
     } catch (error) {
       if (
@@ -141,6 +146,11 @@ export class FileSystemStorage extends StorageBase {
         error
       );
     }
+  }
+
+  async loadGraphMetadata(): Promise<GraphMetadata> {
+    this.ensureInitialized();
+    return getGraphMetadataFromGraph(await this.loadCodeGraph());
   }
 
   async deleteProject(): Promise<void> {
@@ -244,6 +254,15 @@ export class FileSystemStorage extends StorageBase {
   async calculateImpact(moduleId: string, depth: number): Promise<ImpactResult> {
     this.ensureInitialized();
     return calculateImpactInGraph(await this.loadCodeGraph(), moduleId, depth);
+  }
+
+  async calculateSymbolImpact(
+    symbolId: string,
+    depth: number,
+    limit: number
+  ): Promise<SymbolImpactResult> {
+    this.ensureInitialized();
+    return calculateSymbolImpactInGraph(await this.loadCodeGraph(), symbolId, depth, limit);
   }
 
   async getStatistics(): Promise<ProjectStatistics> {
