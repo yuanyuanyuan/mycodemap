@@ -35,7 +35,7 @@
   "@type": "SoftwareApplication",
   "name": "CodeMap",
   "description": "TypeScript 代码地图生成与分析工具",
-  "version": "0.5.2-beta.0",
+  "version": "0.5.2-beta.1",
   "applicationCategory": "DeveloperApplication",
   "programmingLanguage": ["TypeScript", "JavaScript"],
   "offers": {

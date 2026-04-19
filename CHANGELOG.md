@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.5.2-beta.0] - 2026-04-19 - Trusted Publishing Verification
+## [0.5.2-beta.1] - 2026-04-19 - Trusted Publishing Verification
 
 ### 🛠️ Infrastructure
 
@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 
 ### 📝 Documentation
 
-- **release**: 同步 `llms.txt`、`AI_GUIDE.md`、`AI_DISCOVERY.md`、`ai-document-index.yaml` 到 `v0.5.2-beta.0`
+- **release**: 同步 `llms.txt`、`AI_GUIDE.md`、`AI_DISCOVERY.md`、`ai-document-index.yaml` 到 `v0.5.2-beta.1`
 - **changelog**: 新增 beta 验证版本条目，用于自动发布链路验证与 GitHub Release 说明
 
 ## [0.5.1] - 2026-04-19 - Rule Control Hardening & Release Sync
