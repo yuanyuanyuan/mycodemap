@@ -1,7 +1,7 @@
 # CodeMap
 
 > CodeMap 是一个 TypeScript 代码地图生成与分析工具，为 AI 辅助开发提供结构化上下文。
-> 版本: 0.5.1 (MVP3) | 仓库: https://github.com/mycodemap/mycodemap
+> 版本: 0.5.2-beta.0 (MVP3) | 仓库: https://github.com/mycodemap/mycodemap
 
 CodeMap 帮助 AI 大模型、Agent 和开发者理解 TypeScript/JavaScript 项目的代码结构、依赖关系和模块边界。它生成结构化的代码地图，支持影响分析、依赖查询、复杂度评估等功能。
 

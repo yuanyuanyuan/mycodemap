@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.2-beta.0] - 2026-04-19 - Trusted Publishing Verification
+
+### 🛠️ Infrastructure
+
+- **ci**: 升级 `publish.yml` 到 `actions/checkout@v6`、`actions/setup-node@v6`、Node `24` 与 `npm@11.5.1`
+- **release**: OIDC trusted publishing 路径移除显式 `--provenance`，保留 `NPM_TOKEN` fallback 以兼容 registry 偶发问题
+
+### 📝 Documentation
+
+- **release**: 同步 `llms.txt`、`AI_GUIDE.md`、`AI_DISCOVERY.md`、`ai-document-index.yaml` 到 `v0.5.2-beta.0`
+- **changelog**: 新增 beta 验证版本条目，用于自动发布链路验证与 GitHub Release 说明
+
 ## [0.5.1] - 2026-04-19 - Rule Control Hardening & Release Sync
 
 ### 🚀 New Features
