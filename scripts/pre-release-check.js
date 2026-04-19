@@ -110,8 +110,8 @@ function extractVersionFromText(content) {
 }
 
 function extractVersionFromYAML(content) {
-  // 匹配 YAML 中的 version: "x.x.x" 或 version: x.x.x
-  const match = content.match(/version[:\s]+["']?(\d+\.\d+\.\d+)["']?/i);
+  // 匹配 YAML 中的 version: "x.x.x"、version: x.x.x 或 prerelease 版本
+  const match = content.match(/version[:\s]+["']?(\d+\.\d+\.\d+(?:-[\w.]+)?)["']?/i);
   return match ? match[1] : null;
 }
 
