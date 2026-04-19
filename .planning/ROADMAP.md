@@ -74,9 +74,40 @@ Plans:
 | 24. Decision package | v1.5 | 0/0 | Dropped | — |
 | 25. CLI dogfood hardening | v1.6 | 3/3 | Complete | 2026-04-18 |
 | 26. Symbol graph + experimental MCP | post-v1.6 | 3/3 | Complete | 2026-04-19 |
+| 27. Rule control system + hooks/CI QA | next | 6/6 | Complete    | 2026-04-18 |
 
 ## Current Routing Rule
 
 - 不要再把 `Phase 22-24` 当成待恢复 blocker 或默认下一步
 - `Phase 25` 是 `v1.6` 的起点与已完成交付，不再挂靠 `v1.5`
 - `Phase 26` 已作为 `post-v1.6` 薄切片 follow-up 完成；如果继续新工作，应新开 milestone / phase scope，而不是回补已关闭版本
+- `Phase 27` 已完成 repo-local rule control / hooks / CI / scoped subagent injection / QA hardening；如继续新工作，应新开 phase / milestone scope
+
+### Phase 27: Implement repo-local rule control system and add hooks CI QA coverage for the seven workflow gaps
+
+**Goal:** 以 `/home/stark/.claude/plans/harness-claude-openai-github-openharness-parallel-alpaca.md` 作为主计划，结合 `/home/stark/.gstack/projects/codemap/stark-main-eng-review-test-plan-20260418-200710.md` 作为实施 / QA 清单，把 repo-local rule control system 的落地与验证纳入下一阶段规划
+**Requirements**: `P27-NOW-CAPABILITY-REPORT`、`P27-NOW-VALIDATE-RULES`、`P27-NOW-HOOKS-CI-QA`、`P27-NOW-SOFT-GATE-DEFAULTS`、`P27-NOW-SUBAGENT-RULE-INJECTION`、`P27-NOW-WORKFLOW-VALIDATION`、`P27-NOW-NO-VERIFY-BACKSTOP`
+**Depends on:** Phase 26
+**Status**: Complete on 2026-04-18 after verification; all 6 plans passed
+**Plans:** 6/6 plans complete
+
+Planning Inputs:
+- Main plan: `/home/stark/.claude/plans/harness-claude-openai-github-openharness-parallel-alpaca.md`
+- QA checklist: `/home/stark/.gstack/projects/codemap/stark-main-eng-review-test-plan-20260418-200710.md`
+
+Seed TODOs:
+- [x] 默认启用能覆盖 session start / edit path 的 soft-gate 能力，避免 feature flag 默认关闭导致规则系统失效
+- [x] 把规则加载从“依赖任务分析格式”改成“按编辑文件路径强制推断”
+- [x] 为 Edit/Write 后验证建立可核实路径，不再只靠 agent 自述“已验证”
+- [x] 把 hooks / CI / 临时目录 / 临时 git repo 的 QA 路径补成可执行测试清单
+- [x] 为 subagent / agent spawning 注入最小必要规则上下文，避免遗漏或串味
+- [x] 评估并补齐 commit 之前更早的 hard-gate / advisory timing，减少晚发现问题
+- [x] 处理 `--no-verify` 绕过场景，确保 CI 仍能作为最终 backstop
+
+Plans:
+- [x] **27-01** Capability report baseline and JSON contract
+- [x] **27-02** Repo-local `validate-rules.py` exit-code contract
+- [x] **27-03** Entry docs, path-based routing, and soft-gate defaults
+- [x] **27-04** Pre-commit / commit-msg / CI backstop integration
+- [x] **27-05** Scoped rule-context helper and subagent prompt injection
+- [x] **27-06** Executable QA matrix for hooks, soft-gate, and backstop flows

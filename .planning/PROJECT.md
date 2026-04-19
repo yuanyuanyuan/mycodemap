@@ -2,23 +2,24 @@
 
 ## What This Is
 
-CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `design validate → design map → design handoff → design verify` 收口为正式 public collaboration chain；`Phase 25` 把 Agent-facing CLI 的机器契约真相继续收口；`post-v1.6 / Phase 26` 则在此基础上补齐了 opt-in symbol-level graph 与 experimental local MCP 的最小可信纵向切片。
+CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `design validate → design map → design handoff → design verify` 收口为正式 public collaboration chain；`Phase 25` 把 Agent-facing CLI 的机器契约真相继续收口；`post-v1.6 / Phase 26` 补齐了 opt-in symbol-level graph 与 experimental local MCP 的最小可信纵向切片；`Phase 27` 则把 repo-local rule control、hooks/CI backstop、scoped rule injection 与 executable QA 收口成可验证 contract。
 
-2026-04-18 起，规划边界已经调整：**Docker / ArcadeDB 原型线不再属于当前版本范围**。此前 `v1.5` 的 22-24 phase 保留为历史工件，但不会继续作为 active work。`v1.6` 与 `post-v1.6` 已完成，当前没有 active milestone。
+2026-04-18 起，规划边界已经调整：**Docker / ArcadeDB 原型线不再属于当前版本范围**。此前 `v1.5` 的 22-24 phase 保留为历史工件，但不会继续作为 active work。`v1.6`、`post-v1.6` 与 `Phase 27` 已完成，当前没有 active milestone。
 
 ## Core Value
 
 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
 
-## Latest Completed Follow-up: post-v1.6 Symbol-level graph and experimental MCP thin slice
+## Latest Completed Follow-up: Phase 27 repo-local rule control and hooks/CI QA hardening
 
-**Goal:** 在不改默认模块级 public surface 的前提下，验证 symbol-level generate / partial graph truth / experimental MCP stdio query-impact 链路是否能形成可信薄切片。
+**Goal:** 以主计划和 QA checklist 为准，把 repo-local rule control system 的 capability baseline、validator contract、hooks / CI backstop、scoped subagent rule injection 与 executable QA 收口为下一阶段可复用真相。
 
 **Delivered outcome:**
-- `generate --symbol-level` 能把 symbol-level 调用真相与 partial graph metadata 落到存储层
-- experimental `mcp start` / `mcp install` 提供本地只读 stdio server 与 `codemap_query` / `codemap_impact`
-- 真实 dist CLI smoke 已验证 stdio protocol 纯净，`stdout` 不被人类日志污染
-- filesystem backend 的日期反序列化缺口已被真实 dogfood 抓出并通过 regression test 固定
+- `scripts/capability-report.py` 提供 required / optional / strategy capability baseline 与 `duration_ms` 基线
+- `scripts/validate-rules.py` 固定 `report-only` 与 `0/1/2/3/4` gate exit-code contract
+- `.githooks/pre-commit`、`.githooks/commit-msg` 与 `.github/workflows/ci-gateway.yml` 围绕统一 validator truth 协同工作，并保留 `--no-verify` 的 CI backstop
+- `scripts/rule-context.mjs`、`.claude/hooks/rule-route-advisory.js` 与 Claude/Codex workflow 的 `<rule_context>` 注入把规则路由从“希望 AI 记得”收口成可执行机制
+- `scripts/qa-rule-control.sh` 与回归测试让 Phase 27 的关键路径可以重复验证，而不是停留在文档声明
 
 ## Historical Closed Branch: v1.5 Isolated ArcadeDB Server-backed Prototype
 
@@ -49,10 +50,11 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 - ✓ 相邻 dogfood CLI 契约（`complexity` / `ci assess-risk` / `workflow start`）与 AI docs truth 已同步收口 —— v1.6 / Phase 25
 - ✓ `generate --symbol-level` 现在能持久化 symbol-level graph truth，并在退化场景保留 `partial` / failure metadata —— post-v1.6 / Phase 26
 - ✓ experimental local MCP 已能基于 symbol graph 暴露 `codemap_query` / `codemap_impact`，同时保持 `stdout` protocol purity —— post-v1.6 / Phase 26
+- ✓ repo-local rule control 已具备 capability baseline、validator exit contract、hooks/CI backstop、scoped rule-context 与 executable QA —— Phase 27
 
 ### Active
 
-- 当前没有 active milestone requirement；`post-v1.6 / Phase 26` 已完成，下一步需重新定 scope
+- 当前没有 active milestone requirement；`Phase 27` 已完成，下一步需重新定 scope
 
 ### Out of Scope
 
@@ -66,6 +68,7 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 - `Phase 25` 源于 2026-04-17 eatdogfood 报告，是一条独立于 ArcadeDB 原型线的新版本收口工作
 - 2026-04-18 用户明确决定：旧版本遗漏不再继续，因此 active planning 不能再把 22-24 当 blocker
 - `Phase 26` 作为 `post-v1.6` follow-up，验证了 symbol-level graph / partial truth / experimental MCP 的首期链路
+- `Phase 27` 进一步把 repo-local rule-control contract、hooks / CI backstop 与 subagent rule injection 收口成可重复验证的工程事实
 - 当前 README / AI docs / rules / workflow truth 仍围绕 design chain、analysis-first CLI 与 local-first storage surface 收口
 
 ## Constraints
@@ -84,14 +87,15 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 | `v1.5` Docker / ArcadeDB 原型线关闭 | 用户明确表示不再继续该方向，也不需要补旧遗漏 | Closed 2026-04-18 |
 | `Phase 25` 起算为 `v1.6` | 该 phase 属于新的 CLI reliability / docs truth 版本线，而不是旧原型线尾巴 | Completed 2026-04-18 |
 | `Phase 26` 作为 `post-v1.6` 薄切片完成 | 该 phase 验证的是 symbol graph / MCP 分发层最小价值，不应回写成 `v1.5` continuation | Completed 2026-04-19 |
+| `Phase 27` 作为 repo-local rule-control hardening 完成 | 该 phase 把规则系统从文档假设推进到 capability、validator、hooks/CI、workflow injection、QA 一体化可验证 contract | Completed 2026-04-19 |
 
 ## Current State
 
-- **Completed milestones / follow-ups:** `v1.0`、`v1.1`、`v1.2`、`v1.3`、`v1.4`、`post-v1.4`、`v1.6`、`post-v1.6`
+- **Completed milestones / follow-ups:** `v1.0`、`v1.1`、`v1.2`、`v1.3`、`v1.4`、`post-v1.4`、`v1.6`、`post-v1.6`、`phase-27 rule-control hardening`
 - **Historical closed branch:** `v1.5 Isolated ArcadeDB Server-backed Prototype`（22-24 不再继续）
 - **Active milestone:** none
-- **Current planning status:** `Phase 26` complete；等待新的 scope，而不是回补旧版本
-- **Known remaining debt:** repo-wide ESLint warnings 仍是 warning-only 历史基线；hybrid architecture 仍有 seam 成本；未来若再改 CLI / MCP 契约，仍需保持 docs / tests / machine output 同步
+- **Current planning status:** `Phase 27` complete；等待新的 scope，而不是回补旧版本
+- **Known remaining debt:** repo-wide ESLint warnings 仍是 warning-only 历史基线；rule-context 路由覆盖与 docs guardrail 触发范围仍有 advisory 级缝隙；未来若再改 CLI / MCP / rule-control 契约，仍需保持 docs / tests / machine output 同步
 
 ## Evolution
 
@@ -111,4 +115,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. 更新 Current State / Context / Key Decisions
 
 ---
-*Last updated: 2026-04-19 after completing post-v1.6 Phase 26 and reconciling planning truth*
+*Last updated: 2026-04-19 after completing and verifying Phase 27 rule-control hardening*
