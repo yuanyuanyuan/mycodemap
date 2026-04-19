@@ -7,14 +7,13 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { cwd } from 'node:process';
 import type { UnifiedResult, ToolOptions } from '../types.js';
 import type { ToolAdapter } from './base-adapter.js';
 import { ImpactCommand } from '../../cli/commands/impact.js';
 import { DepsCommand } from '../../cli/commands/deps.js';
 import { ComplexityCommand } from '../../cli/commands/complexity.js';
+import { resolveOutputDir } from '../../cli/paths.js';
 
 /**
  * CodemapAdapter 配置选项
@@ -26,29 +25,6 @@ export interface CodemapAdapterOptions {
   defaultIntent?: 'impact' | 'dependency' | 'complexity';
   /** 默认分析范围 */
   defaultScope?: 'direct' | 'transitive';
-}
-
-/**
- * 路径兼容常量
- */
-const DEFAULT_OUTPUT_DIR_NEW = '.mycodemap';
-const DEFAULT_OUTPUT_DIR_OLD = '.codemap';
-
-/**
- * 解析输出目录（兼容逻辑）
- * 优先使用新路径，回退到旧路径
- */
-function resolveOutputDir(): string {
-  const rootDir = cwd();
-  const newPath = join(rootDir, DEFAULT_OUTPUT_DIR_NEW);
-
-  // 优先检查新路径，如果新路径存在或旧路径不存在，使用新路径
-  if (existsSync(newPath) || !existsSync(join(rootDir, DEFAULT_OUTPUT_DIR_OLD))) {
-    return DEFAULT_OUTPUT_DIR_NEW;
-  }
-
-  // 回退到旧路径
-  return DEFAULT_OUTPUT_DIR_OLD;
 }
 
 /**
@@ -67,7 +43,7 @@ export class CodemapAdapter implements ToolAdapter {
   private defaultScope: 'direct' | 'transitive';
 
   constructor(options: CodemapAdapterOptions = {}) {
-    this.codemapPath = options.codemapPath || resolveOutputDir();
+    this.codemapPath = options.codemapPath || resolveOutputDir().outputDir;
     this.defaultIntent = options.defaultIntent || 'impact';
     this.defaultScope = options.defaultScope || 'direct';
   }

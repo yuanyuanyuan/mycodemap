@@ -1,7 +1,7 @@
 // [META] since:2026-03-04 | owner:cli-team | stable:false
 // [WHY] 提供统一的路径解析工具，处理新旧目录/配置文件名的兼容逻辑
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, isAbsolute } from 'node:path';
 import { cwd } from 'node:process';
 
@@ -28,6 +28,29 @@ export interface ResolvePathsResult {
   dataPath: string;
 }
 
+interface OutputConfigShape {
+  output?: unknown;
+}
+
+function resolveConfiguredOutput(rootDir: string): string | undefined {
+  const { path: configPath } = resolveConfigPath(rootDir);
+  if (!existsSync(configPath)) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(readFileSync(configPath, 'utf8')) as OutputConfigShape;
+    if (typeof parsed.output !== 'string') {
+      return undefined;
+    }
+
+    const trimmedOutput = parsed.output.trim();
+    return trimmedOutput.length > 0 ? trimmedOutput : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * 解析输出目录
  * - 优先使用新路径 .mycodemap
@@ -45,13 +68,18 @@ export function resolveOutputDir(customOutput?: string, rootDir: string = cwd())
   if (customOutput) {
     resolvedPath = isAbsolute(customOutput) ? customOutput : join(rootDir, customOutput);
   } else {
-    // 优先检查新路径
-    const newPath = join(rootDir, DEFAULT_OUTPUT_DIR_NEW);
-    if (existsSync(newPath) || !existsSync(join(rootDir, DEFAULT_OUTPUT_DIR_OLD))) {
-      resolvedPath = newPath;
+    const configuredOutput = resolveConfiguredOutput(rootDir);
+    if (configuredOutput) {
+      resolvedPath = isAbsolute(configuredOutput) ? configuredOutput : join(rootDir, configuredOutput);
     } else {
-      // 回退到旧路径
-      resolvedPath = join(rootDir, DEFAULT_OUTPUT_DIR_OLD);
+      // 优先检查新路径
+      const newPath = join(rootDir, DEFAULT_OUTPUT_DIR_NEW);
+      if (existsSync(newPath) || !existsSync(join(rootDir, DEFAULT_OUTPUT_DIR_OLD))) {
+        resolvedPath = newPath;
+      } else {
+        // 回退到旧路径
+        resolvedPath = join(rootDir, DEFAULT_OUTPUT_DIR_OLD);
+      }
     }
   }
 
