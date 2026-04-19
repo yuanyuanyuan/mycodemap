@@ -1,6 +1,6 @@
 # CLAUDE.md — CodeMap 执行手册
 
-> 本文件只做入口路由；细节下沉到 `docs/rules/*.md`、`ARCHITECTURE.md`、`AI_GUIDE.md`。
+> 本文件只做入口路由；细节下沉到 `docs/rules/*.md`、`docs/ai-guide/*.md`、`ARCHITECTURE.md`、`AI_GUIDE.md`。
 
 ## 加载顺序
 

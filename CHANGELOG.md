@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.1] - 2026-04-19 - Rule Control Hardening & Release Sync
+
+### 🚀 New Features
+
+- **rules**: 发布 repo-local rule control baseline，包括 capability report、validator exit-code contract、hooks/CI backstop、scoped subagent rule context 与 executable QA
+- **workflow**: Claude / Codex 执行流现在会在常见执行路径中注入 scoped `<rule_context>`，减少规则遗漏与 prompt 串味
+
+### 📝 Documentation
+
+- **release**: 同步 `llms.txt`、`AI_GUIDE.md`、`AI_DISCOVERY.md`、`ai-document-index.yaml` 到 `v0.5.1`
+- **changelog**: 补齐本版本发布条目，确保 pre-release guardrail 与 GitHub Release notes 可用
+- **claude**: 补齐 `CLAUDE.md` 对 `docs/ai-guide/` 的入口引用，消除发布前 AI 文档交叉引用 warning
+
 ## [0.5.0] - 2026-04-15 - Design Contract Surface
 
 ### 🏗️ v1.4 Milestone: Design-to-Code Mapping & Handoff Package
