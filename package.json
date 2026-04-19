@@ -34,6 +34,7 @@
     "docs:check:ai": "node scripts/validate-ai-docs.js",
     "docs:check:pre-release": "node scripts/pre-release-check.js",
     "test": "vitest run",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "benchmark": "bash scripts/run-benchmark.sh",
@@ -65,6 +66,7 @@
     "chalk": "^5.3.0",
     "chokidar": "^3.5.3",
     "commander": "^11.1.0",
+    "dependency-cruiser": "^17.3.10",
     "globby": "^14.0.0",
     "hono": "^4.12.8",
     "ora": "^8.0.1",
@@ -76,12 +78,10 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
-    "@types/glob": "^8.1.0",
     "@types/node": "^20.10.0",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "@vitest/coverage-v8": "^1.6.1",
-    "dependency-cruiser": "^17.3.10",
     "eslint": "^8.57.1",
     "vitest": "^1.1.0"
   },

@@ -17,6 +17,7 @@
 | 类型 | 路径 |
 |------|------|
 | 常规测试 | `src/**/*.test.ts` |
+| Workflow E2E | `tests/e2e/**/*.test.ts` |
 | 集成测试 | `tests/` 目录（如存在单独集成测试编排） |
 | 基准测试 | `refer/benchmark-quality.test.ts` |
 
@@ -29,6 +30,21 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    exclude: ['node_modules', 'dist', 'refer/**/*.test.ts'],
+    testTimeout: 10000,
+    hookTimeout: 10000,
+    pool: 'threads'
+  }
+});
+```
+
+```typescript
+// vitest.e2e.config.ts
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: 'node',
+    include: ['tests/e2e/**/*.test.ts'],
     exclude: ['node_modules', 'dist', 'refer/**/*.test.ts'],
     testTimeout: 10000,
     hookTimeout: 10000,
@@ -58,6 +74,9 @@ export default defineConfig({
 # 运行所有测试
 npm test
 npx vitest run
+
+# 运行 workflow E2E 护栏
+npm run test:e2e
 
 # 运行特定测试文件
 npx vitest run src/orchestrator/__tests__/confidence.test.ts

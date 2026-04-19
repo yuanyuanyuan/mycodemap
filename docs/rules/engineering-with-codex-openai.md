@@ -80,9 +80,9 @@
   - `.githooks/commit-msg` 只校验 `[TAG] scope: message` 格式；单次 commit 文件数量限制只保留在 `.githooks/pre-commit`。
 - 服务端护栏：
   - `.github/workflows/ci-gateway.yml` 包含固定命名的 `Rule validation backstop` step；即使本地使用 `git commit --no-verify` 绕过 hooks，CI 仍会运行 `python3 scripts/validate-rules.py code`，并仅在退出码 `1` 或 `4` 时 fail，`2/3` 只输出 warn-only / notice-only。
-  - `.github/workflows/ci-gateway.yml` 会执行 `npm run docs:check`、`npm run typecheck`、`npm test`、`npm run build`，并通过 `node dist/cli/index.js ci ...` 执行 `check-docs-sync`（含 docs guardrail + analyze generated block）、`check-commits`、`check-commit-size`、`check-headers`、`assess-risk`、`check-output-contract` 与 AI feed 同步检查。
+  - `.github/workflows/ci-gateway.yml` 会执行 `npm run docs:check`、`npm run typecheck`、`npm test`、`npm run test:e2e`、`npm run build`，并通过 `node dist/cli/index.js ci ...` 执行 `check-docs-sync`（含 docs guardrail + analyze generated block）、`check-commits`、`check-commit-size`、`check-headers`、`assess-risk`、`check-output-contract` 与 AI feed 同步检查。
   - `check-working-tree`、`check-branch`、`check-scripts` 作为共享发布前 gate checks，由本地 `ci` 命令提供，`ship` 的 CHECK 阶段直接复用它们。
-  - `.github/workflows/publish.yml` 会在发布前执行 `npm test` 与 `npm run build`。
+  - `.github/workflows/publish.yml` 会在发布前执行 `npm test`、`npm run test:e2e` 与 `npm run build`。
 - 禁止依赖 `git commit --no-verify` 作为解决方案；它只能跳过本地 hooks，不能绕过 CI 中的 `Rule validation backstop`。
 - 仓库协议仍然禁止通过 `--no-verify`、关闭 hook、放宽阈值、删除检查项来"修复"问题。
 

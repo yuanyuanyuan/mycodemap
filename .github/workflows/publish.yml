@@ -111,6 +111,9 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Run workflow E2E guardrail
+        run: npm run test:e2e
+
       - name: Build package
         run: npm run build
 

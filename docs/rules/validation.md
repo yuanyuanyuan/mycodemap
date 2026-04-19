@@ -39,12 +39,13 @@
 | 1 | `npm run docs:check` | 文档护栏 |
 | 2 | `npm run typecheck` | 类型检查 |
 | 3 | `npm run lint` | lint |
-| 4 | `npm test` | 单元测试 |
-| 5 | `npm run build` | 构建验证 |
-| 6 | `node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10` | 设计 contract 校准；`changed files <= 10` 才可能进入 hard gate |
-| 7 | `node dist/cli/index.js check --contract mycodemap.design.md --against src --base origin/main --annotation-format github` | PR 注解与 contract gate |
-| 8 | `node dist/cli/index.js ci check-docs-sync` | 统一 docs/AI guardrail |
-| 9 | `node dist/cli/index.js ci assess-risk --threshold=0.7` | 风险评估 |
+| 4 | `npm test` | 默认 `src/**/*.test.ts` 回归 |
+| 5 | `npm run test:e2e` | `tests/e2e/**/*.test.ts` workflow E2E 护栏 |
+| 6 | `npm run build` | 构建验证 |
+| 7 | `node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10` | 设计 contract 校准；`changed files <= 10` 才可能进入 hard gate |
+| 8 | `node dist/cli/index.js check --contract mycodemap.design.md --against src --base origin/main --annotation-format github` | PR 注解与 contract gate |
+| 9 | `node dist/cli/index.js ci check-docs-sync` | 统一 docs/AI guardrail |
+| 10 | `node dist/cli/index.js ci assess-risk --threshold=0.7` | 风险评估 |
 
 > PR 超窗、`diff-scope-fallback` 或 `false-positive rate >10%` 时，workflow 必须明确标为 `warn-only / fallback`。
 
@@ -96,6 +97,7 @@ node scripts/report-high-risk-files.mjs --top 3
 npm run typecheck
 npm run lint
 npm test
+npm run test:e2e
 npm run build
 npm run validate-pack
 ```

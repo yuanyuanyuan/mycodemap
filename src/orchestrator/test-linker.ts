@@ -5,8 +5,7 @@
 
 import { readFile, access } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
-import pkg from 'glob';
-const { glob, Glob } = pkg;
+import { globby } from 'globby';
 
 /**
  * CodemapData - 代码映射数据结构
@@ -360,20 +359,9 @@ export class TestLinker {
     const allFiles: string[] = [];
 
     for (const pattern of patterns) {
-      const glob = new Glob(pattern, {
+      const matches = await globby(pattern, {
         cwd: projectRoot,
         absolute: true,
-      });
-
-      const matches = await new Promise<string[]>((resolve, reject) => {
-        const files: string[] = [];
-        glob.on('match', (match) => {
-          files.push(match);
-        });
-        glob.on('end', () => {
-          resolve(files);
-        });
-        glob.on('error', reject);
       });
 
       allFiles.push(...matches);
@@ -622,25 +610,14 @@ export class TestLinker {
    * 使用 glob 搜索测试文件
    */
   private async globSearch(sourceFile: string): Promise<string[]> {
-    const sourceDir = dirname(sourceFile);
     const sourceBasename = this.getBasename(sourceFile);
 
-    const glob = new Glob(`**/${sourceBasename}.{test,spec}.{ts,js}`, {
+    const matches = await globby(`**/${sourceBasename}.{test,spec}.{ts,js}`, {
       cwd: this.rootDir,
       absolute: true,
     });
 
-    const matches = await new Promise<string[]>((resolve, reject) => {
-      glob.on('match', (match) => {
-        // 收集匹配结果
-      });
-      glob.on('end', (matches) => {
-        resolve(matches.slice(0, 3));
-      });
-      glob.on('error', reject);
-    });
-
-    return matches;
+    return matches.slice(0, 3);
   }
 
   /**
@@ -665,20 +642,9 @@ export class TestLinker {
    * 获取所有测试文件
    */
   async getAllTestFiles(): Promise<string[]> {
-    const glob = new Glob(this.testPatterns[0], {
+    return globby(this.testPatterns[0], {
       cwd: this.rootDir,
       absolute: true,
-    });
-
-    return new Promise<string[]>((resolve, reject) => {
-      const matches: string[] = [];
-      glob.on('match', (match) => {
-        matches.push(match);
-      });
-      glob.on('end', () => {
-        resolve(matches);
-      });
-      glob.on('error', reject);
     });
   }
 }
