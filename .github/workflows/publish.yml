@@ -80,6 +80,22 @@ jobs:
           fi
           echo "✅ Tag version matches package.json version"
 
+      - name: Determine npm dist-tag
+        id: npm-tag
+        run: |
+          VERSION="${{ steps.package-version.outputs.version }}"
+          DIST_TAG="latest"
+          if [[ "$VERSION" == *-* ]]; then
+            DIST_TAG="${VERSION#*-}"
+            DIST_TAG="${DIST_TAG%%.*}"
+          fi
+          if [ -z "$DIST_TAG" ]; then
+            echo "❌ Error: 无法从版本号推导 npm dist-tag"
+            exit 1
+          fi
+          echo "dist-tag=$DIST_TAG" >> $GITHUB_OUTPUT
+          echo "NPM dist-tag: $DIST_TAG"
+
       - name: Install dependencies
         run: npm ci
 
@@ -109,13 +125,14 @@ jobs:
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          DIST_TAG="${{ steps.npm-tag.outputs.dist-tag }}"
           if [ -n "$NPM_TOKEN" ]; then
             echo "Using NPM_TOKEN authentication (fallback for OIDC bug)"
             export NODE_AUTH_TOKEN="$NPM_TOKEN"
-            npx npm@11.5.1 publish --access public --provenance --registry https://registry.npmjs.org
+            npx npm@11.5.1 publish --access public --tag "$DIST_TAG" --provenance --registry https://registry.npmjs.org
           else
             echo "Using OIDC Trusted Publishing"
-            npx npm@11.5.1 publish --access public --registry https://registry.npmjs.org
+            npx npm@11.5.1 publish --access public --tag "$DIST_TAG" --registry https://registry.npmjs.org
           fi
 
       - name: Generate Release Notes

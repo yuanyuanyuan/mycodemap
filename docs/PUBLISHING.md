@@ -23,13 +23,12 @@ codemap ship / release.sh → 创建版本提交 → 推送 tag → GitHub Actio
      - **Workflow Name**: `publish.yml`
      - **GitHub Environment**: (留空)
 
-2. **确保没有设置 NPM_TOKEN**
+2. **默认使用 OIDC；需要时可保留 NPM_TOKEN fallback**
    ```bash
    # 检查是否设置了 NPM_TOKEN
    gh secret list | grep NPM_TOKEN
    
-   # 如果存在，删除它
-   gh secret remove NPM_TOKEN
+   # 默认推荐留空；如果需要 fallback，确保它是 Automation token
    ```
 
 3. **验证权限配置**
@@ -62,6 +61,8 @@ codemap ship --yes
 ```
 
 `codemap ship` **不会在本地执行 `npm publish`**；它会创建版本提交、推送 tag，然后由 `.github/workflows/publish.yml` 完成真正的 OIDC 发布。
+
+预发布版本（如 `0.5.2-beta.1`）会自动从版本号推导 npm dist-tag（如 `beta`）；稳定版本默认发布到 `latest`。
 
 ### 方法 1: 使用发布脚本
 
@@ -200,16 +201,27 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0  # 获取完整历史用于生成 changelog
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Determine npm dist-tag
+        id: npm-tag
+        run: |
+          VERSION="${{ steps.package-version.outputs.version }}"
+          DIST_TAG="latest"
+          if [[ "$VERSION" == *-* ]]; then
+            DIST_TAG="${VERSION#*-}"
+            DIST_TAG="${DIST_TAG%%.*}"
+          fi
+          echo "dist-tag=$DIST_TAG" >> $GITHUB_OUTPUT
 
       - name: Get version from package.json
         id: package-version
@@ -259,10 +271,18 @@ jobs:
       - name: Validate package contents
         run: npm run validate-pack
 
-      # 使用 OIDC Trusted Publishing 发布
-      # OIDC 通过 id-token: write 权限自动获取认证，不需要 NPM_TOKEN
+      # 使用 OIDC Trusted Publishing 或 NPM_TOKEN fallback 发布
       - name: Publish to NPM
-        run: npm publish --access public --provenance
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          DIST_TAG="${{ steps.npm-tag.outputs.dist-tag }}"
+          if [ -n "$NPM_TOKEN" ]; then
+            export NODE_AUTH_TOKEN="$NPM_TOKEN"
+            npx npm@11.5.1 publish --access public --tag "$DIST_TAG" --provenance --registry https://registry.npmjs.org
+          else
+            npx npm@11.5.1 publish --access public --tag "$DIST_TAG" --registry https://registry.npmjs.org
+          fi
 
       - name: Generate Release Notes
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
@@ -350,13 +370,13 @@ npm ERR! 403 403 Forbidden - PUT https://registry.npmjs.org/@mycodemap%2fmycodem
 **原因**: 
 1. NPM 端未正确配置 Trusted Publisher
 2. `id-token: write` 权限未设置
-3. 设置了 `NODE_AUTH_TOKEN` 环境变量干扰了 OIDC
+3. workflow 没有为 prerelease 显式传 `--tag`（例如 `0.5.2-beta.1` 需要 `--tag beta`）
 
 **解决**:
 1. 检查 NPM 配置: https://www.npmjs.com/package/@mycodemap/mycodemap/access
 2. 确保 workflow 中有 `id-token: write` 权限
-3. 确保没有设置 `NODE_AUTH_TOKEN` 环境变量
-4. 确保没有设置 `NPM_TOKEN` secret
+3. 确保没有设置错误的 `NODE_AUTH_TOKEN` 环境变量
+4. 如果配置了 `NPM_TOKEN`，确保它是 Automation token
 
 ### 发布失败: "ENEEDAUTH"
 
@@ -392,6 +412,15 @@ npm ERR! 403 403 Forbidden - PUT https://registry.npmjs.org/@mycodemap%2fmycodem
 **解决**:
 1. 检查 package.json 中的版本号
 2. npm 版本号不可重复，需要递增
+
+### 发布失败: "You must specify a tag using --tag"
+
+**原因**: 发布的是 prerelease 版本，但 `npm publish` 没有显式传 dist-tag
+
+**解决**:
+1. 确认 workflow 会从版本号推导 dist-tag
+2. `0.5.2-beta.1` 应发布到 `beta`
+3. `0.5.2-rc.1` 应发布到 `rc`
 
 ### GitHub Actions 未触发
 

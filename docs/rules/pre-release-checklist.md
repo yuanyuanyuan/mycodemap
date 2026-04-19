@@ -78,6 +78,7 @@
 - 所有文件版本号必须完全一致
 - 必须符合语义化版本规范 (`x.x.x`)
 - 预发布版本可包含后缀 (`0.2.0-beta.1`)
+- 预发布版本发布到 npm 时必须显式传 dist-tag（例如 `0.2.0-beta.1 -> --tag beta`）
 
 **版本同步清单**:
 
@@ -202,8 +203,8 @@ git push origin main --tags
      - Workflow Name: `publish.yml`
 
 2. **GitHub Secrets 检查**:
-   - [ ] **不应设置** `NPM_TOKEN` secret
-   - [ ] 如果需要 Token 方式，使用 `NPM_TOKEN` 并确保是 **Automation** 类型
+   - [ ] 默认可不设置 `NPM_TOKEN`，优先走 OIDC Trusted Publishing
+   - [ ] 如果需要 token fallback，使用 `NPM_TOKEN` 并确保是 **Automation** 类型
 
 3. **Workflow 权限配置**:
    ```yaml
@@ -214,9 +215,13 @@ git push origin main --tags
 
 4. **发布命令**:
    ```yaml
-   # 正确：使用 OIDC
+   # 正确：stable 版本发布到 latest
    - name: Publish to NPM
-     run: npm publish --access public --provenance
+     run: npm publish --access public --tag latest
+
+   # 正确：prerelease 版本显式发布到 preid 对应 tag
+   - name: Publish to NPM
+     run: npm publish --access public --tag beta
    
    # 错误：设置 NODE_AUTH_TOKEN 会干扰 OIDC
    # env:

@@ -10,7 +10,7 @@
 | 改 repo-local 规则控制脚本或 hook 路由 | `python3 scripts/validate-rules.py code --report-only` | 先看 contract，不先硬阻断 |
 | 改 CLI 文档入口或统一 guardrail | `node dist/cli/index.js ci check-docs-sync` | 同时验证 docs guardrail 与 analyze generated block |
 | 改实现代码 | `npm run typecheck` → `npm run lint` → `npm test` | 从最小相关验证扩到基础回归 |
-| 改发布/打包边界 | `npm run build` → `npm run validate-pack` | 确认 shipped artifact 仍成立 |
+| 改发布/打包边界 | `npm run docs:check:pre-release` → `npm run build` → `npm run validate-pack` | 先锁版本/发布契约，再确认 shipped artifact 仍成立 |
 
 ## Repo-local rule validator
 
@@ -73,6 +73,7 @@
 | 失败模式 | 先看哪里 | 恢复方式 |
 |---|---|---|
 | `schema / README / AI 文档没同步` | `npm run docs:check` | 先修文档真相，再重跑 |
+| prerelease 发布卡在 npm publish | `.github/workflows/publish.yml` / `package.json version` | 确认 prerelease 版本显式传了 `--tag <preid>`；例如 `0.5.2-beta.1` 必须走 `--tag beta` |
 | 文档继续把历史设计写成当前现实 | `npm run docs:check` | 把 shipped baseline 与 future intent 分开 |
 | 旧的 `neo4j` / `kuzudb` 配置已经不受支持，但文档还把它写成正式 backend | `README.md` / `AI_GUIDE.md` / schema | 改回 `filesystem` / `sqlite` / `memory` / `auto` 真实 contract |
 | `storage.type="sqlite"` 运行时不满足要求 | Node.js `>=20`、`better-sqlite3`、`STORAGE_BACKEND_MIGRATED`、`SQLITE_NOT_AVAILABLE` | 修运行时或改配置，不要静默 fallback |
