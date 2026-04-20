@@ -111,3 +111,34 @@ Plans:
 - [x] **27-04** Pre-commit / commit-msg / CI backstop integration
 - [x] **27-05** Scoped rule-context helper and subagent prompt injection
 - [x] **27-06** Executable QA matrix for hooks, soft-gate, and backstop flows
+
+## Backlog
+
+### Phase 999.1: mycodemap init enhancements — centralized workspace, git hooks, and AI guardrail rules (BACKLOG)
+
+**Goal:** 将 mycodemap 的初始化流程从"配置文件扔根目录"升级为"项目级 AI 助手基础设施初始化"
+
+**Requirements (captured, TBD):**
+
+1. **集中式工作空间** — 所有 mycodemap 相关文件统一放到目标项目的 `.mycodemap/` 目录内
+   - `mycodemap.config.json` 从项目根目录迁移到 `.mycodemap/config.json`
+   - 输出目录 (`.mycodemap/`)、日志、缓存、workflow 等全部收敛到一个目录下
+   - 向后兼容：检测到旧位置配置文件时自动迁移并提示
+
+2. **Git hooks 引导安装** — `mycodemap init` 时引导用户为目标项目添加 git hooks
+   - 参考实现：本项目自身的 `.githooks/` (pre-commit, commit-msg 等)
+   - 可选安装，不强制覆盖用户已有 hooks
+   - hooks 内容围绕 mycodemap 生态的验证（如 docs sync、rules 校验等）
+
+3. **AI 护栏规则注入** — `mycodemap init` 时引导用户将 CI/guardrail rules 注入目标项目的 AI 上下文
+   - 在目标项目创建 `.mycodemap/rules/` 目录，存放规则文件
+   - 规则覆盖：commit 规范、PR 流程、lint 要求、测试门禁、CI 检查等
+   - 引导用户将规则引用添加到目标项目的 `CLAUDE.md` 或 `AGENTS.md`
+   - 目标是让 AI 大模型（Claude Code 等）在操作该项目时自动遵守项目级护栏
+
+**Status:** Backlog — captured for future planning
+**Depends on:** None
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd-review-backlog when ready)
