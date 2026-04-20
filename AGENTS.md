@@ -380,13 +380,13 @@ rtk --version         # 验证 rtk 已安装
 <claude-mem-context>
 # Memory Context
 
-# [codemap] recent context, 2026-04-18 7:19pm GMT+8
+# [codemap] recent context, 2026-04-20 5:38pm GMT+8
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 26 obs (8,907t read) | 1,247,410t work | 99% savings
+Stats: 28 obs (9,760t read) | 1,297,660t work | 99% savings
 
 ### Apr 18, 2026
 3 6:14p 🔵 Primary session awaiting input after sandbox blockage
@@ -409,15 +409,9 @@ Stats: 26 obs (8,907t read) | 1,247,410t work | 99% savings
 36 6:55p 🔵 CodeGraphBuilder creates only module-level dependencies, ignores callGraph data
 37 " 🔵 Sandbox execution blocked by bwrap RTM_NEWADDR permission denial
 41 7:01p 🔵 MCP stdio transport requires stderr for all server logging
-**45** 7:03p 🔵 **Native MCP server implementation is absent despite documentation references**
-The primary session investigated the gap between documented and implemented MCP support. While the AI guide presents an "MCP integration" section to users, it actually describes wrapping existing CLI commands as external tools rather than implementing a native MCP stdio server. A comprehensive grep across the entire codebase confirmed that codemap_query, codemap_impact, mcp start, and mcp install exist only in documentation and design documents, with no actual TypeScript server implementation, tool handlers, or CLI command registration in src/cli or src/cli-new. This establishes the implementation baseline: the MCP server must be built from scratch rather than extended from existing code.
-~385t 🔍 47,510
-
+45 7:03p 🔵 Native MCP server implementation is absent despite documentation references
 46 " 🔵 SmartParser and SQLiteStorage already validate symbol-level call graph extraction and querying
-**47** 7:06p 🔵 **Existing server and CLI already define error code patterns matching MCP design**
-The primary session searched the codebase for error code patterns relevant to the MCP server design and discovered that many of the proposed error semantics already have precedent in the existing code. The HTTP server layer (CodeMapServer.ts) returns structured errors with 'NOT_FOUND' and 'INTERNAL_ERROR' codes. The AnalysisHandler uses UnsupportedAnalysisOperationError to signal unsupported operations with an explicit statusCode. The CLI and history-risk service already classify query results into 'ok', 'ambiguous', 'not_found', and 'unavailable' statuses. This means the MCP tool error contract can be modeled consistently with existing conventions rather than inventing a new taxonomy.
-~364t 🔍 62,655
-
+47 7:06p 🔵 Existing server and CLI already define error code patterns matching MCP design
 **52** 7:11p 🔵 **Graph traversal algorithms in graph-helpers.ts operate at module level for impact analysis**
 The primary session read the shared graph-helpers.ts file that underpins all storage backends. The impact analysis algorithm performs a breadth-first search using a queue, but it traverses module-level dependency edges (targetId → sourceId) rather than symbol-level call edges. In contrast, findCallersInGraph and findCalleesInGraph do operate at symbol granularity by filtering dependencies with type === 'call' and resolving matched IDs against the symbols array. Cycle detection uses recursive DFS with visited/inStack tracking at the module level. All helpers return cloned objects via spread operators to maintain immutability. This establishes that the MCP server can reuse findCallers/findCallees for symbol queries directly, but impact analysis for symbols would require either a new symbol-level BFS variant or adapting the existing module-level algorithm.
 ~413t 🔍 86,270
@@ -430,6 +424,14 @@ The primary session completed the engineering review of the symbol-level graph +
 The primary session completed the engineering review phase and produced two durable artifacts. First, the design document was updated with twelve locked architectural decisions covering parser authority, experimental surface designation, schema minimalism, transport isolation, documentation hierarchy, and test requirements. The document now explicitly lists what is NOT in scope (incremental generation, hook install, community algorithms, HTTP MCP, export --symbol-level, eager cache) and what already exists (smart-parser callGraph, SQLite findCallers/findCallees, QueryHandler read semantics, governance cache patterns). Second, a standalone test plan artifact was written to the gstack projects directory, containing affected pages/routes, key interactions to verify, edge cases, and critical end-to-end paths. This test plan is formatted for consumption by downstream QA skills.
 ~404t 🛠️ 96,142
 
+**57** 7:19p 🔵 **User requested continuation of prior work**
+The user requested continuation in the primary Claude session, but no new tool executions, code changes, or discoveries were visible to the observer in this turn. The last recorded observations remain the 12 engineering review decisions locked in the design doc (observation #54/#56).
+~152t 🔍 18,201
 
-Access 1247k tokens of past work via get_observations([IDs]) or mem-search skill.
+**58** 7:22p ⚖️ **Codex independent review challenges entire first-phase approach**
+The primary session submitted its design plan to an independent Codex review (gpt-5.4, xhigh reasoning) seeking a "brutally honest" second opinion. The review returned harsh findings that challenge fundamental first-phase choices: the plan solves the "best demo" problem rather than the "most painful" problem (no latency targets), exposes MCP query tools while deferring parse-error tracking (risk of partial graphs pretending to be complete), and treats MCP as strategic differentiation when it is merely a distribution layer. The review also identified structural risks: `signature` as unstable identity, `mcp install` as a support-cost black hole without host matrix or uninstall strategy, and the two-truth problem of module-level CLI `impact` vs symbol-level MCP `codemap_impact`. The review recommends a fundamentally simpler validation path: prove symbol query quality via existing CLI/JSON first, then decide whether MCP packaging is warranted.
+~701t ⚖️ 32,049
+
+
+Access 1298k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>
