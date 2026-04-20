@@ -55,13 +55,13 @@
 
 | 文档 | 行数 | 核心内容 |
 |------|------|---------|
-| QUICKSTART.md | ~120 | 决策树、场景映射 |
-| COMMANDS.md | ~350 | 核心分析命令 + 移除命令迁移说明 |
-| OUTPUT.md | ~320 | 目标契约、当前 CLI 现实与 JSON 结构 |
-| PATTERNS.md | ~290 | 核心分析模式 + 过渡 workflow 说明 |
-| PROMPTS.md | ~300 | 8个提示词模板 |
-| INTEGRATION.md | ~420 | MCP、Skill、错误处理 |
-| **总计** | **~1800** | **完整 AI 使用指南** |
+| QUICKSTART.md | 130 | 决策树、场景映射 |
+| COMMANDS.md | 574 | 核心分析命令 + 移除命令迁移说明 |
+| OUTPUT.md | 1546 | 目标契约、当前 CLI 现实与 JSON 结构 |
+| PATTERNS.md | 498 | 核心分析模式 + 过渡 workflow 说明 |
+| PROMPTS.md | 463 | 9个提示词模板 |
+| INTEGRATION.md | 219 | MCP、Skill、错误处理 |
+| **总计** | **3430** | **完整 AI 使用指南** |
 
 ---
 

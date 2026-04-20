@@ -14,6 +14,9 @@
 - `completed/` 当前包含：
   - `2026-03-03-deps-path-extension-fix.md`
   - `2026-03-03-post-task-plan.md`
+  - `2026-04-17-eatdogfood-codemap-cli.md`
+  - `2026-04-19-prerelease-trusted-publishing-fix.md`
+  - `harness-engineering-rollout.md`
 - `tech-debt/` 当前包含：
   - `2026-03-15-lint-guardrail-gap.md`
 
