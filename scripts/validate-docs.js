@@ -195,7 +195,7 @@ function validateAnalyzeDocs(rootDir, failures) {
     failures
   );
 
-  // NOTE: CLAUDE.md 已演进为执行手册（路由层），analyze 命令指南已移至 AI_GUIDE.md / docs/ai-guide/
+  // NOTE: CLAUDE.md 已演进为入口路由，analyze 命令指南已移至 AI_GUIDE.md / docs/ai-guide/
   // 相关检查已下放至 AI_GUIDE.md 与 docs/ai-guide/*.md 的 validateSnippets 中
 
   validateSnippets(
@@ -274,7 +274,7 @@ function validateHistoryRiskDocs(rootDir, failures) {
     );
   }
 
-  // NOTE: CLAUDE.md 已演进为执行手册（路由层），history 风险基线已移至 AI_GUIDE.md / docs/ai-guide/
+  // NOTE: CLAUDE.md 已演进为入口路由，history 风险基线已移至 AI_GUIDE.md / docs/ai-guide/
   // 相关检查已下放至 AI_GUIDE.md 与 docs/ai-guide/*.md 的 validateSnippets 中
 
   if (commandsGuide) {
@@ -437,7 +437,7 @@ function validateDesignContractDocs(rootDir, failures) {
     );
   }
 
-  // NOTE: CLAUDE.md 已演进为执行手册（路由层），design 检索指南已移至 AI_GUIDE.md / docs/ai-guide/
+  // NOTE: CLAUDE.md 已演进为入口路由，design 检索指南已移至 AI_GUIDE.md / docs/ai-guide/
   // 相关检查已下放至 AI_GUIDE.md 与 docs/ai-guide/*.md 的 validateSnippets 中
 
   if (commandsGuide) {
@@ -1032,7 +1032,7 @@ function validateGraphStorageDocs(rootDir, failures) {
     );
   }
 
-  // NOTE: CLAUDE.md 已演进为执行手册（路由层），graph storage 合约已移至 AI_GUIDE.md / docs/ai-guide/
+  // NOTE: CLAUDE.md 已演进为入口路由，graph storage 合约已移至 AI_GUIDE.md / docs/ai-guide/
   // 相关检查已下放至 AI_GUIDE.md 与 docs/ai-guide/*.md 的 validateSnippets 中
 
   if (commandsGuide) {

@@ -2,15 +2,36 @@
 
 ## What This Is
 
-CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `design validate → design map → design handoff → design verify` 收口为正式 public collaboration chain；`v1.6` 把 Agent-facing CLI 的机器契约真相继续收口；`post-v1.6` 补齐了 opt-in symbol-level graph 与 experimental local MCP 的最小可信纵向切片；`v1.7` 则把 repo-local rule control 与 `mycodemap init` 项目级 AI 基础设施收敛成可验证 contract。
+CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `design validate → design map → design handoff → design verify` 收口为正式 public collaboration chain；`v1.6` 把 Agent-facing CLI 的机器契约真相继续收口；`post-v1.6` 补齐了 opt-in symbol-level graph 与 experimental local MCP 的最小可信纵向切片；`v1.7` 则把 repo-local rule control 与 `mycodemap init` 项目级 AI 基础设施收敛成可验证 contract；`v1.8` 进一步把 rules 入口文档面收敛成 constitution / router / adapter 三层结构。
 
-2026-04-18 起，规划边界已经调整：**Docker / ArcadeDB 原型线不再属于当前版本范围**。此前 `v1.5` 的 22-24 phase 保留为历史工件，但不会继续作为 active work。当前 active milestone 为空，下一步必须用 fresh requirements 重新定 scope。
+`v1.8` 已完成：`AGENTS.md`、根 `CLAUDE.md`、`.claude/CLAUDE.md` 现在分别承担宪法 / 路由 / Claude adapter 单一职责，操作性细节已迁回现有 live 文档，入口面恢复为单一权威、零重复、可导航的结构。
+
+2026-04-18 起，规划边界已经调整：**Docker / ArcadeDB 原型线不再属于当前版本范围**。此前 `v1.5` 的 22-24 phase 保留为历史工件，但不会继续作为 active work。
 
 ## Core Value
 
 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
 
-## Latest Completed Milestone: v1.7 init-and-rule-hardening
+## Current Milestone: none (between milestones)
+
+**Goal:** 等待下一轮明确 scope 的 milestone。
+
+**Current focus:**
+- 维持 `v1.8` 已完成的 entry-doc authority split
+- 让后续规则 / CLI / docs 变更继续遵守“入口只路由，正文只在 authoritative docs”
+- 下一轮工作必须重新开 milestone，而不是把历史关闭分支重新拉回 active surface
+
+## Latest Completed Milestone: v1.8 entry-docs-structure-consolidation
+
+**Goal:** 收敛三层入口文档面，恢复“单一权威 + 零重复 + 明确路由”的治理入口结构。
+
+**Delivered outcome:**
+- `AGENTS.md` / `CLAUDE.md` / `.claude/CLAUDE.md` 已稳定收敛为 constitution / router / Claude adapter
+- `Phase 28` 迁移图固定了“旧 section → 新归宿文件”的长期 authority baseline
+- `Phase 29` 把入口文档中的执行回路、命令块、RTK 长表、Claude 第二手册与会话 mem payload 全部迁出
+- `Phase 30` 同步了 README、AI_GUIDE、rules index、ARCHITECTURE、AI index 与 docs guardrail terminology，完成 zero-duplication verification
+
+## Previous Completed Milestone: v1.7 init-and-rule-hardening
 
 **Goal:** Close repo-local rule-control hardening and make `mycodemap init` a project-level AI infrastructure state reconciler.
 
@@ -50,38 +71,46 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 - ✓ experimental local MCP 已能基于 symbol graph 暴露 `codemap_query` / `codemap_impact`，同时保持 `stdout` protocol purity —— post-v1.6 / Phase 26
 - ✓ repo-local rule control 已具备 capability baseline、validator exit contract、hooks/CI backstop、scoped rule-context 与 executable QA —— v1.7 / Phase 27
 - ✓ `mycodemap init` 已升级为项目级 AI 基础设施状态收敛器，覆盖 `.mycodemap/config.json`、receipt、hooks、rules、docs 与 package smoke —— v1.7 / Phase 999.1
+- ✓ 入口文档已按 `AGENTS.md = constitution`、`CLAUDE.md = router`、`.claude/CLAUDE.md = Claude adapter` 收口 —— v1.8 / Phase 29
+- ✓ “旧 section → 新归宿文件” 迁移图与 discoverability 同步已完成，入口面不再保留第二套规则正文 —— v1.8 / Phase 28-30
 
 ### Active
 
-- (none — next milestone not selected yet)
+- [ ] 下一轮 milestone scope TBD（待新需求或新问题驱动）
 
 ### Out of Scope
 
-- 恢复 `Phase 22-24` 作为当前版本待办
-- 重新引入 Docker / ArcadeDB 作为默认下一步
-- 把 `rtk` 扩写成 CodeMap 产品能力
-- 借 Phase 25 顺手把所有 CLI 命令一次性统一成单一旗标 / schema 体系
+- 恢复 `Phase 22-24` 作为当前版本待办 —— 已关闭的历史分支不能重新回流
+- 重新引入 Docker / ArcadeDB 作为默认下一步 —— 与当前 milestone 无关
+- 把 `rtk` 扩写成 CodeMap 产品能力 —— `rtk` 仍是执行包装层
+- 在本 milestone 中引入入口文档自审系统、重复检测自动化或生成式治理中间层 —— 一期只做结构收敛
+- 借入口文档收敛顺手重写全部治理规则正文 —— 当前只做必要的归宿与措辞收口
 
 ## Context
 
-- `Phase 25` 源于 2026-04-17 eatdogfood 报告，是一条独立于 ArcadeDB 原型线的新版本收口工作
-- 2026-04-18 用户明确决定：旧版本遗漏不再继续，因此 active planning 不能再把 22-24 当 blocker
-- `Phase 26` 作为 `post-v1.6` follow-up，验证了 symbol-level graph / partial truth / experimental MCP 的首期链路
-- `Phase 27` 进一步把 repo-local rule-control contract、hooks / CI backstop 与 subagent rule injection 收口成可重复验证的工程事实
-- `Phase 999.1` 把 `mycodemap init` 从根目录配置文件创建器升级为 `.mycodemap/` 工作区、receipt、hooks、rules 与 package smoke 的状态收敛器
-- 当前 README / AI docs / rules / workflow truth 仍围绕 design chain、analysis-first CLI、local-first storage surface 与 `.mycodemap/` init contract 收口
+- 当前入口文档面已固定为三层：`AGENTS.md`、根 `CLAUDE.md`、`.claude/CLAUDE.md`
+- `AGENTS.md` 只保留仓库级治理协议与证据协议；`CLAUDE.md` 只负责把 agent 路由到下一份 live doc；`.claude/CLAUDE.md` 只保留 Claude adapter 差异
+- `docs/rules/validation.md` 与 `docs/rules/engineering-with-codex-openai.md` 已承担验证顺序、工程执行与交付要求
+- `AI_GUIDE.md` 与 `docs/rules/README.md` 已分别承担产品/CLI discoverability 与 rules 路由
+- `Phase 28` migration map 是后续维护 entry-doc authority split 的长期参考基线
 
 ## Constraints
 
-- **Machine Truth First**: 只要 CLI 命令会被 Agent 消费，stdout 必须表达可机读真相
-- **Docs Truth**: 输出契约变化必须同步 AI docs 与 guardrail
-- **Scope Integrity**: 已关闭的历史分支不能被自动当成当前版本待办
-- **Wrapper Boundary**: `rtk` 只是执行包装层，不属于 CodeMap 产品面
+- **Zero Duplication**: 入口文档之间不得保留提醒式摘要、重复政策或第二套规则面
+- **Existing Destinations Only**: 被移出的内容只能迁移到现有 live 文档，不新增治理中间层
+- **Constitutional Narrowness**: `AGENTS.md` 必须保持窄而稳定，只承载宪法级规则
+- **Navigation First**: 根 `CLAUDE.md` 与 `.claude/CLAUDE.md` 必须表达导航/装配关系，而不是重新长成执行手册
+- **Phase Scope Integrity**: 一期只解决结构角色澄清与内容迁移，不扩张到自审框架、ghost commands 全量修复或 archive 身份治理
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
+| 启动 `v1.8 entry-docs-structure-consolidation` | `v1.7` 已归档，下一步需要 fresh requirements 处理入口文档结构收敛 | Active 2026-04-22 |
+| 本 milestone 直接采用 `docs/brainstorms/2026-04-22-rules-entry-docs-phase1-structure-consolidation-requirements.md` 作为 canonical requirements source | 产品级结构决策已经收敛，不需要额外 questioning / research 循环 | ✓ Good |
+| `AGENTS.md` / 根 `CLAUDE.md` / `.claude/CLAUDE.md` 分别收敛为宪法 / 路由 / Claude adapter | 这是本 milestone 的核心结构目标 | Shipped 2026-04-22 |
+| 零重复是本 milestone 的硬约束 | 若保留摘要式复述，入口面会继续重新膨胀 | Shipped 2026-04-22 |
+| 被移出内容只能落回现有 live 文档 | 避免新建治理中间层制造新的入口漂移 | Shipped 2026-04-22 |
 | `v1.4` 以 `Phase 17 → 18 → 19 → 20` 完成并归档 | 设计链主线已经闭环，不应继续停留在 active planning surface | Shipped 2026-03-26 |
 | `Phase 21` 以 direct replacement `NO-GO` 收尾 | 避免把错误的 storage 假设包装成实现前提 | Archived 2026-03-28 |
 | `v1.5` Docker / ArcadeDB 原型线关闭 | 用户明确表示不再继续该方向，也不需要补旧遗漏 | Closed 2026-04-18 |
@@ -94,14 +123,13 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 
 - **Completed milestones / follow-ups:** `v1.0`、`v1.1`、`v1.2`、`v1.3`、`v1.4`、`post-v1.4`、`v1.6`、`post-v1.6`、`v1.7 init-and-rule-hardening`
 - **Historical closed branch:** `v1.5 Isolated ArcadeDB Server-backed Prototype`（22-24 不再继续）
-- **Active milestone:** none selected yet（next milestone should start from fresh requirements）
-- **Current planning status:** `v1.7` archived; Phase 27 and Phase 999.1 are complete; do not backfill old `Phase 22-24`
-- **Known remaining debt:** 1 deferred open debug artifact is recorded in `STATE.md`; repo-wide ESLint warnings remain warning-only historical baseline; rule-context routing and docs guardrail trigger coverage remain advisory expansion opportunities
+- **Active milestone:** none
+- **Current planning status:** between milestones；等待下一轮新 scope
+- **Known remaining debt:** deferred debug artifact 与 governance follow-ups 仍记录在 `STATE.md`
 
-## Next Milestone Candidates
+## Next Execution Step
 
-- Freshly scope the next product milestone with `$gsd-new-milestone /data/codemap`.
-- Decide whether the deferred install-runtime debug session needs release-side verification.
+- 若要继续推进新工作，先运行 `$gsd-new-milestone /data/codemap`，再按新 roadmap 进入 discuss / plan / execute。
 
 ## Evolution
 
@@ -121,4 +149,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. 更新 Current State / Context / Key Decisions
 
 ---
-*Last updated: 2026-04-22 after archiving v1.7 init-and-rule-hardening milestone*
+*Last updated: 2026-04-22 after completing v1.8 entry-docs-structure-consolidation*

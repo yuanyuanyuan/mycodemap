@@ -31,7 +31,7 @@ CodeMap 帮助 AI 大模型、Agent 和开发者理解 TypeScript/JavaScript 项
 ## 约束与规范
 
 - [AGENTS.md](./AGENTS.md): 仓库级 AI 协议和强约束
-- [CLAUDE.md](./CLAUDE.md): Claude/Codex 执行手册
+- [CLAUDE.md](./CLAUDE.md): Claude/Codex 入口路由
 - [ARCHITECTURE.md](./ARCHITECTURE.md): 系统架构总图
 
 ## 命令速查

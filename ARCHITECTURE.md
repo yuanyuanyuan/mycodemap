@@ -159,7 +159,7 @@ src/cli/index.ts
 ## 7. 文档信息架构
 
 - `AGENTS.md`：仓库级执行协议与证据规范。
-- `CLAUDE.md`：Claude / Codex 最小执行手册。
+- `CLAUDE.md`：Claude / Codex 入口路由。
 - `ARCHITECTURE.md`：本文件，系统地图与模块边界。
 - `docs/rules/`：开发、测试、验证、发布规则。
 - `docs/design-docs/`：设计意图、权衡、验证状态。

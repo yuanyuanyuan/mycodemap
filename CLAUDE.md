@@ -1,88 +1,46 @@
-# CLAUDE.md — CodeMap 执行手册
+# CLAUDE.md — CodeMap 入口路由
 
-> 本文件只做入口路由；细节下沉到 `docs/rules/*.md`、`docs/ai-guide/*.md`、`ARCHITECTURE.md`、`AI_GUIDE.md`。
+> 本文件只回答三件事：**谁定权、下一步去哪读、规则变更时该改哪份文档**。
+> 它不是执行手册、命令速查、验证清单或交付 checklist。
+
+## 角色分工
+
+| 文档 | 角色 | 不负责什么 |
+|---|---|---|
+| `AGENTS.md` | 仓库级宪法：治理协议、证据协议、改动边界、验证/交付底线 | 不负责长命令表、任务模板、产品使用说明 |
+| `CLAUDE.md` | 入口路由：告诉 Claude/Codex 下一份该读什么 | 不负责执行政策正文 |
+| `.claude/CLAUDE.md` | Claude adapter：解释 Claude 自动读取与 shared truth 的关系 | 不负责第二套规则 |
 
 ## 加载顺序
 
 ```text
-CLAUDE.md → docs/rules/<最相关 1-2 份> → ARCHITECTURE.md → AI_GUIDE.md → 代码事实
+AGENTS.md → docs/rules/README.md → 最相关的 1-2 份 live docs → ARCHITECTURE.md / AI_GUIDE.md → 代码事实
 ```
 
-## 执行回路
+## 按问题路由
 
-```markdown
-## 任务分析
-**目标**：[一句话]
-**类型**：[新增/修复/重构/性能/文档]
-**等级**：[L0/L1/L2/L3]
-
-## 执行计划
-1. [Plan] 明确边界 → verify: [最小相关检查]
-2. [Build] 落地改动 → verify: [定点测试/命令]
-3. [Verify] 扩大验证 → verify: [typecheck/lint/test/docs]
-```
-
-## 修改后必须执行
-
-```bash
-# repo-local rule control 默认先 report-only
-python3 scripts/validate-rules.py code --report-only
-
-# 代码基础检查
-npm run typecheck
-npm run lint
-npm test
-
-# 文档/入口/规则改动
-npm run docs:check
-node dist/cli/index.js ci check-docs-sync
-```
-
-> `python3 scripts/validate-rules.py code --report-only` 是 post-edit 默认验证命令。只有在后续 gate 明确切到 enforce 时，才允许把它当 blocker。
-
-## 路径路由
-
-| 编辑路径 | 先读规则 |
+| 你现在需要回答的问题 | 去读哪里 |
 |---|---|
-| `src/cli/*` | `docs/rules/code-quality-redlines.md` + `docs/rules/architecture-guardrails.md` |
-| `src/domain/*` | `docs/rules/code-quality-redlines.md` + `docs/rules/architecture-guardrails.md` |
-| `src/server/*` | `docs/rules/code-quality-redlines.md` + `docs/rules/architecture-guardrails.md` |
-| `src/infrastructure/*` | `docs/rules/code-quality-redlines.md` + `docs/rules/architecture-guardrails.md` |
-| `src/interface/*` | `docs/rules/architecture-guardrails.md` |
-| `*.test.ts` | `docs/rules/testing.md` |
-| `docs/*` | `docs/rules/validation.md` |
-| `.githooks/*` | `docs/rules/validation.md` + `docs/rules/engineering-with-codex-openai.md` |
-| `.github/workflows/*` | `docs/rules/validation.md` + `docs/rules/engineering-with-codex-openai.md` |
+| 仓库级规则、证据标签、任务等级、改动红线是什么？ | `AGENTS.md` |
+| 改某类文件时先读哪份规则？ | `docs/rules/README.md` |
+| 计划/执行/交付怎么写，任务模板放哪？ | `docs/rules/engineering-with-codex-openai.md` |
+| 验证顺序、hooks、CI、rule-system defaults 在哪？ | `docs/rules/validation.md` |
+| 架构分层、依赖方向、模块边界是什么？ | `ARCHITECTURE.md` + `docs/rules/architecture-guardrails.md` |
+| 代码质量红线、`[META]` / `[WHY]`、`TODO-DEBT` 在哪？ | `docs/rules/code-quality-redlines.md` |
+| 测试规则与 fixture 边界在？ | `docs/rules/testing.md` |
+| CodeMap CLI / MCP / AI 使用方式在？ | `AI_GUIDE.md` + `docs/ai-guide/*.md` |
+| RTK 为什么要加、具体怎么写？ | `RTK.md` |
 
-## Rule-system 默认值
+## 编辑归宿
 
-- 配置文件：`.claude/rule-system.config.json`
-- 默认开启：`enabled: true`
-- 默认按编辑路径路由：`route_by_edit_path: true`
-- 默认 soft gate：`soft_gate.change_analyzer: true`
-- 默认 hard gate：`hard_gate.mode: "report-only"`
+- 改**仓库级规则**：编辑 `AGENTS.md`
+- 改**路由 / discoverability 文案**：编辑 `CLAUDE.md`
+- 改**Claude 自动读取差异**：编辑 `.claude/CLAUDE.md`
+- 改**工程执行协议**：编辑 `docs/rules/engineering-with-codex-openai.md`
+- 改**验证 / hook / CI 规则**：编辑 `docs/rules/validation.md`
+- 改**产品 / CLI / MCP / 命令说明**：编辑 `AI_GUIDE.md` 与 `docs/ai-guide/*`
 
-## CodeMap CLI Dogfood
+## 非目标
 
-```bash
-node dist/cli/index.js query -s "<symbol>"
-node dist/cli/index.js deps -m "<module>"
-node dist/cli/index.js impact -f "<file>"
-node dist/cli/index.js query -S "<keyword>" -j
-
-# Experimental MCP
-node dist/cli/index.js mcp install
-node dist/cli/index.js mcp start
-```
-
-> 若 CLI 不可用，先运行 `npm run build`。`mcp start` 的 `stdout` 只能用于 MCP 协议，不能混入欢迎信息或 runtime log。
-
-## 交付清单
-
-- [ ] 只改与任务直接相关的文件
-- [ ] 改后已执行 `python3 scripts/validate-rules.py code --report-only`
-- [ ] 已补最小相关验证，再扩大到 `typecheck/lint/test/docs`
-- [ ] 若改入口、规则、契约，已检查 `AI_GUIDE.md`
-- [ ] 交付中包含失败场景与可信度自评
-
-**生效标志**：入口文件短、路由明确、验证命令可复制、规则只在一处维护。
+- 不要把执行回路、验证命令、rule-system 默认值、dogfood 命令、交付清单重新写回这里。
+- 如果某个规则已经在 live doc 中存在，这里只保留指针，不再复述正文。

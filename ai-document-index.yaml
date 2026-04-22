@@ -188,11 +188,11 @@ documentation:
     - id: claude
       path: CLAUDE.md
       type: guide
-      description: "Claude/Codex 执行手册"
+      description: "Claude/Codex 入口路由"
       keywords:
-        - "执行手册"
-        - "验收清单"
-        - "检索优先级"
+        - "入口路由"
+        - "加载顺序"
+        - "去哪读下一份"
       audience: ai
       required_reading: true
       

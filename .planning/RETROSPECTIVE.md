@@ -2,6 +2,49 @@
 
 *A living document updated after each milestone. Lessons feed forward into future planning.*
 
+## Milestone: v1.8 — entry-docs-structure-consolidation
+
+**Shipped:** 2026-04-22
+**Phases:** 3 | **Plans:** 3 | **Sessions:** multiple
+
+### What Was Built
+
+- `AGENTS.md` / `CLAUDE.md` / `.claude/CLAUDE.md` 已稳定拆分为 constitution / router / Claude adapter。
+- `Phase 28` 迁移图固定了“旧 section → destination doc”归宿，成为长期 authority baseline。
+- live docs、machine-readable indexes 与 docs guardrail comments 已统一成 `CLAUDE.md = 入口路由` 的 terminology。
+
+### What Worked
+
+- 先做 migration map、再做 rewrite、最后做 discoverability sweep 的三段式推进，避免了 rewrite 阶段重新猜 authority split。
+- docs-focused 验证（grep + docs guardrail + docs-sync）非常适合治理文档收口类 milestone。
+- 把“入口文档只路由、正文只在 live docs”当成硬约束后，改动面明显更可控。
+
+### What Was Inefficient
+
+- `gsd-integration-checker` 在 audit 阶段超时，导致 integration audit 需要手动完成。
+- `gsd-sdk query milestone.complete` 当前实现会忽略传入版本并触发 `phasesArchive([])`，无法直接完成归档。
+- `roadmap.analyze` 仍把已完成 phase 标成 `roadmap_complete: false`，容易让自治工作流误判完成态。
+
+### Patterns Established
+
+- 治理型 docs milestone 适合采用 `migration map → rewrite → discoverability sweep` 的薄切分。
+- machine-readable index（`ai-document-index.yaml`、`llms.txt`）必须与 live docs 一起同步，否则 discoverability truth 会漂移。
+- repo-level authority docs 绝不能混入运行时会话 payload。
+
+### Key Lessons
+
+1. 入口文档收敛必须先锁 destination ownership，再开始真正重写。
+2. docs guardrail 之外还需要术语扫描，才能捕捉“角色名还对不上”的 discoverability drift。
+3. lifecycle 工具链本身也要纳入验证范围；归档 query 的 bug 会直接影响自治 closeout。
+
+### Cost Observations
+
+- Model mix: not captured in durable telemetry for this milestone.
+- Sessions: multiple planning/execution/closeout sessions.
+- Notable: 绝大多数工作量来自 authority split 与 discoverability consistency，而不是正文规则重写。
+
+---
+
 ## Milestone: v1.7 — init-and-rule-hardening
 
 **Shipped:** 2026-04-22

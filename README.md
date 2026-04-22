@@ -110,7 +110,7 @@ mycodemap design verify mycodemap.design.md --json
 | **[💬 docs/ai-guide/PROMPTS.md](docs/ai-guide/PROMPTS.md)** | 即用型提示词模板 |
 | **[🔧 docs/ai-guide/INTEGRATION.md](docs/ai-guide/INTEGRATION.md)** | 集成指南、错误处理 |
 | **[🛡️ AGENTS.md](AGENTS.md)** | 仓库级强约束、任务分级、代码红线 |
-| **[⚡ CLAUDE.md](CLAUDE.md)** | AI 执行手册、验收清单 |
+| **[⚡ CLAUDE.md](CLAUDE.md)** | AI 入口路由、下一步阅读导航 |
 | **[🤖 docs/AI_ASSISTANT_SETUP.md](docs/AI_ASSISTANT_SETUP.md)** | AI 助手配置指引 |
 | **[🛠️ docs/rules/engineering-with-codex-openai.md](docs/rules/engineering-with-codex-openai.md)** | 面向 agent 的工程约束 |
 

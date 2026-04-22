@@ -1,5 +1,30 @@
 # Project Milestones: CodeMap
 
+## v1.8 entry-docs-structure-consolidation (Shipped: 2026-04-22)
+
+**Delivered:** 将 `AGENTS.md`、根 `CLAUDE.md`、`.claude/CLAUDE.md` 收敛为 constitution / router / Claude adapter，并同步 live docs 与 machine-readable indexes，恢复单一权威、零重复、可导航的入口面。
+
+**Phases completed:** 28-30 (3 plans total)
+
+**Key accomplishments:**
+
+- `Phase 28` 固定了 section-level migration map，明确每类 migrated content 的 destination ownership
+- `Phase 29` 重写三份入口文档，移出执行回路、命令块、RTK 长表、Claude 第二手册与会话 mem payload
+- `Phase 30` 同步 `README.md`、`AI_GUIDE.md`、`docs/rules/README.md`、`ARCHITECTURE.md`、`ai-document-index.yaml`、`llms.txt` 与 `scripts/validate-docs.js`，锁定 `CLAUDE.md = 入口路由`
+- docs guardrails、docs-sync 与 terminology scan 共同证明 entry-doc surface 不再保留第二套规则正文
+
+**Stats:**
+
+- `10/10` milestone requirements satisfied，`3/3` phases complete，milestone audit 为 `passed`
+- 3 phases，3 plans，全部为 docs-governance / discoverability 收口
+- 当前无 active milestone；后续需重新开 milestone 再继续
+
+**Git range:** 未单独捕获（当前运行约束禁止自动 commit / tag / push）
+
+**What's next:** 如需继续，运行 `$gsd-new-milestone /data/codemap`；不要把已关闭的 `v1.8` 再当作 active planning surface。
+
+---
+
 ## v1.7 init-and-rule-hardening (Shipped: 2026-04-22)
 
 **Delivered:** Closed repo-local rule-control hardening and upgraded `mycodemap init` into a project-level AI infrastructure state reconciler.

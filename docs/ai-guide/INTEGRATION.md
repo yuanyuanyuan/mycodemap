@@ -216,4 +216,4 @@ npm ls better-sqlite3
 - 命令参考：`docs/ai-guide/COMMANDS.md`
 - 输出契约：`docs/ai-guide/OUTPUT.md`
 - 主索引：`AI_GUIDE.md`
-- 执行手册：`CLAUDE.md`
+- 入口路由：`CLAUDE.md`

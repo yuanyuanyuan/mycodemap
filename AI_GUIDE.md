@@ -641,7 +641,7 @@ git tag -d vX.Y.Z                    # 删除本地 tag
 ## 📖 相关文档
 
 - `AGENTS.md` - 仓库级强约束
-- `CLAUDE.md` - AI 执行手册
+- `CLAUDE.md` - AI 入口路由
 - `ARCHITECTURE.md` - 系统架构总图
 - `README.md` - 用户指南
 
