@@ -9,6 +9,21 @@
 
 ## 核心命令
 
+### init - 收敛项目状态
+
+```bash
+mycodemap init               # 默认显示 reconciliation preview
+mycodemap init --interactive # 显式显示 preview（不写入）
+mycodemap init -y            # 使用默认选择直接写入
+```
+
+**行为说明**:
+
+- `init` 会收敛 `.mycodemap/config.json`、`.mycodemap/status/init-last.json`、`.mycodemap/hooks/` 与 `.mycodemap/rules/`
+- 默认先显示 receipt preview；只有 `-y/--yes` 才真正写入
+- 若 receipt 中仍有 `manual action`，请先处理这些动作，再继续自动化流程
+- `init` 不会自动改写 `CLAUDE.md` 或 `AGENTS.md`，只会输出可复制的 rules 引用片段
+
 ### generate - 生成代码地图
 
 ```bash
@@ -35,12 +50,12 @@ mycodemap generate --ai-context             # 生成 AI 描述
 - `generate` 完成后，`codemap.json` 会带 `graphStatus`、`failedFileCount` 与可选 `parseFailureFiles`；若 `graphStatus = "partial"`，不要把结果当成完整图。
 
 **插件运行时说明**:
-- `generate` 不提供独立 `--plugin` flags；插件通过 `mycodemap.config.json` 的 `plugins` 段声明。
+- `generate` 不提供独立 `--plugin` flags；插件通过 `.mycodemap/config.json` 的 `plugins` 段声明。
 - 只有显式存在 `plugins` 段时，`generate` 才会加载插件并运行 analyze / generate hooks。
 - `AI_MAP.md` 会增加 `Plugin Summary`，`codemap.json` 会增加 `pluginReport`，stdout 会输出插件诊断摘要。
 
 **图存储运行时说明**:
-- `generate` 会读取 `mycodemap.config.json.storage`，并把 CodeGraph 写入所选后端。
+- `generate` 会读取 `.mycodemap/config.json` 的 `storage` 段，并把 CodeGraph 写入所选后端。
 - `storage.type` 支持 `filesystem`、`sqlite`、`memory`、`auto`；默认是 `filesystem`。
 - 旧的 `neo4j` / `kuzudb` 配置会直接报迁移错误；显式选择 `sqlite` 但运行时缺少 `better-sqlite3` 或 Node.js `<20` 时也会直接报错，不会静默 fallback 到 `filesystem`。
 - `storage.type = "auto"` 当前优先走 `sqlite`；只有 SQLite 不可用时才 warning 后回退 `filesystem`。
@@ -521,7 +536,7 @@ mycodemap export mermaid                     # Mermaid 语法
 mycodemap export json -o ./output.json       # 指定输出
 ```
 
-- `export json|graphml|dot` 会从 `mycodemap.config.json.storage` 指定的后端读取 CodeGraph。
+- `export json|graphml|dot` 会从 `.mycodemap/config.json` 的 `storage` 段指定后端读取 CodeGraph。
 - `export mermaid` 仍直接读取 `.mycodemap/codemap.json`，这是当前保留的文件出口，不代表 graph backend 未接入主路径。
 - 图存储后端收口不等于重新开放公共 `mycodemap server` 产品面；`Server Layer` 仍是内部层。
 

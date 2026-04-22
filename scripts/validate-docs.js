@@ -806,22 +806,29 @@ function validateCliSurfaceDocs(rootDir, failures) {
 
 function validateConfigDocs(rootDir, failures) {
   const readme = readText(rootDir, 'README.md', failures);
+  const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
   const setupGuide = readText(rootDir, 'docs/SETUP_GUIDE.md', failures);
   const assistantGuide = readText(rootDir, 'docs/AI_ASSISTANT_SETUP.md', failures);
+  const commandsGuide = readText(rootDir, 'docs/ai-guide/COMMANDS.md', failures);
+  const quickstartGuide = readText(rootDir, 'docs/ai-guide/QUICKSTART.md', failures);
 
   if (readme) {
     validateSnippets(
       readme,
       'README.md config contract',
       [
-        '执行后会在项目根目录生成 `mycodemap.config.json` 配置文件。',
-        '通过 `mycodemap init` 生成的 `mycodemap.config.json` 配置文件支持以下选项：',
+        '执行后会收敛 `.mycodemap/config.json`，并把 machine-readable receipt 写入 `.mycodemap/status/init-last.json`。',
+        '`init` 还会同步 `.mycodemap/hooks/` 与 `.mycodemap/rules/`；但不会自动改写团队自有的 `CLAUDE.md` / `AGENTS.md`，只会在 receipt 中输出可复制片段。',
+        '通过 `mycodemap init` 收敛的 canonical 配置文件是 `.mycodemap/config.json`',
         '"$schema": "https://mycodemap.dev/schema/config.json"',
         '"mode": "hybrid"',
         '"plugins": {',
+        '"outputPath": ".mycodemap/storage"',
         '| `plugins.builtInPlugins` | `boolean` | 是否启用内置插件 | `true` |'
       ],
       [
+        '执行后会在项目根目录生成 `mycodemap.config.json` 配置文件。',
+        '通过 `mycodemap init` 生成的 `mycodemap.config.json` 配置文件支持以下选项：',
         '执行后会在项目根目录生成 `codemap.config.json` 配置文件。',
         '通过 `codemap init` 生成的 `codemap.config.json` 配置文件支持以下选项：',
         '"$schema": "https://codemap.dev/schema.json"',
@@ -831,18 +838,33 @@ function validateConfigDocs(rootDir, failures) {
     );
   }
 
+  if (aiGuide) {
+    validateSnippets(
+      aiGuide,
+      'AI_GUIDE.md init contract',
+      [
+        '| "需要先把项目初始化到 canonical `.mycodemap/` 工作区" | `init --interactive` → 确认 receipt → `init --yes` |'
+      ],
+      [],
+      failures
+    );
+  }
+
   if (setupGuide) {
     validateSnippets(
       setupGuide,
       'docs/SETUP_GUIDE.md config contract',
       [
-        '生成的配置文件 `mycodemap.config.json`：',
+        '执行后会收敛 canonical 配置 `.mycodemap/config.json`，并把 receipt 写入 `.mycodemap/status/init-last.json`。',
+        '生成的 canonical 配置文件 `.mycodemap/config.json`：',
         '"include": ["src/**/*.ts"]',
         '"watch": false',
         '"plugins": {',
+        '"outputPath": ".mycodemap/storage"',
         '| `plugins.debug` | boolean | `false` | 是否输出插件调试日志 |'
       ],
       [
+        '会询问以下问题：',
         '"include": ["src/**/*"]'
       ],
       failures
@@ -854,11 +876,41 @@ function validateConfigDocs(rootDir, failures) {
       assistantGuide,
       'docs/AI_ASSISTANT_SETUP.md config contract',
       [
-        '- `mycodemap.config.json` - CodeMap 配置文件'
+        '- `.mycodemap/config.json` - CodeMap canonical 配置文件',
+        '- `.mycodemap/status/init-last.json` - init receipt / managed asset ledger',
+        '- `.mycodemap/rules/` - 通用 AI guardrails rules bundle（需手动引用到 `CLAUDE.md` / `AGENTS.md`）'
       ],
       [
         '- `codemap.config.json` - CodeMap 配置文件'
       ],
+      failures
+    );
+  }
+
+  if (commandsGuide) {
+    validateSnippets(
+      commandsGuide,
+      'docs/ai-guide/COMMANDS.md init contract',
+      [
+        '### init - 收敛项目状态',
+        '`init` 会收敛 `.mycodemap/config.json`、`.mycodemap/status/init-last.json`、`.mycodemap/hooks/` 与 `.mycodemap/rules/`',
+        '`init` 不会自动改写 `CLAUDE.md` 或 `AGENTS.md`，只会输出可复制的 rules 引用片段'
+      ],
+      [],
+      failures
+    );
+  }
+
+  if (quickstartGuide) {
+    validateSnippets(
+      quickstartGuide,
+      'docs/ai-guide/QUICKSTART.md init contract',
+      [
+        'node dist/cli/index.js init --interactive',
+        'node dist/cli/index.js init --yes',
+        '`init` 的 receipt 会把 `done`、`manual action`、`conflict`、`skipped` 分开显示'
+      ],
+      [],
       failures
     );
   }
@@ -903,7 +955,7 @@ function validatePluginRuntimeDocs(rootDir, failures) {
       commandsGuide,
       'docs/ai-guide/COMMANDS.md plugin runtime contract',
       [
-        '`generate` 不提供独立 `--plugin` flags；插件通过 `mycodemap.config.json` 的 `plugins` 段声明。',
+        '`generate` 不提供独立 `--plugin` flags；插件通过 `.mycodemap/config.json` 的 `plugins` 段声明。',
         '`AI_MAP.md` 会增加 `Plugin Summary`，`codemap.json` 会增加 `pluginReport`'
       ],
       [],
@@ -970,7 +1022,7 @@ function validateGraphStorageDocs(rootDir, failures) {
       aiGuide,
       'AI_GUIDE.md graph storage contract',
       [
-        '| "需要切换/排查图存储后端" | 编辑 `mycodemap.config.json.storage` → 运行 `generate` / `export` |',
+        '| "需要切换/排查图存储后端" | 编辑 `.mycodemap/config.json` 的 `storage` 段 → 运行 `generate` / `export` |',
         '`generate` 会写入配置的图存储后端；`export` 与内部 `Server Layer` handler 会读取同一份后端数据。',
         '`neo4j` 与 `kuzudb` 已不再是正式支持的 backend；旧配置会暴露显式迁移错误，不会静默 fallback。',
         '`storage.type = "auto"` 当前优先选择 `sqlite`；若运行时缺少 `better-sqlite3` 或 Node.js `<20` 导致 SQLite 不可用，则 warning 后回退到 `filesystem`。'
@@ -988,8 +1040,8 @@ function validateGraphStorageDocs(rootDir, failures) {
       commandsGuide,
       'docs/ai-guide/COMMANDS.md graph storage contract',
       [
-        '`generate` 会读取 `mycodemap.config.json.storage`，并把 CodeGraph 写入所选后端。',
-        '`export json|graphml|dot` 会从 `mycodemap.config.json.storage` 指定的后端读取 CodeGraph。',
+        '`generate` 会读取 `.mycodemap/config.json` 的 `storage` 段，并把 CodeGraph 写入所选后端。',
+        '`export json|graphml|dot` 会从 `.mycodemap/config.json` 的 `storage` 段指定后端读取 CodeGraph。',
         '图存储后端收口不等于重新开放公共 `mycodemap server` 产品面；`Server Layer` 仍是内部层。'
       ],
       [],
@@ -1003,7 +1055,7 @@ function validateGraphStorageDocs(rootDir, failures) {
       'docs/ai-guide/QUICKSTART.md graph storage contract',
       [
         'stdout 还会显示当前写入的 `MVP3 Storage (...)`',
-        '| "需要切换/排查图存储后端" | 编辑 `mycodemap.config.json.storage` 后运行 `generate` | `export json` 验证是否能从同一 backend 读回 | 文本 + 机器可读 |'
+        '| "需要切换/排查图存储后端" | 编辑 `.mycodemap/config.json` 的 `storage` 段后运行 `generate` | `export json` 验证是否能从同一 backend 读回 | 文本 + 机器可读 |'
       ],
       [],
       failures
@@ -1031,7 +1083,7 @@ function validateGraphStorageDocs(rootDir, failures) {
       validationRule,
       'docs/rules/validation.md graph storage guardrail',
       [
-        '若改动涉及 `mycodemap.config.json.storage` 或图数据库适配器',
+        '若改动涉及 `.mycodemap/config.json` 的 `storage` 段或图数据库适配器',
         'schema / README / AI 文档没同步',
         '旧的 `neo4j` / `kuzudb` 配置已经不受支持，但文档还把它写成正式 backend',
         'Node.js `>=20`',
@@ -1050,6 +1102,7 @@ function validateGraphStorageDocs(rootDir, failures) {
         '"storage"',
         '"enum": ["filesystem", "sqlite", "memory", "auto"]',
         '"outputPath"',
+        '".mycodemap/storage"',
         '"databasePath"',
         '"autoThresholds"'
       ],

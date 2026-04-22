@@ -122,11 +122,12 @@ mycodemap design verify mycodemap.design.md --json
 
 ### `mycodemap init`
 
-初始化项目的 CodeMap 配置文件。
+初始化并收敛项目的 CodeMap workspace / config / hooks / rules 状态。
 
 ```bash
-mycodemap init          # 创建默认配置文件
-mycodemap init -y       # 使用默认配置直接创建
+mycodemap init               # 显示 reconciliation preview（默认不写入）
+mycodemap init --interactive # 显式显示 preview（等同默认行为）
+mycodemap init -y            # 使用默认选择直接写入
 
 # 别名：codemap init 也可以使用
 ```
@@ -134,8 +135,13 @@ mycodemap init -y       # 使用默认配置直接创建
 | 选项 | 说明 |
 |------|------|
 | `-y, --yes` | 使用默认配置 |
+| `--interactive` | 仅显示 reconciliation preview，不写入文件 |
 
-执行后会在项目根目录生成 `mycodemap.config.json` 配置文件。
+默认显示 reconciliation preview；使用 `mycodemap init -y` 或 `mycodemap init --yes` 才会真正写入。
+
+执行后会收敛 `.mycodemap/config.json`，并把 machine-readable receipt 写入 `.mycodemap/status/init-last.json`。
+
+`init` 还会同步 `.mycodemap/hooks/` 与 `.mycodemap/rules/`；但不会自动改写团队自有的 `CLAUDE.md` / `AGENTS.md`，只会在 receipt 中输出可复制片段。
 
 ### `mycodemap generate`
 
@@ -452,7 +458,7 @@ mycodemap ci check-output-contract
 
 ## 配置说明
 
-通过 `mycodemap init` 生成的 `mycodemap.config.json` 配置文件支持以下选项：
+通过 `mycodemap init` 收敛的 canonical 配置文件是 `.mycodemap/config.json`（根目录 `mycodemap.config.json` / `codemap.config.json` 只作为 legacy migration source）。
 
 ```jsonc
 {
@@ -487,7 +493,7 @@ mycodemap ci check-output-contract
   // 图存储后端配置
   "storage": {
     "type": "filesystem",
-    "outputPath": ".codemap/storage"
+    "outputPath": ".mycodemap/storage"
   },
 
   // 插件加载配置
@@ -507,8 +513,8 @@ mycodemap ci check-output-contract
 | `output` | `string` | 输出目录路径 | `".mycodemap"` |
 | `watch` | `boolean` | 监听模式预留配置 | `false` |
 | `storage.type` | `"filesystem" \| "sqlite" \| "memory" \| "auto"` | 图存储后端类型 | `"filesystem"` |
-| `storage.outputPath` | `string` | 文件系统存储目录 | `".codemap/storage"` |
-| `storage.databasePath` | `string` | SQLite 数据目录（相对项目根目录） | `".codemap/governance.sqlite"` |
+| `storage.outputPath` | `string` | 文件系统存储目录 | `".mycodemap/storage"` |
+| `storage.databasePath` | `string` | SQLite 数据目录（相对项目根目录，建议放在 `.mycodemap/` 下） | `".mycodemap/governance.sqlite"` |
 | `storage.autoThresholds` | `object` | `auto` 后端选择阈值 | - |
 | `plugins.builtInPlugins` | `boolean` | 是否启用内置插件 | `true` |
 | `plugins.pluginDir` | `string` | 额外插件目录 | - |
@@ -521,7 +527,7 @@ mycodemap ci check-output-contract
 {
   "storage": {
     "type": "sqlite",
-    "databasePath": ".codemap/governance.sqlite"
+    "databasePath": ".mycodemap/governance.sqlite"
   }
 }
 ```

@@ -9,15 +9,24 @@
 ## 快速开始
 
 ```bash
-# Step 1: 生成代码地图（必须在其他命令之前执行）
+# Step 0: 若项目还没初始化，先预览 init 收敛结果
+node dist/cli/index.js init --interactive
+
+# Step 1: 确认 receipt 后执行 init（只在需要写入时）
+node dist/cli/index.js init --yes
+
+# Step 2: 生成代码地图（必须在其他命令之前执行）
 node dist/cli/index.js generate
 
-# Step 2: 阅读生成的 AI_MAP.md 获取项目概览（若显式配置了 plugins，也要看 Plugin Summary）
+# Step 3: 阅读生成的 AI_MAP.md 获取项目概览（若显式配置了 plugins，也要看 Plugin Summary）
 # stdout 还会显示当前写入的 `MVP3 Storage (...)`
 cat .mycodemap/AI_MAP.md
 
-# Step 3: 根据任务选择命令...
+# Step 4: 根据任务选择命令...
 ```
+
+- `init` 的 receipt 会把 `done`、`manual action`、`conflict`、`skipped` 分开显示
+- 如果 receipt 提示需要手动把 `.mycodemap/rules/` 片段加入 `CLAUDE.md` / `AGENTS.md`，请先处理该动作
 
 ---
 
@@ -69,7 +78,7 @@ cat .mycodemap/AI_MAP.md
 |---------|---------|---------|---------|
 | "项目结构是什么" | `generate` + 读 `AI_MAP.md` | `analyze -i show -t "src/" --json` | 文本 |
 | "插件是否真的加载成功" | `generate` + 读 `AI_MAP.md` 的 `Plugin Summary` | 解析 `.mycodemap/codemap.json` 的 `pluginReport` | 机器可读优先 |
-| "需要切换/排查图存储后端" | 编辑 `mycodemap.config.json.storage` 后运行 `generate` | `export json` 验证是否能从同一 backend 读回 | 文本 + 机器可读 |
+| "需要切换/排查图存储后端" | 编辑 `.mycodemap/config.json` 的 `storage` 段后运行 `generate` | `export json` 验证是否能从同一 backend 读回 | 文本 + 机器可读 |
 | "XXX 在哪里定义" | `query -s "XXX"` | `query -S "XXX"` | 文本 |
 | "修改 XXX 会影响什么" | `impact -f "XXX" -t -j` | `analyze -i read -t "XXX" --scope transitive --json` | 机器可读优先 |
 | "XXX 模块依赖什么" | `deps -m "XXX" -j` | `analyze -i link -t "XXX" --json` | 机器可读优先 |

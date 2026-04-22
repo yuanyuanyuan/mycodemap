@@ -51,7 +51,7 @@
 
 ## 需要特别补跑的场景
 
-- 若改动涉及 `mycodemap.config.json.storage` 或图数据库适配器，至少补跑对应 storage adapter 定点测试，并确认 `README.md`、`AI_GUIDE.md`、`docs/ai-guide/COMMANDS.md`、`docs/SETUP_GUIDE.md`、`mycodemap.config.schema.json` 与 guardrail 脚本同步。
+- 若改动涉及 `.mycodemap/config.json` 的 `storage` 段或图数据库适配器，至少补跑对应 storage adapter 定点测试，并确认 `README.md`、`AI_GUIDE.md`、`docs/ai-guide/COMMANDS.md`、`docs/SETUP_GUIDE.md`、`mycodemap.config.schema.json` 与 guardrail 脚本同步。
 - 若改动涉及 `check` / `ci assess-risk` / `history` / `analyze --include-git-history` 的统一 risk truth，至少补跑 `node dist/cli/index.js history --symbol createCheckCommand`、`node scripts/report-high-risk-files.mjs --top 3`、`npm run build`。
 - 若改动涉及产品定位、输出契约、共享文件发现规则或 `Server Layer` / `mycodemap server` 边界，确认 README、AI 文档、架构文档和 guardrail 脚本使用同一套措辞。
 

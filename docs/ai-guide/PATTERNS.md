@@ -271,14 +271,14 @@ node dist/cli/index.js check --contract mycodemap.design.md --against src --base
 **执行步骤**:
 
 ```bash
-# Step 1: 编辑配置文件
-cat mycodemap.config.json
+# Step 1: 编辑 canonical 配置文件
+cat .mycodemap/config.json
 
 # Step 2: 选择后端
 # {
 #   "storage": {
 #     "type": "sqlite",
-#     "databasePath": ".codemap/governance.sqlite"
+#     "databasePath": ".mycodemap/governance.sqlite"
 #   }
 # }
 

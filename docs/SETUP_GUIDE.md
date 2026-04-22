@@ -84,11 +84,7 @@ npx @mycodemap/mycodemap --help
 mycodemap init
 ```
 
-会询问以下问题：
-- 分析模式（fast/smart/hybrid）
-- 包含的文件路径
-- 排除的文件路径
-- 输出目录
+默认会显示 reconciliation preview，并说明哪些资产会被创建、迁移、跳过或需要人工处理。
 
 ### 使用默认配置
 
@@ -96,7 +92,11 @@ mycodemap init
 mycodemap init -y
 ```
 
-生成的配置文件 `mycodemap.config.json`：
+执行后会收敛 canonical 配置 `.mycodemap/config.json`，并把 receipt 写入 `.mycodemap/status/init-last.json`。
+
+`init` 会同步 `.mycodemap/hooks/` 与 `.mycodemap/rules/`，但不会自动改写 `CLAUDE.md` / `AGENTS.md`；相关引用片段会通过 receipt 提示你手动加入。
+
+生成的 canonical 配置文件 `.mycodemap/config.json`：
 
 ```json
 {
@@ -116,7 +116,7 @@ mycodemap init -y
   "watch": false,
   "storage": {
     "type": "filesystem",
-    "outputPath": ".codemap/storage"
+    "outputPath": ".mycodemap/storage"
   },
   "plugins": {
     "builtInPlugins": true,
@@ -136,8 +136,8 @@ mycodemap init -y
 | `output` | string | `".mycodemap"` | 输出目录路径 |
 | `watch` | boolean | `false` | 监听模式预留配置 |
 | `storage.type` | string | `"filesystem"` | 图存储后端类型：`filesystem` / `sqlite` / `memory` / `auto` |
-| `storage.outputPath` | string | `".codemap/storage"` | 文件系统存储目录 |
-| `storage.databasePath` | string | `".codemap/governance.sqlite"` | SQLite 数据库文件路径（相对项目根目录） |
+| `storage.outputPath` | string | `".mycodemap/storage"` | 文件系统存储目录 |
+| `storage.databasePath` | string | `".mycodemap/governance.sqlite"` | SQLite 数据库文件路径（相对项目根目录，建议放在 `.mycodemap/` 下） |
 | `plugins.builtInPlugins` | boolean | `true` | 是否启用内置插件 |
 | `plugins.pluginDir` | string | - | 额外插件目录 |
 | `plugins.plugins` | string[] | `[]` | 显式加载的插件名称列表 |
@@ -146,7 +146,7 @@ mycodemap init -y
 ### 图存储后端配置
 
 - `generate` 会把 CodeGraph 写入 `storage` 指定的后端；`export json|graphml|dot` 会从同一后端读取。
-- 选择 `sqlite` 时默认落盘到 `.codemap/governance.sqlite`；也可通过 `storage.databasePath` 覆盖。
+- 选择 `sqlite` 时建议落盘到 `.mycodemap/governance.sqlite`；也可通过 `storage.databasePath` 覆盖。
 - 旧的 `neo4j` / `kuzudb` 配置已不再受支持，会返回显式迁移错误，不会静默 fallback 到 `filesystem`。
 - 显式选择 `sqlite` 且运行时缺少 `better-sqlite3` 或 Node.js `<20` 时，会返回显式错误。
 - `storage.type = "auto"` 当前优先选择 `sqlite`；仅当 SQLite 运行时不可用时才 warning 后回退到 `filesystem`。
@@ -457,8 +457,8 @@ npx mycodemap --help
 #### 2. 配置文件未找到
 
 ```bash
-# 确认配置文件存在
-ls mycodemap.config.json
+# 确认 canonical 配置文件存在
+ls .mycodemap/config.json
 
 # 重新初始化
 mycodemap init -y

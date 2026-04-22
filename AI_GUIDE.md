@@ -64,8 +64,9 @@ cat .mycodemap/AI_MAP.md
 | "需要把 design contract 作为代码门禁执行" | `check --contract mycodemap.design.md --against src` |
 | "需要在 PR 中看到 contract gate annotations" | `check --contract mycodemap.design.md --against src --base <sha> --annotation-format github` |
 | "需要导出结构化结果" | `export json -o ./output.json` |
+| "需要先把项目初始化到 canonical `.mycodemap/` 工作区" | `init --interactive` → 确认 receipt → `init --yes` |
 | "需要插件诊断/扩展结果" | `generate` → 读 `AI_MAP.md` 的 `Plugin Summary` 或解析 `codemap.json.pluginReport` |
-| "需要切换/排查图存储后端" | 编辑 `mycodemap.config.json.storage` → 运行 `generate` / `export` |
+| "需要切换/排查图存储后端" | 编辑 `.mycodemap/config.json` 的 `storage` 段 → 运行 `generate` / `export` |
 | "需要把 symbol-level 关系暴露给 MCP host" | `generate --symbol-level` → `mcp install` → 让 host 启动 `mcp start` |
 
 **完整决策树**: 见 [docs/ai-guide/QUICKSTART.md](./docs/ai-guide/QUICKSTART.md)
@@ -99,7 +100,7 @@ cat .mycodemap/AI_MAP.md
 {
   "storage": {
     "type": "filesystem",
-    "outputPath": ".codemap/storage"
+    "outputPath": ".mycodemap/storage"
   }
 }
 ```
@@ -108,7 +109,7 @@ cat .mycodemap/AI_MAP.md
 {
   "storage": {
     "type": "sqlite",
-    "databasePath": ".codemap/governance.sqlite"
+    "databasePath": ".mycodemap/governance.sqlite"
   }
 }
 ```
@@ -117,7 +118,7 @@ cat .mycodemap/AI_MAP.md
 - `generate --symbol-level` 只在显式开启时额外 materialize symbol-level `call` 依赖；未开启时默认 generate 行为保持兼容。
 - `generate` 产出的 `codemap.json` / 图存储会携带 `graphStatus`、`failedFileCount` 与可选 `parseFailureFiles`；若 `graphStatus = "partial"`，说明发现到的文件没有全部成功进入最终图。
 - `neo4j` 与 `kuzudb` 已不再是正式支持的 backend；旧配置会暴露显式迁移错误，不会静默 fallback。
-- 选择 `sqlite` 时默认落盘到 `.codemap/governance.sqlite`；也可通过 `storage.databasePath` 覆盖。
+- 选择 `sqlite` 时建议落盘到 `.mycodemap/governance.sqlite`；也可通过 `storage.databasePath` 覆盖。
 - `storage.type = "auto"` 当前优先选择 `sqlite`；若运行时缺少 `better-sqlite3` 或 Node.js `<20` 导致 SQLite 不可用，则 warning 后回退到 `filesystem`。
 - 图存储后端是存储面收口，不是重新开放公共 HTTP API 产品面。
 

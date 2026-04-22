@@ -53,7 +53,7 @@ MyCodeMap 可以与多种 AI 编程助手集成，让 AI 能够：
 - 也可以通过 `mycodemap ci check-docs-sync` 走统一的 CI 子命令入口
 - 当前仓库的 agent 工程规则以 `docs/rules/engineering-with-codex-openai.md` 为准
 - 若文档或提示词仍把 `server`、`watch`、`report`、`logs` 当成当前 public CLI，必须同步改成 removed-command 迁移说明
-- 若项目启用了 `mycodemap.config.json.storage` 的 `sqlite`，先确认 `better-sqlite3` 已安装且 Node.js `>=20`；若仍看到 `kuzudb` / `neo4j` 配置，应先迁移再让 AI 判断 graph backend 失败原因
+- 若项目启用了 `.mycodemap/config.json` 中 `storage.type = "sqlite"`，先确认 `better-sqlite3` 已安装且 Node.js `>=20`；若仍看到 `kuzudb` / `neo4j` 配置，应先迁移再让 AI 判断 graph backend 失败原因
 
 ---
 
@@ -422,7 +422,9 @@ mycodemap impact -f "src/file.ts"
 
 ## 关键文件
 
-- `mycodemap.config.json` - CodeMap 配置文件
+- `.mycodemap/config.json` - CodeMap canonical 配置文件
+- `.mycodemap/status/init-last.json` - init receipt / managed asset ledger
+- `.mycodemap/rules/` - 通用 AI guardrails rules bundle（需手动引用到 `CLAUDE.md` / `AGENTS.md`）
 - `.mycodemap/AI_MAP.md` - 项目全局概览
 
 ## 开发规范
