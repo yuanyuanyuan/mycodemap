@@ -53,7 +53,7 @@
         },
         "outputPath": {
           "type": "string",
-          "default": ".codemap/storage",
+          "default": ".mycodemap/storage",
           "description": "Filesystem storage directory"
         },
         "databasePath": {

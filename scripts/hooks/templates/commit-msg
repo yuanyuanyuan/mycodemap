@@ -1,0 +1,38 @@
+#!/bin/sh
+# Commit-msg hook: 仅验证 Commit 消息格式
+
+MSG_FILE=$1
+MSG=$(head -1 "$MSG_FILE")
+
+VALID_TAGS="BUGFIX FEATURE REFACTOR CONFIG DOCS DELETE"
+
+COMMIT_FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
+
+ONLY_DOT_DIRS=true
+if [ -n "$COMMIT_FILES" ]; then
+    NON_DOT_FILES=$(echo "$COMMIT_FILES" | grep -v '^\.' || true)
+    if [ -n "$NON_DOT_FILES" ]; then
+        ONLY_DOT_DIRS=false
+    fi
+fi
+
+if [ "$ONLY_DOT_DIRS" = "true" ]; then
+    echo "Note: Commit only contains files in dot-directories, skipping message format check"
+elif ! echo "$MSG" | grep -qE '^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]'; then
+    echo "ERROR: Commit message must start with an uppercase tag."
+    echo "Format: [TAG] scope: message"
+    echo "Valid tags: $VALID_TAGS"
+    exit 1
+fi
+
+if [ "$ONLY_DOT_DIRS" = "true" ]; then
+    echo "Note: Commit only contains files in dot-directories, skipping scope check"
+elif ! echo "$MSG" | grep -qE '^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]\s+[^:]+:\s+.+'; then
+    echo "ERROR: scope and message are required."
+    echo "Format: [TAG] scope: message"
+    echo "Example: [FEATURE] cli: add new command"
+    exit 1
+fi
+
+echo "Commit message validated"
+exit 0
