@@ -339,14 +339,14 @@ describe('validate-docs.js', () => {
     }).toThrow(/documentation guardrails failed/);
   });
 
-  it('fails when README reintroduces the legacy config filename', () => {
+  it('fails when README reintroduces root config as the canonical init target', () => {
     const fixtureRoot = createFixtureRoot();
     tempRoots.push(fixtureRoot);
 
     const readmePath = path.join(fixtureRoot, 'README.md');
     const updatedReadme = readFileSync(readmePath, 'utf8').replace(
-      'mycodemap.config.json',
-      'codemap.config.json'
+      '.mycodemap/config.json',
+      'mycodemap.config.json'
     );
     writeFileSync(readmePath, updatedReadme);
 

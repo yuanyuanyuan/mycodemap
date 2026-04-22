@@ -7,7 +7,24 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../../..');
-const gsdToolsPath = path.join(repoRoot, '.claude/get-shit-done/bin/gsd-tools.cjs');
+
+function resolveGsdToolsPath(): string {
+  const candidates = [
+    path.join(repoRoot, '.claude/get-shit-done/bin/gsd-tools.cjs'),
+    path.join(process.env.HOME ?? '', '.claude/get-shit-done/bin/gsd-tools.cjs'),
+    path.join(process.env.HOME ?? '', '.codex/get-shit-done/bin/gsd-tools.cjs'),
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return candidates[0];
+}
+
+const gsdToolsPath = resolveGsdToolsPath();
 
 function write(root: string, relativePath: string, content: string): void {
   const fullPath = path.join(root, relativePath);

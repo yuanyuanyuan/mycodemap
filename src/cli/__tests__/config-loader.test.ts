@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { loadCodemapConfig } from '../config-loader.js';
@@ -9,7 +9,9 @@ function createTempRoot(): string {
 }
 
 function writeJson(rootDir: string, fileName: string, value: unknown): void {
-  writeFileSync(path.join(rootDir, fileName), JSON.stringify(value, null, 2));
+  const fullPath = path.join(rootDir, fileName);
+  mkdirSync(path.dirname(fullPath), { recursive: true });
+  writeFileSync(fullPath, JSON.stringify(value, null, 2));
 }
 
 describe('config-loader', () => {
@@ -37,7 +39,7 @@ describe('config-loader', () => {
     expect(result.config.include).toEqual(['src/**/*.ts']);
     expect(result.config.storage).toEqual({
       type: 'filesystem',
-      outputPath: '.codemap/storage',
+      outputPath: '.mycodemap/storage',
     });
     expect(result.config.plugins).toEqual({
       builtInPlugins: true,
@@ -46,10 +48,11 @@ describe('config-loader', () => {
     });
   });
 
-  it('prefers mycodemap.config.json over legacy config', async () => {
+  it('prefers canonical .mycodemap/config.json over root config files', async () => {
     const rootDir = createTempRoot();
     tempRoots.push(rootDir);
 
+    writeJson(rootDir, '.mycodemap/config.json', { mode: 'hybrid', output: '.mycodemap' });
     writeJson(rootDir, 'mycodemap.config.json', { mode: 'smart' });
     writeJson(rootDir, 'codemap.config.json', { mode: 'fast' });
 
@@ -58,10 +61,30 @@ describe('config-loader', () => {
     expect(result.exists).toBe(true);
     expect(result.isLegacy).toBe(false);
     expect(result.hasExplicitPluginConfig).toBe(false);
-    expect(result.config.mode).toBe('smart');
+    expect(result.config.mode).toBe('hybrid');
+    expect(result.configPath).toBe(path.join(rootDir, '.mycodemap/config.json'));
   });
 
-  it('loads legacy config when the new filename is absent', async () => {
+  it('loads root mycodemap.config.json when canonical config is absent', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+
+    writeJson(rootDir, 'mycodemap.config.json', {
+      output: '.legacy-output',
+      plugins: { builtInPlugins: false },
+    });
+
+    const result = await loadCodemapConfig(rootDir);
+
+    expect(result.exists).toBe(true);
+    expect(result.isLegacy).toBe(false);
+    expect(result.hasExplicitPluginConfig).toBe(true);
+    expect(result.config.output).toBe('.legacy-output');
+    expect(result.config.plugins.builtInPlugins).toBe(false);
+    expect(result.configPath).toBe(path.join(rootDir, 'mycodemap.config.json'));
+  });
+
+  it('loads legacy config when canonical and root modern config are absent', async () => {
     const rootDir = createTempRoot();
     tempRoots.push(rootDir);
 
@@ -77,6 +100,7 @@ describe('config-loader', () => {
     expect(result.hasExplicitPluginConfig).toBe(true);
     expect(result.config.output).toBe('.legacy-output');
     expect(result.config.plugins.builtInPlugins).toBe(false);
+    expect(result.configPath).toBe(path.join(rootDir, 'codemap.config.json'));
   });
 
   it('normalizes plugin config with focused defaults', async () => {
@@ -110,7 +134,7 @@ describe('config-loader', () => {
     writeJson(rootDir, 'mycodemap.config.json', {
       storage: {
         type: 'kuzudb',
-        databasePath: '.codemap/graph.kuzu',
+        databasePath: '.mycodemap/graph.kuzu',
         autoThresholds: {
           useGraphDBWhenFileCount: 200,
           useGraphDBWhenNodeCount: 5000,
@@ -122,8 +146,8 @@ describe('config-loader', () => {
 
     expect(result.config.storage).toEqual({
       type: 'kuzudb',
-      outputPath: '.codemap/storage',
-      databasePath: '.codemap/graph.kuzu',
+      outputPath: '.mycodemap/storage',
+      databasePath: '.mycodemap/graph.kuzu',
       autoThresholds: {
         useGraphDBWhenFileCount: 200,
         useGraphDBWhenNodeCount: 5000,
@@ -138,7 +162,7 @@ describe('config-loader', () => {
     writeJson(rootDir, 'mycodemap.config.json', {
       storage: {
         type: 'sqlite',
-        databasePath: '.codemap/governance.sqlite',
+        databasePath: '.mycodemap/governance.sqlite',
       },
     });
 
@@ -146,8 +170,8 @@ describe('config-loader', () => {
 
     expect(result.config.storage).toEqual({
       type: 'sqlite',
-      outputPath: '.codemap/storage',
-      databasePath: '.codemap/governance.sqlite',
+      outputPath: '.mycodemap/storage',
+      databasePath: '.mycodemap/governance.sqlite',
       autoThresholds: undefined,
     });
   });
@@ -183,7 +207,7 @@ describe('config-loader', () => {
     writeJson(rootDir, 'mycodemap.config.json', {
       storage: {
         type: 'filesystem',
-        location: '.codemap/storage',
+        location: '.mycodemap/storage',
       },
     });
 

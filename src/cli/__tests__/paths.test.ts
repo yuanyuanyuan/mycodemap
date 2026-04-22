@@ -25,8 +25,9 @@ describe('paths', () => {
     tempRoots.push(rootDir);
 
     mkdirSync(path.join(rootDir, '.codemap'));
+    mkdirSync(path.join(rootDir, '.mycodemap'), { recursive: true });
     writeFileSync(
-      path.join(rootDir, 'mycodemap.config.json'),
+      path.join(rootDir, '.mycodemap', 'config.json'),
       JSON.stringify({ output: '.mycodemap' }, null, 2)
     );
 
@@ -34,6 +35,7 @@ describe('paths', () => {
 
     expect(resolved.outputDir).toBe(path.join(rootDir, '.mycodemap'));
     expect(resolved.isLegacy).toBe(false);
+    expect(resolved.configPath).toBe(path.join(rootDir, '.mycodemap', 'config.json'));
     expect(resolved.dataPath).toBe(path.join(rootDir, '.mycodemap', 'codemap.json'));
   });
 
@@ -47,6 +49,7 @@ describe('paths', () => {
 
     expect(resolved.outputDir).toBe(path.join(rootDir, '.codemap'));
     expect(resolved.isLegacy).toBe(true);
+    expect(resolved.configPath).toBe(path.join(rootDir, '.mycodemap', 'config.json'));
     expect(resolved.dataPath).toBe(path.join(rootDir, '.codemap', 'codemap.json'));
   });
 });
