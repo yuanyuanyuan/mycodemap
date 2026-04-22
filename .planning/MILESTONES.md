@@ -1,5 +1,32 @@
 # Project Milestones: CodeMap
 
+## v1.7 init-and-rule-hardening (Shipped: 2026-04-22)
+
+**Delivered:** Closed repo-local rule-control hardening and upgraded `mycodemap init` into a project-level AI infrastructure state reconciler.
+
+**Phases completed:** 27, 999.1 (11 plans total)
+
+**Key accomplishments:**
+
+- Repo-local rule control now has capability baseline, validator exit-code contract, hooks/CI backstop, scoped rule-context injection, and executable QA.
+- `mycodemap init` now reconciles canonical `.mycodemap/config.json`, workspace directories, receipts, first-run guidance, hooks, rules, and manual AI context snippets.
+- Packaged CLI smoke proves `mycodemap init --yes` can install config, receipt, hooks, and rules from the npm tarball shape.
+- Human and AI docs now describe `.mycodemap/config.json`, `.mycodemap/status/init-last.json`, `.mycodemap/hooks/`, and `.mycodemap/rules/` as the canonical init contract.
+- Focused validation passed: docs guardrails, 60 targeted vitest tests, typecheck, build, Phase 27 verifier, and package smoke evidence.
+
+**Stats:**
+
+- 2 phases, 11 plans, 52 task/checklist markers
+- 67,512 TypeScript LOC in `src/` at close
+- Focused verification: docs guardrails, 60 targeted tests, typecheck, build, Phase 27 verification, tarball smoke evidence
+- Known deferred items at close: 2 (see `STATE.md` Deferred Items)
+
+**Git range:** implementation commits immediately before archive close; see local tag `v1.7`
+
+**What's next:** Start the next milestone with `$gsd-new-milestone /data/codemap`; do not auto-restore closed Phase 22-24 work.
+
+---
+
 ## post-v1.6 Symbol-level graph and experimental MCP thin slice (Completed: 2026-04-19)
 
 **Delivered:** 在不改变默认模块级 surface 的前提下，完成 `generate --symbol-level` → partial graph truth → experimental local MCP stdio query / impact 的最小纵向切片，并用真实 dist smoke 证明协议输出干净可消费。
