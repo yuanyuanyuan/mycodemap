@@ -10,6 +10,7 @@ import { cwd } from 'node:process';
  */
 export const DEFAULT_OUTPUT_DIR_NEW = '.mycodemap';
 export const DEFAULT_OUTPUT_DIR_OLD = '.codemap';
+export const CONFIG_FILE_CANONICAL = 'config.json';
 export const CONFIG_FILE_NEW = 'mycodemap.config.json';
 export const CONFIG_FILE_OLD = 'codemap.config.json';
 export const DATA_FILE = 'codemap.json'; // P0 保持不变
@@ -30,6 +31,10 @@ export interface ResolvePathsResult {
 
 interface OutputConfigShape {
   output?: unknown;
+}
+
+function getCanonicalConfigPath(rootDir: string): string {
+  return join(rootDir, DEFAULT_OUTPUT_DIR_NEW, CONFIG_FILE_CANONICAL);
 }
 
 function resolveConfiguredOutput(rootDir: string): string | undefined {
@@ -88,20 +93,26 @@ export function resolveOutputDir(customOutput?: string, rootDir: string = cwd())
   return {
     outputDir: resolvedPath,
     isLegacy,
-    configPath: join(resolvedPath, isLegacy ? CONFIG_FILE_OLD : CONFIG_FILE_NEW),
+    configPath: resolveConfigPath(rootDir).path,
     dataPath: join(resolvedPath, DATA_FILE),
   };
 }
 
 /**
  * 解析配置文件路径（读取时使用）
- * - 优先检查新配置 mycodemap.config.json
- * - 不存在则回退旧配置 codemap.config.json
+ * - 优先检查 canonical `.mycodemap/config.json`
+ * - 不存在则回退根目录 `mycodemap.config.json`
+ * - 再回退旧配置 `codemap.config.json`
  *
  * @param rootDir - 项目根目录（默认为 cwd）
  * @returns 配置文件路径和是否使用旧配置
  */
 export function resolveConfigPath(rootDir: string = cwd()): { path: string; isLegacy: boolean } {
+  const canonicalPath = getCanonicalConfigPath(rootDir);
+  if (existsSync(canonicalPath)) {
+    return { path: canonicalPath, isLegacy: false };
+  }
+
   const newPath = join(rootDir, CONFIG_FILE_NEW);
   if (existsSync(newPath)) {
     return { path: newPath, isLegacy: false };
@@ -112,8 +123,7 @@ export function resolveConfigPath(rootDir: string = cwd()): { path: string; isLe
     return { path: oldPath, isLegacy: true };
   }
 
-  // 都不存在，返回新路径（用于创建）
-  return { path: newPath, isLegacy: false };
+  return { path: canonicalPath, isLegacy: false };
 }
 
 /**

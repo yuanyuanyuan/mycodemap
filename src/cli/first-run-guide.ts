@@ -17,12 +17,13 @@ const FIRST_RUN_MARKER = '.mycodemap/.first-run-done';
  * - 不存在旧输出目录（用于迁移检测）
  */
 export function isFirstRun(cwd: string = process.cwd()): boolean {
-  const configNew = path.join(cwd, 'mycodemap.config.json');
-  const configOld = path.join(cwd, 'codemap.config.json');
+  const canonicalConfig = path.join(cwd, '.mycodemap', 'config.json');
+  const rootConfig = path.join(cwd, 'mycodemap.config.json');
+  const legacyConfig = path.join(cwd, 'codemap.config.json');
   const markerPath = path.join(cwd, FIRST_RUN_MARKER);
   const oldOutputDir = path.join(cwd, '.codemap');
 
-  const hasConfig = fs.existsSync(configNew) || fs.existsSync(configOld);
+  const hasConfig = fs.existsSync(canonicalConfig) || fs.existsSync(rootConfig) || fs.existsSync(legacyConfig);
   const hasMarker = fs.existsSync(markerPath);
   const hasOldOutput = fs.existsSync(oldOutputDir);
 
@@ -52,17 +53,16 @@ export function markFirstRunDone(cwd: string = process.cwd()): void {
  */
 export function showFirstRunGuide(): void {
   console.log('');
-  console.log(chalk.cyan('━'.repeat(60)));
-  console.log(chalk.white.bold('  欢迎使用 CodeMap - TypeScript 代码地图工具'));
-  console.log(chalk.cyan('━'.repeat(60)));
+  console.log(chalk.cyan('━'.repeat(48)));
+  console.log(chalk.white.bold('  欢迎使用 CodeMap'));
+  console.log(chalk.cyan('━'.repeat(48)));
   console.log('');
 
-  console.log(chalk.white('  快速开始：'));
+  console.log(chalk.white('  首次使用建议顺序：'));
   console.log('');
 
-  console.log(chalk.gray('  1. ') + chalk.white('初始化配置'));
+  console.log(chalk.gray('  1. ') + chalk.white('初始化项目'));
   console.log(chalk.gray('     ') + chalk.cyan('mycodemap init'));
-  console.log(chalk.gray('        或 ') + chalk.cyan('codemap init'));
   console.log('');
 
   console.log(chalk.gray('  2. ') + chalk.white('生成代码地图'));
@@ -73,9 +73,7 @@ export function showFirstRunGuide(): void {
   console.log(chalk.gray('     ') + chalk.cyan('mycodemap --help'));
   console.log('');
 
-  console.log(chalk.cyan('━'.repeat(60)));
-  console.log(chalk.gray('  更多功能：query | deps | cycles | complexity | impact'));
-  console.log(chalk.cyan('━'.repeat(60)));
+  console.log(chalk.cyan('━'.repeat(48)));
   console.log('');
 }
 

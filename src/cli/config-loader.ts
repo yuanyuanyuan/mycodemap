@@ -168,7 +168,7 @@ function createDefaultPluginConfig(): NormalizedPluginConfig {
 export function createDefaultStorageConfig(): NormalizedStorageConfig {
   return {
     type: 'filesystem',
-    outputPath: '.codemap/storage',
+    outputPath: '.mycodemap/storage',
   };
 }
 

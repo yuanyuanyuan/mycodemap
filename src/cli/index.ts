@@ -80,8 +80,9 @@ program
 
 program
   .command('init')
-  .description('初始化 CodeMap 配置')
+  .description('初始化并收敛 CodeMap 项目状态')
   .option('-y, --yes', '使用默认配置')
+  .option('--interactive', '仅显示 reconciliation preview，不写入文件')
   .action(initCommand);
 
 program
