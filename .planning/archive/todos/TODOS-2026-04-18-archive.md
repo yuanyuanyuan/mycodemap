@@ -1,4 +1,28 @@
-# TODOS
+# TODOS (归档)
+
+> **归档日期**: 2026-04-22  
+> **归档原因**: TODOS 已完成提醒职责，未完成项已在 `post-v1.6-MILESTONE-AUDIT.md` tech_debt 章节中正式追踪  
+> **当前里程碑状态**: v1.7 (init-and-rule-hardening) 已完成，无活跃里程碑  
+> **后续规划入口**: `gsd-new-milestone` (参见 `.planning/ROADMAP.md`)
+
+---
+
+## 归档前状态速查
+
+| # | 条目 | 归档前状态 | 当前追踪位置 |
+|---|------|-----------|-------------|
+| 1 | MCP 是否保留首期交付面 | 未完成（待复盘） | `.planning/post-v1.6-MILESTONE-AUDIT.md` § Tech Debt #4 |
+| 2 | graph freshness identity | 未完成 | `.planning/post-v1.6-MILESTONE-AUDIT.md` § Tech Debt #2 |
+| 3 | `mcp install` host support matrix | 未完成 | `.planning/post-v1.6-MILESTONE-AUDIT.md` § Tech Debt #1 |
+| 4 | symbol query 最小质量基线 | 未完成 | `.planning/post-v1.6-MILESTONE-AUDIT.md` § Tech Debt #3 |
+| 5 | partial-graph state 暴露 | **已完成** | Phase 26 `P26-NOW-PARTIAL-GRAPH-TRUTH` |
+| 6 | `mcp start` project binding | 部分完成 | Phase 26 已实现基础版，完整规则未定义 |
+| 7 | dual `impact` 语义收敛 | 未决策 | 无正式追踪，需在新里程碑规划中决策 |
+
+---
+
+*以下内容为原始 TODO，保留以供查阅。*
+
 
 ## 2026-04-18 — `/plan-eng-review`
 
