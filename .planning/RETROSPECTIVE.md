@@ -96,14 +96,18 @@
 | Milestone | Sessions | Phases | Key Change |
 |-----------|----------|--------|------------|
 | v1.7 | multiple | 2 | Moved from docs-only guardrails to executable rule/init contracts with package smoke |
+| v1.8 | multiple | 3 | Governance docs use migration-map-first, rewrite-second, discoverability-sweep-third pattern |
 
 ### Cumulative Quality
 
 | Milestone | Tests | Coverage | Zero-Dep Additions |
 |-----------|-------|----------|-------------------|
 | v1.7 | 60 focused tests + prior Phase 27 QA | focused changed-surface coverage | no new runtime package dependency required by closeout |
+| v1.8 | docs guardrail + grep-based terminology scan | docs governance surface | no new runtime or build dependency |
 
 ### Top Lessons (Verified Across Milestones)
 
 1. Machine-readable CLI truth must move together with README, AI guide, and guardrail checks.
 2. Planning archives are only trustworthy when `STATE.md`, `ROADMAP.md`, requirements, and phase summaries are reconciled at close.
+3. Entry-doc authority split must lock destination ownership before any rewrite begins.
+4. Lifecycle tooling bugs (milestone.complete query) are themselves blockers for autonomous closeout.
