@@ -96,13 +96,12 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 - **Historical closed branch:** `v1.5 Isolated ArcadeDB Server-backed Prototype`（22-24 不再继续）
 - **Active milestone:** none selected yet（next milestone should start from fresh requirements）
 - **Current planning status:** `v1.7` archived; Phase 27 and Phase 999.1 are complete; do not backfill old `Phase 22-24`
-- **Known remaining debt:** 2 deferred open artifacts are recorded in `STATE.md`; repo-wide ESLint warnings remain warning-only historical baseline; rule-context routing and docs guardrail trigger coverage remain advisory expansion opportunities
+- **Known remaining debt:** 1 deferred open debug artifact is recorded in `STATE.md`; repo-wide ESLint warnings remain warning-only historical baseline; rule-context routing and docs guardrail trigger coverage remain advisory expansion opportunities
 
 ## Next Milestone Candidates
 
 - Freshly scope the next product milestone with `$gsd-new-milestone /data/codemap`.
 - Decide whether the deferred install-runtime debug session needs release-side verification.
-- Keep dormant ArcadeDB server-backed prototype seed out of active work unless a future milestone explicitly selects it.
 
 ## Evolution
 

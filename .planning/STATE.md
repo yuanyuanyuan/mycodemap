@@ -61,7 +61,6 @@ Items acknowledged and deferred at milestone close on 2026-04-22:
 | Category | Item | Status |
 |----------|------|--------|
 | debug | mycodemap-install-runtime-deps | awaiting_human_verify |
-| seed | SEED-001-evaluate-isolated-arcadedb-server-backed-prototype | dormant |
 
 ## Accumulated Context
 
@@ -86,4 +85,4 @@ Items acknowledged and deferred at milestone close on 2026-04-22:
 - 不要再把已关闭的 `v1.5` 历史分支误当成 active blocker
 - 未来若再改 CLI / JSON contract，必须同步更新 AI docs 与 guardrail
 - 不要把 `rtk` 从执行包装层误写成 CodeMap 产品能力
-- Deferred debug / seed items should be reviewed before selecting a future milestone if they become relevant
+- Deferred debug items should be reviewed before selecting a future milestone if they become relevant

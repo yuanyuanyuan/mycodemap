@@ -24,7 +24,6 @@ Do not resume the historical Docker / ArcadeDB `Phase 22-24` branch by default. 
 - `v1.6` roadmap / requirements / audit are archived to `.planning/milestones/v1.6-ROADMAP.md`, `.planning/milestones/v1.6-REQUIREMENTS.md`, `.planning/milestones/v1.6-MILESTONE-AUDIT.md`
 - `post-v1.6` phase history is archived to `.planning/milestones/post-v1.6-phases/26-implement-symbol-level-graph-and-experimental-mcp-thin-slice/`
 - `v1.5` historical phase artifacts remain under `.planning/milestones/v1.5-phases/`; these are trace-only and not active backlog
-- dormant seed source: `.planning/seeds/SEED-001-evaluate-isolated-arcadedb-server-backed-prototype.md`
 
 ## Phases
 
@@ -50,4 +49,4 @@ No active backlog item is currently selected. Phase 999.1 has been archived as p
 
 - `$gsd-new-milestone /data/codemap` is the correct next planning entry point.
 - Do not treat `Phase 22-24` as pending work.
-- Keep the open debug session and dormant seed visible as deferred items rather than default next actions.
+- Keep the open debug session visible as a deferred item rather than a default next action.

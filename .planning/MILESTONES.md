@@ -19,7 +19,7 @@
 - 2 phases, 11 plans, 52 task/checklist markers
 - 67,512 TypeScript LOC in `src/` at close
 - Focused verification: docs guardrails, 60 targeted tests, typecheck, build, Phase 27 verification, tarball smoke evidence
-- Known deferred items at close: 2 (see `STATE.md` Deferred Items)
+- Deferred items at close: 2; current deferred items after seed cleanup: 1 (see `STATE.md` Deferred Items)
 
 **Git range:** implementation commits immediately before archive close; see local tag `v1.7`
 
