@@ -28,6 +28,7 @@ AGENTS.md → docs/rules/README.md → 最相关的 1-2 份 live docs → ARCHIT
 | 架构分层、依赖方向、模块边界是什么？ | `ARCHITECTURE.md` + `docs/rules/architecture-guardrails.md` |
 | 代码质量红线、`[META]` / `[WHY]`、`TODO-DEBT` 在哪？ | `docs/rules/code-quality-redlines.md` |
 | 测试规则与 fixture 边界在？ | `docs/rules/testing.md` |
+| `/release` 发布流程、milestone 绑定、确认门在哪？ | `docs/rules/release.md` |
 | CodeMap CLI / MCP / AI 使用方式在？ | `AI_GUIDE.md` + `docs/ai-guide/*.md` |
 | RTK 为什么要加、具体怎么写？ | `RTK.md` |
 
@@ -38,6 +39,7 @@ AGENTS.md → docs/rules/README.md → 最相关的 1-2 份 live docs → ARCHIT
 - 改**Claude 自动读取差异**：编辑 `.claude/CLAUDE.md`
 - 改**工程执行协议**：编辑 `docs/rules/engineering-with-codex-openai.md`
 - 改**验证 / hook / CI 规则**：编辑 `docs/rules/validation.md`
+- 改**/release 发布流程规则**：编辑 `docs/rules/release.md`
 - 改**产品 / CLI / MCP / 命令说明**：编辑 `AI_GUIDE.md` 与 `docs/ai-guide/*`
 
 ## 非目标

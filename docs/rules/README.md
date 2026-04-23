@@ -13,7 +13,8 @@
 | 改测试、fixture、测试文件布局 | `testing.md` | `npm test` |
 | 改 hooks、CI、验证顺序、repo-local guardrail | `validation.md` | `npm run docs:check` / `python3 scripts/validate-rules.py code --report-only` |
 | 改 agent 执行协议、CLI/CI 工程护栏 | `engineering-with-codex-openai.md` | `node dist/cli/index.js ci check-docs-sync` |
-| 改发布/打包流程 | `deployment.md` | `npm run build` / `npm run validate-pack` |
+| 改 `/release workflow`、milestone 绑定、确认门 | `release.md` | `npm run docs:check:pre-release` |
+| 改发布/打包 mechanics | `deployment.md` | `npm run build` / `npm run validate-pack` |
 | 改发布前 checklist / 版本同步 | `pre-release-checklist.md` | `npm run docs:check:pre-release` |
 
 ## 使用规则

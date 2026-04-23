@@ -159,24 +159,31 @@
 - [ ] 远程 tag 是否已推送
 - [ ] 当前分支是否为 main/master
 
-**发布流程**:
+**推荐发布入口**:
 
 ```bash
-# 方式1: 使用发布脚本（推荐）
-./scripts/release.sh patch   # patch/minor/major
+# milestone-bound release 的推荐方式只有 `/release vX.Y`
+/release v1.9
 
-# 方式2: 手动发布
-# 1. 更新版本号
-npm version patch  # 自动创建 tag
+# `/release` 会负责:
+# 1. 检查 milestone readiness / 工作区 / 分支 / tag 冲突
+# 2. 运行 milestone closeout 或确认已归档状态
+# 3. 展示 Confirmation Gate #1 与 #2
+# 4. 在最终确认后委托机械 helper
+```
 
-# 2. 推送 tag
-git push origin main --tags
+**手动例外（仅限人工受控且已完成等价 closeout + 双确认门）**:
 
-# 3. GitHub Actions 自动完成:
-#    - 构建项目
-#    - 运行测试
-#    - 发布到 NPM (通过 OIDC)
-#    - 创建 GitHub Release
+```bash
+# 只有在完成与 `/release` 等价的 closeout / Gate #1 / Gate #2 后
+# 才允许调用机械 helper
+rtk ./scripts/release.sh 1.9.0
+
+# tag push 后由 GitHub Actions 自动完成:
+# - 构建项目
+# - 运行测试
+# - 发布到 NPM (通过 OIDC)
+# - 创建 GitHub Release
 ```
 
 **Tag 命名规范**:
@@ -290,25 +297,22 @@ npm run docs:check:pre-release 2>&1 | less
 
 ### 发布前准备
 
-**推荐方式: 使用发布脚本（一键完成）**
+**推荐方式: 使用 `/release vX.Y` 统一编排**
 
 ```bash
-# 使用发布脚本（自动处理版本、tag、推送）
-./scripts/release.sh patch    # patch 版本 (0.2.0 -> 0.2.1)
-./scripts/release.sh minor    # minor 版本 (0.2.0 -> 0.3.0)
-./scripts/release.sh major    # major 版本 (0.2.0 -> 1.0.0)
-./scripts/release.sh 0.3.0    # 指定具体版本
+# milestone-bound release 的统一入口
+/release v1.9
 
-# 脚本会自动:
-# 1. 运行 npm run check:all
-# 2. 更新 package.json 版本
-# 3. 创建 git commit
-# 4. 创建 git tag
-# 5. 推送到远程仓库
-# 6. 触发 GitHub Actions 发布 (OIDC)
+# `/release` 会负责:
+# 1. 检查 milestone readiness / 工作区 / 分支 / tag 冲突
+# 2. 运行 milestone closeout 或确认已归档状态
+# 3. 展示 Confirmation Gate #1 与 #2
+# 4. 在最终确认后委托 `rtk ./scripts/release.sh 1.9.0`
 ```
 
-**手动方式（需要更多控制时）**
+`scripts/release.sh` 是 Gate #2 之后的机械 helper，不是绕过 `/release` 的主入口。
+
+**手动方式（仅限人工受控的例外流）**
 
 ```bash
 # 1. 确保工作区干净
@@ -317,17 +321,24 @@ git status
 # 2. 运行发布前检查
 npm run docs:check:pre-release
 
-# 3. 构建和测试
+# 3. 完成 milestone readiness 与双确认门
+#    - Confirmation Gate #1: closeout 摘要确认
+#    - Confirmation Gate #2: 版本 bump / tag / push 前最终确认
+
+# 4. 构建和测试
 npm run check:all
 
-# 4. 更新版本号（会自动创建 tag）
+# 5. 仅在确认后调用机械 helper
+rtk ./scripts/release.sh 1.9.0
+
+# 6. 或者手动更新版本号（会自动创建 tag）
 npm version patch|minor|major
 
-# 5. 推送代码和 tag
+# 7. 推送代码和 tag
 git push origin main
 git push origin --tags
 
-# 6. GitHub Actions 自动完成发布
+# 8. GitHub Actions 自动完成发布
 ```
 
 ---

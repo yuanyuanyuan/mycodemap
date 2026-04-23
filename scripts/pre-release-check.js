@@ -710,10 +710,10 @@ async function runPreReleaseChecks() {
     const pkgVersion = JSON.parse(pkg).version;
     console.log(`\n当前版本: v${pkgVersion}`);
     console.log('\n📋 发布步骤:');
-    console.log('  1. npm run docs:check:pre-release  # 运行此检查');
-    console.log('  2. ./scripts/release.sh patch|minor|major  # 或指定版本');
-    console.log('  3. git push origin main --tags  # 推送 tag');
-    console.log('  4. GitHub Actions 自动: 构建 → 测试 → 发布 → 创建 Release');
+    console.log('  1. /release vX.Y  # 统一入口：readiness → closeout → 双确认门');
+    console.log('  2. Gate #2 通过后委托 ./scripts/release.sh X.Y.0  # 机械 helper');
+    console.log('  3. 推送 tag 后由 .github/workflows/publish.yml 自动: 构建 → 测试 → 发布 → 创建 Release');
+    console.log('  4. 若不是 milestone-bound release，才使用人工受控的例外流程');
     console.log('\n🔗 相关链接:');
     console.log(`  - GitHub Actions: https://github.com/mycodemap/mycodemap/actions`);
     console.log(`  - NPM 包: https://www.npmjs.com/package/@mycodemap/mycodemap`);

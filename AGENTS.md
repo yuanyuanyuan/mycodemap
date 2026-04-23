@@ -45,6 +45,7 @@
 - 任务开始时，必须声明：`当前任务评估为 L[X] 级`。
 - 禁止擅自降低风险等级以绕过审查。
 - 遇到模糊边界时，自动上溯到更高等级。
+- `/release` 属于发布操作；即使流程文档完备，也必须遵守 `docs/rules/release.md` 中定义的双确认门，不得自主完成版本号变更、tag 或 push。
 
 ## 4. 执行底线
 
@@ -113,6 +114,7 @@
 - 交付时至少说明：改了什么、为什么改、如何验证、还剩什么风险。
 - 若改动会影响接口、CLI、配置、架构、规则、验证流程、输出契约或 agent 路由，必须同步对应的 authoritative docs。
 - 详细文档同步触发条件、AI 友好文档 authoring 规则、任务模板与交付 checklist 统一在 `docs/rules/engineering-with-codex-openai.md` 定权。
+- AI 友好文档的**结构清晰要求**、**决策树要求**、**速查表要求**、**代码可复现要求**、**类型定义要求**与**提示词模板要求**统一在 `docs/rules/engineering-with-codex-openai.md` 定权。
 - 若判断“不需要更新文档”，也要明确写出原因。
 - 每次任务结束都要自问：是否需要同步 `AGENTS.md`、`CLAUDE.md`、`.claude/CLAUDE.md`、`README.md`、`ARCHITECTURE.md`、`AI_GUIDE.md`、`docs/rules/*` 与 `docs/ai-guide/*`。
 
