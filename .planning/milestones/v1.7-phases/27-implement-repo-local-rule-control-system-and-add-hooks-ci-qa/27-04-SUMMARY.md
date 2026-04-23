@@ -21,7 +21,7 @@ tech-stack:
   patterns: [hook exit-code routing, ci backstop parity, split hook responsibilities]
 key-files:
   created:
-    - .planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-04-SUMMARY.md
+    - .planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-04-SUMMARY.md
   modified:
     - .githooks/pre-commit
     - .githooks/commit-msg
@@ -68,7 +68,7 @@ Each task was committed atomically:
 - `.githooks/commit-msg` - removes file-count enforcement and keeps message-format validation only
 - `.github/workflows/ci-gateway.yml` - adds `Rule validation backstop` with `1/4` fail and `2/3` warn-only handling
 - `docs/rules/engineering-with-codex-openai.md` - documents hook responsibility split and CI backstop for `--no-verify`
-- `.planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-04-SUMMARY.md` - records plan execution, verification, and readiness
+- `.planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-04-SUMMARY.md` - records plan execution, verification, and readiness
 
 ## Decisions Made
 - Pre-commit reads `.claude/rule-system.config.json` directly instead of hardcoding mode in the hook, so config remains the single source of truth.
@@ -94,7 +94,7 @@ None - no external service configuration required.
 
 ## Self-Check: PASSED
 
-- Found `.planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-04-SUMMARY.md` on disk.
+- Found `.planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-04-SUMMARY.md` on disk.
 - Verified task commits `5ddfc46` and `1de8b2a` exist in git history.
 
 ---

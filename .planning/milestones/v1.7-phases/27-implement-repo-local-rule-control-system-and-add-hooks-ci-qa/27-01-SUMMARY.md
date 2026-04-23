@@ -16,7 +16,7 @@ key-files:
   created:
     - scripts/capability-report.py
     - scripts/tests/test_capability_report.py
-    - .planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-01-SUMMARY.md
+    - .planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-01-SUMMARY.md
   modified: []
 key-decisions:
   - "Required capabilities use PASS vs REQUIRED_FAIL so missing local prerequisites never look green."
@@ -56,7 +56,7 @@ Each task was committed atomically:
 ## Files Created/Modified
 - `scripts/capability-report.py` - Implements capability discovery, explicit status classification, duration measurement, and JSON report writing.
 - `scripts/tests/test_capability_report.py` - Verifies required failure, optional disablement, and `--output` file generation behavior.
-- `.planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-01-SUMMARY.md` - Captures execution evidence and handoff context for this plan.
+- `.planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-01-SUMMARY.md` - Captures execution evidence and handoff context for this plan.
 
 ## Decisions Made
 - Treating git hooks as a required capability but allowing `.githooks/` to satisfy the check when `core.hooksPath` is unset keeps the baseline factual without hard-coding one local setup.
@@ -99,7 +99,7 @@ None - no external service configuration required.
 - No blocker found within this plan’s scope.
 
 ## Self-Check: PASSED
-- Summary file exists at `.planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-01-SUMMARY.md`
+- Summary file exists at `.planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-01-SUMMARY.md`
 - Task commit `ca2a42b` exists in git history
 - Task commit `65d5df0` exists in git history
 

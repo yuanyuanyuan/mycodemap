@@ -15,7 +15,7 @@ tech-stack:
 key-files:
   created:
     - .claude/rule-system.config.json
-    - .planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-03-SUMMARY.md
+    - .planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-03-SUMMARY.md
   modified:
     - CLAUDE.md
     - docs/rules/README.md
@@ -64,7 +64,7 @@ Each task was committed atomically:
 - `docs/rules/code-quality-redlines.md` - Reduces the redline policy to a command/threshold/failure/recovery table.
 - `docs/rules/architecture-guardrails.md` - Reduces architecture rules to the MVP3 path map plus a short enforcement table.
 - `docs/rules/validation.md` - Keeps validation rules short while preserving design/risk/storage/doc guardrail truths required by docs checks.
-- `.planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-03-SUMMARY.md` - Records execution evidence and handoff context for this plan.
+- `.planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-03-SUMMARY.md` - Records execution evidence and handoff context for this plan.
 
 ## Decisions Made
 - Kept `hard_gate.mode` at `report-only` so the repo gains a truthful default contract before Phase 27 wires that contract into hooks and CI.
@@ -110,7 +110,7 @@ None - no external service configuration required.
 - Subagent rule injection now has a durable path-routing contract to target in the next plan.
 
 ## Self-Check: PASSED
-- Summary file exists at `.planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-03-SUMMARY.md`
+- Summary file exists at `.planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-03-SUMMARY.md`
 - Task commit `3e4ec18` exists in git history
 - Task commit `9015f32` exists in git history
 

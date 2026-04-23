@@ -20,7 +20,7 @@ key-files:
   created:
     - scripts/qa-rule-control.sh
     - scripts/tests/test_rule_control_workflow.py
-    - .planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-06-SUMMARY.md
+    - .planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-06-SUMMARY.md
   modified:
     - docs/rules/validation.md
 key-decisions:
@@ -63,7 +63,7 @@ Each task was committed atomically:
 - `scripts/qa-rule-control.sh` - Runs seven rule-control smoke scenarios entirely from `/tmp` fixtures or pure-function checks.
 - `scripts/tests/test_rule_control_workflow.py` - Locks scoped helper output, workflow rule-context injection, and CI backstop presence.
 - `docs/rules/validation.md` - Documents the rule-control QA commands and keeps validation routing discoverable.
-- `.planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-06-SUMMARY.md` - Records execution evidence and handoff context for this plan.
+- `.planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-06-SUMMARY.md` - Records execution evidence and handoff context for this plan.
 
 ## Decisions Made
 - Used `/tmp/codemap-rule-control-*` fixtures for disabled-soft-gate checks so QA never pollutes the main working tree.
@@ -107,7 +107,7 @@ None - no external service configuration required.
 - No blocker remains inside Phase 27’s planned scope.
 
 ## Self-Check: PASSED
-- Summary file exists at `.planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-06-SUMMARY.md`
+- Summary file exists at `.planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-06-SUMMARY.md`
 - Task commit `1dfacba` exists in git history
 - Task commit `b195a06` exists in git history
 

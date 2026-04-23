@@ -16,7 +16,7 @@ key-files:
   created:
     - scripts/validate-rules.py
     - scripts/tests/test_validate_rules.py
-    - .planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-02-SUMMARY.md
+    - .planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-02-SUMMARY.md
   modified: []
 key-decisions:
   - "Gate mode gives unavailable precedence over P0/P1/P2 so missing dependencies never look green."
@@ -56,7 +56,7 @@ Each task was committed atomically:
 ## Files Created/Modified
 - `scripts/validate-rules.py` - Implements the repo-local validator, check execution, JSON report generation, and gate/report-only exit mapping.
 - `scripts/tests/test_validate_rules.py` - Verifies exit-code precedence, report-only behavior, runtime status vocabulary, and missing-dist unavailable behavior.
-- `.planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-02-SUMMARY.md` - Captures execution evidence, decisions, and handoff state for this plan.
+- `.planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-02-SUMMARY.md` - Captures execution evidence, decisions, and handoff state for this plan.
 
 ## Decisions Made
 - Used the repository’s existing commands exactly as required: `npm run typecheck`, `npm test`, and `npm run lint`.
@@ -113,7 +113,7 @@ None - no external service configuration required.
 - No blocker found within this plan’s scope.
 
 ## Self-Check: PASSED
-- Summary file exists at `.planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-02-SUMMARY.md`
+- Summary file exists at `.planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-02-SUMMARY.md`
 - Task commit `dc299fd` exists in git history
 - Task commit `97d4d25` exists in git history
 

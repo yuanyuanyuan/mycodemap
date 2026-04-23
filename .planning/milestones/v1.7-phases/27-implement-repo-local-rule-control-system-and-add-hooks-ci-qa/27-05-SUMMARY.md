@@ -20,7 +20,7 @@ key-files:
   created:
     - scripts/rule-context.mjs
     - .claude/hooks/rule-route-advisory.js
-    - .planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-05-SUMMARY.md
+    - .planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-05-SUMMARY.md
   modified:
     - .claude/settings.json
     - .codex/get-shit-done/workflows/execute-phase.md
@@ -71,7 +71,7 @@ Each task was committed atomically:
 - `.codex/get-shit-done/workflows/quick.md` - Adds RULE_CONTEXT derivation and `<rule_context>` injection for quick tasks.
 - `.claude/get-shit-done/workflows/execute-phase.md` - Mirrors the scoped rule injection flow on the Claude side.
 - `.claude/get-shit-done/workflows/quick.md` - Mirrors the scoped rule injection flow on the Claude side.
-- `.planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-05-SUMMARY.md` - Records execution evidence and handoff context for this plan.
+- `.planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-05-SUMMARY.md` - Records execution evidence and handoff context for this plan.
 
 ## Decisions Made
 - Kept the helper output bounded to the first matched 1-2 rule docs so prompts stay scoped and do not regress into full-rules injection.
@@ -117,7 +117,7 @@ None - no external service configuration required.
 - No blocker found for the final QA plan.
 
 ## Self-Check: PASSED
-- Summary file exists at `.planning/phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-05-SUMMARY.md`
+- Summary file exists at `.planning/milestones/v1.7-phases/27-implement-repo-local-rule-control-system-and-add-hooks-ci-qa/27-05-SUMMARY.md`
 - Task commit `e526f81` exists in git history
 - Task commit `aa0260d` exists in git history
 
