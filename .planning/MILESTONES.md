@@ -1,5 +1,38 @@
 # Project Milestones: CodeMap
 
+## v1.9 release-governance-unification (Shipped: 2026-04-23)
+
+**Goal:** Define and verify a safe unified `/release` workflow that binds milestone closeout to npm release, while preserving L3 user-confirmation boundaries for version bumps, tags, pushes, and publication.
+
+**Phases completed:** 31-34 (4 plans total)
+
+**Delivered:**
+
+- `docs/rules/release.md` 已成为 `/release` 的 authoritative workflow document
+- deployment、pre-release、`AGENTS.md` 与 `CLAUDE.md` 现在都把 release governance 路由到同一权威文档
+- `.claude/skills/release/SKILL.md` 已提供 thin orchestrator：preflight checks、版本映射、双确认门、helper delegation
+- docs guardrails、pre-release guardrail、docs-sync、failure rehearsal 已证明 release surface 在不执行真实 npm publish 的前提下可 dry-run
+- `Phase 34` 已清理 `pre-release-checklist.md` 的 helper-first authority drift，恢复 `/release` 为唯一推荐入口
+
+**Source:** `/home/stark/.claude/plans/ticklish-sprouting-church.md`
+
+**Key accomplishments:**
+
+- `Phase 31` 固定了 `/release` 的 rules authority、milestone ↔ npm version 绑定、双确认门与机械 helper 委托边界
+- `Phase 32` 为 Claude runtime 落地 `.claude/skills/release/SKILL.md`，并把 refusal matrix 与 `0.5.2-beta.1 → 1.9.0` 警告写成运行时模板
+- `Phase 33` 用 docs / pre-release / docs-sync 验证和 failure rehearsal 证明 release routing、rules 与 skill 当前一致
+- `Phase 34` 关闭了 release checklist authority drift，重新满足 `REL-01` / `DOC-02` / `VAL-01`
+- `v1.9` planning state 已归档为 milestone closeout-ready / shipped planning milestone，且没有执行真实 tag / push / publish
+
+**Stats:**
+
+- `13/13` milestone requirements satisfied，`4/4` phases complete，milestone audit 为 `passed`
+- Known deferred items at close: 1 (`mycodemap-install-runtime-deps`, see `STATE.md` Deferred Items)
+
+**What's next:** Start the next milestone with `$gsd-new-milestone` when desired; only run a real `/release v1.9` later on a clean tree with both confirmation gates explicitly accepted.
+
+---
+
 ## v1.8 entry-docs-structure-consolidation (Shipped: 2026-04-22)
 
 **Delivered:** 将 `AGENTS.md`、根 `CLAUDE.md`、`.claude/CLAUDE.md` 收敛为 constitution / router / Claude adapter，并同步 live docs 与 machine-readable indexes，恢复单一权威、零重复、可导航的入口面。
@@ -17,11 +50,11 @@
 
 - `10/10` milestone requirements satisfied，`3/3` phases complete，milestone audit 为 `passed`
 - 3 phases，3 plans，全部为 docs-governance / discoverability 收口
-- 当前无 active milestone；后续需重新开 milestone 再继续
+- `v1.9 release-governance-unification` 已作为下一轮 active milestone 启动
 
 **Git range:** 未单独捕获（当前运行约束禁止自动 commit / tag / push）
 
-**What's next:** 如需继续，运行 `$gsd-new-milestone /data/codemap`；不要把已关闭的 `v1.8` 再当作 active planning surface。
+**What's next:** 维护 v1.8 作为已归档基线；不要把已关闭的 `v1.8` 再当作 active planning surface。
 
 ---
 

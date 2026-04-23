@@ -2,9 +2,9 @@
 
 ## What This Is
 
-CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `design validate → design map → design handoff → design verify` 收口为正式 public collaboration chain；`v1.6` 把 Agent-facing CLI 的机器契约真相继续收口；`post-v1.6` 补齐了 opt-in symbol-level graph 与 experimental local MCP 的最小可信纵向切片；`v1.7` 则把 repo-local rule control 与 `mycodemap init` 项目级 AI 基础设施收敛成可验证 contract；`v1.8` 进一步把 rules 入口文档面收敛成 constitution / router / adapter 三层结构。
+CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `design validate → design map → design handoff → design verify` 收口为正式 public collaboration chain；`v1.6` 把 Agent-facing CLI 的机器契约真相继续收口；`post-v1.6` 补齐了 opt-in symbol-level graph 与 experimental local MCP 的最小可信纵向切片；`v1.7` 则把 repo-local rule control 与 `mycodemap init` 项目级 AI 基础设施收敛成可验证 contract；`v1.8` 进一步把 rules 入口文档面收敛成 constitution / router / adapter 三层结构；`v1.9` 已把 milestone closeout 与 npm release 的发布治理面收敛成统一 `/release` contract。
 
-`v1.8` 已完成：`AGENTS.md`、根 `CLAUDE.md`、`.claude/CLAUDE.md` 现在分别承担宪法 / 路由 / Claude adapter 单一职责，操作性细节已迁回现有 live 文档，入口面恢复为单一权威、零重复、可导航的结构。
+`v1.8` 已完成：`AGENTS.md`、根 `CLAUDE.md`、`.claude/CLAUDE.md` 现在分别承担宪法 / 路由 / Claude adapter 单一职责，操作性细节已迁回现有 live 文档，入口面恢复为单一权威、零重复、可导航的结构。`v1.9` 已完成 docs + skill + dry-run readiness 三个 phase，随后又用 `Phase 34` 关闭了 `pre-release-checklist.md` 中的 helper-first authority drift，使 `/release` 再次回到唯一推荐入口。
 
 2026-04-18 起，规划边界已经调整：**Docker / ArcadeDB 原型线不再属于当前版本范围**。此前 `v1.5` 的 22-24 phase 保留为历史工件，但不会继续作为 active work。
 
@@ -12,16 +12,19 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 
 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
 
-## Current Milestone: none (between milestones)
+## Latest Completed Milestone: v1.9 release-governance-unification
 
-**Goal:** 等待下一轮明确 scope 的 milestone。
+**Goal:** 定义并验证统一 `/release` 发布治理流程，将 milestone closeout、版本映射、双确认门与现有 npm/GitHub 发布工具链串成一个薄编排入口。
+**Status:** Closed as a planning milestone on 2026-04-23; real npm / GitHub release remains out of scope until a future explicit `/release v1.9`
 
-**Current focus:**
-- 维持 `v1.8` 已完成的 entry-doc authority split
-- 让后续规则 / CLI / docs 变更继续遵守“入口只路由，正文只在 authoritative docs”
-- 下一轮工作必须重新开 milestone，而不是把历史关闭分支重新拉回 active surface
+**Target features:**
+- `docs/rules/release.md` 成为 `/release` 的权威流程文档
+- `AGENTS.md`、`CLAUDE.md`、deployment 与 pre-release 文档能路由到 release 权威文档
+- `.claude/skills/release/SKILL.md` 提供带双确认门的薄编排器
+- 验证覆盖 docs guardrails、docs-sync 与关键失败场景预演
+- 已清理 `docs/rules/pre-release-checklist.md` 中 helper-first 竞争入口，并补强 `VAL-01` 的 authority drift 证明面
 
-## Latest Completed Milestone: v1.8 entry-docs-structure-consolidation
+## Previous Completed Milestone: v1.8 entry-docs-structure-consolidation
 
 **Goal:** 收敛三层入口文档面，恢复“单一权威 + 零重复 + 明确路由”的治理入口结构。
 
@@ -31,7 +34,7 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 - `Phase 29` 把入口文档中的执行回路、命令块、RTK 长表、Claude 第二手册与会话 mem payload 全部迁出
 - `Phase 30` 同步了 README、AI_GUIDE、rules index、ARCHITECTURE、AI index 与 docs guardrail terminology，完成 zero-duplication verification
 
-## Previous Completed Milestone: v1.7 init-and-rule-hardening
+## Earlier Completed Milestone: v1.7 init-and-rule-hardening
 
 **Goal:** Close repo-local rule-control hardening and make `mycodemap init` a project-level AI infrastructure state reconciler.
 
@@ -73,18 +76,23 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 - ✓ `mycodemap init` 已升级为项目级 AI 基础设施状态收敛器，覆盖 `.mycodemap/config.json`、receipt、hooks、rules、docs 与 package smoke —— v1.7 / Phase 999.1
 - ✓ 入口文档已按 `AGENTS.md = constitution`、`CLAUDE.md = router`、`.claude/CLAUDE.md = Claude adapter` 收口 —— v1.8 / Phase 29
 - ✓ “旧 section → 新归宿文件” 迁移图与 discoverability 同步已完成，入口面不再保留第二套规则正文 —— v1.8 / Phase 28-30
+- ✓ 维护者现在可以通过 `docs/rules/release.md` 理解 milestone closeout ↔ npm release 的 1:1 绑定、版本映射、双确认门与失败处理 —— v1.9 / Phase 31
+- ✓ Claude `/release` skill 已固定 refusal cases、major jump 警告与双确认门，并委托现有 release tooling —— v1.9 / Phase 32
+- ✓ release docs / routing / skill 已通过 docs guardrails、pre-release guardrail、docs-sync 与 diff hygiene 验证 —— v1.9 / Phase 33
+- ✓ `pre-release-checklist.md` 不再把 release helper 呈现为绕过 `/release` 的推荐主入口 —— v1.9 / Phase 34
 
 ### Active
 
-- [ ] 下一轮 milestone scope TBD（待新需求或新问题驱动）
+- [ ] 选择下一个 milestone，或在干净工作树与双确认门下显式执行未来真实 `/release v1.9`
 
 ### Out of Scope
 
 - 恢复 `Phase 22-24` 作为当前版本待办 —— 已关闭的历史分支不能重新回流
 - 重新引入 Docker / ArcadeDB 作为默认下一步 —— 与当前 milestone 无关
 - 把 `rtk` 扩写成 CodeMap 产品能力 —— `rtk` 仍是执行包装层
-- 在本 milestone 中引入入口文档自审系统、重复检测自动化或生成式治理中间层 —— 一期只做结构收敛
-- 借入口文档收敛顺手重写全部治理规则正文 —— 当前只做必要的归宿与措辞收口
+- 在本 milestone 中执行真实 npm publish / GitHub Release —— 当前目标是流程定义和验证，不是发布当前工作树
+- 重建 `scripts/release.sh` 或 GitHub Actions 发布逻辑 —— `/release` 必须保持薄编排器定位
+- 在仓库中写入 `NPM_TOKEN` 或其他发布密钥 —— 发布密钥只能来自环境 / GitHub Secrets
 
 ## Context
 
@@ -93,6 +101,7 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 - `docs/rules/validation.md` 与 `docs/rules/engineering-with-codex-openai.md` 已承担验证顺序、工程执行与交付要求
 - `AI_GUIDE.md` 与 `docs/rules/README.md` 已分别承担产品/CLI discoverability 与 rules 路由
 - `Phase 28` migration map 是后续维护 entry-doc authority split 的长期参考基线
+- `v1.9` scope 来源于 `/home/stark/.claude/plans/ticklish-sprouting-church.md`，其中用户已锁定 milestone / npm release 1:1 绑定、版本统一与二次确认门
 
 ## Constraints
 
@@ -100,7 +109,9 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 - **Existing Destinations Only**: 被移出的内容只能迁移到现有 live 文档，不新增治理中间层
 - **Constitutional Narrowness**: `AGENTS.md` 必须保持窄而稳定，只承载宪法级规则
 - **Navigation First**: 根 `CLAUDE.md` 与 `.claude/CLAUDE.md` 必须表达导航/装配关系，而不是重新长成执行手册
-- **Phase Scope Integrity**: 一期只解决结构角色澄清与内容迁移，不扩张到自审框架、ghost commands 全量修复或 archive 身份治理
+- **Release L3 Boundary**: AI 不得在缺少用户显式确认时执行版本号变更、tag 创建、远程 push 或真实发布
+- **Thin Orchestration**: `/release` 只能编排和委托现有工具链，不重建 GSD closeout、release script 或 GitHub Actions
+- **Version Binding**: milestone `vX.Y` 映射为 npm `X.Y.0`，major 跳跃必须在确认门中特别提示
 
 ## Key Decisions
 
@@ -118,18 +129,21 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 | `Phase 26` 作为 `post-v1.6` 薄切片完成 | 该 phase 验证的是 symbol graph / MCP 分发层最小价值，不应回写成 `v1.5` continuation | Completed 2026-04-19 |
 | `Phase 27` 作为 repo-local rule-control hardening 完成 | 该 phase 把规则系统从文档假设推进到 capability、validator、hooks/CI、workflow injection、QA 一体化可验证 contract | Completed 2026-04-19 |
 | `v1.7` closed Phase 27 + Phase 999.1 | 把 repo-local rule-control contract 与 `mycodemap init` 项目基础设施收敛合并为一个已归档里程碑 | Shipped 2026-04-22 |
+| 启动 `v1.9 release-governance-unification` | 用户提供 `/release` 统一发布流程方案，并要求用它开启 v1.9 milestone | Shipped 2026-04-23 |
+| `v1.9` 采用 milestone / npm release 1:1 绑定 | 用户决策明确每个 milestone 对应一个 npm release，且 `v1.9` 映射 npm `1.9.0` | Shipped 2026-04-23 |
+| `/release` 必须保留两道用户确认门 | 发布属于 L3；确认门是防止 AI 自主发布和 major 版本跳跃误操作的核心安全机制 | Shipped 2026-04-23 |
 
 ## Current State
 
-- **Completed milestones / follow-ups:** `v1.0`、`v1.1`、`v1.2`、`v1.3`、`v1.4`、`post-v1.4`、`v1.6`、`post-v1.6`、`v1.7 init-and-rule-hardening`
+- **Completed milestones / follow-ups:** `v1.0`、`v1.1`、`v1.2`、`v1.3`、`v1.4`、`post-v1.4`、`v1.6`、`post-v1.6`、`v1.7 init-and-rule-hardening`、`v1.8 entry-docs-structure-consolidation`、`v1.9 release-governance-unification`
 - **Historical closed branch:** `v1.5 Isolated ArcadeDB Server-backed Prototype`（22-24 不再继续）
-- **Active milestone:** none
-- **Current planning status:** between milestones；等待下一轮新 scope
+- **Active milestone:** None selected after `v1.9` closeout
+- **Current planning status:** `v1.9` archived; waiting for next milestone selection or a future explicit `/release v1.9`
 - **Known remaining debt:** deferred debug artifact 与 governance follow-ups 仍记录在 `STATE.md`
 
 ## Next Execution Step
 
-- 若要继续推进新工作，先运行 `$gsd-new-milestone /data/codemap`，再按新 roadmap 进入 discuss / plan / execute。
+- 运行 `$gsd-new-milestone` 选择下一轮，或等待未来显式 `/release v1.9` 指令进入真实发布流程。
 
 ## Evolution
 
@@ -149,4 +163,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. 更新 Current State / Context / Key Decisions
 
 ---
-*Last updated: 2026-04-22 after completing v1.8 entry-docs-structure-consolidation*
+*Last updated: 2026-04-23 after closing v1.9 release-governance-unification*

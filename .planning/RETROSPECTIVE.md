@@ -2,6 +2,49 @@
 
 *A living document updated after each milestone. Lessons feed forward into future planning.*
 
+## Milestone: v1.9 — release-governance-unification
+
+**Shipped:** 2026-04-23
+**Phases:** 4 | **Plans:** 4 | **Sessions:** multiple
+
+### What Was Built
+
+- `/release` now has an authoritative rules contract tying milestone closeout, npm version mapping, refusal cases, and two explicit confirmation gates together.
+- `.claude/skills/release/SKILL.md` now acts as a thin release orchestrator that delegates to GSD closeout, `scripts/release.sh`, and GitHub Actions instead of rebuilding release logic.
+- Release docs, pre-release checks, routing docs, and dry-run rehearsals now agree that `/release` is the only recommended release entry.
+
+### What Worked
+
+- Treating release as governance first avoided accidental npm / git side effects while still making the release path reviewable.
+- The Phase 34 audit gap closure caught and removed helper-first checklist drift before milestone closeout.
+- Keeping real publish out of scope made the L3 boundary explicit and testable.
+
+### What Was Inefficient
+
+- Historical Phase 31-33 Nyquist validation files were missing, so the final audit had to preserve that as non-blocking technical debt.
+- The closeout workflow still needs manual care because its full path includes commit / tag behavior that must not be autonomous in this environment.
+- Existing open debug artifacts still require an explicit acknowledge-or-resolve decision at milestone close.
+
+### Patterns Established
+
+- Release workflows should be documented as authority chains, not as multiple equivalent command snippets.
+- A helper script may exist, but docs must describe it as post-gate mechanical execution rather than a primary human entry point.
+- Milestone closeout and npm release can be bound 1:1 while still deferring the actual publish to a later explicit confirmation flow.
+
+### Key Lessons
+
+1. Audit should search for competing recommended paths, not just missing docs or failed checks.
+2. L3 release workflows need two separate boundaries: planning closeout and publish-triggering git/npm actions.
+3. Closeout can safely prepare archives without committing or tagging, but the final git boundary still needs explicit human authorization.
+
+### Cost Observations
+
+- Model mix: not captured in durable telemetry for this milestone.
+- Sessions: multiple planning/execution/audit/closeout sessions.
+- Notable: Most rework came from authority drift cleanup, not from implementing new release mechanics.
+
+---
+
 ## Milestone: v1.8 — entry-docs-structure-consolidation
 
 **Shipped:** 2026-04-22
@@ -97,6 +140,7 @@
 |-----------|----------|--------|------------|
 | v1.7 | multiple | 2 | Moved from docs-only guardrails to executable rule/init contracts with package smoke |
 | v1.8 | multiple | 3 | Governance docs use migration-map-first, rewrite-second, discoverability-sweep-third pattern |
+| v1.9 | multiple | 4 | Release governance uses authority-chain docs, thin orchestration, and explicit L3 confirmation gates |
 
 ### Cumulative Quality
 
@@ -104,6 +148,7 @@
 |-----------|-------|----------|-------------------|
 | v1.7 | 60 focused tests + prior Phase 27 QA | focused changed-surface coverage | no new runtime package dependency required by closeout |
 | v1.8 | docs guardrail + grep-based terminology scan | docs governance surface | no new runtime or build dependency |
+| v1.9 | docs guardrails + pre-release guardrail + docs-sync + audit | release governance surface | no new runtime or build dependency |
 
 ### Top Lessons (Verified Across Milestones)
 
@@ -111,3 +156,4 @@
 2. Planning archives are only trustworthy when `STATE.md`, `ROADMAP.md`, requirements, and phase summaries are reconciled at close.
 3. Entry-doc authority split must lock destination ownership before any rewrite begins.
 4. Lifecycle tooling bugs (milestone.complete query) are themselves blockers for autonomous closeout.
+5. Release governance must prevent competing “recommended” paths, not only document the intended happy path.
