@@ -80,7 +80,17 @@
 
 - 涉及代码搜索、项目分析、影响评估时，优先使用 CodeMap CLI：`node dist/cli/index.js query|analyze|deps|impact`。
 - CodeMap 不足或失败时，再回退到 `rg`、`find` 等标准工具。
-- 若因 CodeMap 缺陷被迫回退，且当前任务适用，应记录到 `.codemap/issues/codemap-issues.md`。
+- 若因 CodeMap 缺陷被迫回退，且当前任务适用，应记录到 `.mycodemap/issues/codemap-issues.md`。
+
+### 6.1 mycodemap-rules-bundle
+
+<!-- mycodemap-rules-bundle:start -->
+- `@.mycodemap/rules/commit/default.md`
+- `@.mycodemap/rules/test/default.md`
+- `@.mycodemap/rules/lint/default.md`
+- `@.mycodemap/rules/docs/default.md`
+- `@.mycodemap/rules/validation/default.md`
+<!-- mycodemap-rules-bundle:end -->
 
 ## 7. 代码与改动规则
 

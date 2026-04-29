@@ -309,6 +309,48 @@ function buildNewMilestone(extraArgs) {
   };
 }
 
+function buildMilestoneComplete(args) {
+  const version = args[2];
+  if (!version) {
+    return { error: 'version required for milestone complete' };
+  }
+
+  const cwd = process.cwd();
+  const archiveDir = path.join(cwd, '.planning', 'milestones');
+  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  const reqPath = path.join(cwd, '.planning', 'REQUIREMENTS.md');
+
+  // Parse --name <value>
+  let name = version;
+  const nameIdx = args.indexOf('--name');
+  if (nameIdx !== -1 && args[nameIdx + 1]) {
+    name = args[nameIdx + 1];
+  }
+
+  fs.mkdirSync(archiveDir, { recursive: true });
+
+  if (fs.existsSync(roadmapPath)) {
+    const content = fs.readFileSync(roadmapPath, 'utf8');
+    fs.writeFileSync(path.join(archiveDir, `${version}-ROADMAP.md`), content, 'utf8');
+  }
+
+  if (fs.existsSync(reqPath)) {
+    const content = fs.readFileSync(reqPath, 'utf8');
+    const today = new Date().toISOString().split('T')[0];
+    const header = `# Requirements Archive: ${version} ${name}\n\n**Archived:** ${today}\n**Status:** SHIPPED\n\nFor current requirements, see \`.planning/REQUIREMENTS.md\`.\n\n---\n\n`;
+    fs.writeFileSync(path.join(archiveDir, `${version}-REQUIREMENTS.md`), header + content, 'utf8');
+  }
+
+  return {
+    version,
+    name,
+    archived: {
+      roadmap: fs.existsSync(path.join(archiveDir, `${version}-ROADMAP.md`)),
+      requirements: fs.existsSync(path.join(archiveDir, `${version}-REQUIREMENTS.md`)),
+    },
+  };
+}
+
 function findDelegateTarget() {
   const candidates = [
     path.join(process.env.HOME ?? '', '.claude/get-shit-done/bin/gsd-tools.cjs'),
@@ -374,6 +416,11 @@ if (args[0] === 'roadmap' && args[1] === 'analyze') {
 
 if (args[0] === 'init' && args[1] === 'new-milestone') {
   printJson(buildNewMilestone(args.slice(2)));
+  process.exit(0);
+}
+
+if (args[0] === 'milestone' && args[1] === 'complete') {
+  printJson(buildMilestoneComplete(args));
   process.exit(0);
 }
 

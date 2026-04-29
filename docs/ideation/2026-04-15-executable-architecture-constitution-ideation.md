@@ -1,10 +1,13 @@
 ---
 date: 2026-04-15
+updated: 2026-04-29
 topic: executable-architecture-constitution
 focus: Pivot CodeMap to an "Executable Architecture Constitution" — making design.md a diff-aware, git-history-risk-weighted, CI-enforceable gate
 ---
 
 # Ideation: Executable Architecture Constitution
+
+> **状态更新（2026-04-29）**：本文档原始包含 7 个想法，其中 #1（Diff-Aware Contract Enforcement）与 #3（Revive Git History Risk Scoring）已实现并归档至 `docs/archive/ideation/2026-04-15-executable-architecture-constitution-ideation-archive.md`。本文档保留剩余 5 项。
 
 ## Codebase Context
 
@@ -28,31 +31,15 @@ focus: Pivot CodeMap to an "Executable Architecture Constitution" — making des
 
 ## Ranked Ideas
 
-### 1. Diff-Aware Contract Enforcement
-**Description:** Upgrade `mycodemap verify` into a true contract enforcer that scans `src/` code. By default, only validate files touched by `git diff` and their dependency chains. Return non-zero exit codes when `layer_direction`, `forbidden_imports`, or `module_public_api_only` rules are violated.
-**Rationale:** This is the core product soul of the pivot. Today `design verify` only checks handoff drift and never touches source code — creating a dangerous false sense of security for users.
-**Downsides:** Bridging design.md's text constraints with tree-sitter symbol extraction requires careful engineering for the first rule.
-**Confidence:** 90%
-**Complexity:** Medium
-**Status:** Unexplored
-
-### 2. SQLite + In-Memory Graph Storage Migration
+### 1. SQLite + In-Memory Graph Storage Migration
 **Description:** Remove the KùzuDB adapter and replace it with `better-sqlite3` for persisting symbol relationships, plus a lightweight in-memory directed graph (Map/Set adjacency list) loaded at startup. The same storage layer should handle code graphs, git blame history, and contract metadata.
 **Rationale:** KùzuDB installation failures are the top onboarding friction. SQLite's single-file nature turns CodeMap into a version-controllable CLI tool rather than a system requiring database ops.
 **Downsides:** Must validate startup time and memory footprint against large codebases (target: <1s for 10K files, <200MB RAM).
 **Confidence:** 85%
 **Complexity:** Medium-High
-**Status:** Unexplored
+**Status:** Partially Implemented (`better-sqlite3` added to `package.json`, but KùzuDB adapter not yet removed)
 
-### 3. Revive Git History Risk Scoring (GRAVITY/HEAT/IMPACT)
-**Description:** Harden the existing but dormant `calculateRiskScore` in `src/orchestrator/workflow/git-analyzer.ts` and rewire the GRAVITY/HEAT/IMPACT three-dimensional model into `verify` and `impact` outputs.
-**Rationale:** Competitors cannot replicate the causal narrative of "who changed this block, what regressions this dependency chain caused before." The formula is already designed — it just needs to be wired up.
-**Downsides:** Requires high-quality historical data (rollbacks, incident correlations); young codebases may have weak signal.
-**Confidence:** 80%
-**Complexity:** Medium
-**Status:** Unexplored
-
-### 4. Auto-Generate design.md from Existing Codebase
+### 2. Auto-Generate design.md from Existing Codebase
 **Description:** Instead of asking humans to write `design.md` from scratch, use the existing tree-sitter parser to scan `src/` for module boundaries and public APIs, then generate a baseline contract. Users only review and lock it.
 **Rationale:** Eliminates the root cause of "docs vs code divergence." If contract generation cost approaches zero, maintenance cost collapses too.
 **Downsides:** Auto-generated rules may be too permissive or capture too many implementation details; needs smart UX to "lock" which rules matter.
@@ -60,7 +47,7 @@ focus: Pivot CodeMap to an "Executable Architecture Constitution" — making des
 **Complexity:** Medium
 **Status:** Unexplored
 
-### 5. Auto-Generate Architecture Remediation Patches
+### 3. Auto-Generate Architecture Remediation Patches
 **Description:** When `verify` finds a module boundary violation, don't just report it — generate a concrete refactoring patch (e.g., "move this import down to the adapter layer").
 **Rationale:** In the AI era, "errors without fixes" is a half-measure. This was also highlighted in Codex's second opinion as a core element of the coolest version.
 **Downsides:** Requires semantic understanding beyond import graphs; fully automated fixes risk introducing bugs.
@@ -68,7 +55,7 @@ focus: Pivot CodeMap to an "Executable Architecture Constitution" — making des
 **Complexity:** High
 **Status:** Unexplored
 
-### 6. Self-Healing Design Contract (Drift Approval)
+### 4. Self-Healing Design Contract (Drift Approval)
 **Description:** Allow `design.md` to evolve with the code through an approval workflow. When drift is detected, provide `codemap design evolve --approve` to snapshot current code boundaries back into the contract as the new baseline.
 **Rationale:** Architecture decay is an organizational norm. If contracts forever forbid drift, they get abandoned. A reviewable, approvable evolution mechanism is the only way they survive long-term.
 **Downsides:** Requires strict versioning and multi-level approval, otherwise it becomes a channel for "legitimizing tech debt."
@@ -76,7 +63,7 @@ focus: Pivot CodeMap to an "Executable Architecture Constitution" — making des
 **Complexity:** Medium
 **Status:** Unexplored
 
-### 7. MCP `verify_contract` Tool
+### 5. MCP `verify_contract` Tool
 **Description:** Wrap the `design verify` JSON output contract as an MCP Server tool for Claude Code / Cursor to call before every code modification.
 **Rationale:** Minimal engineering investment for maximum ecosystem leverage. Transforms CodeMap from "a CLI developers remember to run" into "infrastructure AI calls by default."
 **Downsides:** The MCP ecosystem is still early; interface standardization may shift.
@@ -100,3 +87,4 @@ focus: Pivot CodeMap to an "Executable Architecture Constitution" — making des
 ## Session Log
 
 - 2026-04-15: Initial ideation — ~40 candidates generated across 4 frames, 7 survived after adversarial filtering
+- 2026-04-29: #1 and #3 verified as fully implemented and archived
