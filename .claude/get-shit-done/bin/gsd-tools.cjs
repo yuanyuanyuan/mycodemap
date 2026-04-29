@@ -98,6 +98,7 @@ function countPhaseArtifacts(phaseDir) {
 }
 
 function extractPhaseSection(roadmap, phaseNumber) {
+  if (!phaseNumber) return null;
   const pattern = new RegExp(
     `^###\\s+Phase\\s+${escapeRegExp(phaseNumber)}:\\s+(.+)$([\\s\\S]*?)(?=^###\\s+Phase\\s+\\d+:|$)`,
     'mu'
