@@ -1,5 +1,65 @@
 # Project Milestones: CodeMap
 
+> **Current active planning truth** lives in `.planning/PROJECT.md`, `.planning/ROADMAP.md`, `.planning/REQUIREMENTS.md`, and `.planning/STATE.md`.
+> The shipped entries below are **historical snapshots**. Their `What's next` text records closeout-time context and must not override the current active planning surface.
+
+**Current status:** No active milestone. The latest shipped milestone is `v1.11 release-followup-hardening` (2026-04-29). Start the next milestone when ready.
+
+## v1.11 release-followup-hardening (Shipped: 2026-04-29)
+
+**Goal:** Pick up deferred `RELF-01~03` release follow-ups after `v1.9` / `v1.10` by shipping non-Claude runtime release entry surfaces, adding optional publish-status polling, and evaluating whether release readiness should become a stronger gate.
+
+**Phases completed:** 38-40 (3 plans total)
+
+**Delivered:**
+
+- `.agents/skills/release/SKILL.md` 已为 Codex 收口首个 non-Claude release entry / wrapper，保持 `docs/rules/release.md` 仍是唯一 authority chain
+- `mycodemap publish-status` 已提供 snapshot-only、strict truth-first 的 publish follow-up 状态查询
+- `mycodemap readiness-gate` 已把 release quality checks 重构为 hard / warn-only / fallback 三层语义
+- `ship` pipeline 现在会在遇到 `fallback` 状态时显式停止并提示人工判断
+
+**Key accomplishments:**
+
+- `Phase 38` 为 Codex 补齐 repo-local release adapter，不形成 competing release path
+- `Phase 39` 为 GitHub Actions publish 链补齐独立只读 follow-up observability
+- `Phase 40` 统一发布检查体系为三层 gate 语义，并把 gate 暴露为独立 CLI 命令
+
+**Stats:**
+
+- `3/3` milestone requirements satisfied，`3/3` phases complete，milestone audit 为 `passed`
+- No blocker remained at close; deferred items are actual `/release v1.9` execution and multi-runtime expansion
+
+**What's next:** Start the next milestone when ready, or explicitly decide whether the next focus is real `/release v1.9` execution or broader governance / integration expansion.
+
+---
+
+## v1.10 governance-debt-cleanup (Shipped: 2026-04-23)
+
+**Goal:** Close the deferred governance debt left after `v1.8` / `v1.9` by adding entry-doc drift backstops, aligning validation truth, and clarifying archive/live planning identity.
+
+**Phases completed:** 35-37 (3 plans total)
+
+**Delivered:**
+
+- `scripts/validate-docs.js` 现在会捕捉 entry-doc duplicate policy、ghost command / route 与 authority-routing drift
+- README、`AI_GUIDE.md`、`docs/rules/validation.md`、`docs/rules/engineering-with-codex-openai.md` 现在共享同一组 validation quick truth
+- `.planning/MILESTONES.md`、`.planning/RETROSPECTIVE.md`、`.planning/milestones/README.md` 与最新 `v1.9` archive docs 现在都显式区分 current truth 与 historical snapshot
+
+**Key accomplishments:**
+
+- `Phase 35` 把 entry-doc governance drift detection 接进现有 `docs:check` / `ci check-docs-sync`
+- `Phase 36` 把 `docs:check` first pass、`check-docs-sync` 统一入口、`report-only` 非阻断、`warn-only / fallback` 非 hard-gate-success 这四件事锁成共享 truth
+- `Phase 37` 把 active planning truth 与 archive snapshot 的身份边界写实，并避免继续靠历史 `What's next` 文案猜 current state
+
+**Stats:**
+
+- `9/9` milestone requirements satisfied，`3/3` phases complete，milestone audit 为 `passed`
+- No blocker remained at close; deferred items are now release follow-ups rather than governance debt
+
+**What's next:** Start the next milestone when ready, or explicitly decide whether the next focus is real `/release v1.9` execution or `RELF-01~03` release follow-ups.
+
+---
+
 ## v1.9 release-governance-unification (Shipped: 2026-04-23)
 
 **Goal:** Define and verify a safe unified `/release` workflow that binds milestone closeout to npm release, while preserving L3 user-confirmation boundaries for version bumps, tags, pushes, and publication.

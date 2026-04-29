@@ -2,6 +2,96 @@
 
 *A living document updated after each milestone. Lessons feed forward into future planning.*
 
+> Archive identity note: milestone sections below are retrospective snapshots of shipped work.
+> They are a lessons archive, **not** the current active planning surface; current truth lives in `.planning/PROJECT.md`, `.planning/ROADMAP.md`, `.planning/REQUIREMENTS.md`, and `.planning/STATE.md`.
+
+## Milestone: v1.11 — release-followup-hardening
+
+**Shipped:** 2026-04-29
+**Phases:** 3 | **Plans:** 3 | **Sessions:** multiple
+
+### What Was Built
+
+- Codex repo-local release adapter (`SKILL.md`) that routes back to existing release authority instead of creating a competing path.
+- Standalone `publish-status` CLI command for snapshot-only, read-only publish workflow follow-up.
+- Three-layer readiness gate (`hard` / `warn-only` / `fallback`) replacing the old two-layer mustPass/shouldPass model.
+- Standalone `readiness-gate` CLI command that exposes the gate system for independent use.
+
+### What Worked
+
+- Shipping release follow-ups as thin adapters (Codex skill, publish-status, readiness-gate) rather than rebuilding the release pipeline kept the authority chain intact.
+- Reusing existing `ship/rules/quality-rules.ts` as the gate core engine minimized duplication.
+- The `fallback` state cleanly separates "signal unavailable" from "check failed," preventing silent auto-passes when data is missing.
+
+### What Was Inefficient
+
+- `gsd-sdk query` surfaces remain unavailable in the current runtime, forcing manual emulation of workflow steps (init, audit, complete, cleanup).
+- Phase 40 involved cross-cutting changes to `ship` internals (rules, checker, pipeline) that required careful type migration across multiple files.
+- The `fallback` concept is powerful but needs explicit user education — it is neither pass nor fail.
+
+### Patterns Established
+
+- Release wrappers must route back to a single authority document; they must not become second-handbooks.
+- Follow-up observability commands should be read-only and fail conservatively (`unavailable` / `ambiguous`) rather than guessing.
+- Gate semantics should be explicit in code (`gateMode`) rather than implicit (`blocking: boolean`).
+
+### Key Lessons
+
+1. A thin runtime adapter is often better than a thick wrapper — authority preservation beats feature completeness.
+2. When signals are unavailable, halt automation rather than defaulting to pass or fail.
+3. Refactoring internal rule models to match external docs prevents semantic drift between "what the code does" and "what the docs say."
+
+### Cost Observations
+
+- Model mix: not captured in durable telemetry for this milestone.
+- Sessions: multiple planning/execution/closeout steps across multiple days.
+- Notable: most work was boundary hardening and contract clarification, not new product capability.
+
+---
+
+## Milestone: v1.10 — governance-debt-cleanup
+
+**Shipped:** 2026-04-23
+**Phases:** 3 | **Plans:** 3 | **Sessions:** multiple
+
+### What Was Built
+
+- Existing docs guardrails now detect entry-doc governance drift instead of waiting for future milestone audits to rediscover it.
+- README, AI guide, validation rule, and engineering rule now share one validation quick-truth baseline.
+- Planning surfaces now explicitly separate current truth from archived milestone snapshots.
+
+### What Worked
+
+- Fixing governance debt in the same order it appears to maintainers—entry docs → validation truth → archive identity—kept the scope sharp.
+- Reusing `docs:check` / `ci check-docs-sync` avoided creating a second governance system just to police the first one.
+- Adding explicit archive notes to the most-likely-opened snapshots solved identity confusion without rewriting the whole planning archive.
+
+### What Was Inefficient
+
+- `MILESTONES.md` historical `What's next` text is useful context but easily misread without explicit identity notes.
+- Snippet-based docs guardrails remain effective but still require judgment about false-positive noise as the repository grows.
+- Lifecycle automation still depends on manual closeout shaping because GSD query surfaces remain partially unreliable for milestone metadata.
+
+### Patterns Established
+
+- Governance hardening should land in the existing enforcement surface before adding more prose.
+- Shared quick-truth sentences are a cheap and effective way to keep multiple live docs aligned.
+- Archive directories need explicit identity labels whenever they coexist next to active planning files.
+
+### Key Lessons
+
+1. If a governance rule matters, put it behind an existing guardrail instead of trusting future audits.
+2. Validation drift is easier to prevent with shared sentence-level truth than with “roughly equivalent” summaries.
+3. Archive identity issues should be fixed at the navigation layer first, not by rewriting every historical artifact.
+
+### Cost Observations
+
+- Model mix: not captured in durable telemetry for this milestone.
+- Sessions: multiple planning/execution/closeout steps in one milestone day.
+- Notable: most work was boundary clarification, not new product capability.
+
+---
+
 ## Milestone: v1.9 — release-governance-unification
 
 **Shipped:** 2026-04-23
