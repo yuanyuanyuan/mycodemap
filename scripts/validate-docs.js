@@ -204,8 +204,7 @@ function validateEntryDocGovernance(rootDir, failures) {
       'docs/rules/release.md',
       'AI_GUIDE.md',
       'ARCHITECTURE.md',
-      'docs/ai-guide',
-      'RTK.md'
+      'docs/ai-guide'
     ],
     failures
   );

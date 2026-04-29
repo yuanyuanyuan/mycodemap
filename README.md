@@ -714,6 +714,67 @@ cp examples/codex/codemap-agent.md .agents/skills/codemap/SKILL.md
 
 详细配置请参考 [AI_ASSISTANT_SETUP.md](docs/AI_ASSISTANT_SETUP.md)，设计与规则入口请先看 [docs/README.md](docs/README.md)。
 
+### CodeMap Skill 使用指南
+
+CodeMap Skill 是一个预置的 AI 技能文件，让 Claude Code 等支持 Skill 机制的 AI 助手自动获得 CodeMap 的全部分析能力。当用户提到"分析代码结构"、"查找依赖"、"影响范围"、"代码地图"等意图时，AI 会自动加载该技能并调用 CodeMap CLI。
+
+#### 工作原理
+
+```
+用户提问 → AI 识别意图 → 加载 CodeMap Skill → 调用 CLI 命令 → 返回结构化结果
+```
+
+Skill 文件由两部分组成：
+
+| 文件 | 作用 |
+|------|------|
+| `.claude/skills/codemap/SKILL.md` | 主技能文件：触发条件、场景-命令映射、任务示例、错误处理 |
+| `.claude/skills/codemap/references/commands.md` | 完整命令参考：所有命令的选项、参数和用法 |
+
+#### 安装
+
+Skill 文件已内置在本仓库中，无需额外安装。对于其他项目，复制即可：
+
+```bash
+# 复制到目标项目的 .claude/skills/ 目录
+cp -r .claude/skills/codemap /path/to/target-project/.claude/skills/
+```
+
+#### 典型使用场景
+
+在 Claude Code 对话中直接用自然语言触发，无需手动输入命令：
+
+| 用户意图 | AI 自动执行的命令 |
+|----------|-------------------|
+| "这个项目有哪些模块？" | `mycodemap query -m "src/..."` 或查看 `AI_MAP.md` |
+| "IntentRouter 在哪里定义的？" | `mycodemap query -s "IntentRouter"` |
+| "修改这个文件会影响什么？" | `mycodemap impact -f <path> --transitive` |
+| "项目有循环依赖吗？" | `mycodemap cycles` |
+| "这个模块的复杂度如何？" | `mycodemap complexity -f <path> --detail` |
+| "帮我检查提交格式" | `mycodemap ci check-commits` |
+| "验证设计契约" | `mycodemap design validate` |
+
+#### CLI 调用方式
+
+标准用户通过全局安装的 `mycodemap` 调用；CodeMap 本体仓库的开发者使用 `node dist/cli/index.js`：
+
+```bash
+# 用户模式（全局安装后）
+mycodemap query -s "SymbolName"
+mycodemap impact -f src/file.ts
+
+# 开发者模式（CodeMap 本体仓库内，需先 npm run build）
+node dist/cli/index.js query -s "SymbolName"
+```
+
+#### 自定义与扩展
+
+- **修改触发条件**：编辑 `SKILL.md` 头部的 `description` 字段，调整 AI 何时自动加载此技能
+- **添加新命令**：在 `references/commands.md` 中补充新命令文档
+- **添加新场景**：在 `SKILL.md` 的 "任务场景" 部分追加新的使用模式
+
+详细配置请参考 [AI_ASSISTANT_SETUP.md](docs/AI_ASSISTANT_SETUP.md)，设计与规则入口请先看 [docs/README.md](docs/README.md)。
+
 ## 新增 CLI 命令
 
 ### `mycodemap design`
