@@ -73,6 +73,13 @@ cat .mycodemap/AI_MAP.md
 
 > 运行环境提示：仓库内 Agent shell 可能使用 `rtk` 作为 token 节省 wrapper；`rtk` 不是 CodeMap 产品功能、CLI 依赖或用户可见能力。
 
+## ✅ Validation Quick Truth
+
+- 文档/入口变更先跑 `npm run docs:check`。
+- 统一 docs/AI guardrail 入口：`node dist/cli/index.js ci check-docs-sync`（产品命令等价于 `mycodemap ci check-docs-sync`）。
+- repo-local rules 预检：`python3 scripts/validate-rules.py code --report-only` 只报告，不阻断。
+- CI / PR 超窗、fallback 或 false-positive 漂移时，`warn-only / fallback` 不是 hard gate success。
+
 ---
 
 ## 🔌 插件扩展点速查

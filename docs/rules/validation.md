@@ -12,6 +12,13 @@
 | 改实现代码 | `npm run typecheck` → `npm run lint` → `npm test` | 从最小相关验证扩到基础回归 |
 | 改发布/打包边界 | `npm run docs:check:pre-release` → `npm run build` → `npm run validate-pack` | 先锁版本/发布契约，再确认 shipped artifact 仍成立 |
 
+## Validation quick truth
+
+- 文档/入口变更先跑 `npm run docs:check`。
+- 统一 docs/AI guardrail 入口：`node dist/cli/index.js ci check-docs-sync`（产品命令等价于 `mycodemap ci check-docs-sync`）。
+- repo-local rules 预检：`python3 scripts/validate-rules.py code --report-only` 只报告，不阻断。
+- CI / PR 超窗、fallback 或 false-positive 漂移时，`warn-only / fallback` 不是 hard gate success。
+
 ## Repo-local rule validator
 
 ### `validate-rules.py` exit-code 表

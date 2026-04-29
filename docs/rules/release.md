@@ -6,6 +6,8 @@
 > **适用对象**：执行发布的 AI 助手或人类操作者。
 > **前置阅读**：`docs/rules/pre-release-checklist.md`、`docs/rules/deployment.md`。
 
+> **Runtime adapters**：`.claude/skills/release/SKILL.md` 与 `.agents/skills/release/SKILL.md` 只允许作为运行时薄适配器存在。它们必须回指本文档，不能替代这里的单一权威流程。
+
 ---
 
 ## 核心原则
@@ -76,6 +78,12 @@
 运行以下检查，收集状态信息用于后续确认门：
 
 ```bash
+# 运行 readiness gate（hard / warn-only / fallback 三层语义）
+mycodemap readiness-gate
+
+# 或结构化输出
+mycodemap readiness-gate --json --structured
+
 # 检查开放工件
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" audit-open 2>/dev/null
 
@@ -87,6 +95,7 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" audit-open 2>/dev/null
 - 所有 phase 有 `SUMMARY.md`
 - 所有 requirement 已勾选（或已记录为 deferred）
 - 无未解决的 blocker
+- readiness gate 无 `fallback` 状态（若存在 fallback，需人工判断后方可继续）
 
 如果有开放项目，展示给用户并要求选择：
 - [R] 解决 — 停止，修复后重新运行 `/release`
@@ -210,7 +219,21 @@ echo "GitHub Actions 发布状态:"
 echo "https://github.com/{owner}/{repo}/actions/workflows/publish.yml"
 ```
 
-可选：轮询验证 Actions 运行状态（非阻塞，仅报告）。
+如需做**只读 follow-up observability**，统一使用独立命令：
+
+```bash
+mycodemap publish-status --tag v{X.Y}.0 --sha {headSha}
+mycodemap publish-status --tag v{X.Y}.0 --sha {headSha} --json --structured
+```
+
+约束：
+
+- `publish-status` 只读取 `.github/workflows/publish.yml` 的 snapshot truth
+- 它必须依赖 `--tag + --sha` 做精确匹配；无法精确确认时返回 `unavailable` / `ambiguous`
+- 它**不是**第二条发布路径；`/release` 仍是单一权威，`publish-status` 不得 rerun workflow、不得 dispatch、不得 publish、不得 push
+- 默认只做一次 snapshot；是否继续跟进由人类或上层 agent 自主决定
+
+可选：使用 `publish-status` 做非阻塞状态复核，但不要把它当成发布 authority 的一部分。
 
 #### ⑨ 完成报告
 
@@ -225,6 +248,7 @@ GitHub Actions: 运行中
 - Actions: https://github.com/{owner}/{repo}/actions
 - NPM:     https://www.npmjs.com/package/@mycodemap/mycodemap
 - Release: https://github.com/{owner}/{repo}/releases
+- Follow-up: `mycodemap publish-status --tag v{X.Y}.0 --sha {headSha}`
 ```
 
 ---

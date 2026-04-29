@@ -162,13 +162,23 @@ export async function runShipPipeline(ctx: ShipPipelineContext): Promise<Pipelin
   // 检查是否应该阻止发布
   if (shouldBlockRelease(checkOutput)) {
     console.log(SEPARATOR);
-    console.log(chalk.red('\n发布被阻止: 检查未通过'));
+
+    if (checkOutput.hasFallback) {
+      console.log(chalk.yellow('\n⏸️ 发布被阻止: 存在 fallback 状态，需要人工判断'));
+      const fallbackItems = Array.from(checkOutput.results.entries())
+        .filter(([, item]) => item.result.status === 'fallback')
+        .map(([name, item]) => `${name}${item.result.message ? ` (${item.result.message})` : ''}`);
+      console.log(chalk.yellow(`  Fallback 检查: ${fallbackItems.join(', ')}`));
+    } else {
+      console.log(chalk.red('\n发布被阻止: 检查未通过'));
+    }
+
     if (checkOutput.confidence.decision === 'block') {
       console.log(chalk.yellow(`  置信度过低 (${checkOutput.confidence.score}/100)`));
     }
-    if (!checkOutput.allMustPassed) {
-      const failed = Array.from(checkOutput.mustPassResults.entries())
-        .filter(([, r]) => !r.passed)
+    if (!checkOutput.allHardPassed) {
+      const failed = Array.from(checkOutput.results.entries())
+        .filter(([, item]) => item.gateMode === 'hard' && item.result.status === 'failed')
         .map(([name]) => name);
       console.log(chalk.yellow(`  失败检查: ${failed.join(', ')}`));
     }
@@ -178,7 +188,7 @@ export async function runShipPipeline(ctx: ShipPipelineContext): Promise<Pipelin
       versionResult,
       checkOutput,
       blocked: true,
-      blockReason: '质量检查未通过'
+      blockReason: checkOutput.hasFallback ? '存在 fallback 状态，需要人工判断' : '质量检查未通过'
     };
   }
 

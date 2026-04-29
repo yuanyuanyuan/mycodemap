@@ -1,16 +1,16 @@
 // [META] since:2026-03 | owner:cli-team | stable:false
-// [WHY] Step 3: 质量检查，运行 mustPass 和 shouldPass 检查
+// [WHY] Step 3: 质量检查，运行 hard、warn-only 和 fallback gate 检查
 
 import chalk from 'chalk';
 import { AnalyzeResult } from './analyzer.js';
 import { VersionResult } from './versioner.js';
-import { CheckContext, runChecks } from './rules/quality-rules.js';
+import { CheckContext, runChecks, type GateCheckItem } from './rules/quality-rules.js';
 import { calculateConfidence, ConfidenceResult } from './rules/confidence-rules.js';
 
 export interface CheckOutput {
-  mustPassResults: Map<string, { passed: boolean; message?: string }>;
-  shouldPassResults: Map<string, { passed: boolean; message?: string }>;
-  allMustPassed: boolean;
+  results: Map<string, GateCheckItem>;
+  allHardPassed: boolean;
+  hasFallback: boolean;
   confidence: ConfidenceResult;
 }
 
@@ -26,7 +26,7 @@ export async function runQualityChecks(
   };
 
   // 运行所有检查
-  const { mustPassResults, shouldPassResults } = await runChecks(ctx);
+  const results = await runChecks(ctx);
 
   // 计算置信度
   // 跳过 merge commits，只检查常规 commits
@@ -35,38 +35,73 @@ export async function runQualityChecks(
     /^(feat|fix|docs|style|refactor|test|chore|ci|perf|breaking|feature|bugfix|hotfix|config|infra|enhance|improvement|breaking-change)(\(.+\))?$/i.test(c.type)
   );
 
+  const coverageItem = results.get('testCoverageAbove80');
+  const changelogItem = results.get('changelogUpdated');
+
   const confidence = calculateConfidence({
     commits: analyzeResult.commits,
     changedFiles: analyzeResult.changedFiles,
     allCommitsConventional,
-    coverageAbove80: shouldPassResults.get('testCoverageAbove80')?.passed ?? false,
-    changelogUpdated: shouldPassResults.get('changelogUpdated')?.passed ?? false,
+    coverageAbove80: coverageItem?.result.status === 'passed',
+    changelogUpdated: changelogItem?.result.status === 'passed',
     hasBreaking: analyzeResult.breakingChanges
   });
 
-  const allMustPassed = Array.from(mustPassResults.values()).every(r => r.passed);
+  const allHardPassed = Array.from(results.values())
+    .filter(item => item.gateMode === 'hard')
+    .every(item => item.result.status === 'passed');
+
+  const hasFallback = Array.from(results.values())
+    .some(item => item.result.status === 'fallback');
 
   return {
-    mustPassResults,
-    shouldPassResults,
-    allMustPassed,
+    results,
+    allHardPassed,
+    hasFallback,
     confidence
   };
 }
 
+function formatStatusIcon(status: string): string {
+  switch (status) {
+    case 'passed':
+      return '✅';
+    case 'failed':
+      return '❌';
+    case 'fallback':
+      return '⏸️';
+    default:
+      return '❓';
+  }
+}
+
+function formatGateModeLabel(gateMode: string): string {
+  switch (gateMode) {
+    case 'hard':
+      return '[hard]';
+    case 'warn-only':
+      return '[warn]';
+    case 'fallback':
+      return '[fallback]';
+    default:
+      return '[?]';
+  }
+}
+
 export function formatCheckOutput(output: CheckOutput, verbose: boolean = false): string {
   const lines: string[] = [];
-  const { mustPassResults, shouldPassResults, confidence } = output;
+  const { results, confidence } = output;
 
   lines.push('质量检查:');
 
-  // mustPass 结果
-  for (const [name, result] of mustPassResults) {
-    const icon = result.passed ? '✅' : '❌';
+  // hard 结果
+  for (const [name, item] of results) {
+    if (item.gateMode !== 'hard') continue;
+    const icon = formatStatusIcon(item.result.status);
     const label = name.replace(/([A-Z])/g, ' $1').toLowerCase();
-    lines.push(`   ${icon} ${label}`);
-    if (!result.passed && result.message) {
-      lines.push(`      ${result.message}`);
+    lines.push(`   ${icon} ${formatGateModeLabel(item.gateMode)} ${label}`);
+    if (item.result.status !== 'passed' && item.result.message) {
+      lines.push(`      ${item.result.message}`);
     }
   }
 
@@ -82,12 +117,13 @@ export function formatCheckOutput(output: CheckOutput, verbose: boolean = false)
   if (verbose) {
     lines.push('');
     lines.push('建议检查:');
-    for (const [name, result] of shouldPassResults) {
-      const icon = result.passed ? '✅' : '⚠️';
+    for (const [name, item] of results) {
+      if (item.gateMode === 'hard') continue;
+      const icon = formatStatusIcon(item.result.status);
       const label = name.replace(/([A-Z])/g, ' $1').toLowerCase();
-      lines.push(`   ${icon} ${label}`);
-      if (result.message) {
-        lines.push(`      ${result.message}`);
+      lines.push(`   ${icon} ${formatGateModeLabel(item.gateMode)} ${label}`);
+      if (item.result.message) {
+        lines.push(`      ${item.result.message}`);
       }
     }
   }
@@ -118,8 +154,13 @@ export function formatConfidenceOutput(confidence: ConfidenceResult): string {
 }
 
 export function shouldBlockRelease(output: CheckOutput): boolean {
-  // mustPass 失败
-  if (!output.allMustPassed) {
+  // hard gate 失败
+  if (!output.allHardPassed) {
+    return true;
+  }
+
+  // fallback 状态存在（需要人工判断）
+  if (output.hasFallback) {
     return true;
   }
 

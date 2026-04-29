@@ -46,6 +46,39 @@ function expectNotIncludes(text, snippet, label, failures) {
   }
 }
 
+function expectNoCommandSurface(text, label, forbiddenSnippets, failures) {
+  if (!text) {
+    return;
+  }
+
+  for (const snippet of forbiddenSnippets) {
+    if (text.includes(snippet)) {
+      failures.push(`[entry-doc ghost-command] ${label} should stay routing-only, but contains command snippet: ${snippet}`);
+    }
+  }
+}
+
+function expectNoPolicyDuplication(text, label, forbiddenSnippets, failures) {
+  if (!text) {
+    return;
+  }
+
+  for (const snippet of forbiddenSnippets) {
+    if (text.includes(snippet)) {
+      failures.push(`[entry-doc duplicate-policy] ${label} duplicates governance policy that should stay in AGENTS.md or live rules: ${snippet}`);
+    }
+  }
+}
+
+function expectReferencedPaths(rootDir, label, references, failures) {
+  for (const reference of references) {
+    const absolutePath = path.join(rootDir, reference);
+    if (!existsSync(absolutePath)) {
+      failures.push(`[entry-doc ghost-route] ${label} references missing path: ${reference}`);
+    }
+  }
+}
+
 function validateSnippets(text, label, requiredSnippets, outdatedSnippets, failures) {
   if (!text) {
     return;
@@ -57,6 +90,166 @@ function validateSnippets(text, label, requiredSnippets, outdatedSnippets, failu
 
   for (const snippet of outdatedSnippets) {
     expectNotIncludes(text, snippet, label, failures);
+  }
+}
+
+function validateEntryDocGovernance(rootDir, failures) {
+  const agents = readText(rootDir, 'AGENTS.md', failures);
+  const claudeGuide = readText(rootDir, 'CLAUDE.md', failures);
+  const claudeAdapter = readText(rootDir, '.claude/CLAUDE.md', failures);
+  const rulesIndex = readText(rootDir, 'docs/rules/README.md', failures);
+
+  validateSnippets(
+    agents,
+    'AGENTS.md entry-doc authority baseline',
+    [
+      '`AGENTS.md = constitution` / `CLAUDE.md = router` / `.claude/CLAUDE.md = Claude adapter`',
+      '本文件只保留仓库级治理协议；若某条细则在 live doc 已定权，这里只保留原则与路由，不重复正文。'
+    ],
+    [],
+    failures
+  );
+
+  validateSnippets(
+    claudeGuide,
+    'CLAUDE.md router baseline',
+    [
+      '本文件只回答三件事：**谁定权、下一步去哪读、规则变更时该改哪份文档**。',
+      '它不是执行手册、命令速查、验证清单或交付 checklist。'
+    ],
+    [
+      'AI 执行手册',
+      '最小执行手册',
+      'Claude/Codex 执行手册'
+    ],
+    failures
+  );
+
+  validateSnippets(
+    claudeAdapter,
+    '.claude/CLAUDE.md adapter baseline',
+    [
+      'Claude Code 会自动读取本文件；它只负责把 Claude 连接到仓库里的**共享真相**。',
+      '本文件不是执行手册，也不是第二套规则入口。'
+    ],
+    [
+      'AI 执行手册',
+      '最小执行手册',
+      'Claude/Codex 执行手册',
+      'Claude 第二手册'
+    ],
+    failures
+  );
+
+  validateSnippets(
+    rulesIndex,
+    'docs/rules/README.md routing baseline',
+    [
+      '入口角色约束：`AGENTS.md` 定权，根 `CLAUDE.md` 只负责把你路由到这里或其他 live docs；规则正文仍以本目录各文件为准。'
+    ],
+    [],
+    failures
+  );
+
+  expectNoCommandSurface(
+    claudeGuide,
+    'CLAUDE.md',
+    ['npm run ', 'node dist/cli/index.js', 'mycodemap ', 'rtk ', 'python3 scripts/', '$gsd-'],
+    failures
+  );
+  expectNoCommandSurface(
+    claudeAdapter,
+    '.claude/CLAUDE.md',
+    ['npm run ', 'node dist/cli/index.js', 'mycodemap ', 'rtk ', 'python3 scripts/', '$gsd-'],
+    failures
+  );
+
+  expectNoPolicyDuplication(
+    claudeGuide,
+    'CLAUDE.md',
+    [
+      '## 3.1 任务分级与自主权边界（Harness 规范）',
+      '## 5. 证据协议',
+      '## 5.1 可信度自评要求（Harness 规范）',
+      '## 7.1 代码生成红线（Harness 规范）',
+      '## 8. 验证与失败预演'
+    ],
+    failures
+  );
+  expectNoPolicyDuplication(
+    claudeAdapter,
+    '.claude/CLAUDE.md',
+    [
+      '## 3.1 任务分级与自主权边界（Harness 规范）',
+      '## 5. 证据协议',
+      '## 5.1 可信度自评要求（Harness 规范）',
+      '## 7.1 代码生成红线（Harness 规范）',
+      '## 8. 验证与失败预演'
+    ],
+    failures
+  );
+
+  expectReferencedPaths(
+    rootDir,
+    'CLAUDE.md',
+    [
+      'AGENTS.md',
+      '.claude/CLAUDE.md',
+      'docs/rules/README.md',
+      'docs/rules/engineering-with-codex-openai.md',
+      'docs/rules/validation.md',
+      'docs/rules/architecture-guardrails.md',
+      'docs/rules/code-quality-redlines.md',
+      'docs/rules/testing.md',
+      'docs/rules/release.md',
+      'AI_GUIDE.md',
+      'ARCHITECTURE.md',
+      'docs/ai-guide',
+      'RTK.md'
+    ],
+    failures
+  );
+  expectReferencedPaths(
+    rootDir,
+    '.claude/CLAUDE.md',
+    [
+      'AGENTS.md',
+      'CLAUDE.md',
+      'docs/rules/engineering-with-codex-openai.md',
+      'docs/rules/validation.md',
+      'AI_GUIDE.md',
+      'ARCHITECTURE.md'
+    ],
+    failures
+  );
+  expectReferencedPaths(
+    rootDir,
+    'docs/rules/README.md',
+    [
+      'docs/rules/code-quality-redlines.md',
+      'docs/rules/architecture-guardrails.md',
+      'docs/rules/testing.md',
+      'docs/rules/validation.md',
+      'docs/rules/engineering-with-codex-openai.md',
+      'docs/rules/release.md',
+      'docs/rules/deployment.md',
+      'docs/rules/pre-release-checklist.md'
+    ],
+    failures
+  );
+
+  if (
+    claudeGuide &&
+    (!claudeGuide.includes('AGENTS.md') || !claudeGuide.includes('docs/rules/README.md'))
+  ) {
+    failures.push('[entry-doc authority-routing] CLAUDE.md no longer routes readers to AGENTS.md and docs/rules/README.md');
+  }
+
+  if (
+    claudeAdapter &&
+    (!claudeAdapter.includes('AGENTS.md') || !claudeAdapter.includes('CLAUDE.md'))
+  ) {
+    failures.push('[entry-doc authority-routing] .claude/CLAUDE.md no longer points Claude back to AGENTS.md and root CLAUDE.md');
   }
 }
 
@@ -1400,6 +1593,28 @@ function validateGuardrailDocs(rootDir, failures) {
   }
 }
 
+function validateValidationTruthDocs(rootDir, failures) {
+  const readme = readText(rootDir, 'README.md', failures);
+  const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
+  const validationRule = readText(rootDir, 'docs/rules/validation.md', failures);
+  const engineeringRule = readText(rootDir, 'docs/rules/engineering-with-codex-openai.md', failures);
+  const requiredTruthSnippets = [
+    '文档/入口变更先跑 `npm run docs:check`。',
+    '统一 docs/AI guardrail 入口：`node dist/cli/index.js ci check-docs-sync`（产品命令等价于 `mycodemap ci check-docs-sync`）。',
+    'repo-local rules 预检：`python3 scripts/validate-rules.py code --report-only` 只报告，不阻断。',
+    'CI / PR 超窗、fallback 或 false-positive 漂移时，`warn-only / fallback` 不是 hard gate success。'
+  ];
+
+  for (const [label, text] of [
+    ['README.md validation quick truth', readme],
+    ['AI_GUIDE.md validation quick truth', aiGuide],
+    ['docs/rules/validation.md validation quick truth', validationRule],
+    ['docs/rules/engineering-with-codex-openai.md validation quick truth', engineeringRule]
+  ]) {
+    validateSnippets(text, label, requiredTruthSnippets, [], failures);
+  }
+}
+
 function validateAssistantDocs(rootDir, failures) {
   const assistantGuide = readText(rootDir, 'docs/AI_ASSISTANT_SETUP.md', failures);
   const setupGuide = readText(rootDir, 'docs/SETUP_GUIDE.md', failures);
@@ -1442,6 +1657,7 @@ function validateDocs(rootDir) {
   validateConfigDocs(rootDir, failures);
   validatePluginRuntimeDocs(rootDir, failures);
   validateGraphStorageDocs(rootDir, failures);
+  validateEntryDocGovernance(rootDir, failures);
   validateAnalyzeDocs(rootDir, failures);
   validateHistoryRiskDocs(rootDir, failures);
   validateDesignContractDocs(rootDir, failures);
@@ -1449,6 +1665,7 @@ function validateDocs(rootDir) {
   validateWorkflowAndDiscoveryDocs(rootDir, failures);
   validateProductSpecsDocs(rootDir, failures);
   validateGuardrailDocs(rootDir, failures);
+  validateValidationTruthDocs(rootDir, failures);
   validateAssistantDocs(rootDir, failures);
 
   if (failures.length > 0) {

@@ -71,6 +71,13 @@
 - `generate`、`analyze` 与 `ci check-headers -d` 共享 `.gitignore` 感知文件发现模块；没有 `.gitignore` 时回退到统一默认 `exclude`。
 - 涉及发布边界时，再补 `npm run build` 与 `npm run validate-pack`；不要把本地临时产物当成发布事实。
 
+## 4.1 Validation quick truth
+
+- 文档/入口变更先跑 `npm run docs:check`。
+- 统一 docs/AI guardrail 入口：`node dist/cli/index.js ci check-docs-sync`（产品命令等价于 `mycodemap ci check-docs-sync`）。
+- repo-local rules 预检：`python3 scripts/validate-rules.py code --report-only` 只报告，不阻断。
+- CI / PR 超窗、fallback 或 false-positive 漂移时，`warn-only / fallback` 不是 hard gate success。
+
 ## 5. 当前项目的 CI 护栏
 
 - 本地护栏：

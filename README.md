@@ -456,6 +456,13 @@ mycodemap ci check-output-contract
 
 > `ci assess-risk` 现在输出 `status/confidence/freshness/source` 与统一 risk level；若 Git history 不可用，会显式打印 `unavailable` / warning，并说明阈值未被应用。
 
+## Validation quick truth
+
+- 文档/入口变更先跑 `npm run docs:check`。
+- 统一 docs/AI guardrail 入口：`node dist/cli/index.js ci check-docs-sync`（产品命令等价于 `mycodemap ci check-docs-sync`）。
+- repo-local rules 预检：`python3 scripts/validate-rules.py code --report-only` 只报告，不阻断。
+- CI / PR 超窗、fallback 或 false-positive 漂移时，`warn-only / fallback` 不是 hard gate success。
+
 ## 配置说明
 
 通过 `mycodemap init` 收敛的 canonical 配置文件是 `.mycodemap/config.json`（根目录 `mycodemap.config.json` / `codemap.config.json` 只作为 legacy migration source）。

@@ -8,7 +8,7 @@ vi.mock('child_process', () => ({
   execSync: execSyncMock
 }));
 
-import { monitorCI } from '../monitor.js';
+import { monitorCI, snapshotPublishStatus } from '../monitor.js';
 
 describe('ship monitor', () => {
   beforeEach(() => {
@@ -117,5 +117,104 @@ describe('ship monitor', () => {
     expect(result.success).toBe(false);
     expect(result.failedJobs).toEqual(['Build and Publish / Run tests']);
     expect(result.error).toContain('Run tests');
+  });
+
+  it('should return ambiguous when multiple exact-match workflow runs exist', async () => {
+    const createdAt = new Date().toISOString();
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        workflow_runs: [
+          {
+            id: 10,
+            name: 'Publish to NPM',
+            status: 'completed',
+            conclusion: 'success',
+            html_url: 'https://example.com/run/10',
+            created_at: createdAt,
+            updated_at: createdAt,
+            head_branch: 'v0.4.1',
+            head_sha: 'target-sha',
+            jobs_url: 'https://example.com/jobs/10'
+          },
+          {
+            id: 11,
+            name: 'Publish to NPM',
+            status: 'in_progress',
+            conclusion: null,
+            html_url: 'https://example.com/run/11',
+            created_at: createdAt,
+            updated_at: createdAt,
+            head_branch: 'v0.4.1',
+            head_sha: 'target-sha',
+            jobs_url: 'https://example.com/jobs/11'
+          }
+        ]
+      }), { status: 200 })
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await snapshotPublishStatus({
+      tagName: 'v0.4.1',
+      headSha: 'target-sha',
+      workflowFile: 'publish.yml'
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.status).toBe('ambiguous');
+    expect(result.matchedRunCount).toBe(2);
+    expect(result.details).toContain('10');
+    expect(result.details).toContain('11');
+  });
+
+  it('should return unavailable when workflow runs cannot be fetched', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('forbidden', { status: 403, statusText: 'Forbidden' })
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await snapshotPublishStatus({
+      tagName: 'v0.4.1',
+      headSha: 'target-sha',
+      workflowFile: 'publish.yml'
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.status).toBe('unavailable');
+    expect(result.details).toContain('403');
+  });
+
+  it('should return pending when no exact-match workflow run exists yet', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        workflow_runs: [
+          {
+            id: 12,
+            name: 'Publish to NPM',
+            status: 'completed',
+            conclusion: 'success',
+            html_url: 'https://example.com/run/12',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            head_branch: 'main',
+            head_sha: 'other-sha',
+            jobs_url: 'https://example.com/jobs/12'
+          }
+        ]
+      }), { status: 200 })
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await snapshotPublishStatus({
+      tagName: 'v0.4.1',
+      headSha: 'target-sha',
+      workflowFile: 'publish.yml'
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.status).toBe('pending');
+    expect(result.reason).toContain('尚未观察到');
   });
 });

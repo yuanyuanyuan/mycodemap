@@ -17,6 +17,8 @@ import { workflowCommand } from './commands/workflow.js';
 import { exportCommand } from './commands/export.js';
 import { checkCommand } from './commands/check.js';
 import { historyCommand } from './commands/history.js';
+import { publishStatusCommand } from './commands/publish-status.js';
+import { readinessGateCommand } from './commands/readiness-gate.js';
 import { mcpCommand, isMcpStartInvocation } from './commands/mcp.js';
 import { shipCommand } from './commands/ship/index.js';
 import { ANALYZE_COMMAND_DESCRIPTION, configureAnalyzeCommand } from './commands/analyze-options.js';
@@ -175,6 +177,12 @@ program.addCommand(checkCommand);
 
 // History risk 命令
 program.addCommand(historyCommand);
+
+// Publish workflow follow-up 命令
+program.addCommand(publishStatusCommand);
+
+// Readiness gate 命令
+program.addCommand(readinessGateCommand);
 
 // Experimental MCP 命令
 program.addCommand(mcpCommand);

@@ -578,6 +578,45 @@ mycodemap ship --yes                       # 置信度 60-75 时自动确认
 
 ---
 
+### publish-status - 发布后的只读 snapshot 复核
+
+> `publish-status` 是 `ship` / `/release` 之后的 follow-up observability surface；它不触发发布、不重跑 workflow，也不猜“最新一条 run”。
+
+```bash
+mycodemap publish-status --tag v1.9.0 --sha abcdef123456
+mycodemap publish-status --tag v1.9.0 --sha abcdef123456 --json
+mycodemap publish-status --tag v1.9.0 --sha abcdef123456 --json --structured
+mycodemap publish-status --tag v1.9.0 --sha abcdef123456 --workflow-file publish.yml
+```
+
+| 选项 | 说明 | 默认值 |
+|------|------|--------|
+| `--tag <tag>` | 发布 tag，必须精确提供 | - |
+| `--sha <sha>` | 发布 commit SHA，必须精确提供 | - |
+| `--workflow-file <file>` | GitHub Actions workflow 文件名 | `publish.yml` |
+| `--json` | 输出 machine-readable JSON | `false` |
+| `--structured` | 去掉自然语言 `content`，需配合 `--json` 使用 | `false` |
+
+**状态语义:**
+- `success`：找到唯一精确匹配 run，且 workflow 成功
+- `failure`：找到唯一精确匹配 run，且 workflow 明确失败
+- `pending`：还没观察到精确匹配 run，或 run 仍在执行中
+- `ambiguous`：出现多个同时匹配 `tag + sha` 的 runs；不会猜哪一个才是“最新”
+- `unavailable`：repo slug、GitHub API、权限或最终 truth 无法精确确认
+
+**输出契约:**
+- 默认输出终端摘要
+- `--json` 输出 machine-readable payload，并保留 `content`
+- `--json --structured` 移除自然语言字段，仅保留结构化 truth
+- payload 至少包含 `status`、`workflowUrl`、`releaseUrl`、`runId`、`failedJobs`、`reason`、`details`
+
+**边界:**
+- 只做一次 snapshot read，不内置轮询
+- 只读；不会 rerun workflow、dispatch workflow、`npm publish`、`git push`
+- 它不会替代 `ship` 或 `/release`，发布 authority 仍在 `docs/rules/release.md`
+
+---
+
 ## 全局选项
 
 所有命令支持：
