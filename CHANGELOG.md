@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.0] - 2026-04-29 - Release Governance Unification
+
+### 🏛️ Governance
+
+- **release**: `/release v{X.Y}` 统一发布治理入口，绑定 milestone closeout 与 npm release 1:1
+- **release**: 引入双确认门（Confirmation Gate #1 / #2），发布操作升级为 L3 受控等级
+- **release**: `docs/rules/release.md` 成为单一权威发布流程文档
+- **release**: `.claude/skills/release/SKILL.md` 作为 thin orchestrator，委托 `scripts/release.sh` 与 `.github/workflows/publish.yml`
+
+### 📝 Documentation
+
+- **release**: 同步 `llms.txt`、`AI_GUIDE.md`、`AI_DISCOVERY.md`、`ai-document-index.yaml` 到 `v1.9.0`
+- **changelog**: 新增 v1.9.0 发布条目，记录 release governance unification milestone
+
 ## [0.5.2-beta.1] - 2026-04-19 - Trusted Publishing Verification
 
 ### 🛠️ Infrastructure
