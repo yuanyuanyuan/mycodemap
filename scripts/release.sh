@@ -109,7 +109,7 @@ echo ""
 # 步骤 2: 提交版本更新
 echo -e "${BLUE}2/5 提交版本更新...${NC}"
 git add package.json package-lock.json
-git commit -m "[RELEASE] bump version to v$NEW_VERSION"
+git commit -m "[CONFIG] version: bump to v$NEW_VERSION"
 echo -e "${GREEN}   ✅ 已提交版本更新${NC}"
 echo ""
 
