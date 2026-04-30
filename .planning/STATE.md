@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: agent-native-foundation
-current_phase: 42 — completed
-current_phase_name: cli-as-mcp-automatic-gateway
+current_phase: 40.1
+current_phase_name: real-world-validation-guardrails
 current_plan: —
-status: executing
-last_updated: "2026-04-30T09:14:00+08:00"
+status: context-gathered
+last_updated: "2026-04-30T10:00:00+08:00"
 last_activity: 2026-04-30
 progress:
   total_phases: 8
@@ -112,3 +112,6 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 
 ---
 *State initialized: 2026-04-30 for Milestone v2.0*
+
+- Phase 40.1 added: Real-World Validation Guardrails — 添加真实场景验证规则到测试规范、发布检查清单、AGENTS.md、CLAUDE.md 和 CI 护栏
+- Phase 40.1 context gathered (2026-04-30): 硬约束+CI护栏双保险、启发式grep pre-commit + [证据]标签CI、分层豁免41/42、元信息层文档增强
