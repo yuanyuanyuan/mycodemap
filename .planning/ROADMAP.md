@@ -28,9 +28,9 @@ Earlier milestones: see `.planning/MILESTONES.md` and `.planning/milestones/`.
 **Requirements:** VAL-01 (真实场景验证规则)
 **Plans:** 2 plans
 **Wave 1** *(no dependencies)*
-- [ ] 40.1-01-PLAN.md — 文档层修改（AGENTS.md, CLAUDE.md, testing.md, pre-release-checklist.md）
+- [x] 40.1-01-PLAN.md — 文档层修改（AGENTS.md, CLAUDE.md, testing.md, pre-release-checklist.md）
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 40.1-02-PLAN.md — 自动化层（pre-commit, CI workflow）
+- [x] 40.1-02-PLAN.md — 自动化层（pre-commit, CI workflow）
 
 **Cross-cutting constraints:** AGENTS.md Section 8.1 真实场景验证阈值（Plan 01 声明，Plan 02 引用）
 **Success criteria:**
@@ -63,6 +63,10 @@ Earlier milestones: see `.planning/MILESTONES.md` and `.planning/milestones/`.
 ### Phase 43: codemap doctor
 **Goal:** Create a living diagnostics command that audits the entire CodeMap ecosystem.
 **Requirements:** TRUST-01, TRUST-02, TRUST-03
+**Plans:** 1 plan
+Plans:
+- [ ] 43-01-PLAN.md — Diagnostic types, 4 checker modules, orchestrator, formatter, CLI registration, and tests
+
 **Success criteria:**
 1. `codemap doctor` command exists and runs without errors
 2. Detects ghost commands (`echo` stubs in `package.json`)
@@ -180,8 +184,8 @@ These are scoped but not yet initialized. Requirements and roadmaps will be crea
 
 ## Next Options
 
-1. **Discuss Phase 41** — `$gsd-discuss-phase 41` (gather context and clarify approach)
-2. **Plan Phase 41** — `$gsd-plan-phase 41` (skip discussion, plan directly)
+1. **Discuss Phase 43** — `$gsd-discuss-phase 43` (gather context and clarify approach)
+2. **Plan Phase 43** — `$gsd-plan-phase 43` (skip discussion, plan directly)
 3. **Review full requirements** — Read `.planning/REQUIREMENTS.md` for detailed acceptance criteria
 4. **Adjust milestone scope** — If v2.0 feels too large, use `$gsd-insert-phase` or `$gsd-remove-phase` to rebalance
 
