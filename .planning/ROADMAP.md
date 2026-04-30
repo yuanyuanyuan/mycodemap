@@ -22,7 +22,23 @@ Earlier milestones: see `.planning/MILESTONES.md` and `.planning/milestones/`.
 <details open>
 <summary>🚧 v2.0 agent-native-foundation (Phases 41-48) — IN PROGRESS</summary>
 
+### Phase 40.1: Real-World Validation Guardrails
+**Goal:** Add mandatory real-world validation rules to testing docs, pre-release checklist, AGENTS.md, CLAUDE.md, and CI guardrails. All tests must include real test cases with evidence from actual execution.
+**Depends on:** None
+**Requirements:** VAL-01 (真实场景验证规则)
+**Plans:** 2 plans
+- [ ] 40.1-01-PLAN.md — 文档层修改（AGENTS.md, CLAUDE.md, testing.md, pre-release-checklist.md）
+- [ ] 40.1-02-PLAN.md — 自动化层（pre-commit, CI workflow）
+**Success criteria:**
+1. `docs/rules/testing.md` contains real-world validation rules with evidence requirements
+2. `docs/rules/pre-release-checklist.md` contains check item #12 for real-world validation
+3. `AGENTS.md` Section 8 strengthened with real-world validation requirements
+4. `CLAUDE.md` contains route pointer to testing rules
+5. `.github/workflows/ci-gateway.yml` runs real-validation check
+6. `.githooks/pre-commit` enforces evidence presence
+
 ### Phase 41: Interface Contract Schema
+
 **Goal:** Define the CLI surface as a formal machine-readable contract schema and expose runtime metadata.
 **Requirements:** AGENT-01, AGENT-02, AGENT-04, AGENT-05
 **Success criteria:**
