@@ -20,6 +20,7 @@ import { historyCommand } from './commands/history.js';
 import { publishStatusCommand } from './commands/publish-status.js';
 import { readinessGateCommand } from './commands/readiness-gate.js';
 import { mcpCommand, isMcpStartInvocation } from './commands/mcp.js';
+import { doctorCommand } from './commands/doctor.js';
 import { shipCommand } from './commands/ship/index.js';
 import { ANALYZE_COMMAND_DESCRIPTION, configureAnalyzeCommand } from './commands/analyze-options.js';
 import { setupRuntimeLogging } from './runtime-logger.js';
@@ -34,7 +35,11 @@ const program = new Command();
 const cliArgs = process.argv.slice(2);
 
 // --schema must bypass all startup side effects to keep stdout machine-parseable
-if (cliArgs.includes('--schema')) {
+// Only intercept at root level (no subcommand present) so valid subcommand args
+// that happen to be exactly --schema are not hijacked.
+const firstArg = cliArgs[0];
+const isRootLevel = !firstArg || firstArg.startsWith('-');
+if (isRootLevel && cliArgs.includes('--schema')) {
   console.log(JSON.stringify(getFullContract(), null, 2));
   process.exit(0);
 }
@@ -194,6 +199,9 @@ program.addCommand(readinessGateCommand);
 
 // Experimental MCP 命令
 program.addCommand(mcpCommand);
+
+// Doctor command
+program.addCommand(doctorCommand);
 
 // Workflow 命令
 program.addCommand(workflowCommand);
