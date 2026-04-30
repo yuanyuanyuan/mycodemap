@@ -27,8 +27,12 @@ Earlier milestones: see `.planning/MILESTONES.md` and `.planning/milestones/`.
 **Depends on:** None
 **Requirements:** VAL-01 (真实场景验证规则)
 **Plans:** 2 plans
+**Wave 1** *(no dependencies)*
 - [ ] 40.1-01-PLAN.md — 文档层修改（AGENTS.md, CLAUDE.md, testing.md, pre-release-checklist.md）
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 40.1-02-PLAN.md — 自动化层（pre-commit, CI workflow）
+
+**Cross-cutting constraints:** AGENTS.md Section 8.1 真实场景验证阈值（Plan 01 声明，Plan 02 引用）
 **Success criteria:**
 1. `docs/rules/testing.md` contains real-world validation rules with evidence requirements
 2. `docs/rules/pre-release-checklist.md` contains check item #12 for real-world validation
