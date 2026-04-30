@@ -79,7 +79,7 @@ function registerContractTools(server: McpServer, contract: InterfaceContract, r
   const registeredNames = new Set<string>(reservedNames);
 
   for (const command of contract.commands) {
-    const definitions = convertContractToMcpTools(command);
+    const definitions = convertContractToMcpTools(command, contract.programName);
 
     for (const def of definitions) {
       let toolName = def.name;
@@ -87,8 +87,10 @@ function registerContractTools(server: McpServer, contract: InterfaceContract, r
       if (registeredNames.has(toolName)) {
         const altName = `${toolName}_contract`;
         if (registeredNames.has(altName)) {
-          continue; // Both taken, silently skip
+          console.warn(`Contract tool "${def.name}" skipped — name reserved by native tool and alternative "${altName}" also taken`);
+          continue;
         }
+        console.warn(`Contract tool "${def.name}" renamed to "${altName}" — name reserved by native tool`);
         toolName = altName;
       }
       registeredNames.add(toolName);
@@ -97,6 +99,7 @@ function registerContractTools(server: McpServer, contract: InterfaceContract, r
         title: def.config.title,
         description: def.config.description,
         inputSchema: def.config.inputSchema,
+        outputSchema: def.config.outputSchema,
       }, async (args) => def.handler(args as Record<string, unknown>));
     }
   }
