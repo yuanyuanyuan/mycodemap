@@ -188,6 +188,9 @@ describe('CodeMap experimental MCP server', () => {
     expect(tools.tools.map(tool => tool.name)).toEqual([
       'codemap_query',
       'codemap_impact',
+      'codemap_analyze',
+      'codemap_query_contract',
+      'codemap_deps',
     ]);
 
     await connection.client.callTool({

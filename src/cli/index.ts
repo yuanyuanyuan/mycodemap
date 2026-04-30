@@ -28,9 +28,17 @@ import { printMigrationWarning } from './paths.js';
 import { validatePlatform } from './platform-check.js';
 import { formatRemovedCommandMessage, getRemovedTopLevelCommand } from './removed-commands.js';
 import { commandRequiresTreeSitter, validateTreeSitter } from './tree-sitter-check.js';
+import { getFullContract } from './interface-contract/index.js';
 
 const program = new Command();
 const cliArgs = process.argv.slice(2);
+
+// --schema must bypass all startup side effects to keep stdout machine-parseable
+if (cliArgs.includes('--schema')) {
+  console.log(JSON.stringify(getFullContract(), null, 2));
+  process.exit(0);
+}
+
 const shouldBypassHumanStartupSideEffects = isMcpStartInvocation(cliArgs);
 
 const removedCommand = getRemovedTopLevelCommand(cliArgs);

@@ -1,6 +1,6 @@
 # AGENTS.md - CodeMap 仓库级 AI 协议
 
-> 目标：让入口文档稳定收敛为 **`AGENTS.md = constitution` / `CLAUDE.md = router`**。
+> 目标：让入口文档稳定收敛为 **`AGENTS.md = constitution` / `CLAUDE.md = router` / `.claude/CLAUDE.md = Claude adapter`**。
 > 语言：中文。默认面向 AI 编程助手与自动化代理。
 
 ## 1. 作用域与优先级
@@ -137,3 +137,4 @@
 
 如果遇到代码运行问题，尽量添加更多调试日志，最好是包含有问题的位置的代码的整个执行日志，查阅日志来检查错误，而不是盲目测试和修改代码。
 
+@/home/stark/.codex/RTK.md

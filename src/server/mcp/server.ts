@@ -8,7 +8,10 @@ import { z } from 'zod';
 import type { Readable, Writable } from 'node:stream';
 import type { IStorage } from '../../interface/types/storage.js';
 import { createConfiguredStorage } from '../../cli/storage-runtime.js';
+import { getFullContract } from '../../cli/interface-contract/index.js';
+import type { InterfaceContract } from '../../cli/interface-contract/types.js';
 import { CodeMapMcpService } from './service.js';
+import { convertContractToMcpTools } from './schema-adapter.js';
 
 const MCP_SERVER_NAME = 'mycodemap-experimental';
 const MCP_SERVER_VERSION = process.env.npm_package_version ?? '0.5.0';
@@ -23,7 +26,7 @@ function renderStructuredContent(result: unknown): string {
   return JSON.stringify(result, null, 2);
 }
 
-function registerTools(server: McpServer, service: CodeMapMcpService): void {
+function registerNativeTools(server: McpServer, service: CodeMapMcpService): void {
   server.registerTool('codemap_query', {
     title: 'CodeMap Query',
     description: 'Experimental: query a symbol definition plus callers and callees from the local CodeMap graph.',
@@ -72,6 +75,33 @@ function registerTools(server: McpServer, service: CodeMapMcpService): void {
   });
 }
 
+function registerContractTools(server: McpServer, contract: InterfaceContract, reservedNames: Set<string>): void {
+  const registeredNames = new Set<string>(reservedNames);
+
+  for (const command of contract.commands) {
+    const definitions = convertContractToMcpTools(command);
+
+    for (const def of definitions) {
+      let toolName = def.name;
+      // If a native tool occupies this name, register under a stable alternative
+      if (registeredNames.has(toolName)) {
+        const altName = `${toolName}_contract`;
+        if (registeredNames.has(altName)) {
+          continue; // Both taken, silently skip
+        }
+        toolName = altName;
+      }
+      registeredNames.add(toolName);
+
+      server.registerTool(toolName, {
+        title: def.config.title,
+        description: def.config.description,
+        inputSchema: def.config.inputSchema,
+      }, async (args) => def.handler(args as Record<string, unknown>));
+    }
+  }
+}
+
 export function createCodeMapMcpServer(storage: IStorage): McpServer {
   const server = new McpServer({
     name: MCP_SERVER_NAME,
@@ -79,7 +109,10 @@ export function createCodeMapMcpServer(storage: IStorage): McpServer {
   });
   const service = new CodeMapMcpService(storage);
 
-  registerTools(server, service);
+  const reservedNames = new Set<string>(['codemap_query', 'codemap_impact']);
+
+  registerNativeTools(server, service);
+  registerContractTools(server, getFullContract(), reservedNames);
 
   return server;
 }
