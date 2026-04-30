@@ -1,6 +1,6 @@
 # AGENTS.md - CodeMap 仓库级 AI 协议
 
-> 目标：让入口文档稳定收敛为 **`AGENTS.md = constitution` / `CLAUDE.md = router` / `.claude/CLAUDE.md = Claude adapter`**。
+> 目标：让入口文档稳定收敛为 **`AGENTS.md = constitution` / `CLAUDE.md = router`**。
 > 语言：中文。默认面向 AI 编程助手与自动化代理。
 
 ## 1. 作用域与优先级
@@ -126,7 +126,7 @@
 - 详细文档同步触发条件、AI 友好文档 authoring 规则、任务模板与交付 checklist 统一在 `docs/rules/engineering-with-codex-openai.md` 定权。
 - AI 友好文档的**结构清晰要求**、**决策树要求**、**速查表要求**、**代码可复现要求**、**类型定义要求**与**提示词模板要求**统一在 `docs/rules/engineering-with-codex-openai.md` 定权。
 - 若判断“不需要更新文档”，也要明确写出原因。
-- 每次任务结束都要自问：是否需要同步 `AGENTS.md`、`CLAUDE.md`、`.claude/CLAUDE.md`、`README.md`、`ARCHITECTURE.md`、`AI_GUIDE.md`、`docs/rules/*` 与 `docs/ai-guide/*`。
+- 每次任务结束都要自问：是否需要同步 `AGENTS.md`、`CLAUDE.md`、`README.md`、`ARCHITECTURE.md`、`AI_GUIDE.md`、`docs/rules/*` 与 `docs/ai-guide/*`。
 
 ## 10. 当前仓库过渡说明
 
