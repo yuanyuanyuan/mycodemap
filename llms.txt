@@ -1,7 +1,7 @@
 # CodeMap
 
-> CodeMap 是一个 TypeScript 代码地图生成与分析工具，为 AI 辅助开发提供结构化上下文。
-> 版本: 1.9.0 (MVP3) | 仓库: https://github.com/mycodemap/mycodemap
+> CodeMap 是一个 AI-Native 优先、人类友好的代码架构治理基础设施，为 AI/Agent 提供结构化、可预测的代码上下文。
+> 版本: v2.0 agent-native-foundation | 仓库: https://github.com/mycodemap/mycodemap
 
 CodeMap 帮助 AI 大模型、Agent 和开发者理解 TypeScript/JavaScript 项目的代码结构、依赖关系和模块边界。它生成结构化的代码地图，支持影响分析、依赖查询、复杂度评估等功能。
 
@@ -48,6 +48,20 @@ node dist/cli/index.js analyze -i read -t "file.ts" --scope transitive --json
 
 # 检查代码质量
 node dist/cli/index.js analyze -i read -t "src/" --json
+
+# v2.0 新命令
+# 诊断 CodeMap 自身健康
+node dist/cli/index.js doctor --json
+
+# 查看 CLI 完整契约 schema
+node dist/cli/index.js --schema
+
+# 对比 WASM vs Native 性能
+node dist/cli/index.js benchmark
+
+# MCP 安装与启动
+node dist/cli/index.js mcp install
+node dist/cli/index.js mcp start
 ```
 
 ## 可选
@@ -59,4 +73,4 @@ node dist/cli/index.js analyze -i read -t "src/" --json
 ---
 
 *本文档遵循 llms.txt 标准格式: https://llmstxt.org/*
-*最后更新: 2026-03-22*
+*最后更新: 2026-05-01*

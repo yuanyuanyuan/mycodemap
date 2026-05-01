@@ -5,7 +5,7 @@
 
 ## 1. 系统定位
 
-CodeMap 是一个面向 TypeScript / JavaScript / Go 项目的 AI-first 代码地图工具，目标是为 AI/Agent 提供结构化、可预测、可机器消费的代码上下文。当前仓库仍处于 brownfield 过渡期：legacy CLI / workflow / release surfaces 与 MVP3 分层架构并存。
+CodeMap 是一个面向 TypeScript / JavaScript / Go 项目的 AI-Native 优先代码架构治理基础设施，`v2.0` 已把 CLI 表面升级为 schema 驱动的自描述统一接口。目标是为 AI/Agent 提供结构化、可预测、可机器消费的代码上下文。当前仓库处于 v2.0 已交付状态：Interface Contract Schema、MCP Automatic Gateway、AI-First Default Output、doctor 诊断、WASM Fallback 均已实现，legacy CLI / workflow / release surfaces 与 MVP3 分层架构并存。
 
 - 作为 CLI：以代码地图生成、查询、依赖/影响/复杂度分析、导出、CI 护栏为主要产品面。
 - 作为库：通过 `dist/index.js` 暴露分析、解析与生成能力。

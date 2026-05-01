@@ -299,12 +299,12 @@ function renderAnalyzeOptionsTable(rootDir) {
 
 const ANALYZE_DOC_BLOCKS = [
   {
-    relativePath: 'README.md',
+    relativePath: 'README.zh-CN.md',
     marker: 'analyze-readme-examples',
     render: () => renderReadmeAnalyzeExamples(),
   },
   {
-    relativePath: 'README.md',
+    relativePath: 'README.zh-CN.md',
     marker: 'analyze-readme-options',
     render: rootDir => renderAnalyzeOptionsTable(rootDir),
   },

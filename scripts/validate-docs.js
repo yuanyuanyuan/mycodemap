@@ -273,7 +273,7 @@ function validatePackageScripts(rootDir, failures) {
 }
 
 function validateAnalyzeDocs(rootDir, failures) {
-  const readme = readText(rootDir, 'README.md', failures);
+  const readme = readText(rootDir, 'README.zh-CN.md', failures) || readText(rootDir, 'README.md', failures);
   const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
   const claudeGuide = readText(rootDir, 'CLAUDE.md', failures);
   const commandsGuide = readText(rootDir, 'docs/ai-guide/COMMANDS.md', failures);
@@ -410,7 +410,7 @@ function validateAnalyzeDocs(rootDir, failures) {
 }
 
 function validateHistoryRiskDocs(rootDir, failures) {
-  const readme = readText(rootDir, 'README.md', failures);
+  const readme = readText(rootDir, 'README.zh-CN.md', failures) || readText(rootDir, 'README.md', failures);
   const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
   const claudeGuide = readText(rootDir, 'CLAUDE.md', failures);
   const commandsGuide = readText(rootDir, 'docs/ai-guide/COMMANDS.md', failures);
@@ -513,7 +513,7 @@ function validateHistoryRiskDocs(rootDir, failures) {
 }
 
 function validateDesignContractDocs(rootDir, failures) {
-  const readme = readText(rootDir, 'README.md', failures);
+  const readme = readText(rootDir, 'README.zh-CN.md', failures) || readText(rootDir, 'README.md', failures);
   const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
   const claudeGuide = readText(rootDir, 'CLAUDE.md', failures);
   const commandsGuide = readText(rootDir, 'docs/ai-guide/COMMANDS.md', failures);
@@ -932,7 +932,7 @@ function validateNpmScriptsAreReal(rootDir, failures) {
 }
 
 function validatePositioningBaselineDocs(rootDir, failures) {
-  const readme = readText(rootDir, 'README.md', failures);
+  const readme = readText(rootDir, 'README.zh-CN.md', failures) || readText(rootDir, 'README.md', failures);
   const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
   const aiGuideIndex = readText(rootDir, 'docs/ai-guide/README.md', failures);
   const outputGuide = readText(rootDir, 'docs/ai-guide/OUTPUT.md', failures);
@@ -940,7 +940,7 @@ function validatePositioningBaselineDocs(rootDir, failures) {
 
   if (readme) {
     const requiredReadmeSnippets = [
-      'AI-first 代码地图工具',
+      'AI-Native',
       'AI/Agent 是主要消费者',
       '`server`、`watch`、`report`、`logs` 已从 public CLI 移除，并在调用时给出迁移提示。'
     ];
@@ -959,8 +959,8 @@ function validatePositioningBaselineDocs(rootDir, failures) {
 
   if (aiGuide) {
     const requiredAiGuideSnippets = [
-      'CodeMap 是一个 AI-first 代码地图工具',
-      '当前 CLI 过渡现实',
+      'CodeMap 是一个 AI-Native 优先',
+      'JSON/NDJSON 默认输出',
       '`Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令',
       '后者已从 public CLI 移除'
     ];
@@ -1005,7 +1005,7 @@ function validatePositioningBaselineDocs(rootDir, failures) {
 }
 
 function validateCliSurfaceDocs(rootDir, failures) {
-  const readme = readText(rootDir, 'README.md', failures);
+  const readme = readText(rootDir, 'README.zh-CN.md', failures) || readText(rootDir, 'README.md', failures);
   const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
   const aiGuideIndex = readText(rootDir, 'docs/ai-guide/README.md', failures);
   const commandsGuide = readText(rootDir, 'docs/ai-guide/COMMANDS.md', failures);
@@ -1093,7 +1093,7 @@ function validateCliSurfaceDocs(rootDir, failures) {
 }
 
 function validateConfigDocs(rootDir, failures) {
-  const readme = readText(rootDir, 'README.md', failures);
+  const readme = readText(rootDir, 'README.zh-CN.md', failures) || readText(rootDir, 'README.md', failures);
   const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
   const setupGuide = readText(rootDir, 'docs/SETUP_GUIDE.md', failures);
   const assistantGuide = readText(rootDir, 'docs/AI_ASSISTANT_SETUP.md', failures);
@@ -1205,7 +1205,7 @@ function validateConfigDocs(rootDir, failures) {
 }
 
 function validatePluginRuntimeDocs(rootDir, failures) {
-  const readme = readText(rootDir, 'README.md', failures);
+  const readme = readText(rootDir, 'README.zh-CN.md', failures) || readText(rootDir, 'README.md', failures);
   const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
   const commandsGuide = readText(rootDir, 'docs/ai-guide/COMMANDS.md', failures);
   const outputGuide = readText(rootDir, 'docs/ai-guide/OUTPUT.md', failures);
@@ -1280,7 +1280,7 @@ function validatePluginRuntimeDocs(rootDir, failures) {
 }
 
 function validateGraphStorageDocs(rootDir, failures) {
-  const readme = readText(rootDir, 'README.md', failures);
+  const readme = readText(rootDir, 'README.zh-CN.md', failures) || readText(rootDir, 'README.md', failures);
   const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
   const claudeGuide = readText(rootDir, 'CLAUDE.md', failures);
   const commandsGuide = readText(rootDir, 'docs/ai-guide/COMMANDS.md', failures);
@@ -1427,7 +1427,7 @@ function validateTestingDocs(rootDir, failures) {
 }
 
 function validateWorkflowAndDiscoveryDocs(rootDir, failures) {
-  const readme = readText(rootDir, 'README.md', failures);
+  const readme = readText(rootDir, 'README.zh-CN.md', failures) || readText(rootDir, 'README.md', failures);
   const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
   const commandsGuide = readText(rootDir, 'docs/ai-guide/COMMANDS.md', failures);
   const outputGuide = readText(rootDir, 'docs/ai-guide/OUTPUT.md', failures);
@@ -1627,7 +1627,7 @@ function validateProductSpecsDocs(rootDir, failures) {
 }
 
 function validateGuardrailDocs(rootDir, failures) {
-  const readme = readText(rootDir, 'README.md', failures);
+  const readme = readText(rootDir, 'README.zh-CN.md', failures) || readText(rootDir, 'README.md', failures);
   const engineeringRule = readText(rootDir, 'docs/rules/engineering-with-codex-openai.md', failures);
   const validationRule = readText(rootDir, 'docs/rules/validation.md', failures);
   const ciWorkflow = readText(rootDir, '.github/workflows/ci-gateway.yml', failures);
@@ -1689,7 +1689,7 @@ function validateGuardrailDocs(rootDir, failures) {
 }
 
 function validateValidationTruthDocs(rootDir, failures) {
-  const readme = readText(rootDir, 'README.md', failures);
+  const readme = readText(rootDir, 'README.zh-CN.md', failures) || readText(rootDir, 'README.md', failures);
   const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
   const validationRule = readText(rootDir, 'docs/rules/validation.md', failures);
   const engineeringRule = readText(rootDir, 'docs/rules/engineering-with-codex-openai.md', failures);

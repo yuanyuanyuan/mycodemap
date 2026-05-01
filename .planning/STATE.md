@@ -1,19 +1,19 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.0
-milestone_name: agent-native-foundation
+milestone_name: milestone
 current_phase: —
 current_phase_name: —
 current_plan: —
-status: archived
-last_updated: "2026-05-01T16:00:00.000Z"
+status: Archived
+last_updated: "2026-05-01T08:13:03.574Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 10
-  completed_phases: 10
-  total_plans: 16
-  completed_plans: 16
-  percent: 100
+  completed_phases: 5
+  total_plans: 13
+  completed_plans: 11
+  percent: 85
 ---
 
 # Session State

@@ -34,7 +34,11 @@ AGENTS.md → docs/rules/README.md → 最相关的 1-2 份 live docs → ARCHIT
 | 代码质量红线、`[META]` / `[WHY]`、`TODO-DEBT` 在哪？ | `docs/rules/code-quality-redlines.md`                       |
 | 测试规则与 fixture 边界在？                        | `docs/rules/testing.md`                                     |
 | `/release` 发布流程、milestone 绑定、确认门在哪？    | `docs/rules/release.md`                                     |
-| CodeMap CLI / MCP / AI 使用方式在？                | `AI_GUIDE.md` + `docs/ai-guide/*.md`                        |                                      |
+| CodeMap CLI / MCP / AI 使用方式在？                | `AI_GUIDE.md` + `docs/ai-guide/*.md`                        |
+| Interface Contract Schema / `--schema` 在哪？       | `src/cli/interface-contract/` + `AI_GUIDE.md`               |
+| MCP Gateway 动态 tool 注册在哪？                    | `src/server/mcp/schema-adapter.ts` + `docs/ai-guide/INTEGRATION.md` |
+| `codemap doctor` 诊断体系在哪？                     | `src/cli/doctor/` + `AI_GUIDE.md`                           |
+| WASM Fallback / Native 性能对比在哪？               | `src/cli/loaders/` + `AI_GUIDE.md`                          |
 
 ## 验证决策树
 
