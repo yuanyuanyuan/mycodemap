@@ -531,27 +531,23 @@ export const initContract: CommandContract = {
 | A4 | The existing `InitAssetStatus` enum covers all profile states without new values | Architecture Patterns | If "profile-applied" vs "profile-skipped" semantics need differentiation beyond `installed`/`skipped`, a new status may be needed; but D-17 says reuse existing enum |
 | A5 | `analysis_depth` values `shallow`/`standard`/`deep` map to `mode: 'fast'`/`'hybrid'`/`'smart'` respectively | Profile JSON Schema | If the mapping is wrong, profile recommendations will produce unexpected analysis behavior. The mapping is a planner choice not yet locked. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Build-step: How do profile JSON files reach `dist/`?**
-   - What we know: `tsconfig.json` has `"resolveJsonModule": true` but `tsc` does not copy JSON files to `outDir`.
-   - What's unclear: Whether the project's build process (`npm run build` = `tsc`) needs a post-build copy step for `src/cli/init/profiles/*.json` → `dist/cli/init/profiles/`.
-   - Recommendation: Verify by running `npm run build` and checking if `dist/cli/init/profiles/` exists. If not, add a copy step to `package.json` scripts or read profiles from a directory that is already shipped (e.g., `scripts/` is in `files` array). Alternative: place profiles under `scripts/profiles/` since `scripts/` is in `files`.
+1. **Build-step: How do profile JSON files reach `dist/`?** — RESOLVED
+   - Decision: Profile JSON files are read at runtime via `readFileSync` with `fileURLToPath(new URL('../../../', import.meta.url))` resolution. `tsc` does not copy JSON to `dist/`, so the loader resolves from package root at both dev and build time. The `src/cli/init/profiles/` directory is part of the source tree and will be shipped in the npm package via the `files` array. If `npm run build` verification shows JSON files are not accessible post-build, a copy step will be added to the build script.
+   - Planned in: 53-01 Task 3, 53-02 Task 2
 
-2. **What is the exact mapping from `analysis_depth` to `mode`?**
-   - What we know: `CodemapConfig.mode` accepts `'fast' | 'smart' | 'hybrid'`.
-   - What's unclear: Whether `shallow` → `fast`, `standard` → `hybrid`, `deep` → `smart` is the intended semantic, or if `analysis_depth` should be a separate field.
-   - Recommendation: Map `analysis_depth` to `mode` in the profile application logic. Document the mapping in profile JSON comments (not valid JSON, so document in loader code instead).
+2. **What is the exact mapping from `analysis_depth` to `mode`?** — RESOLVED
+   - Decision: `analysis_depth` maps directly to `mode`: `shallow` → `'fast'`, `standard` → `'hybrid'`, `deep` → `'smart'`. This mapping is implemented in `profile-plan.ts` when merging profile defaults into the canonical config.
+   - Planned in: 53-02 Task 1
 
-3. **Should `generic.json` set `mode: 'hybrid'` with `include: ['**/*']`?**
-   - What we know: The `generic` profile is the CI/agent fallback when no markers are found (but D-04 says no markers → refuse; `generic` is only for explicit `--profile generic`).
-   - What's unclear: Whether `generic` should use ultra-conservative defaults (`include: ['**/*']`, `exclude: ['node_modules/**']`) or mirror the current default (`include: ['src/**/*.ts']`).
-   - Recommendation: `generic` should use `include: ['**/*.{ts,js,py,go,rs}']` and broad excludes, making it safe for any project type without over-scanning.
+3. **Should `generic.json` set `mode: 'hybrid'` with `include: ['**/*']`?** — RESOLVED
+   - Decision: `generic.json` uses `mode: 'hybrid'` with `include: ['**/*.{ts,js,jsx,tsx,py,go,rs,mjs,cjs}']` and standard excludes (`node_modules/**`, `.git/**`, `dist/**`, `build/**`, `coverage/**`). This is the safe fallback for explicit `--profile generic`.
+   - Planned in: 53-01 Task 3
 
-4. **How does the `--json` flag interact with profile detection output?**
-   - What we know: `initContract` declares `--json` but `executeInitCommand` does not implement JSON output (Phase 51 context notes this inconsistency, INI-01 covers it in Phase 55).
-   - What's unclear: Whether Phase 53 should begin emitting JSON receipt when `--json` is passed, or leave that to Phase 55.
-   - Recommendation: Phase 53 should not change `--json` behavior; keep the existing receipt object return and leave JSON serialization to Phase 55 (INI-01). However, profile asset data must be present in the receipt so Phase 55 can serialize it.
+4. **How does the `--json` flag interact with profile detection output?** — RESOLVED
+   - Decision: Phase 53 does not implement `--json` output. Profile asset data is included in `InitReceipt` so Phase 55 (INI-01) can serialize it. No changes to `--json` behavior in this phase.
+   - Planned in: 53-02 Task 4 (explicit no-op for --json)
 
 ## Environment Availability
 

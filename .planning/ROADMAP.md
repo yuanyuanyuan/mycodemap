@@ -218,15 +218,15 @@ Plans:
 <summary>○ v2.1 ux-onboarding-enhancement (Phases 53-57) — PLANNING</summary>
 
 ### Phase 53: Bootstrap Profiles + Project Detection
-**Status:** Planned
+**Status:** In progress (Wave 1 complete; Wave 2 in flight)
 **Goal:** Establish project type auto-detection and Bootstrap Profile system so first-time users get sensible defaults without manual configuration.
 **Depends on:** None
 **Requirements:** FRC-01, FRC-02, FRC-03, FRC-04
 **Plans:** 3 plans in 2 waves
 
 **Wave 1** *(no dependencies)*
-- [ ] 53-01-PLAN.md — Core detection + profile infrastructure (detect.ts, profile-loader.ts, 5 profile JSON files)
-- [ ] 53-02-PLAN.md — Profile plan integration (profile-plan.ts, reconciler.ts, init.ts --profile, interface contract)
+- [x] 53-01-PLAN.md — Core detection + profile infrastructure (detect.ts, profile-loader.ts, 5 profile JSON files)
+- [x] 53-02-PLAN.md — Profile plan integration (profile-plan.ts, reconciler.ts, init.ts --profile, interface contract)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 53-03-PLAN.md — Tests + first-run guide (detect.test.ts, profile-loader.test.ts, init-profile.test.ts, first-run-guide.ts update)
@@ -234,7 +234,7 @@ Plans:
 **Success criteria:**
 1. `codemap` first run auto-detects project type (Node.js, Python, Go, Rust, generic)
 2. Each project type has a defined Bootstrap Profile with parser config, ignore patterns, analysis depth defaults
-3. Interactive mode allows user to review, accept, modify, or skip recommended profile
+3. Interactive mode allows user to review, accept, or skip recommended profile (modify deferred to future phase)
 4. Profile definitions are stored as data files, not hardcoded in source
 
 ### Phase 54: Zero-Config Preview

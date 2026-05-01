@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: ux-onboarding-enhancement
-current_phase: —
-current_phase_name: —
-current_plan: —
-status: planning
-last_updated: "2026-05-01T12:00:00.000Z"
-last_activity: 2026-05-01
+current_phase: "53"
+current_phase_name: "Bootstrap Profiles + Project Detection"
+current_plan: "53-03"
+status: "Wave 2 in flight"
+last_updated: "2026-05-02T00:15:00.000Z"
+last_activity: 2026-05-02
 progress:
-  total_phases: 0
+  total_phases: 1
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 3
+  completed_plans: 2
+  percent: 66
 ---
 
 # Session State
@@ -28,15 +28,15 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 ## Position
 
 **Milestone:** v2.1 — ux-onboarding-enhancement
-**Current Phase:** Not started (defining requirements)
-**Current Phase Name:** —
-**Current Plan:** —
-**Total Phases:** 0
-**Total Plans in Milestone:** 0
-**Status:** Defining requirements
-**Progress:** [░░░░░░░░░░] 0% (milestone initialized, requirements being defined)
-**Last Activity:** 2026-05-01
-**Last Activity Description:** Phase 53 context gathered — Bootstrap Profiles + Project Detection scope locked around marker-only detection, JSON built-in-only profiles, accept/skip-only interactive boundary, and init-embedded entry point.
+**Current Phase:** 53
+**Current Phase Name:** Bootstrap Profiles + Project Detection
+**Current Plan:** 53-03
+**Total Phases:** 1 planned (53)
+**Total Plans in Milestone:** 3
+**Status:** Wave 2 in flight
+**Progress:** [██████░░░░] 66% (Wave 1 merged + post-merge hotfix; Wave 2 starting)
+**Last Activity:** 2026-05-02
+**Last Activity Description:** Phase 53 Wave 1 complete and merged (53-01 detection foundation + 53-02 reconciler integration). Post-merge hotfix landed (D-16 legacy-config recognition + ProjectType import correction + D-04 marker fixtures for sibling test files). 453 cli tests green, typecheck clean. Wave 2 (Plan 53-03) now in flight: 3 test files + first-run-guide profile hint.
 
 ## Decisions Made
 
@@ -95,6 +95,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 - 2026-05-01: Phase 52 added: CodeMap CLI Priority Harness Guard — split runtime/session CLI-first compliance guard out from init bootstrap so the two can be planned independently
 - 2026-05-01: Phase 52 context gathered — locked scope around report-only session compliance detection, fallback cases, and Claude/Codex auditability
 - 2026-05-01: Phase 53 context gathered — locked scope around marker-only project type detection (D-01..D-04), built-in JSON profiles with strict schema validation (D-05..D-08), preview-default + accept/skip-only interaction (D-09..D-13), and `mycodemap init`-embedded single entry point (D-14..D-17)
+- 2026-05-01: Phase 53 planned — 3 plans in 2 waves: 53-01 (core detection + profile infrastructure), 53-02 (profile plan integration into init), 53-03 (tests + first-run guide). Research completed with zod validation, readline prompting, and RulesPlan/HookPlan pattern reuse. Verification passed with 2 documentation blockers resolved (VALIDATION.md created, RESEARCH.md open questions resolved, ROADMAP.md success criteria aligned with D-11).
 
 ### Verified Existing Capabilities (carried forward)
 
