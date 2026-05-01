@@ -1,6 +1,7 @@
 # AI Discovery Hub - CodeMap
 
 > 通用 AI 文档发现入口 - 适用于所有 AI 大模型、搜索工具和搜索引擎
+> 版本: 1.9.0
 
 ---
 

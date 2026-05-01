@@ -1,7 +1,7 @@
 # CodeMap
 
 > CodeMap 是一个 AI-Native 优先、人类友好的代码架构治理基础设施，为 AI/Agent 提供结构化、可预测的代码上下文。
-> 版本: v2.0 agent-native-foundation | 仓库: https://github.com/mycodemap/mycodemap
+> 版本: 1.9.0 | 仓库: https://github.com/mycodemap/mycodemap
 
 CodeMap 帮助 AI 大模型、Agent 和开发者理解 TypeScript/JavaScript 项目的代码结构、依赖关系和模块边界。它生成结构化的代码地图，支持影响分析、依赖查询、复杂度评估等功能。
 
