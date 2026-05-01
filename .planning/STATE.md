@@ -6,7 +6,7 @@ current_phase: —
 current_phase_name: —
 current_plan: —
 status: planning
-last_updated: "2026-05-01T10:00:00.000Z"
+last_updated: "2026-05-01T12:00:00.000Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 0
@@ -36,7 +36,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 **Status:** Defining requirements
 **Progress:** [░░░░░░░░░░] 0% (milestone initialized, requirements being defined)
 **Last Activity:** 2026-05-01
-**Last Activity Description:** Milestone v2.1 initialized. Phase 51 (Post-Install Agent Bootstrap) merged into v2.1 scope. Phase 50 and 52 remain independent.
+**Last Activity Description:** Phase 53 context gathered — Bootstrap Profiles + Project Detection scope locked around marker-only detection, JSON built-in-only profiles, accept/skip-only interactive boundary, and init-embedded entry point.
 
 ## Decisions Made
 
@@ -94,6 +94,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 - 2026-05-01: Phase 51 context gathered — locked scope around init-managed config, hooks, rules, agent snippets, receipt visibility, and real temp-project verification
 - 2026-05-01: Phase 52 added: CodeMap CLI Priority Harness Guard — split runtime/session CLI-first compliance guard out from init bootstrap so the two can be planned independently
 - 2026-05-01: Phase 52 context gathered — locked scope around report-only session compliance detection, fallback cases, and Claude/Codex auditability
+- 2026-05-01: Phase 53 context gathered — locked scope around marker-only project type detection (D-01..D-04), built-in JSON profiles with strict schema validation (D-05..D-08), preview-default + accept/skip-only interaction (D-09..D-13), and `mycodemap init`-embedded single entry point (D-14..D-17)
 
 ### Verified Existing Capabilities (carried forward)
 
