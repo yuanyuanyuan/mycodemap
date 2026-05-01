@@ -66,4 +66,36 @@ describe('cli help surface', () => {
     expect(output).not.toContain('logs');
     expect(output).not.toContain('server');
   });
+
+  it('exposes --profile and all 5 bootstrap profile names on init --help', async () => {
+    // Binary-level smoke test for the API/binary gap closed in commit 1866672.
+    // Verifies commander.js (real binary entrypoint) registers --profile on the
+    // init subcommand. Without this guard, future flag-only-in-API regressions
+    // pass the unit/integration suite but break `mycodemap init --profile foo`.
+    process.argv = ['node', 'mycodemap', 'init', '--help'];
+
+    let output = '';
+
+    const captureWrite = vi.fn((chunk: string | Uint8Array) => {
+      output += typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8');
+      return true;
+    });
+
+    vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit:${code ?? 0}`);
+    }) as never);
+
+    vi.spyOn(process.stdout, 'write').mockImplementation(captureWrite as never);
+    vi.spyOn(process.stderr, 'write').mockImplementation(captureWrite as never);
+
+    await expect(import('../index.ts')).rejects.toThrow('process.exit:0');
+
+    const profileLine = output.split('\n').find((line) => line.includes('--profile'));
+    expect(profileLine, '--profile not registered on init subcommand').toBeDefined();
+    expect(profileLine).toContain('nodejs');
+    expect(profileLine).toContain('python');
+    expect(profileLine).toContain('go');
+    expect(profileLine).toContain('rust');
+    expect(profileLine).toContain('generic');
+  });
 });
