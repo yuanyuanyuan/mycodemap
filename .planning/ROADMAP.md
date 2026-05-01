@@ -8,7 +8,7 @@
 
 ## Milestones
 
-- 🚧 **v2.0 agent-native-foundation** — Phases 41-48 (in progress)
+- 🚧 **v2.0 agent-native-foundation** — Phases 41-49 (in progress)
 - ✅ **v1.11 release-followup-hardening** — Phases 38-40 (shipped 2026-04-29)
 - ✅ **v1.10 governance-debt-cleanup** — Phases 35-37 (shipped 2026-04-23)
 - ✅ **v1.9 release-governance-unification** — Phases 31-34 (shipped 2026-04-22)
@@ -20,7 +20,7 @@ Earlier milestones: see `.planning/MILESTONES.md` and `.planning/milestones/`.
 ## Phases
 
 <details open>
-<summary>🚧 v2.0 agent-native-foundation (Phases 41-48) — IN PROGRESS</summary>
+<summary>✅ v2.0 agent-native-foundation (Phases 40.1-49) — SHIPPED 2026-05-01</summary>
 
 ### Phase 40.1: Real-World Validation Guardrails
 **Goal:** Add mandatory real-world validation rules to testing docs, pre-release checklist, AGENTS.md, CLAUDE.md, and CI guardrails. All tests must include real test cases with evidence from actual execution.
@@ -139,6 +139,20 @@ Plans:
 **Requirements:** `.planning/REQUIREMENTS.md`
 **Phases:** `.planning/phases/` (will be created per phase)
 
+### Phase 49: Integration Wiring
+**Status:** Completed 2026-05-01
+**Goal:** 修复 v2.0 audit 中 4 个 critical blockers，使已实现的代码真正工作。纯接线修复，不新增功能。
+**Depends on:** Phase 41-48
+**Plans:** 2 plans
+- [x] 49-01 — Loader & Error Handler Wiring（validateTreeSitter loader-aware 改造、tryApplySuggestion 接入、global flags 消费）
+- [x] 49-02 — Contract Schema Core Commands（doctor、benchmark、init 加入 contract schema）
+
+**Success criteria:**
+1. `codemap generate --wasm-fallback` 在 tree-sitter 不可用时成功使用 WASM fallback
+2. `codemap generate --apply-suggestion` 在出错时尝试执行 nextCommand
+3. `codemap --schema` 输出包含 doctor、benchmark、init 的完整契约
+4. 所有修改保持现有命令行为不变
+
 </details>
 
 <details>
@@ -195,8 +209,8 @@ These are scoped but not yet initialized. Requirements and roadmaps will be crea
 
 ## Next Options
 
-1. **Discuss Phase 43** — `$gsd-discuss-phase 43` (gather context and clarify approach)
-2. **Plan Phase 43** — `$gsd-plan-phase 43` (skip discussion, plan directly)
+1. **Execute Phase 49** — `/gsd-execute-phase 49` (run 2 plans to fix integration blockers)
+2. **Review Phase 49 plans** — `cat .planning/phases/49-integration-wiring/*-PLAN.md`
 3. **Review full requirements** — Read `.planning/REQUIREMENTS.md` for detailed acceptance criteria
 4. **Adjust milestone scope** — If v2.0 feels too large, use `$gsd-insert-phase` or `$gsd-remove-phase` to rebalance
 
