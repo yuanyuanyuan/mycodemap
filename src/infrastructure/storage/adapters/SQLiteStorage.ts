@@ -97,9 +97,10 @@ export interface SQLiteStorageRuntimeOptions {
   readonly governanceGraphThresholds?: GovernanceGraphPerfThresholds;
 }
 
+import { loadSQLite } from './sqlite-loader.js';
+
 async function loadSQLiteModule(): Promise<SQLiteConstructor> {
-  const sqliteModule = await import('better-sqlite3');
-  return sqliteModule.default as unknown as SQLiteConstructor;
+  return loadSQLite();
 }
 
 function toStringValue(value: unknown, fallback = ''): string {

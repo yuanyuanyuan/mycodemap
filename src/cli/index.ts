@@ -21,6 +21,7 @@ import { publishStatusCommand } from './commands/publish-status.js';
 import { readinessGateCommand } from './commands/readiness-gate.js';
 import { mcpCommand, isMcpStartInvocation } from './commands/mcp.js';
 import { doctorCommand } from './commands/doctor.js';
+import { benchmarkCommand } from './commands/benchmark.js';
 import { shipCommand } from './commands/ship/index.js';
 import { ANALYZE_COMMAND_DESCRIPTION, configureAnalyzeCommand } from './commands/analyze-options.js';
 import { setupRuntimeLogging } from './runtime-logger.js';
@@ -93,7 +94,8 @@ program
   .description('TypeScript 代码地图工具 - 为 AI 辅助开发提供结构化上下文')
   .version('0.1.0')
   .option('--apply-suggestion', 'Allow automatic execution of high-confidence remediation suggestions (confidence >= 0.8)')
-  .option('--wasm-fallback', 'Use WASM fallback for native dependencies (tree-sitter, better-sqlite3) when native compilation fails');
+  .option('--wasm-fallback', 'Automatically use WASM fallback when native dependencies fail to compile')
+  .option('--native', 'Force native binary usage for tree-sitter and better-sqlite3 (disables WASM fallback)');
 
 program
   .command('init')
@@ -207,6 +209,16 @@ program.addCommand(mcpCommand);
 // Doctor command
 program.addCommand(doctorCommand);
 
+// Benchmark command
+program
+  .command('benchmark')
+  .description('Compare WASM vs Native performance')
+  .option('-t, --target <path>', 'Target repository', '.')
+  .option('-m, --mode <mode>', 'Benchmark mode: native, wasm, both', 'both')
+  .option('-i, --iterations <n>', 'Number of iterations', '3')
+  .option('-j, --json', 'JSON output')
+  .action(benchmarkCommand);
+
 // Workflow 命令
 program.addCommand(workflowCommand);
 
@@ -226,5 +238,12 @@ program
   .option('--verbose', '显示详细输出')
   .option('--yes, -y', '置信度 60-75 时自动确认（不询问）')
   .action(shipCommand);
+
+// Handle --native flag: disable WASM fallback before any command runs
+const cliOpts = program.opts();
+if (cliOpts.native) {
+  process.env.CODEMAP_USE_WASM_TREE_SITTER = '0';
+  process.env.CODEMAP_USE_WASM_BETTER_SQLITE3 = '0';
+}
 
 program.parse();

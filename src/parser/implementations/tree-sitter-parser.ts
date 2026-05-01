@@ -4,25 +4,34 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import Parser from 'tree-sitter';
-import TypeScript from 'tree-sitter-typescript';
 import type { ExportInfo, ImportInfo, ImportSpecifier, ModuleSymbol, SymbolKind } from '../../types/index.js';
 import type { IParser, ParserOptions, ParseResult } from '../interfaces/IParser.js';
+import { loadTreeSitter } from './tree-sitter-loader.js';
+
+// Type-only import for compile-time type safety.
+// At runtime the actual module is loaded via tree-sitter-loader (native or WASM).
+import type ParserType from 'tree-sitter';
 
 /**
  * Tree-sitter Parser
  * 使用 tree-sitter 进行高性能代码解析
+ * WASM-first: loads web-tree-sitter when native compilation fails
  */
 export class TreeSitterParser implements IParser {
   readonly name = 'TreeSitterParser';
   readonly mode: 'fast' | 'smart' = 'fast';
-  private parser: Parser;
+  private parser: any;
+  private parserPromise: Promise<void>;
   private rootDir: string;
 
   constructor(options: ParserOptions) {
     this.rootDir = options.rootDir;
+    this.parserPromise = this.initializeParser();
+  }
+
+  private async initializeParser(): Promise<void> {
+    const { Parser, TypeScript } = await loadTreeSitter();
     this.parser = new Parser();
-    // 使用 TypeScript 语言
     this.parser.setLanguage(TypeScript.typescript);
   }
 
@@ -30,6 +39,7 @@ export class TreeSitterParser implements IParser {
    * 解析单个文件
    */
   async parseFile(filePath: string): Promise<ParseResult> {
+    await this.parserPromise;
     const content = await fs.readFile(filePath, 'utf-8');
     const tree = this.parser.parse(content);
 
@@ -61,7 +71,7 @@ export class TreeSitterParser implements IParser {
   /**
    * 提取导入信息
    */
-  private extractImports(root: Parser.SyntaxNode, content: string): ImportInfo[] {
+  private extractImports(root: ParserType.SyntaxNode, content: string): ImportInfo[] {
     const imports: ImportInfo[] = [];
 
     // 查找 import 语句
@@ -149,7 +159,7 @@ export class TreeSitterParser implements IParser {
   /**
    * 提取导出信息
    */
-  private extractExports(root: Parser.SyntaxNode, content: string): ExportInfo[] {
+  private extractExports(root: ParserType.SyntaxNode, content: string): ExportInfo[] {
     const exports: ExportInfo[] = [];
 
     // 查找 export 语句
@@ -291,7 +301,7 @@ export class TreeSitterParser implements IParser {
   /**
    * 提取符号信息
    */
-  private extractSymbols(root: Parser.SyntaxNode, content: string): ModuleSymbol[] {
+  private extractSymbols(root: ParserType.SyntaxNode, content: string): ModuleSymbol[] {
     const symbols: ModuleSymbol[] = [];
 
     // 查找所有声明
@@ -318,8 +328,8 @@ export class TreeSitterParser implements IParser {
   /**
    * 查找所有声明
    */
-  private findDeclarations(node: Parser.SyntaxNode): Array<{ name: string; kind: SymbolKind; node: Parser.SyntaxNode }> {
-    const declarations: Array<{ name: string; kind: SymbolKind; node: Parser.SyntaxNode }> = [];
+  private findDeclarations(node: ParserType.SyntaxNode): Array<{ name: string; kind: SymbolKind; node: ParserType.SyntaxNode }> {
+    const declarations: Array<{ name: string; kind: SymbolKind; node: ParserType.SyntaxNode }> = [];
 
     // 类声明
     if (node.type === 'class_declaration') {
@@ -380,7 +390,7 @@ export class TreeSitterParser implements IParser {
   /**
    * 提取依赖列表
    */
-  private extractDependencies(root: Parser.SyntaxNode, content: string): string[] {
+  private extractDependencies(root: ParserType.SyntaxNode, content: string): string[] {
     const deps: Set<string> = new Set();
 
     // 从导入语句中提取依赖
@@ -416,7 +426,7 @@ export class TreeSitterParser implements IParser {
   /**
    * 计算代码统计
    */
-  private calculateStats(content: string, root: Parser.SyntaxNode): {
+  private calculateStats(content: string, root: ParserType.SyntaxNode): {
     lines: number;
     codeLines: number;
     commentLines: number;
@@ -457,8 +467,8 @@ export class TreeSitterParser implements IParser {
   /**
    * 查找注释节点
    */
-  private findCommentNodes(node: Parser.SyntaxNode): Parser.SyntaxNode[] {
-    const comments: Parser.SyntaxNode[] = [];
+  private findCommentNodes(node: ParserType.SyntaxNode): ParserType.SyntaxNode[] {
+    const comments: ParserType.SyntaxNode[] = [];
 
     if (node.type === 'comment') {
       comments.push(node);

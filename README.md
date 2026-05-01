@@ -44,7 +44,21 @@ pnpm add @mycodemap/mycodemap
 npm install -g @mycodemap/mycodemap
 ```
 
-**环境要求**: Node.js >= 18.0.0
+**环境要求**: Node.js >= 20.0.0
+
+### No Build Tools? No Problem
+
+CodeMap ships with WASM-first fallback. If your system lacks `python`, `make`, or `gcc`:
+- `tree-sitter` automatically falls back to `web-tree-sitter` (WASM)
+- `better-sqlite3` automatically falls back to `node:sqlite` (Node.js 22+) or `sql.js` (WASM)
+- No manual intervention required — fallback activates on first run
+
+### Force Native (Performance)
+
+If you have build tools installed and want maximum performance:
+```bash
+mycodemap --native <command>
+```
 
 **MVP3 新依赖**:
 - `hono` - HTTP 服务器框架

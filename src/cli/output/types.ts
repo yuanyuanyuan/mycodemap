@@ -40,6 +40,7 @@ export interface StructuredError {
 export interface ActionableError extends StructuredError {
   type: 'error';
   code: string;  // ErrorCode from registry or custom code from callers
+  name: string;  // Required for Error compatibility
   attempted: string;
   rootCause: string;
   remediationPlan: string;
