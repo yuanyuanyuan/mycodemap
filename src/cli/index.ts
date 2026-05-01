@@ -29,8 +29,11 @@ import { runFirstRunGuide } from './first-run-guide.js';
 import { printMigrationWarning } from './paths.js';
 import { validatePlatform } from './platform-check.js';
 import { formatRemovedCommandMessage, getRemovedTopLevelCommand } from './removed-commands.js';
-import { commandRequiresTreeSitter, validateTreeSitter } from './tree-sitter-check.js';
+import { commandRequiresTreeSitter, validateTreeSitterAsync } from './tree-sitter-check.js';
 import { getFullContract } from './interface-contract/index.js';
+import { tryApplySuggestion } from './output/apply-suggestion.js';
+import { resolveOutputMode, formatError } from './output/index.js';
+import type { ActionableError } from './output/types.js';
 
 const program = new Command();
 const cliArgs = process.argv.slice(2);
@@ -72,19 +75,39 @@ try {
 }
 
 /**
- * 包装命令 action，按需检测 tree-sitter
+ * 统一命令 action 包装器：tree-sitter 检查 + 集中式错误处理 + suggestion 自动修复
  */
-function wrapWithTreeSitterCheck<T>(commandName: string, action: (options: T) => void | Promise<void>): (options: T) => void | Promise<void> {
-  return async (options: T) => {
-    if (commandRequiresTreeSitter(commandName)) {
-      try {
-        validateTreeSitter();
-      } catch (error) {
-        console.error(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+async function createActionHandler<TArgs extends unknown[]>(
+  commandName: string,
+  action: (...args: TArgs) => void | Promise<void>,
+): Promise<(...args: TArgs) => Promise<void>> {
+  return async (...args: TArgs) => {
+    try {
+      if (commandRequiresTreeSitter(commandName)) {
+        await validateTreeSitterAsync();
       }
+      await action(...args);
+    } catch (error) {
+      const mode = resolveOutputMode({});
+      const formatted = formatError(error, mode, commandName);
+      process.stdout.write(formatted + '\n');
+
+      // 尝试自动修复（如果 --apply-suggestion 已设置且错误是 ActionableError）
+      const cliOpts = program.opts();
+      if (cliOpts.applySuggestion && error && typeof error === 'object' && 'nextCommand' in error) {
+        const suggestionResult = await tryApplySuggestion(
+          error as ActionableError,
+          { applySuggestion: cliOpts.applySuggestion, wasmFallback: cliOpts.wasmFallback },
+          mode,
+        );
+        if (suggestionResult.success) {
+          process.exitCode = 0;
+          return;
+        }
+      }
+
+      process.exitCode = 1;
     }
-    return action(options);
   };
 }
 
@@ -111,15 +134,15 @@ program
   .option('-o, --output <dir>', '输出目录', '.mycodemap')
   .option('--symbol-level', '额外 materialize symbol-level 调用依赖到代码图存储', false)
   .option('--ai-context', '为每个文件生成 AI 描述（需要 AI Provider）', false)
-  .action(async (options, command: Command) => {
+  .action(await createActionHandler('generate', async (options: unknown, command: Command) => {
     await generateCommand({
-      ...options,
+      ...(options as Record<string, unknown>),
       __optionSources: {
         mode: command.getOptionValueSource('mode'),
         output: command.getOptionValueSource('output'),
       },
     });
-  });
+  }));
 
 program.addCommand(designCommand);
 
@@ -150,7 +173,7 @@ program
   .option('-j, --json', 'JSON 格式输出')
   .option('--human', '强制人类可读输出')
   .option('--structured', '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 使用）')
-  .action(depsCommand);
+  .action(await createActionHandler('deps', depsCommand));
 
 program
   .command('cycles')
@@ -158,7 +181,7 @@ program
   .option('-d, --depth <number>', '检测深度', '5')
   .option('-j, --json', 'JSON 格式输出')
   .option('--structured', '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 使用）')
-  .action(cyclesCommand);
+  .action(await createActionHandler('cycles', cyclesCommand));
 
 program
   .command('complexity')
@@ -167,7 +190,7 @@ program
   .option('-d, --detail', '显示函数级复杂度详情（使用 AST 精确分析）')
   .option('-j, --json', 'JSON 格式输出')
   .option('--structured', '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 使用）')
-  .action(complexityCommand);
+  .action(await createActionHandler('complexity', complexityCommand));
 
 program
   .command('impact')
@@ -176,17 +199,17 @@ program
   .option('-t, --transitive', '包含传递依赖')
   .option('-j, --json', 'JSON 格式输出')
   .option('--structured', '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 使用）')
-  .action(impactCommand);
+  .action(await createActionHandler('impact', impactCommand));
 
 configureAnalyzeCommand(
   program
     .command('analyze')
     .description(ANALYZE_COMMAND_DESCRIPTION)
-).action(async () => {
+).action(await createActionHandler('analyze', async () => {
   const { analyzeCommand } = await import('./commands/analyze.js');
   // 跳过 program name 和 command name
   await analyzeCommand(process.argv.slice(2));
-});
+}));
 
 // CI Gateway 命令
 program.addCommand(ciCommand);
@@ -244,6 +267,12 @@ const cliOpts = program.opts();
 if (cliOpts.native) {
   process.env.CODEMAP_USE_WASM_TREE_SITTER = '0';
   process.env.CODEMAP_USE_WASM_BETTER_SQLITE3 = '0';
+}
+
+// Handle --wasm-fallback flag: activate WASM fallback before any command runs
+if (cliOpts.wasmFallback) {
+  process.env.CODEMAP_USE_WASM_TREE_SITTER = '1';
+  process.env.CODEMAP_USE_WASM_BETTER_SQLITE3 = '1';
 }
 
 program.parse();

@@ -121,7 +121,34 @@ export function commandRequiresTreeSitter(commandName: string): boolean {
 }
 
 /**
- * 验证 tree-sitter 可用性，不可用时抛出错误
+ * 异步验证 tree-sitter 可用性，使用 loader-aware 检测。
+ * 不可用时抛出 ActionableError，包含 WASM fallback 建议。
+ */
+export async function validateTreeSitterAsync(): Promise<TreeSitterInfo> {
+  const info = await detectTreeSitter();
+
+  if (!info.isAvailable) {
+    const error = new Error(
+      [
+        `❌ tree-sitter 不可用`,
+        `  错误: ${info.error || '未知错误'}`,
+        '',
+        '某些命令需要 tree-sitter 才能运行。',
+        '请确保已正确安装依赖: npm install',
+        '',
+        '或使用 --wasm-fallback 自动切换到 WASM 版本。',
+      ].join('\n'),
+    ) as Error & { code?: string; remediation?: string };
+    error.code = 'DEP_NATIVE_MISSING';
+    error.remediation = 'tree-sitter WASM fallback';
+    throw error;
+  }
+
+  return info;
+}
+
+/**
+ * 验证 tree-sitter 可用性，不可用时抛出错误（同步版本，保持向后兼容）
  */
 export function validateTreeSitter(): TreeSitterInfo {
   const info = detectTreeSitterSync();
