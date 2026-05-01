@@ -3,6 +3,9 @@
 
 export { resolveOutputMode } from './mode.js';
 export { createProgressEmitter } from './progress.js';
-export { formatError } from './errors.js';
+export { formatError, createActionableError } from './errors.js';
 export { renderOutput } from './render.js';
-export type { OutputMode, OutputModeOptions, ProgressEmitter, StructuredError } from './types.js';
+export type { OutputMode, OutputModeOptions, ProgressEmitter, StructuredError, ActionableError } from './types.js';
+export { isActionableError, APPLY_SUGGESTION_CONFIDENCE_THRESHOLD } from './types.js';
+export { ErrorCodes, ErrorRemediation } from './error-codes.js';
+export type { ErrorCode } from './error-codes.js';

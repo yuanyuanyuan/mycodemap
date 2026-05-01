@@ -32,3 +32,31 @@ export interface StructuredError {
   message: string;
   remediation?: string;
 }
+
+/**
+ * Actionable error with recovery context — extends StructuredError
+ * with fields that enable automated or guided remediation.
+ */
+export interface ActionableError extends StructuredError {
+  type: 'error';
+  code: string;  // ErrorCode from registry or custom code from callers
+  attempted: string;
+  rootCause: string;
+  remediationPlan: string;
+  confidence: number;  // 0-1 float
+  nextCommand?: string;
+  causes?: ActionableError[];
+}
+
+/**
+ * Type guard: checks if an error has actionable recovery fields
+ */
+export function isActionableError(error: StructuredError | ActionableError): error is ActionableError {
+  return 'attempted' in error && 'rootCause' in error && 'confidence' in error;
+}
+
+/**
+ * Confidence threshold for --apply-suggestion auto-execution.
+ * Suggestions below this threshold are not auto-executed.
+ */
+export const APPLY_SUGGESTION_CONFIDENCE_THRESHOLD = 0.8;

@@ -91,7 +91,9 @@ program
   .name('mycodemap')
   .alias('codemap')  // 兼容旧命令名
   .description('TypeScript 代码地图工具 - 为 AI 辅助开发提供结构化上下文')
-  .version('0.1.0');
+  .version('0.1.0')
+  .option('--apply-suggestion', 'Allow automatic execution of high-confidence remediation suggestions (confidence >= 0.8)')
+  .option('--wasm-fallback', 'Use WASM fallback for native dependencies (tree-sitter, better-sqlite3) when native compilation fails');
 
 program
   .command('init')
