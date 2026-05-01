@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: agent-native-foundation
-current_phase: 47 — executing
+current_phase: 47 — completed
 current_phase_name: wasm-first-build-foundation
-current_plan: —
-status: executing
+current_plan: 47-01, 47-02, 47-03
+status: completed
 last_updated: "2026-05-01T03:34:14.069Z"
 last_activity: 2026-05-01
 progress:
