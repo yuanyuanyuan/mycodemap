@@ -191,6 +191,9 @@ describe('CodeMap experimental MCP server', () => {
       'codemap_analyze',
       'codemap_query_contract',
       'codemap_deps',
+      'codemap_doctor',
+      'codemap_benchmark',
+      'codemap_init',
     ]);
 
     await connection.client.callTool({

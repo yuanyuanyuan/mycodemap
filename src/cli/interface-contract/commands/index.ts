@@ -4,11 +4,17 @@
 import { analyzeContract } from './analyze.js';
 import { queryContract } from './query.js';
 import { depsContract } from './deps.js';
+import { doctorContract } from './doctor.js';
+import { benchmarkContract } from './benchmark.js';
+import { initContract } from './init.js';
 
 export const commandContracts = [
   analyzeContract,
   queryContract,
   depsContract,
+  doctorContract,
+  benchmarkContract,
+  initContract,
 ] as const;
 
-export { analyzeContract, queryContract, depsContract };
+export { analyzeContract, queryContract, depsContract, doctorContract, benchmarkContract, initContract };

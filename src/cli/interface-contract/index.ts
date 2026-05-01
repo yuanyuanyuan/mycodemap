@@ -31,6 +31,9 @@ export {
   analyzeContract,
   queryContract,
   depsContract,
+  doctorContract,
+  benchmarkContract,
+  initContract,
 } from './commands/index.js';
 
 /**
