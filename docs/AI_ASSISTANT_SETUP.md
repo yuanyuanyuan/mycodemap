@@ -808,6 +808,120 @@ npm install --save-dev @mycodemap/mycodemap
 
 ---
 
+## AI CLI 一键安装引导
+
+> 本章节面向 AI CLI 工具（Claude Code、Codex CLI 等），提供结构化安装引导。
+> 当用户说"帮我安装 mycodemap"时，AI CLI 应按照以下步骤引导。
+
+### Step 1: 前置条件检查 [CONFIRM]
+
+在开始安装前，确认以下条件：
+
+- Node.js >= 18 是否已安装（`node --version`）
+- 当前项目是否有 package.json（`ls package.json`）
+- 向用户确认：是项目级别安装还是全局安装
+
+### Step 2: 安装依赖 [CONFIRM]
+
+```bash
+# 项目级别安装（推荐）
+npm install @mycodemap/mycodemap
+
+# 或全局安装
+npm install -g @mycodemap/mycodemap
+```
+
+### Step 3: 初始化 [CONFIRM]
+
+```bash
+# 先预览配置（不写入文件）
+mycodemap init
+
+# 确认后写入
+mycodemap init -y
+```
+
+### Step 4: 生成代码地图
+
+```bash
+mycodemap generate
+```
+
+安装完成后会生成：
+- `.mycodemap/AI_MAP.md` — 项目全局概览
+- `.mycodemap/codemap.json` — 结构化数据
+- `.mycodemap/CONTEXT.md` — 上下文入口
+
+### Step 5: 配置 AI 助手 skill [CONFIRM]
+
+根据使用的 AI 助手，拷贝对应的 skill 文件：
+
+**Claude Code:**
+```bash
+mkdir -p .claude/skills/codemap
+cp node_modules/@mycodemap/mycodemap/examples/claude/codemap-skill.md .claude/skills/codemap/SKILL.md
+
+# 可选：安装架构分析技能
+mkdir -p .claude/skills/mycodemap-repo-analyzer
+cp node_modules/@mycodemap/mycodemap/examples/claude/skills/mycodemap-repo-analyzer/SKILL.md .claude/skills/mycodemap-repo-analyzer/SKILL.md
+cp -r node_modules/@mycodemap/mycodemap/examples/claude/skills/mycodemap-repo-analyzer/references .claude/skills/mycodemap-repo-analyzer/
+```
+
+**Codex CLI:**
+```bash
+mkdir -p .agents/skills/codemap
+cp node_modules/@mycodemap/mycodemap/examples/codex/codemap-agent.md .agents/skills/codemap/SKILL.md
+```
+
+### Step 6: 更新项目 rules [CONFIRM]
+
+在项目的 `CLAUDE.md` 和 `AGENTS.md` 中追加以下内容：
+
+```markdown
+## CodeMap Skill
+
+### 何时使用
+- 需要理解项目整体结构或模块关系
+- 分析代码变更的影响范围
+- 查询符号定义、调用关系、依赖链
+- 评估代码复杂度或检测循环依赖
+
+### 何时不用
+- 简单的单文件修改或调试
+- 非代码文件操作（文档、配置等）
+- 已有明确上下文的局部改动
+
+### 如何使用
+- 参考 .claude/skills/codemap/ 中的 skill 指令
+- 使用 mycodemap CLI 命令（generate/query/impact/deps/cycles/complexity）
+
+### 索引维护
+- 代码变更后需运行 `mycodemap generate` 更新索引
+- 在重大功能开发/重构完成后，主动更新一次
+- 如发现 mycodemap 查询结果与代码不一致，先更新索引再使用
+```
+
+### Step 7: 验证安装
+
+```bash
+# 验证 CLI 可用
+mycodemap query --help
+
+# 验证 skill 文件已就位
+ls .claude/skills/codemap/SKILL.md
+```
+
+### 可选：MCP 服务器配置
+
+如需使用 MCP 协议与 AI 助手集成：
+
+```bash
+mycodemap generate --symbol-level
+mycodemap mcp install
+```
+
+---
+
 ## 参考
 
 - [SETUP_GUIDE.md](./SETUP_GUIDE.md) - 人类用户安装指南
