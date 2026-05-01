@@ -127,6 +127,7 @@ mycodemap design verify mycodemap.design.md --json
 | **[🛡️ AGENTS.md](AGENTS.md)** | 仓库级强约束、任务分级、代码红线 |
 | **[⚡ CLAUDE.md](CLAUDE.md)** | AI 入口路由、下一步阅读导航 |
 | **[🤖 docs/AI_ASSISTANT_SETUP.md](docs/AI_ASSISTANT_SETUP.md)** | AI 助手配置指引 |
+| **[🔍 examples/claude/skills/mycodemap-repo-analyzer/](examples/claude/skills/mycodemap-repo-analyzer/)** | 项目深度架构分析技能（基于 repo-analyzer + mycodemap CLI） |
 | **[🛠️ docs/rules/engineering-with-codex-openai.md](docs/rules/engineering-with-codex-openai.md)** | 面向 agent 的工程约束 |
 
 **AI 快速入口**: `.cursorrules` | `.github/copilot-instructions.md`
