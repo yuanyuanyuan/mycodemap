@@ -27,6 +27,14 @@
 - [ ] **ABT-04**: 默认不自动重写用户项目的 `CLAUDE.md` / `AGENTS.md`；输出可复制的 copy-paste 片段
 - [ ] **ABT-05**: 支持 `--profile claude|codex|generic` 标志选择目标 assistant 类型
 
+### Subagent Delegation Contract (SDC)
+
+- [ ] **SDC-01**: 存在单一 canonical Project Environment Contract，供 delegated sub-agent prompt 前置注入使用
+- [ ] **SDC-02**: Contract 明确包含 RTK shell 包装、`[TAG] scope: message` commit 格式、当前 Vitest 入口/命令、CodeMap/rule-context 优先级
+- [ ] **SDC-03**: Contract 注入覆盖 edit / review / verification delegation 路径，并覆盖无 scoped rules 命中的场景
+- [ ] **SDC-04**: Contract 内容从仓库事实或生成源派生；当 commit/test/runtime 契约漂移时，验证必须失败
+- [ ] **SDC-05**: 至少一条验证路径必须通过 Claude Code `claude -p` 或 Codex `codex exec` 真实启动 sub-agent，并保留 prompt/output 证据
+
 ### Init Infrastructure (INI)
 
 - [ ] **INI-01**: `mycodemap init --json` 返回真实的 machine-readable `InitReceipt` JSON（当前 contract 声明但实现不一致）
@@ -78,6 +86,11 @@
 | ABT-03 | 56 | — | pending |
 | ABT-04 | 56 | — | pending |
 | ABT-05 | 55 | — | pending |
+| SDC-01 | 58 | — | pending |
+| SDC-02 | 58 | — | pending |
+| SDC-03 | 58 | — | pending |
+| SDC-04 | 58 | — | pending |
+| SDC-05 | 58 | — | pending |
 | INI-01 | 55 | — | pending |
 | INI-02 | 56 | — | pending |
 | INI-03 | 56 | — | pending |
