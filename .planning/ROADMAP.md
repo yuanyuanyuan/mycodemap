@@ -42,9 +42,12 @@ Earlier milestones: see `.planning/MILESTONES.md` and `.planning/milestones/`.
 6. `.githooks/pre-commit` enforces evidence presence
 
 ### Phase 41: Interface Contract Schema
-
+**Status:** Completed 2026-04-30
 **Goal:** Define the CLI surface as a formal machine-readable contract schema and expose runtime metadata.
 **Requirements:** AGENT-01, AGENT-02, AGENT-04, AGENT-05
+**Plans:** 1 plan
+- [x] 41-01 — Schema types, meta-schema, 3 core command families (`analyze`, `query`, `deps`), `--schema` CLI flag, commander config validation
+
 **Success criteria:**
 1. Contract schema file exists and validates against a meta-schema
 2. At least 3 core command families (`analyze`, `query`, `deps`) are defined in schema
@@ -52,9 +55,12 @@ Earlier milestones: see `.planning/MILESTONES.md` and `.planning/milestones/`.
 4. Schema can generate or validate existing commander configuration
 
 ### Phase 42: CLI-as-MCP Automatic Gateway
-
+**Status:** Completed 2026-04-30
 **Goal:** Auto-expose every schema-defined CLI command as an MCP tool with zero handwritten maintenance.
 **Requirements:** AGENT-03, AGENT-06
+**Plans:** 1 plan
+- [x] 42-01 — Schema-to-MCP adapter (`schema-adapter.ts`), dynamic tool registration, flag-to-zod mapping, output shape JSON Schema conversion, graceful degradation for nested types
+
 **Success criteria:**
 1. MCP server dynamically registers tools from contract schema, not hardcoded `server.ts`
 2. Adding a new command to the schema automatically creates a new MCP tool on restart

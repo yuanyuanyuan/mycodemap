@@ -9,12 +9,12 @@
 
 > Goal: 把 CLI 表面从"手写 dual track"升级为"schema 驱动的自描述统一接口"，让新命令自动获得 parser、MCP、help-json 和 completion。
 
-- [ ] **AGENT-01**: 定义 CLI Interface Contract Schema 作为单一真相源。Schema 必须覆盖：命令名、参数（positional + optional）、标志（boolean / string / number / array）、输出形状（JSON Schema）、错误码枚举、示例。
-- [ ] **AGENT-02**: Schema 驱动生成 CLI parser。Contract schema 能直接生成或校验现有 commander 配置，消除手写 parser 与文档之间的漂移。
-- [ ] **AGENT-03**: Schema 驱动自动生成 MCP tool 定义。每个 schema 命令自动获得对应的 MCP `registerTool` 调用，包括参数映射和 JSON schema 输出形状。
-- [ ] **AGENT-04**: Schema 驱动生成 `--help-json` 与 shell completion。`--help-json` 输出完整的命令契约（非人类 help 文本），供 agent 消费；shell completion 从同一 schema 生成。
-- [ ] **AGENT-05**: 运行时暴露 interface contract 元数据。提供 `codemap --schema` 或类似命令输出完整契约，供外部 agent 自省和动态适配。
-- [ ] **AGENT-06**: 现有核心命令渐进迁移到 contract schema。至少覆盖 `analyze`、`query`、`deps`、`design` 四个命令族；未迁移命令保持向后兼容。
+- [x] **AGENT-01**: 定义 CLI Interface Contract Schema 作为单一真相源。Schema 必须覆盖：命令名、参数（positional + optional）、标志（boolean / string / number / array）、输出形状（JSON Schema）、错误码枚举、示例。
+- [x] **AGENT-02**: Schema 驱动生成 CLI parser。Contract schema 能直接生成或校验现有 commander 配置，消除手写 parser 与文档之间的漂移。
+- [x] **AGENT-03**: Schema 驱动自动生成 MCP tool 定义。每个 schema 命令自动获得对应的 MCP `registerTool` 调用，包括参数映射和 JSON schema 输出形状。
+- [x] **AGENT-04**: Schema 驱动生成 `--help-json` 与 shell completion。`--help-json` 输出完整的命令契约（非人类 help 文本），供 agent 消费；shell completion 从同一 schema 生成。
+- [x] **AGENT-05**: 运行时暴露 interface contract 元数据。提供 `codemap --schema` 或类似命令输出完整契约，供外部 agent 自省和动态适配。
+- [x] **AGENT-06**: 现有核心命令渐进迁移到 contract schema。至少覆盖 `analyze`、`query`、`deps`、`design` 四个命令族；未迁移命令保持向后兼容。
 - [ ] **AGENT-07**: 所有命令默认输出 JSON/NDJSON。stdout 输出结构化数据；人类可读内容走渲染器或 `--human`。
 - [ ] **AGENT-08**: `--human` 标志与 TTY 自动检测渲染器。当检测到 TTY 且无显式 `--json`/`--human` 时，输出表格、颜色和 spinner；非 TTY 时默认 JSON。
 - [ ] **AGENT-09**: Progress 事件重定向到 stderr 作为结构化 NDJSON。长时间运行的命令（`generate`、`analyze`）在 stderr 输出 `{type: "progress", percent, message}` NDJSON 行，不污染 stdout 数据流。
@@ -58,12 +58,12 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AGENT-01 | Phase 41 | Not started |
-| AGENT-02 | Phase 41 | Not started |
-| AGENT-03 | Phase 42 | Not started |
-| AGENT-04 | Phase 41 | Not started |
-| AGENT-05 | Phase 41 | Not started |
-| AGENT-06 | Phase 42 | Not started |
+| AGENT-01 | Phase 41 | Complete |
+| AGENT-02 | Phase 41 | Complete |
+| AGENT-03 | Phase 42 | Complete |
+| AGENT-04 | Phase 41 | Complete |
+| AGENT-05 | Phase 41 | Complete |
+| AGENT-06 | Phase 42 | Complete |
 | AGENT-07 | Phase 44 | Not started |
 | AGENT-08 | Phase 44 | Not started |
 | AGENT-09 | Phase 44 | Not started |
@@ -80,10 +80,10 @@
 
 **Coverage:**
 - v2.0 requirements: 19 total
-- Complete: 0
+- Complete: 6
 - Mapped to phases: 19
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-30*
-*Last updated: 2026-04-30 at milestone initialization*
+*Last updated: 2026-05-01 — Phase 41/42 status synchronized from completed implementation*

@@ -6,14 +6,14 @@ current_phase: 48 — completed
 current_phase_name: ai-cli-install-guide-repo-analyzer-skill
 current_plan: —
 status: completed
-last_updated: "2026-05-01T04:01:46.822Z"
+last_updated: "2026-05-01T12:00:00.000Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 9
-  completed_phases: 4
+  completed_phases: 6
   total_plans: 11
-  completed_plans: 6
-  percent: 55
+  completed_plans: 8
+  percent: 67
 ---
 
 # Session State
@@ -53,8 +53,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 
 ## Blockers
 
-- No active blocker at milestone start.
-- Phase 41 awaits `$gsd-discuss-phase 41` or `$gsd-plan-phase 41`.
+- No active blockers.
 
 ## Deferred Items (from previous milestones, still valid)
 
@@ -86,6 +85,9 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 - 2026-04-29: `v1.11` closed as planning milestone; Phase 38-40 archived to `.planning/milestones/v1.11-phases/`
 - 2026-04-30: `v2.0 agent-native-foundation` initialized from ideation artifacts; Phase 41-47 scoped
 - 2026-04-30: Phase 48 added: AI CLI Install Guide + repo-analyzer Skill
+- 2026-04-30: Phase 41 completed — Interface Contract Schema (`src/cli/interface-contract/`, 16 tests)
+- 2026-04-30: Phase 42 completed — CLI-as-MCP Automatic Gateway (`src/server/mcp/schema-adapter.ts`, 36 tests)
+- 2026-05-01: Phase 41/42 planning artifacts backfilled — STATE.md, REQUIREMENTS.md, ROADMAP.md synchronized
 
 ### Verified Existing Capabilities (carried forward)
 
@@ -98,7 +100,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 - `v1.9` 已统一 `/release` 发布治理流程与 milestone ↔ npm release 绑定
 - `v1.10` 已补齐 governance drift detection、validation truth 与 archive/live identity
 - `v1.11` 已为 Codex 补齐 release entry、publish-status follow-up、readiness-gate 三层语义
-- **Current gaps:** CLI surface is hand-maintained dual track (CLI + MCP); `--json` is bolt-on and inconsistent; native dep install is #1 drop-off; ghost commands erode trust; errors are dead ends not state transitions
+- **Current gaps:** `--json` is bolt-on and inconsistent; native dep install is #1 drop-off; ghost commands erode trust; errors are dead ends not state transitions
 
 ### Risks To Watch
 
