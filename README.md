@@ -23,6 +23,7 @@ CodeMap 是一个面向 TypeScript/JavaScript/Go 项目的 AI-first 代码地图
 | 产品是谁 | `CodeMap` 是 AI-first 代码地图工具，而不是泛化的实现/发布/HTTP 工具箱 |
 | 主要消费者 | `AI/Agent 是主要消费者`；人类开发者负责配置、维护与按需阅读输出 |
 | 输出契约 | 目标是机器可读优先；`当前 CLI 现实` 是多数命令通过 `--json` 提供结构化结果，`analyze` 额外支持 `--output-mode machine|human` |
+| 命名规范 | 产品/项目名写 `CodeMap`；npm 包名是 `@mycodemap/mycodemap`；公开 CLI 命令首选写 `mycodemap`；`codemap` 只作为兼容别名，不作为新示例首选 |
 | 架构边界 | `Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令 |
 
 当前公共 CLI 聚焦 `init`、`generate`、`query`、`deps`、`cycles`、`complexity`、`impact`、`analyze`、`design`、`ci`、`workflow`、`export`、`ship`，以及 experimental 的 `mcp`；`server`、`watch`、`report`、`logs` 已从 public CLI 移除，并在调用时给出迁移提示。
@@ -128,8 +129,6 @@ mycodemap design verify mycodemap.design.md --json
 mycodemap init               # 显示 reconciliation preview（默认不写入）
 mycodemap init --interactive # 显式显示 preview（等同默认行为）
 mycodemap init -y            # 使用默认选择直接写入
-
-# 别名：codemap init 也可以使用
 ```
 
 | 选项 | 说明 |
@@ -152,8 +151,6 @@ mycodemap generate                    # 使用默认 hybrid 模式
 mycodemap generate -m smart           # 使用 smart 模式（AST 深度分析）
 mycodemap generate -o ./docs/codemap  # 指定输出目录
 mycodemap generate --symbol-level     # 额外 materialize symbol-level 调用依赖（实验性首期切片）
-
-# 别名：codemap generate 也可以使用
 ```
 
 | 选项 | 说明 | 默认值 |
@@ -185,8 +182,6 @@ mycodemap query -d "analyzer"          # 查询依赖关系
 mycodemap query -S "cache"             # 模糊搜索
 mycodemap query -S "parse" -j          # JSON 格式输出
 mycodemap query -S "plugin" -l 5       # 限制结果数量
-
-# 别名：codemap query 也可以使用
 ```
 
 | 选项 | 说明 | 默认值 |
@@ -687,7 +682,7 @@ src/
 
 ## AI 助手集成
 
-MyCodeMap 可与多种 AI 编程助手深度集成，提供智能代码分析能力：
+CodeMap 可与多种 AI 编程助手深度集成，提供智能代码分析能力：
 
 | AI 助手 | 配置方式 | 支持功能 |
 |---------|----------|----------|
@@ -885,6 +880,7 @@ mycodemap analyze -i link -t src/index.ts --structured --json
 | `--include-tests` | 包含测试文件关联 | - |
 | `--include-git-history` | 包含 Git 历史分析 | - |
 | `--json` | JSON 格式输出 | - |
+| `--human` | 强制人类可读输出（覆盖非 TTY 默认 JSON 行为） | - |
 | `--structured` | 纯结构化输出（移除自然语言字段，配合 `--json` 使用） | - |
 | `--output-mode <mode>` | 输出模式：`machine`/`human` | `human` |
 <!-- END GENERATED: analyze-readme-options -->

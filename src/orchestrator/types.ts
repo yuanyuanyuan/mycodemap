@@ -270,6 +270,8 @@ export interface AnalyzeArgs {
   includeTests?: boolean;
   includeGitHistory?: boolean;
   json?: boolean;
+  /** 强制人类可读输出（即使是非 TTY 环境） */
+  human?: boolean;
   /** 输出完全结构化的 JSON（不包含自然语言字符串） */
   structured?: boolean;
   outputMode?: 'machine' | 'human';

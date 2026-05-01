@@ -5,12 +5,15 @@ import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
 import { resolveDataPath } from '../paths.js';
+import { resolveOutputMode, renderOutput, createProgressEmitter, formatError } from '../output/index.js';
+import type { OutputMode } from '../output/index.js';
 import type { CodeMap, ModuleInfo, SourceLocation } from '../../types/index.js';
 import type { UnifiedResult, HeatScore } from '../../orchestrator/types.js';
 
 interface DepsOptions {
   module?: string;
   json?: boolean;
+  human?: boolean;
   structured?: boolean;
 }
 
@@ -169,144 +172,178 @@ function analyzeDeps(codeMap: CodeMap, modulePaths?: string[]): DepsResult {
 }
 
 /**
- * 格式化依赖输出
+ * Build structured deps data for JSON output
  */
-function formatDependencies(
+function buildDepsData(
   codeMap: CodeMap,
   targetModule: ModuleInfo | undefined,
-  allDependencies: Map<string, { type: string; count: number }>,
-  options: DepsOptions
-): void {
-  if (options.json) {
-    const output: Record<string, unknown> = {};
+  allDependencies: Map<string, { type: string; count: number }>
+): Record<string, unknown> {
+  const output: Record<string, unknown> = {};
 
-    if (options.module && targetModule) {
-      const dependentsMap = buildDependentsMap(targetModule.dependents, codeMap);
-      const location = buildLocation(
-        path.relative(codeMap.project.rootDir, targetModule.absolutePath)
-      );
+  if (targetModule) {
+    const dependentsMap = buildDependentsMap(targetModule.dependents, codeMap);
+    const location = buildLocation(
+      path.relative(codeMap.project.rootDir, targetModule.absolutePath)
+    );
 
-      output.module = {
-        path: targetModule.absolutePath,
-        relativePath: path.relative(codeMap.project.rootDir, targetModule.absolutePath),
-        location, // 新增：结构化位置信息
-        dependencies: targetModule.dependencies,
-        dependents: targetModule.dependents,
-        dependentsMap
-      };
-    } else {
-      output.allDependencies = Object.fromEntries(allDependencies);
-      output.modules = Array.from(allDependencies.entries()).map(([modulePath, info]) => ({
-        path: modulePath,
-        relativePath: path.relative(codeMap.project.rootDir, modulePath),
-        location: buildLocation(path.relative(codeMap.project.rootDir, modulePath)),
-        ...info
-      }));
-    }
-
-    console.log(JSON.stringify(output, null, 2));
-    return;
+    output.module = {
+      path: targetModule.absolutePath,
+      relativePath: path.relative(codeMap.project.rootDir, targetModule.absolutePath),
+      location,
+      dependencies: targetModule.dependencies,
+      dependents: targetModule.dependents,
+      dependentsMap
+    };
+  } else {
+    output.allDependencies = Object.fromEntries(allDependencies);
+    output.modules = Array.from(allDependencies.entries()).map(([modulePath, info]) => ({
+      path: modulePath,
+      relativePath: path.relative(codeMap.project.rootDir, modulePath),
+      location: buildLocation(path.relative(codeMap.project.rootDir, modulePath)),
+      ...info
+    }));
   }
 
-  if (options.module && targetModule) {
-    // 输出指定模块的依赖
-    console.log(chalk.cyan(`\n📦 模块: ${path.relative(codeMap.project.rootDir, targetModule.absolutePath)}`));
-    console.log(chalk.gray('─'.repeat(50)));
+  return output;
+}
 
-    // 直接依赖
-    console.log(chalk.yellow('\n⬇️  直接依赖 (dependencies):'));
+/**
+ * Human-readable renderer for deps output (chalk + padEnd table pattern)
+ */
+function formatDepsHuman(
+  codeMap: CodeMap,
+  targetModule: ModuleInfo | undefined,
+  allDependencies: Map<string, { type: string; count: number }>
+): string {
+  const lines: string[] = [];
+
+  if (targetModule) {
+    // Single module output
+    lines.push(chalk.cyan(`\nModule: ${path.relative(codeMap.project.rootDir, targetModule.absolutePath)}`));
+    lines.push(chalk.gray('-'.repeat(50)));
+
+    // Direct dependencies as table
+    const MODULE_WIDTH = 40;
+    const TYPE_WIDTH = 12;
+    const header = 'MODULE'.padEnd(MODULE_WIDTH) + 'TYPE'.padEnd(TYPE_WIDTH);
+    lines.push(chalk.yellow('\nDependencies:'));
     if (targetModule.dependencies.length === 0) {
-      console.log(chalk.gray('   无'));
+      lines.push(chalk.gray('   none'));
     } else {
+      lines.push(header);
+      lines.push('-'.repeat(header.length));
       for (const dep of targetModule.dependencies) {
         const depModule = codeMap.modules.find(m =>
           m.dependencies.includes(dep) || m.absolutePath.includes(dep)
         );
         const depType = depModule?.type || 'unknown';
-        console.log(chalk.green(`   • ${dep}`), chalk.gray(`[${depType}]`));
+        const name = dep.substring(0, MODULE_WIDTH - 1).padEnd(MODULE_WIDTH);
+        lines.push(`${name}${depType.padEnd(TYPE_WIDTH)}`);
       }
     }
 
-    // 依赖者（反向依赖）
-    console.log(chalk.yellow('\n⬆️  被依赖 (dependents):'));
+    // Dependents
+    lines.push(chalk.yellow('\nDependents:'));
     if (targetModule.dependents.length === 0) {
-      console.log(chalk.gray('   无'));
+      lines.push(chalk.gray('   none'));
     } else {
       for (const dep of targetModule.dependents) {
         const depModule = codeMap.modules.find(m => m.id === dep);
         const relPath = depModule
           ? path.relative(codeMap.project.rootDir, depModule.absolutePath)
           : dep;
-        console.log(chalk.green(`   • ${relPath}`));
+        lines.push(`   ${relPath}`);
       }
     }
 
-    // 统计
-    console.log(chalk.gray('─'.repeat(50)));
-    console.log(chalk.cyan(`   依赖数量: ${targetModule.dependencies.length}`));
-    console.log(chalk.cyan(`   被依赖数量: ${targetModule.dependents.length}`));
+    lines.push(chalk.gray('-'.repeat(50)));
+    lines.push(`   Dependencies: ${targetModule.dependencies.length}, Dependents: ${targetModule.dependents.length}`);
   } else {
-    // 输出所有模块的依赖统计
-    console.log(chalk.cyan('\n📊 项目依赖分析'));
-    console.log(chalk.gray('─'.repeat(50)));
+    // All modules output
+    lines.push(chalk.cyan('\nProject Dependency Analysis'));
+    lines.push(chalk.gray('-'.repeat(50)));
 
-    // 按依赖数量排序
+    const MODULE_WIDTH = 50;
+    const COUNT_WIDTH = 10;
+    const TYPE_WIDTH = 12;
+    const header = 'MODULE'.padEnd(MODULE_WIDTH) + 'DEPS'.padEnd(COUNT_WIDTH) + 'TYPE'.padEnd(TYPE_WIDTH);
+    lines.push(chalk.yellow('\nModule Dependency Ranking (Top 20):'));
+    lines.push(header);
+    lines.push('-'.repeat(header.length));
+
     const sortedDeps = Array.from(allDependencies.entries())
       .sort((a, b) => b[1].count - a[1].count);
 
-    console.log(chalk.yellow('\n📦 模块依赖排名 (Top 20):'));
     let rank = 1;
     for (const [modulePath, info] of sortedDeps.slice(0, 20)) {
       const relPath = modulePath.replace(codeMap.project.rootDir + '/', '');
-      console.log(chalk.green(`   ${rank}. ${relPath}`));
-      console.log(chalk.gray(`      依赖: ${info.count}, 类型: ${info.type}`));
+      const name = relPath.substring(0, MODULE_WIDTH - 1).padEnd(MODULE_WIDTH);
+      const count = String(info.count).padEnd(COUNT_WIDTH);
+      lines.push(`${rank}. ${name}${count}${info.type.padEnd(TYPE_WIDTH)}`);
       rank++;
     }
 
-    // 统计
+    // Summary
     const totalDeps = allDependencies.size;
     const totalDepCount = Array.from(allDependencies.values()).reduce((sum, v) => sum + v.count, 0);
 
-    console.log(chalk.gray('─'.repeat(50)));
-    console.log(chalk.cyan(`   总模块数: ${codeMap.modules.length}`));
-    console.log(chalk.cyan(`   有依赖的模块: ${totalDeps}`));
-    console.log(chalk.cyan(`   总依赖关系: ${totalDepCount}`));
+    lines.push(chalk.gray('-'.repeat(50)));
+    lines.push(`   Total modules: ${codeMap.modules.length}`);
+    lines.push(`   Modules with deps: ${totalDeps}`);
+    lines.push(`   Total dependencies: ${totalDepCount}`);
   }
 
-  console.log('');
+  return lines.join('\n');
 }
 
 /**
- * Deps 命令实现 - 保持向后兼容
+ * Deps 命令实现 - AI-first dual output
  */
 export async function depsCommand(options: DepsOptions) {
   const rootDir = process.cwd();
 
-  // 加载代码地图
-  const codeMap = loadCodeMap(rootDir);
-  if (!codeMap) {
-    process.exit(1);
-  }
+  // Resolve output mode: --human/--json/no-flag = TTY auto-detect
+  const mode: OutputMode = resolveOutputMode({ json: options.json, human: options.human });
+  const progress = createProgressEmitter(mode, 'Analyzing deps...');
 
-  // 获取目标模块
-  let targetModule: ModuleInfo | undefined;
-  const allDependencies = new Map<string, { type: string; count: number }>();
-
-  if (options.module) {
-    const result = getModuleDependencies(codeMap, options.module);
-    targetModule = result.module;
-  } else {
-    // 统计所有模块的依赖
-    for (const module of codeMap.modules) {
-      allDependencies.set(module.absolutePath, {
-        type: module.type,
-        count: module.dependencies.length
-      });
+  try {
+    // 加载代码地图
+    const codeMap = loadCodeMap(rootDir);
+    if (!codeMap) {
+      const error = new Error('Code map not found, run codemap generate first') as Error & { code: string; remediation: string };
+      error.code = 'INDEX_NOT_FOUND';
+      error.remediation = 'Run codemap generate to create the code map';
+      throw error;
     }
-  }
 
-  // 输出结果
-  formatDependencies(codeMap, targetModule, allDependencies, options);
+    progress.update(30, 'Loading modules...');
+
+    // 获取目标模块
+    let targetModule: ModuleInfo | undefined;
+    const allDependencies = new Map<string, { type: string; count: number }>();
+
+    if (options.module) {
+      const result = getModuleDependencies(codeMap, options.module);
+      targetModule = result.module;
+    } else {
+      // 统计所有模块的依赖
+      for (const module of codeMap.modules) {
+        allDependencies.set(module.absolutePath, {
+          type: module.type,
+          count: module.dependencies.length
+        });
+      }
+    }
+
+    const data = buildDepsData(codeMap, targetModule, allDependencies);
+    progress.complete();
+    renderOutput(data, () => formatDepsHuman(codeMap, targetModule, allDependencies), mode);
+  } catch (error) {
+    progress.fail();
+    process.stdout.write(formatError(error, mode) + '\n');
+    process.exitCode = 1;
+  }
 }
 
 /**

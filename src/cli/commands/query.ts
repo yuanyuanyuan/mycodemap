@@ -5,6 +5,8 @@ import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
 import { resolveDataPath } from '../paths.js';
+import { resolveOutputMode, renderOutput, createProgressEmitter, formatError } from '../output/index.js';
+import type { OutputMode } from '../output/index.js';
 import type { CodeMap, ModuleInfo, ExportInfo, ModuleSymbol } from '../../types/index.js';
 
 interface QueryOptions {
@@ -14,6 +16,7 @@ interface QueryOptions {
   search?: string;
   limit?: number;
   json?: boolean;
+  human?: boolean;
   verbose?: boolean;
   cache?: boolean;
   regex?: boolean;  // 新增：正则表达式模式
@@ -766,79 +769,48 @@ function search(
 }
 
 /**
- * 格式化输出结果
+ * Human-readable renderer for query output (chalk + padEnd table pattern)
  */
-function formatResults(result: QueryResult, isJson: boolean, verbose: boolean, structured: boolean = false): void {
-  if (isJson) {
-    // 如果是 structured 模式，移除 details 字段
-    if (structured) {
-      const structuredResult = {
-        ...result,
-        results: result.results.map(item => {
-          const { details, ...rest } = item;
-          void details; // 标记为有意忽略的变量
-          return rest;
-        })
-      };
-      console.log(JSON.stringify(structuredResult, null, 2));
-    } else {
-      console.log(JSON.stringify(result, null, 2));
-    }
-    return;
-  }
+function formatQueryHuman(result: QueryResult): string {
+  const lines: string[] = [];
 
-  console.log(chalk.cyan(`\n查询 "${result.query}" (${result.type})`));
-  console.log(chalk.gray(`   找到 ${result.count} 个结果\n`));
+  lines.push(chalk.cyan(`\nQuery "${result.query}" (${result.type})`));
+  lines.push(chalk.gray(`   Found ${result.count} results\n`));
 
   if (result.count === 0) {
-    console.log(chalk.yellow('   未找到匹配结果'));
-    return;
+    lines.push(chalk.yellow('   No matching results'));
+    return lines.join('\n');
   }
+
+  // Table header
+  const NAME_WIDTH = 30;
+  const KIND_WIDTH = 15;
+  const header =
+    'NAME'.padEnd(NAME_WIDTH) +
+    'KIND'.padEnd(KIND_WIDTH) +
+    'PATH';
+  lines.push(header);
+  lines.push('-'.repeat(header.length));
 
   for (const item of result.results) {
-    console.log(chalk.green(`   ${item.name}`));
-    if (item.kind) {
-      console.log(chalk.gray(`      类型: ${item.kind}`));
-    }
-    if (item.path) {
-      console.log(chalk.gray(`      路径: ${item.path}`));
-    }
-    if (item.details) {
-      console.log(chalk.gray(`      ${item.details}`));
-    }
-
-    // 显示引用信息
-    if (item.references && item.references.length > 0) {
-      console.log(chalk.gray(`      引用:`));
-      for (const ref of item.references.slice(0, 5)) {
-        console.log(chalk.gray(`        - ${ref.type}: ${ref.file}`));
-      }
-      if (item.references.length > 5) {
-        console.log(chalk.gray(`        ... 还有 ${item.references.length - 5} 个引用`));
-      }
-    }
-
-    // 显示代码上下文
-    if (item.context && item.context.length > 0) {
-      console.log(chalk.gray(`      代码上下文:`));
-      for (const ctx of item.context) {
-        const prefix = ctx.line === item.location?.line ? '>' : ' ';
-        console.log(chalk.gray(`        ${prefix}${ctx.line}: ${ctx.content}`));
-      }
-    }
-
-    console.log('');
+    const name = item.name.substring(0, NAME_WIDTH - 1).padEnd(NAME_WIDTH);
+    const kind = (item.kind || '').substring(0, KIND_WIDTH - 1).padEnd(KIND_WIDTH);
+    const pathStr = item.path || '';
+    lines.push(`${name}${kind}${pathStr}`);
   }
 
-  // verbose 模式输出性能指标
-  if (verbose && result.metrics) {
+  // Metrics
+  if (result.metrics) {
     const m = result.metrics;
-    console.log(chalk.cyan('性能指标:'));
-    console.log(chalk.gray(`   索引加载: ${m.indexLoadTime.toFixed(2)}ms ${m.cacheHit ? '(缓存命中)' : ''}`));
-    console.log(chalk.gray(`   查询执行: ${m.queryTime.toFixed(2)}ms`));
-    console.log(chalk.gray(`   总耗时: ${m.totalTime.toFixed(2)}ms`));
-    console.log(chalk.gray(`   索引大小: ${m.indexSize} 个条目`));
+    lines.push('');
+    lines.push(chalk.cyan('Metrics:'));
+    lines.push(chalk.gray(`   Index load: ${m.indexLoadTime.toFixed(2)}ms ${m.cacheHit ? '(cached)' : ''}`));
+    lines.push(chalk.gray(`   Query: ${m.queryTime.toFixed(2)}ms`));
+    lines.push(chalk.gray(`   Total: ${m.totalTime.toFixed(2)}ms`));
+    lines.push(chalk.gray(`   Index size: ${m.indexSize} entries`));
   }
+
+  return lines.join('\n');
 }
 
 /**
@@ -855,92 +827,108 @@ export async function queryCommand(options: QueryOptions) {
   const contextLines = typeof options.context === 'string' ? parseInt(options.context, 10) : (options.context || 0);
   const includeReferences = options.includeReferences || false;
 
+  // Resolve output mode: --human/--json/no-flag = TTY auto-detect
+  const mode: OutputMode = resolveOutputMode({ json: options.json, human: options.human });
+  const progress = createProgressEmitter(mode, 'Querying...');
+
   // 清除缓存（如果指定 --no-cache）
   if (!useCache) {
     clearCache();
   }
 
-  // 加载代码地图（带缓存）
-  const startTotal = performance.now();
-  const { codeMap, index, cacheHit, loadTime } = loadCodeMap(rootDir, useCache);
+  try {
+    // 加载代码地图（带缓存）
+    const startTotal = performance.now();
+    const { codeMap, index, cacheHit, loadTime } = loadCodeMap(rootDir, useCache);
 
-  if (!codeMap || !index) {
-    process.exit(1);
+    if (!codeMap || !index) {
+      const error = new Error('Code map not found, run codemap generate first') as Error & { code: string };
+      error.code = 'INDEX_NOT_FOUND';
+      throw error;
+    }
+
+    const indexLoadTime = loadTime;
+    const indexSize = index.symbols.size + index.modules.size + index.dependencies.size;
+
+    let result: QueryResult;
+    const queryStartTime = performance.now();
+
+    progress.update(30, 'Loading index...');
+
+    // 执行查询
+    if (options.symbol) {
+      const items = querySymbol(index, codeMap, options.symbol, limit, caseSensitive, includeReferences, contextLines);
+      result = {
+        type: 'symbol',
+        query: options.symbol,
+        count: items.length,
+        results: items,
+      };
+    } else if (options.module) {
+      const items = queryModule(index, codeMap, options.module, limit);
+      result = {
+        type: 'module',
+        query: options.module,
+        count: items.length,
+        results: items,
+      };
+    } else if (options.deps) {
+      const deduplicate = depsFormat !== 'detailed';
+      const items = queryDeps(index, codeMap, options.deps, limit, deduplicate);
+      result = {
+        type: 'deps',
+        query: options.deps,
+        count: items.length,
+        results: items,
+      };
+    } else if (options.search) {
+      const items = search(index, codeMap, options.search, limit, useRegex, caseSensitive, contextLines);
+      result = {
+        type: 'search',
+        query: options.search,
+        count: items.length,
+        results: items,
+      };
+    } else {
+      // No query type specified - output usage help
+      const usageError = new Error('Please specify query type: --symbol, --module, --deps, or --search') as Error & { code: string; remediation: string };
+      usageError.code = 'MISSING_QUERY_TYPE';
+      usageError.remediation = 'Run codemap query --symbol <name> to search for symbols';
+      throw usageError;
+    }
+
+    const queryTime = performance.now() - queryStartTime;
+    const totalTime = performance.now() - startTotal;
+
+    // 添加性能指标
+    if (verbose) {
+      result.metrics = {
+        indexLoadTime,
+        queryTime,
+        totalTime,
+        cacheHit,
+        indexSize,
+      };
+    }
+
+    // If structured mode, strip details field
+    let data: QueryResult = result;
+    if (options.structured) {
+      data = {
+        ...result,
+        results: result.results.map(item => {
+          const { details, ...rest } = item;
+          void details;
+          return rest;
+        }),
+      };
+    }
+
+    progress.complete();
+    renderOutput(data, formatQueryHuman, mode);
+  } catch (error) {
+    progress.fail();
+    process.stdout.write(formatError(error, mode) + '\n');
+    process.exitCode = 1;
   }
-
-  const indexLoadTime = loadTime;
-  const indexSize = index.symbols.size + index.modules.size + index.dependencies.size;
-
-  let result: QueryResult;
-  const queryStartTime = performance.now();
-
-  // 执行查询
-  if (options.symbol) {
-    const items = querySymbol(index, codeMap, options.symbol, limit, caseSensitive, includeReferences, contextLines);
-    result = {
-      type: 'symbol',
-      query: options.symbol,
-      count: items.length,
-      results: items,
-    };
-  } else if (options.module) {
-    const items = queryModule(index, codeMap, options.module, limit);
-    result = {
-      type: 'module',
-      query: options.module,
-      count: items.length,
-      results: items,
-    };
-  } else if (options.deps) {
-    // 依赖查询：根据 depsFormat 决定是否去重
-    // default 模式下去重，detailed 模式显示完整信息（包含 dependency 和 import）
-    const deduplicate = depsFormat !== 'detailed';
-    const items = queryDeps(index, codeMap, options.deps, limit, deduplicate);
-    result = {
-      type: 'deps',
-      query: options.deps,
-      count: items.length,
-      results: items,
-    };
-  } else if (options.search) {
-    const items = search(index, codeMap, options.search, limit, useRegex, caseSensitive, contextLines);
-    result = {
-      type: 'search',
-      query: options.search,
-      count: items.length,
-      results: items,
-    };
-  } else {
-    console.log(chalk.red('错误: 请指定查询类型: --symbol, --module, --deps, 或 --search'));
-    console.log(chalk.gray('\n用法:'));
-    console.log(chalk.gray('   codemap query --symbol <name>    # 查询符号'));
-    console.log(chalk.gray('   codemap query --module <path>   # 查询模块'));
-    console.log(chalk.gray('   codemap query --deps <name>    # 查询依赖'));
-    console.log(chalk.gray('   codemap query --search <word>  # 模糊搜索'));
-    console.log(chalk.gray('\n选项:'));
-    console.log(chalk.gray('   -l, --limit <number>  限制结果数量'));
-    console.log(chalk.gray('   -j, --json           JSON 格式输出'));
-    console.log(chalk.gray('   -v, --verbose        显示性能指标'));
-    console.log(chalk.gray('   -r, --regex          使用正则表达式搜索'));
-    console.log(chalk.gray('   --deps-format        依赖查询格式 (default|detailed)'));
-    console.log(chalk.gray('   --no-cache           禁用缓存'));
-    process.exit(1);
-  }
-
-  const queryTime = performance.now() - queryStartTime;
-  const totalTime = performance.now() - startTotal;
-
-  // 添加性能指标
-  if (verbose) {
-    result.metrics = {
-      indexLoadTime,
-      queryTime,
-      totalTime,
-      cacheHit,
-      indexSize,
-    };
-  }
-
-  // 输出结果
-  formatResults(result, options.json || false, verbose, options.structured || false);
 }

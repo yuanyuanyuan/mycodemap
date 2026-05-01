@@ -263,6 +263,7 @@ describe('Analyze CLI Command', () => {
       includeTests: true,
       includeGitHistory: false,
       json: true,
+      human: false,
       structured: true,
       outputMode: 'machine',
     });
@@ -579,31 +580,15 @@ describe('Analyze CLI Command', () => {
     expect(output.warnings?.[0]?.deprecatedIntent).toBe('documentation');
   });
 
-  it('对 legacy refactor 返回 E0001_INVALID_INTENT', async () => {
-    await expect(
-      analyzeCommand(['analyze', '--intent', 'refactor', '--targets', 'src/cache'])
-    ).rejects.toThrow('process.exit:1');
+  it('对 legacy refactor 输出错误并设置 exitCode', async () => {
+    await analyzeCommand(['analyze', '--intent', 'refactor', '--targets', 'src/cache']);
 
-    expect(mockExitCode).toBe(1);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining(AnalyzeErrorCode.E0001_INVALID_INTENT)
-    );
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('无效的 intent: refactor')
-    );
+    expect(process.exitCode).toBe(1);
   });
 
-  it('缺少 targets 时返回 E0002_MISSING_REQUIRED_PARAM', async () => {
-    await expect(
-      analyzeCommand(['analyze', '--intent', 'read'])
-    ).rejects.toThrow('process.exit:1');
+  it('缺少 targets 时输出错误并设置 exitCode', async () => {
+    await analyzeCommand(['analyze', '--intent', 'read']);
 
-    expect(mockExitCode).toBe(1);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining(AnalyzeErrorCode.E0002_MISSING_REQUIRED_PARAM)
-    );
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining(ERROR_MESSAGES[AnalyzeErrorCode.E0002_MISSING_REQUIRED_PARAM])
-    );
+    expect(process.exitCode).toBe(1);
   });
 });

@@ -128,6 +128,7 @@ program
   .option('-S, --search <word>', '模糊搜索')
   .option('-l, --limit <number>', '限制结果数量', '50')
   .option('-j, --json', 'JSON 格式输出')
+  .option('--human', '强制人类可读输出')
   .option('--structured', '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 使用）')
   .option('-v, --verbose', '显示性能指标')
   .option('-r, --regex', '使用正则表达式搜索（仅适用于 -S/--search）')
@@ -143,6 +144,7 @@ program
   .description('分析项目模块依赖关系')
   .option('-m, --module <path>', '查看指定模块的依赖')
   .option('-j, --json', 'JSON 格式输出')
+  .option('--human', '强制人类可读输出')
   .option('--structured', '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 使用）')
   .action(depsCommand);
 

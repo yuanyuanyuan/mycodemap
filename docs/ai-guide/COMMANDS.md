@@ -3,6 +3,7 @@
 > 完整的 CLI 命令详解
 >
 > CodeMap 是 AI-first 代码地图工具。以下文档记录当前公开命令，并补充已移除命令的迁移提示。  
+> 命名规范：公开命令示例统一使用 `mycodemap`；`codemap` 只作为兼容别名保留，不作为新示例首选。  
 > 当前 CLI 过渡现实：多数命令显式使用 `--json` 输出机器可读结果；`analyze` 额外支持 `--output-mode machine|human`。
 
 ---
@@ -248,6 +249,7 @@ mycodemap analyze -i show -t "src/index.ts" --output-mode human
 | `--include-tests` | 包含测试文件关联 | - |
 | `--include-git-history` | 包含 Git 历史分析 | - |
 | `--json` | JSON 格式输出 | - |
+| `--human` | 强制人类可读输出（覆盖非 TTY 默认 JSON 行为） | - |
 | `--structured` | 纯结构化输出（移除自然语言字段，配合 `--json` 使用） | - |
 | `--output-mode <mode>` | 输出模式：`machine`/`human` | `human` |
 <!-- END GENERATED: analyze-commands-options -->

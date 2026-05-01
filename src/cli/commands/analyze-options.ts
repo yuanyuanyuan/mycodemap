@@ -98,6 +98,14 @@ export const ANALYZE_OPTION_DEFINITIONS: readonly AnalyzeOptionDefinition[] = [
     parse: { type: 'boolean', default: false },
   },
   {
+    name: 'human',
+    flags: '--human',
+    description: '强制人类可读输出（即使是非 TTY 环境）',
+    helpDescription: '强制人类可读输出',
+    docDescription: '强制人类可读输出（覆盖非 TTY 默认 JSON 行为）',
+    parse: { type: 'boolean', default: false },
+  },
+  {
     name: 'structured',
     flags: '--structured',
     description: '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 或 --output-mode=machine 使用）',

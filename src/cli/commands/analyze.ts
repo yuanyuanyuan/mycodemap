@@ -43,6 +43,8 @@ import { IntentRouter } from '../../orchestrator/intent-router.js';
 import { resolveDataPath, resolveOutputDir } from '../paths.js';
 import { discoverProjectFiles } from '../../core/file-discovery.js';
 import { loadCodemapConfig } from '../config-loader.js';
+import { resolveOutputMode, renderOutput, createProgressEmitter, formatError } from '../output/index.js';
+import type { OutputMode } from '../output/index.js';
 
 /**
  * 错误码定义
@@ -1427,12 +1429,59 @@ export function parseAnalyzeArgs(argv: string[]): AnalyzeArgs {
       includeTests: values['include-tests'] as boolean,
       includeGitHistory: values['include-git-history'] as boolean,
       json: values.json as boolean,
+      human: values.human as boolean,
       structured: values.structured as boolean,
       outputMode: values['output-mode'] as AnalyzeArgs['outputMode'],
     };
   } catch {
     return {};
   }
+}
+
+/**
+ * Human-readable renderer for analyze output (chalk + padEnd table pattern)
+ */
+function formatAnalyzeHuman(output: CodemapOutput): string {
+  const lines: string[] = [];
+
+  // Warnings
+  for (const warning of output.warnings || []) {
+    lines.push(chalk.yellow(`Warning: ${warning.message}`));
+  }
+
+  // Header
+  const intentLabel = output.intent?.toUpperCase() || 'ANALYSIS';
+  lines.push(chalk.bold(`\n${intentLabel} Analysis Results\n`));
+
+  // Table header
+  const TYPE_WIDTH = 12;
+  const NAME_WIDTH = 30;
+  const PATH_WIDTH = 40;
+  const header =
+    'TYPE'.padEnd(TYPE_WIDTH) +
+    'NAME'.padEnd(NAME_WIDTH) +
+    'PATH'.padEnd(PATH_WIDTH) +
+    'RELEVANCE';
+  lines.push(header);
+  lines.push('-'.repeat(header.length));
+
+  // Data rows
+  for (const result of output.results || []) {
+    const type = (result.type || '').padEnd(TYPE_WIDTH);
+    const name = (result.id || '').substring(0, NAME_WIDTH - 1).padEnd(NAME_WIDTH);
+    const lineInfo = result.location?.line ? `:${result.location.line}` : '';
+    const filePath = `${result.file}${lineInfo}`.substring(0, PATH_WIDTH - 1).padEnd(PATH_WIDTH);
+    const relevance = `${(result.relevance * 100).toFixed(1)}%`;
+    lines.push(`${type}${name}${filePath}${relevance}`);
+  }
+
+  // Summary
+  if (output.results.length > 0) {
+    lines.push('');
+  }
+  lines.push(chalk.gray(`Tools: ${output.tool}, Confidence: ${output.confidence.level} (${output.confidence.score})`));
+
+  return lines.join('\n');
 }
 
 /**
@@ -1449,52 +1498,35 @@ export async function analyzeCommand(argv: string[]): Promise<void> {
     return;
   }
 
-  try {
-    const command = new AnalyzeCommand(args);
-    const output = await command.execute();
+  // Resolve output mode: --human/--json/no-flag = TTY auto-detect
+  const mode: OutputMode = resolveOutputMode({ json: args.json, human: args.human });
+  const progress = createProgressEmitter(mode, 'Analyzing...');
 
-    if (args.outputMode === 'machine' || args.json) {
-      // 如果是 structured 模式，移除 content 字段（自然语言描述）
-      if (args.structured) {
-        const structuredOutput = JSON.parse(JSON.stringify(output)) as CodemapOutput;
-        if (structuredOutput.results) {
-          structuredOutput.results = structuredOutput.results.map(r => {
-            const { content, ...rest } = r;
-            void content; // 标记为有意忽略的变量
-            return rest as UnifiedResult;
-          });
-        }
-        console.log(JSON.stringify(structuredOutput, null, 2));
-      } else {
-        console.log(JSON.stringify(output, null, 2));
+  try {
+    progress.update(10, 'Starting analysis...');
+    const command = new AnalyzeCommand(args);
+    const output = await command.execute() as CodemapOutput;
+
+    // If structured mode, strip content field from results
+    let data: CodemapOutput = output;
+    if (args.structured) {
+      const structuredOutput = JSON.parse(JSON.stringify(output)) as CodemapOutput;
+      if (structuredOutput.results) {
+        structuredOutput.results = structuredOutput.results.map(r => {
+          const { content, ...rest } = r;
+          void content;
+          return rest as UnifiedResult;
+        });
       }
-    } else {
-      // human 模式：打印格式化输出
-      const typedOutput = output as CodemapOutput;
-      for (const warning of typedOutput.warnings || []) {
-        console.warn(chalk.yellow(`⚠️  ${warning.message}`));
-      }
-      console.log(chalk.bold(`\n📊 ${typedOutput.intent?.toUpperCase() || 'ANALYSIS'} 分析结果\n`));
-      for (const result of typedOutput.results || []) {
-        const lineInfo = result.location?.line ? `:${result.location.line}` : '';
-        console.log(chalk.cyan(`📁 ${result.file}${lineInfo}`));
-        console.log(`   ${result.content}`);
-        console.log(chalk.gray(`   相关度: ${(result.relevance * 100).toFixed(1)}%`));
-        if (result.metadata?.testFile) {
-          console.log(chalk.green(`   🧪 测试: ${result.metadata.testFile}`));
-        }
-        console.log();
-      }
-      console.log(chalk.gray(`Tools: ${typedOutput.tool}, Confidence: ${typedOutput.confidence.level} (${typedOutput.confidence.score})`));
+      data = structuredOutput;
     }
+
+    progress.complete();
+    renderOutput(data, formatAnalyzeHuman, mode);
   } catch (error) {
-    if (error instanceof Error && 'code' in error) {
-      const analyzeError = error as Error & { code: AnalyzeErrorCode };
-      console.error(chalk.red(`❌ ${analyzeError.code}: ${analyzeError.message}`));
-      process.exit(1);
-    }
-    console.error(chalk.red(`❌ ${AnalyzeErrorCode.E0005_EXECUTION_FAILED}: ${error instanceof Error ? error.message : String(error)}`));
-    process.exit(1);
+    progress.fail();
+    process.stdout.write(formatError(error, mode) + '\n');
+    process.exitCode = 1;
   }
 }
 
