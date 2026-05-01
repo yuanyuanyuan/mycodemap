@@ -25,7 +25,11 @@ vi.mock('chalk', () => ({
 import { executeInitCommand } from '../init.js';
 
 function createTempProject(): string {
-  return mkdtempSync(path.join(tmpdir(), 'codemap-init-command-'));
+  const root = mkdtempSync(path.join(tmpdir(), 'codemap-init-command-'));
+  // Phase 53: init now requires a project-type marker (D-04). Add a
+  // minimal package.json so detection picks the nodejs profile.
+  writeFileSync(path.join(root, 'package.json'), '{"name":"test"}', 'utf8');
+  return root;
 }
 
 function readJson<T>(filePath: string): T {
