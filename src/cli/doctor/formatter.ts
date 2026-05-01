@@ -37,12 +37,12 @@ function sortByCategory(results: DiagnosticResult[]): DiagnosticResult[] {
 }
 
 /**
- * Format diagnostics as a JSON flat array — simple, grepable, jq-friendly.
- * Each element: {category, severity, id, message, remediation}
- * nextCommand is included only when defined.
+ * Build serializable data array from diagnostics — same filtering logic as
+ * formatDoctorJson but returns the array of objects instead of a JSON string.
+ * Used by renderOutput for JSON mode output.
  */
-export function formatDoctorJson(results: DiagnosticResult[]): string {
-  const serializable = results.map((r) => {
+export function formatDoctorJsonData(results: DiagnosticResult[]): Record<string, string>[] {
+  return results.map((r) => {
     const entry: Record<string, string> = {
       category: r.category,
       severity: r.severity,
@@ -55,7 +55,15 @@ export function formatDoctorJson(results: DiagnosticResult[]): string {
     }
     return entry;
   });
-  return JSON.stringify(serializable, null, 2);
+}
+
+/**
+ * Format diagnostics as a JSON flat array — simple, grepable, jq-friendly.
+ * Each element: {category, severity, id, message, remediation}
+ * nextCommand is included only when defined.
+ */
+export function formatDoctorJson(results: DiagnosticResult[]): string {
+  return JSON.stringify(formatDoctorJsonData(results), null, 2);
 }
 
 /**
