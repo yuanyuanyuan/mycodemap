@@ -22,6 +22,7 @@
     "examples/",
     "scripts/",
     "README.md",
+    "README.zh-CN.md",
     "LICENSE",
     "CHANGELOG.md",
     "mycodemap.config.schema.json"

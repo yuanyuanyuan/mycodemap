@@ -24,6 +24,10 @@ MyCodeMap 可以与多种 AI 编程助手集成，让 AI 能够：
 - 📊 **依赖分析** - 理解项目结构和模块关系
 - ⚡ **影响评估** - 分析代码变更的影响范围
 - 🛡️ **质量门禁** - 自动执行 CI 检查
+- 🩺 **持续健康诊断** (`doctor`) - 安装 / 配置 / 运行时 / Agent 四类健康检查
+- 🧬 **WASM 回退** - 当 Native 依赖不可用时自动切换 WASM 实现
+- 📜 **接口契约自省** (`--schema`) - 输出完整 CLI 契约 JSON，供 Agent 动态发现能力
+- 🔌 **MCP 自动网关** - 所有 Schema 定义的 CLI 命令自动暴露为 MCP tools，动态注册
 
 ### 快速选择
 
@@ -138,23 +142,20 @@ $CODEMAP_CMD complexity -f "<file-path>"
 
 ### 统一分析入口（analyze）
 ```bash
-# 影响分析
-$CODEMAP_CMD analyze -i impact -t "<file-path>"
+# 符号查找
+$CODEMAP_CMD analyze -i find -s "<symbol-name>"
 
-# 依赖分析
-$CODEMAP_CMD analyze -i dependency -t "<module-path>"
+# 代码读取（含上下文）
+$CODEMAP_CMD analyze -i read -t "<file-path>" --scope transitive
 
-# 复杂度分析
-$CODEMAP_CMD analyze -i complexity -t "<path>"
+# 依赖链接分析
+$CODEMAP_CMD analyze -i link -t "<module-path>"
 
-# 搜索分析
-$CODEMAP_CMD analyze -i search -k "<keyword>"
-
-# 项目概览
-$CODEMAP_CMD analyze -i overview -t "<path>"
+# 项目概览展示
+$CODEMAP_CMD analyze -i show -t "<path>"
 
 # JSON 输出
-$CODEMAP_CMD analyze -i impact -t "<file>" --json
+$CODEMAP_CMD analyze -i find -s "<symbol>" --json
 ```
 
 ### CI 门禁（ci）
@@ -852,7 +853,38 @@ mycodemap generate
 - `.mycodemap/codemap.json` — 结构化数据
 - `.mycodemap/CONTEXT.md` — 上下文入口
 
-### Step 5: 配置 AI 助手 skill [CONFIRM]
+### Step 5: 环境健康诊断 [CONFIRM]
+
+运行 `codemap doctor` 验证环境健康状态：
+
+```bash
+# 运行全部诊断（安装 / 配置 / 运行时 / Agent）
+codemap doctor
+
+# 或按类别诊断
+codemap doctor --category install
+codemap doctor --category config
+codemap doctor --category runtime
+codemap doctor --category agent
+```
+
+诊断输出为结构化 JSON，包含 `rootCause` + `remediationPlan` + `confidence` + `nextCommand`。修复所有 HIGH 级别问题后再继续。
+
+### Step 6: 查看接口契约 [CONFIRM]
+
+运行 `codemap --schema` 查看完整 CLI 接口契约，供 Agent 自省：
+
+```bash
+# 输出完整契约 JSON
+codemap --schema
+
+# 或保存到文件供 skill 引用
+codemap --schema > .mycodemap/interface-contract.json
+```
+
+契约包含所有命令、参数、输出格式的结构化定义，是 MCP Gateway 动态暴露 tools 的单一数据源。
+
+### Step 7: 配置 AI 助手 skill [CONFIRM]
 
 根据使用的 AI 助手，拷贝对应的 skill 文件：
 
@@ -861,7 +893,7 @@ mycodemap generate
 mkdir -p .claude/skills/codemap
 cp node_modules/@mycodemap/mycodemap/examples/claude/codemap-skill.md .claude/skills/codemap/SKILL.md
 
-# 可选：安装架构分析技能
+# 可选：安装架构分析技能（Phase 48 已交付）
 mkdir -p .claude/skills/mycodemap-repo-analyzer
 cp node_modules/@mycodemap/mycodemap/examples/claude/skills/mycodemap-repo-analyzer/SKILL.md .claude/skills/mycodemap-repo-analyzer/SKILL.md
 cp -r node_modules/@mycodemap/mycodemap/examples/claude/skills/mycodemap-repo-analyzer/references .claude/skills/mycodemap-repo-analyzer/
@@ -873,7 +905,7 @@ mkdir -p .agents/skills/codemap
 cp node_modules/@mycodemap/mycodemap/examples/codex/codemap-agent.md .agents/skills/codemap/SKILL.md
 ```
 
-### Step 6: 更新项目 rules [CONFIRM]
+### Step 8: 更新项目 rules [CONFIRM]
 
 在项目的 `CLAUDE.md` 和 `AGENTS.md` 中追加以下内容：
 
@@ -901,11 +933,17 @@ cp node_modules/@mycodemap/mycodemap/examples/codex/codemap-agent.md .agents/ski
 - 如发现 mycodemap 查询结果与代码不一致，先更新索引再使用
 ```
 
-### Step 7: 验证安装
+### Step 9: 验证安装
 
 ```bash
 # 验证 CLI 可用
 mycodemap query --help
+
+# 验证 doctor 可用
+codemap doctor --help
+
+# 验证 schema 输出
+codemap --schema | head -20
 
 # 验证 skill 文件已就位
 ls .claude/skills/codemap/SKILL.md
@@ -913,12 +951,17 @@ ls .claude/skills/codemap/SKILL.md
 
 ### 可选：MCP 服务器配置
 
-如需使用 MCP 协议与 AI 助手集成：
+CodeMap v2.0 采用 **CLI-as-MCP 自动网关**：所有 Schema 定义的 CLI 命令自动暴露为 MCP tools，无需手动维护 tool 列表。
 
 ```bash
-mycodemap generate --symbol-level
-mycodemap mcp install
+# 安装 MCP 适配器（一次性）
+codemap mcp install
+
+# 验证动态 tool 注册（应列出 20+ 个 tools）
+codemap mcp list-tools
 ```
+
+配置完成后，AI 助手可通过 MCP 调用任意 `codemap` 命令（如 `doctor`、`benchmark`、`analyze`、`query` 等），Gateway 会根据 Interface Contract Schema 动态生成 tool 定义。无需再使用实验性的 2-tool 限制模式。
 
 ---
 

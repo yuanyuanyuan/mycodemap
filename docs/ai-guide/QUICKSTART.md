@@ -2,7 +2,7 @@
 
 > AI/Agent 使用 CodeMap 的快速入门和决策指南
 >
-> CodeMap 是一个 AI-first 代码地图工具：AI/Agent 是主要消费者，代码分析是首屏产品面。
+> CodeMap 是 AI-Native 优先、人类友好的代码架构治理基础设施：AI/Agent 是主要消费者，代码分析是首屏产品面。
 
 ---
 
@@ -88,6 +88,13 @@ cat .mycodemap/AI_MAP.md
 | "需要重构建议" | `cycles` + `complexity` | `analyze -i read -t "src/" --json` | 机器可读优先 |
 | "查找循环依赖" | `cycles` | - | 文本 |
 | "有哪些测试文件" | `query -S ".test.ts"` | - | 文本 |
+| "诊断 CodeMap 环境健康" | `codemap doctor --json` | `mycodemap doctor` | 机器可读优先 |
+| "查看 CLI 接口契约" | `codemap --schema \| jq '.'` | `mycodemap --schema` | 机器可读优先 |
+| "对比 WASM/Native 性能" | `codemap benchmark --json` | `mycodemap benchmark --wasm` / `--native` | 机器可读优先 |
+| "验证设计契约" | `codemap design validate mycodemap.design.md --json` | - | 机器可读优先 |
+| "映射设计范围到代码" | `codemap design map mycodemap.design.md --json` | - | 机器可读优先 |
+| "生成 handoff 包" | `codemap design handoff mycodemap.design.md --json` | - | 机器可读优先 |
+| "验证交付 checklist" | `codemap design verify mycodemap.design.md --json` | - | 机器可读优先 |
 
 ---
 
@@ -128,6 +135,26 @@ cat .mycodemap/AI_MAP.md
 | 结果导出 | `export` | 导出 JSON / GraphML / Mermaid |
 | CI 门禁 | `ci` | 代码质量检查 |
 | 工作流编排（analysis-only） | `workflow` | 复杂分析任务管理 |
+| 环境健康诊断 | `doctor` | 检测 ghost 命令、native 依赖、workspace drift、agent 连通性 |
+| 性能对比 | `benchmark` | WASM vs Native 性能对比 |
+| 接口契约 | `--schema` | 输出完整 Interface Contract Schema JSON |
+| 设计契约工作流 | `design` | validate / map / handoff / verify 设计契约 |
+
+---
+
+## v2.0 新命令速查
+
+| 命令 | 用途 | 示例 |
+|------|------|------|
+| `doctor` | 环境健康诊断 | `mycodemap doctor --json` |
+| `benchmark` | WASM/Native 性能对比 | `mycodemap benchmark --json` |
+| `--schema` | 接口契约输出 | `mycodemap --schema \| jq '.'` |
+| `design validate` | 验证设计契约 | `mycodemap design validate mycodemap.design.md --json` |
+| `design map` | 映射设计范围到代码 | `mycodemap design map mycodemap.design.md --json` |
+| `design handoff` | 生成 handoff 包 | `mycodemap design handoff mycodemap.design.md --json` |
+| `design verify` | 验证交付 checklist | `mycodemap design verify mycodemap.design.md --json` |
+
+> v2.0 milestone: **agent-native-foundation**。AI-First Default Output: JSON/NDJSON 默认；`--human` 或 TTY 自动检测切换为人类可读。
 
 ---
 

@@ -1,6 +1,6 @@
 # AI Guide - MCP / Agent 集成
 
-> 当前 canonical integration path：**真实本地 stdio MCP server**。旧 CLI wrapper 只作为 fallback。
+> v2.0 更新：CLI-as-MCP Automatic Gateway。所有 schema 定义的 CLI 命令自动暴露为 MCP tools。
 
 ---
 
@@ -11,10 +11,15 @@
 | transport | 本地 `stdio` |
 | 读写权限 | **只读** |
 | public surface | `mycodemap mcp install`、`mycodemap mcp start` |
-| MCP tools | `codemap_query`、`codemap_impact` |
+| MCP tools | **ALL 20+ schema 定义的 CLI 命令** |
 | 图前置条件 | 先执行 `mycodemap generate --symbol-level` |
-| 稳定性 | **experimental** |
+| 稳定性 | **stable (v2.0)** |
 | 非目标 | HTTP MCP、远程 transport、写操作、全局 host lifecycle |
+
+### 动态 Tool 注册
+
+- 向 `Interface Contract Schema` 添加新命令 → 重启 MCP server → 新 tool 自动出现在 host 中
+- 无需手写 tool 定义、无需修改 MCP server 代码、无需重新安装
 
 ---
 
@@ -44,7 +49,7 @@ mycodemap generate --symbol-level
 mycodemap mcp install
 ```
 
-该命令当前只做一件事：在**当前仓库根目录**的 `.mcp.json` 里写入一个 experimental server entry。
+该命令在当前仓库根目录的 `.mcp.json` 里写入一个 v2.0 server entry。
 
 ### Step 3: 让 MCP host 启动 stdio server
 
@@ -57,6 +62,8 @@ mycodemap mcp start
 - `stdout` 只承载 MCP 协议帧
 - 欢迎信息、迁移提示、runtime log 不会混入 `stdout`
 
+> **v2.0 关键变更**：所有在 `Interface Contract Schema` 中定义的命令自动作为 MCP tools 可用。无需手写 tool 定义，无需逐个注册。
+
 ---
 
 ## 3. `.mcp.json` 参考配置
@@ -66,7 +73,7 @@ mycodemap mcp start
 ```json
 {
   "mcpServers": {
-    "mycodemap-experimental": {
+    "mycodemap": {
       "command": "node",
       "args": ["dist/cli/index.js", "mcp", "start"],
       "cwd": "/absolute/path/to/repo",
@@ -80,7 +87,7 @@ mycodemap mcp start
 
 ### 当前宿主支持边界
 
-- 当前文档只保证**repo-local `.mcp.json`** 这一路径
+- 当前文档只保证 **repo-local `.mcp.json`** 这一路径
 - 不承诺全局安装、升级覆盖策略或卸载命令
 - 若你的 host 不读取 `.mcp.json`，请手动拷贝上面的 server entry 到宿主自己的 MCP 配置文件
 
@@ -88,7 +95,25 @@ mycodemap mcp start
 
 ## 4. MCP tool contract
 
-### `codemap_query`
+### Gateway 模式
+
+CLI-as-MCP Automatic Gateway 将所有 CLI 命令统一映射为 MCP tools：
+
+| CLI 命令 | MCP tool 名 | 输入参数 |
+|----------|-------------|----------|
+| `mycodemap query -s X` | `codemap_query` | `{ symbol: string, filePath?: string }` |
+| `mycodemap impact -f X` | `codemap_impact` | `{ symbol: string, filePath?: string, depth?: number, limit?: number }` |
+| `mycodemap doctor` | `codemap_doctor` | `{ category?: string, json?: boolean }` |
+| `mycodemap benchmark` | `codemap_benchmark` | `{ command?: string, json?: boolean }` |
+| `mycodemap analyze -i find -k X` | `codemap_analyze` | `{ intent: string, keyword: string, ... }` |
+| ... | ... | ... |
+
+映射规则：
+- CLI 命令名 → MCP tool 名前缀为 `codemap_`
+- CLI 短选项（`-s`）和长选项（`--symbol`）→ MCP tool 参数名使用长选项名
+- CLI 输出结构 → MCP tool 返回结构完全一致
+
+### `codemap_query`（示例之一）
 
 输入：
 
@@ -107,7 +132,7 @@ interface CodemapQueryInput {
 - `generated_at`
 - `error.code`（若失败）
 
-### `codemap_impact`
+### `codemap_impact`（示例之一）
 
 输入：
 
@@ -128,7 +153,7 @@ interface CodemapImpactInput {
 - `generated_at`
 - `error.code`（若失败）
 
-> 完整输出类型见 `docs/ai-guide/OUTPUT.md`。
+> 完整输出类型见 `docs/ai-guide/OUTPUT.md`。以上仅为 20+ tools 中的两个示例。
 
 ---
 
@@ -139,6 +164,40 @@ interface CodemapImpactInput {
 | `GRAPH_NOT_FOUND` | 还没生成 symbol-level 图 | 先跑 `mycodemap generate --symbol-level` |
 | `SYMBOL_NOT_FOUND` | 请求的 symbol 不存在 | 检查拼写，或先用 `query -S` / `analyze -i find` 搜索 |
 | `AMBIGUOUS_EDGE` | 同名 symbol 无法仅靠 `symbol` / `filePath` 消歧 | 补充更具体的 `filePath` |
+
+### Failure-to-Action Protocol
+
+v2.0 错误响应包含可执行的修复指引：
+
+```typescript
+interface McpError {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+  // Failure-to-Action Protocol 字段
+  rootCause?: string;           // 根因分析
+  remediationPlan?: string[];   // 修复步骤（按优先级）
+  confidence: "high" | "medium" | "low";
+  nextCommand?: string;         // 建议执行的下一步命令
+}
+```
+
+示例：
+
+```json
+{
+  "code": "GRAPH_NOT_FOUND",
+  "message": "symbol-level 图不存在",
+  "rootCause": "未执行 mycodemap generate --symbol-level",
+  "remediationPlan": [
+    "mycodemap generate --symbol-level",
+    "mycodemap mcp install",
+    "重启 MCP host"
+  ],
+  "confidence": "high",
+  "nextCommand": "mycodemap generate --symbol-level"
+}
+```
 
 ### `graph_status` 解读
 
@@ -158,6 +217,8 @@ interface CodemapImpactInput {
 mycodemap query -s "SymbolName" -j
 mycodemap impact -f "src/file.ts" -j
 mycodemap analyze -i find -k "SymbolName" --json --structured
+mycodemap doctor --json
+mycodemap benchmark --json
 ```
 
 但要注意：
@@ -178,7 +239,7 @@ mycodemap generate --symbol-level
 ### `mcp install` 后看不到 server
 
 - 确认 host 会读取当前仓库根目录的 `.mcp.json`
-- 不会读取的话，手动复制 `mycodemap-experimental` entry 到宿主配置
+- 不会读取的话，手动复制 `mycodemap` entry 到宿主配置
 
 ### `mcp start` 无法启动
 
@@ -199,6 +260,12 @@ npm ls better-sqlite3
 
 - 先检查 `graph_status` 是否为 `partial`
 - 再检查 symbol 是否真的唯一；必要时补 `filePath`
+
+### 新增命令后 MCP host 看不到新 tool
+
+- 确认新命令已注册到 `Interface Contract Schema`（`mycodemap --schema` 检查）
+- 重启 MCP server（host 侧或 `mycodemap mcp start`）
+- 不需要重新运行 `mcp install`，除非 server entry 本身有变更
 
 ### storage 运行时错误速查表
 

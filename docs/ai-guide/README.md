@@ -2,7 +2,7 @@
 
 > 专为 AI/Agent 设计的 CodeMap 使用指南。
 >
-> CodeMap 是一个 AI-first 代码地图工具；AI/Agent 是主要消费者。  
+> CodeMap 是 AI-Native 优先、人类友好的代码架构治理基础设施；AI/Agent 是主要消费者。  
 > 入口层优先聚焦 `generate`、`query`、`deps`、`impact`、`complexity`、`export`、`ci` 等核心分析能力。  
 > `workflow` 是当前公开的 analysis-only 工作流能力，`ship` 仍是公开的过渡能力；`server`、`watch`、`report`、`logs` 已从 public CLI 移除，并在调用时给出迁移提示。
 
@@ -26,7 +26,7 @@
 | 原则 | 说明 |
 |------|------|
 | AI-first 入口 | 优先从 `AI_GUIDE.md`、`QUICKSTART.md`、`OUTPUT.md` 建立对产品和契约的理解 |
-| 机器可读优先 | 当前 CLI 过渡现实下，大多数命令仍用 `--json` 暴露机器可读结果 |
+| 机器可读优先 | v2.0 AI-First Default Output：JSON/NDJSON 默认；`--human` 或 TTY 自动检测切换为人类可读 |
 | 人类可读显式入口 | `analyze` 当前支持 `--output-mode human`；其余命令按现有文本输出使用 |
 | 边界优先 | `Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令 |
 

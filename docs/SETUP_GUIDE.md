@@ -210,24 +210,21 @@ mycodemap impact -f src/cli/index.ts --transitive
 ### 统一分析（analyze）
 
 ```bash
-# 影响分析
-mycodemap analyze -i impact -t src/cli/index.ts
-mycodemap analyze -i impact -t src/cli/index.ts --scope transitive --include-tests
+# 搜索符号或文件
+mycodemap analyze -i find -k "UnifiedResult" --topK 10
 
-# 依赖分析
-mycodemap analyze -i dependency -t src/orchestrator
+# 读取代码范围
+mycodemap analyze -i read -t src/cli/index.ts
+mycodemap analyze -i read -t src/cli/index.ts --scope transitive --include-tests
 
-# 复杂度分析
-mycodemap analyze -i complexity -t src/domain
+# 查看模块依赖关系
+mycodemap analyze -i link -t src/orchestrator
 
-# 搜索分析
-mycodemap analyze -i search -k "UnifiedResult" --topK 10
+# 展示项目概览或复杂度
+mycodemap analyze -i show -t src/
 
-# 项目概览
-mycodemap analyze -i overview -t src/
-
-# JSON 输出
-mycodemap analyze -i impact -t src/index.ts --json
+# JSON 结构化输出
+mycodemap analyze -i find -k "UnifiedResult" --json --structured
 ```
 
 ### 工作流编排（workflow）

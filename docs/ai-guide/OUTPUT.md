@@ -28,6 +28,92 @@
 
 ---
 
+## Interface Contract Schema 输出结构
+
+> `mycodemap --schema` 输出整个 CLI 表面的单一真相源（single source of truth）。
+
+```typescript
+interface InterfaceContractSchema {
+  version: string;           // 契约版本号，如 "2.0.0"
+  commands: CommandSchema[]; // 所有 CLI 命令的定义
+  options: GlobalOptionSchema[]; // 全局选项定义
+  metadata: {
+    generatedAt: string;     // ISO 8601 时间戳
+    schemaVersion: string;   // schema 格式版本
+    totalCommands: number;
+    totalOptions: number;
+  };
+}
+
+interface CommandSchema {
+  name: string;              // 命令名，如 "query", "analyze", "doctor"
+  description: string;       // 命令描述
+  arguments: ArgumentSchema[];
+  options: OptionSchema[];
+  output: OutputSchema;      // 输出结构定义
+  examples: string[];
+}
+
+interface ArgumentSchema {
+  name: string;
+  required: boolean;
+  description: string;
+  type: "string" | "number" | "boolean" | "array";
+}
+
+interface OptionSchema {
+  name: string;
+  alias?: string;
+  type: "string" | "number" | "boolean" | "array";
+  description: string;
+  default?: unknown;
+  required: boolean;
+}
+
+interface OutputSchema {
+  format: "json" | "text" | "table";
+  schemaRef: string;         // 指向具体 TypeScript interface 的引用
+}
+```
+
+### 关键特性
+
+- **单一真相源**：此 schema 同时驱动以下四个输出：
+  1. CLI parser（命令行参数解析器）
+  2. MCP tool definitions（MCP 工具定义）
+  3. `--help-json`（机器可读帮助）
+  4. Shell completions（bash/zsh/fish 补全）
+- **变更即生效**：修改 schema 中的命令定义后，上述四个输出自动同步更新，无需手写维护
+- **MCP 网关依赖**：MCP server 通过读取此 schema 动态注册所有工具，见下文 MCP 章节
+
+### 示例
+
+```json
+{
+  "version": "2.0.0",
+  "commands": [
+    {
+      "name": "query",
+      "description": "查询符号、模块或依赖信息",
+      "arguments": [],
+      "options": [
+        { "name": "symbol", "alias": "s", "type": "string", "required": false },
+        { "name": "json", "alias": "j", "type": "boolean", "required": false }
+      ],
+      "output": { "format": "json", "schemaRef": "QueryOutput" }
+    }
+  ],
+  "metadata": {
+    "generatedAt": "2026-05-01T00:00:00.000Z",
+    "schemaVersion": "2.0.0",
+    "totalCommands": 20,
+    "totalOptions": 45
+  }
+}
+```
+
+---
+
 ## 文件发现契约
 
 ```typescript
@@ -128,9 +214,23 @@ interface CodeMap {
 
 ---
 
-## experimental MCP tool 输出结构
+## MCP Tool 输出结构 (CLI-as-MCP Automatic Gateway)
 
-> canonical MCP path 是 `generate --symbol-level → mcp install → host 启动 mcp start`。当前只暴露 `codemap_query` / `codemap_impact` 两个工具。
+> canonical MCP path 是 `generate --symbol-level → mcp install → host 启动 mcp start`。
+> **v2.0 重大变更**：所有 schema 定义的 CLI 命令自动暴露为 MCP tools，不再只有 2 个工具。
+
+### Gateway 模式
+
+CLI-as-MCP Automatic Gateway 的核心机制：
+
+1. **自动映射**：`Interface Contract Schema` 中定义的每个命令自动成为 MCP tool
+2. **动态注册**：向 schema 添加新命令 → 重启 MCP server → 新 tool 自动出现，无需手写 tool 定义
+3. **契约一致**：CLI 的输入/输出结构与对应的 MCP tool 完全同源，不存在漂移
+4. **工具定义自动生成**：MCP server 启动时从 schema 自动生成 `tool.name`、`tool.description`、`inputSchema`
+
+当前 schema 定义了 **20+ 个命令**，意味着 MCP host 可见 20+ 个 tools。以下 `McpQueryResult` 和 `McpImpactResult` 仅为其中两个示例。
+
+> 注意：tool 定义是自动生成的。如果你看到某个命令在 CLI 可用但在 MCP 不可见，检查该命令是否已注册到 `Interface Contract Schema`。
 
 ```typescript
 type McpToolStatus = "ok" | "not_found" | "ambiguous" | "unavailable";
@@ -261,6 +361,199 @@ interface CodemapImpactInput {
     }
   ],
   "callees": []
+}
+```
+
+---
+
+## doctor 命令输出结构
+
+### JSON 输出 (`--json`)
+
+```typescript
+type DoctorCheckStatus = "pass" | "warn" | "fail" | "skip";
+type DoctorCategory = "install" | "config" | "runtime" | "agent";
+
+interface DoctorCheck {
+  name: string;
+  status: DoctorCheckStatus;
+  message: string;
+  remediation?: string;
+  details?: Record<string, unknown>;
+}
+
+interface DoctorCategoryResult {
+  category: DoctorCategory;
+  summary: {
+    pass: number;
+    warn: number;
+    fail: number;
+    skip: number;
+  };
+  checks: DoctorCheck[];
+}
+
+interface DoctorOutput {
+  overall: "healthy" | "degraded" | "critical";
+  categories: DoctorCategoryResult[];
+  // Failure-to-Action Protocol 字段
+  rootCause?: string;           // 若 overall != healthy，给出根因
+  remediationPlan?: string[];   // 按优先级排列的修复步骤
+  confidence: "high" | "medium" | "low";  // 诊断置信度
+  nextCommand?: string;         // 建议执行的下一步 CLI 命令
+}
+```
+
+### Failure-to-Action Protocol
+
+当诊断发现问题时，`doctor` 不仅返回状态，还返回可执行的修复指引：
+
+| 字段 | 含义 | 示例 |
+|------|------|------|
+| `rootCause` | 问题的根本原因 | `"SQLite binding 缺失，导致 storage backend 无法初始化"` |
+| `remediationPlan` | 按优先级排列的修复步骤 | `["npm install better-sqlite3", "mycodemap generate --symbol-level"]` |
+| `confidence` | 诊断置信度 | `"high"` — 对根因判断有把握 |
+| `nextCommand` | 建议执行的下一步命令 | `"mycodemap generate --symbol-level"` |
+
+### 示例
+
+```json
+{
+  "overall": "degraded",
+  "categories": [
+    {
+      "category": "install",
+      "summary": { "pass": 2, "warn": 0, "fail": 0, "skip": 0 },
+      "checks": [
+        { "name": "node_version", "status": "pass", "message": "Node.js >= 20" },
+        { "name": "npm_packages", "status": "pass", "message": "所有依赖已安装" }
+      ]
+    },
+    {
+      "category": "config",
+      "summary": { "pass": 1, "warn": 1, "fail": 0, "skip": 0 },
+      "checks": [
+        { "name": "config_file", "status": "pass", "message": "mycodemap.config.json 存在" },
+        { "name": "storage_type", "status": "warn", "message": "storage.type 未显式设置，使用 auto", "remediation": "建议显式设置为 sqlite 或 filesystem" }
+      ]
+    },
+    {
+      "category": "runtime",
+      "summary": { "pass": 1, "warn": 0, "fail": 1, "skip": 0 },
+      "checks": [
+        { "name": "graph_exists", "status": "fail", "message": "symbol-level 图不存在", "remediation": "运行 mycodemap generate --symbol-level" },
+        { "name": "sqlite_available", "status": "pass", "message": "better-sqlite3 可用" }
+      ]
+    },
+    {
+      "category": "agent",
+      "summary": { "pass": 1, "warn": 0, "fail": 0, "skip": 1 },
+      "checks": [
+        { "name": "mcp_server", "status": "pass", "message": "MCP server 可启动" },
+        { "name": "shell_completions", "status": "skip", "message": "未检测 shell 环境" }
+      ]
+    }
+  ],
+  "rootCause": "symbol-level 图缺失，MCP tools 无法提供完整语义查询",
+  "remediationPlan": [
+    "mycodemap generate --symbol-level",
+    "mycodemap mcp install",
+    "重启 MCP host"
+  ],
+  "confidence": "high",
+  "nextCommand": "mycodemap generate --symbol-level"
+}
+```
+
+---
+
+## benchmark 命令输出结构
+
+### JSON 输出 (`--json`)
+
+```typescript
+interface BenchmarkTiming {
+  mean: number;      // 平均耗时 (ms)
+  median: number;    // 中位数 (ms)
+  p95: number;       // 95 分位 (ms)
+  p99: number;       // 99 分位 (ms)
+  stdDev: number;    // 标准差
+  samples: number;   // 采样次数
+}
+
+interface BenchmarkComparison {
+  command: string;
+  wasm: BenchmarkTiming;
+  native: BenchmarkTiming;
+  speedup: number;   // native / wasm，>1 表示 native 更快
+  fallback: {
+    used: boolean;   // 是否发生了 WASM → Native fallback
+    reason?: string; // fallback 原因，如 "wasm_unavailable", "timeout", "memory_limit"
+  };
+}
+
+interface BenchmarkOutput {
+  overall: {
+    totalCommands: number;
+    fallbackCount: number;
+    averageSpeedup: number;
+  };
+  comparisons: BenchmarkComparison[];
+  system: {
+    nodeVersion: string;
+    platform: string;
+    arch: string;
+    memoryMb: number;
+  };
+}
+```
+
+### WASM vs Native 对比语义
+
+| 字段 | 含义 |
+|------|------|
+| `speedup` | Native 相对于 WASM 的加速比。`1.0` 表示无差异，`>1` 表示 Native 更快，`<1` 表示 WASM 更快（罕见） |
+| `fallback.used` | 是否因 WASM 不可用/超时/内存限制而回退到 Native 实现 |
+| `fallback.reason` | fallback 触发原因，用于诊断 WASM 路径的问题 |
+
+### 示例
+
+```json
+{
+  "overall": {
+    "totalCommands": 5,
+    "fallbackCount": 1,
+    "averageSpeedup": 2.3
+  },
+  "comparisons": [
+    {
+      "command": "generate",
+      "wasm": { "mean": 1200, "median": 1150, "p95": 1800, "p99": 2100, "stdDev": 200, "samples": 10 },
+      "native": { "mean": 500, "median": 480, "p95": 720, "p99": 850, "stdDev": 90, "samples": 10 },
+      "speedup": 2.4,
+      "fallback": { "used": false }
+    },
+    {
+      "command": "query",
+      "wasm": { "mean": 80, "median": 75, "p95": 120, "p99": 150, "stdDev": 15, "samples": 10 },
+      "native": { "mean": 35, "median": 32, "p95": 55, "p99": 70, "stdDev": 8, "samples": 10 },
+      "speedup": 2.29,
+      "fallback": { "used": false }
+    },
+    {
+      "command": "analyze",
+      "wasm": { "mean": 0, "median": 0, "p95": 0, "p99": 0, "stdDev": 0, "samples": 0 },
+      "native": { "mean": 600, "median": 580, "p95": 900, "p99": 1100, "stdDev": 120, "samples": 10 },
+      "speedup": 0,
+      "fallback": { "used": true, "reason": "wasm_unavailable: analyze 命令尚未提供 WASM 实现" }
+    }
+  ],
+  "system": {
+    "nodeVersion": "v22.14.0",
+    "platform": "linux",
+    "arch": "x64",
+    "memoryMb": 32768
+  }
 }
 ```
 

@@ -2,8 +2,8 @@
 
 > 本文档是 AI/Agent 使用 CodeMap 的**主索引**。
 > 
-> CodeMap 是一个 AI-first 代码地图工具。AI/Agent 是主要消费者；人类开发者负责配置、维护与按需阅读输出。  
-> 当前 CLI 过渡现实：多数命令通过 `--json` 输出机器可读结果；`analyze` 额外提供 `--output-mode machine|human`，`design validate` 负责校验 human-authored design contract，`design map` 负责把 design contract 映射成 candidate code scope。
+> CodeMap 是一个 AI-Native 优先、人类友好的代码架构治理基础设施。AI/Agent 是主要消费者；人类开发者负责配置、维护与按需阅读输出。  
+> `v2.0` 已把 CLI 表面升级为 schema 驱动的自描述统一接口：单一 contract schema 同时生成 parser、MCP tool 定义和 shell completion。JSON/NDJSON 是默认输出；`--human` 或 TTY 自动检测渲染表格/颜色，`design validate` 负责校验 human-authored design contract，`design map` 负责把 design contract 映射成 candidate code scope。
 > 命名规范：产品/项目名写 `CodeMap`；公开 CLI 命令首选写 `mycodemap`；`codemap` 只作为兼容别名或内部 MCP tool 名称，不作为新示例首选。  
 > 命名边界：`Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令。  
 > 
@@ -11,7 +11,7 @@
 > 📖 **发现机制**: `AI_DISCOVERY.md`  
 > 📚 **详细文档**: `docs/ai-guide/` 目录
 > 
-> 版本: 1.9.0 (MVP3) | 生成时间: 2026-04-19
+> 版本: v2.0 agent-native-foundation | 生成时间: 2026-05-01
 
 ---
 
@@ -33,12 +33,12 @@ cat .mycodemap/AI_MAP.md
 
 | 维度 | 结论 |
 |------|------|
-| 产品定位 | `CodeMap` 是一个 AI-first 代码地图工具 |
+| 产品定位 | `CodeMap` 是 AI-Native 优先、人类友好的代码架构治理基础设施 |
 | 主要消费者 | AI/Agent |
 | 人类角色 | 配置、维护、按需阅读输出 |
 | CLI 命名 | 对用户和 agent 写 `mycodemap`；`codemap` 仅作为 legacy alias / 内部 tool name |
-| 当前机器输出入口 | 多数命令显式使用 `--json`；`analyze` 支持 `--output-mode machine` |
-| 当前人类输出入口 | `analyze --output-mode human`，其他命令大多保留现有文本输出 |
+| 机器输出入口 | JSON/NDJSON 默认输出；所有命令无需 `--json` 即输出结构化结果 |
+| 人类输出入口 | `--human` 标志强制渲染；TTY 自动检测保留交互体验 |
 | 命名边界 | `Server Layer` ≠ 公共 `mycodemap server` 命令 |
 | 文件发现契约 | 扫描类命令共享 `.gitignore` 感知排除模块；无 `.gitignore` 时回退到默认 `exclude` |
 
@@ -69,7 +69,12 @@ cat .mycodemap/AI_MAP.md
 | "需要先把项目初始化到 canonical `.mycodemap/` 工作区" | `init --interactive` → 确认 receipt → `init --yes` |
 | "需要插件诊断/扩展结果" | `generate` → 读 `AI_MAP.md` 的 `Plugin Summary` 或解析 `codemap.json.pluginReport` |
 | "需要切换/排查图存储后端" | 编辑 `.mycodemap/config.json` 的 `storage` 段 → 运行 `generate` / `export` |
-| "需要把 symbol-level 关系暴露给 MCP host" | `generate --symbol-level` → `mcp install` → 让 host 启动 `mcp start` |
+| "需要诊断 CodeMap 自身健康状态" | `doctor --json` |
+| "需要查看 CLI 完整契约 schema" | `--schema` 或 `--schema | jq '.'` |
+| "需要对比 WASM vs Native 性能" | `benchmark --wasm` / `benchmark --native` |
+| "需要查询发布状态" | `publish-status` |
+| "需要评估发布就绪度" | `readiness-gate` |
+| "需要通过 MCP 调用任意 CLI 命令" | `mcp install` → host 启动 `mcp start`（所有 schema 命令自动暴露） |
 
 **完整决策树**: 见 [docs/ai-guide/QUICKSTART.md](./docs/ai-guide/QUICKSTART.md)
 
@@ -133,24 +138,24 @@ cat .mycodemap/AI_MAP.md
 
 ---
 
-## 🔌 Experimental MCP 薄切片
+## 🔌 MCP 集成（CLI-as-MCP Automatic Gateway）
+
+v2.0 的 MCP 集成已从 experimental 2-tool 薄切片升级为 **CLI-as-MCP Automatic Gateway**：所有 schema 定义的 CLI 命令自动暴露为 MCP tool，零手写维护。
 
 ```bash
-# 1. 先生成 symbol-level 图
-node dist/cli/index.js generate --symbol-level
-
-# 2. 把当前仓库安装到本地 MCP host 配置
+# 1. 把当前仓库安装到本地 MCP host 配置
 node dist/cli/index.js mcp install
 
-# 3. 由 MCP host 启动本地 stdio server
+# 2. 由 MCP host 启动本地 stdio server
 node dist/cli/index.js mcp start
 ```
 
-- 当前 canonical path 是**本地、只读、stdio first** 的 experimental MCP server。
-- 首期只暴露两个工具：`codemap_query`、`codemap_impact`。
-- 两个工具都会返回 `graph_status`、`generated_at`、`error.code`；若图不存在，返回 `GRAPH_NOT_FOUND`，不会伪装成空结果。
-- `mcp install` 当前只维护**当前仓库根目录**的 `.mcp.json`，不承诺全局安装/卸载生命周期。
-- 详细集成步骤见 `docs/ai-guide/INTEGRATION.md`；完整 output contract 见 `docs/ai-guide/OUTPUT.md`。
+- 所有 schema 定义的 CLI 命令（20+）都可通过 MCP 调用，不再局限于 `codemap_query` / `codemap_impact`
+- 动态 tool 注册：MCP server 从 `codemap --schema` 输出的 contract schema 动态构建 tool 定义
+- 添加新命令到 contract schema → 重启 MCP server → 自动获得新 tool，无需修改 MCP 代码
+- 复杂嵌套类型降级到简单 scalar 映射时，MCP 仍能优雅工作
+- `mcp install` 当前只维护**当前仓库根目录**的 `.mcp.json`，不承诺全局安装/卸载生命周期
+- 详细集成步骤见 `docs/ai-guide/INTEGRATION.md`；完整 output contract 见 `docs/ai-guide/OUTPUT.md`
 
 ---
 

@@ -35,7 +35,7 @@
   "@type": "SoftwareApplication",
   "name": "CodeMap",
   "description": "TypeScript 代码地图生成与分析工具",
-  "version": "1.9.0",
+  "version": "v2.0",
   "applicationCategory": "DeveloperApplication",
   "programmingLanguage": ["TypeScript", "JavaScript"],
   "offers": {
@@ -89,12 +89,18 @@
 - `AI 代码理解工具`
 - `代码地图生成器`
 - `TypeScript 项目结构分析`
+- `CLI Interface Contract Schema`
+- `MCP Gateway 代码工具`
+- `AI-Native 代码架构治理`
 
 **AI 相关关键词**:
 - `AI 代码分析工具`
 - `大模型代码理解`
 - `Agent 代码工具`
 - `AI 提示词模板 代码分析`
+- `MCP tool 自动生成`
+- `WASM 回退代码解析`
+- `结构化错误修复建议`
 
 ### Sitemap
 
@@ -279,4 +285,4 @@ graph TD
 ---
 
 *本文档帮助所有 AI 和搜索工具发现 CodeMap 的 AI 资源*
-*最后更新: 2026-03-22*
+*最后更新: 2026-05-01*
