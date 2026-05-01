@@ -2,13 +2,13 @@
 
 ## Current Planning Surface
 
-**Status:** Active milestone `v2.0 agent-native-foundation` (initialized 2026-04-30).
+**Status:** No active milestone. The latest shipped milestone is `v2.0 agent-native-foundation` (2026-05-01).
 
-`v1.11` has been archived as a planning milestone. The active phase directories for Phase 38-40 were moved to `.planning/milestones/v1.11-phases/`, and the milestone audit / roadmap / requirements snapshots are now under `.planning/milestones/`.
+All v2.0 phase directories remain in `.planning/phases/`. The milestone archive (roadmap + requirements + audit) is at `.planning/milestones/v2.0-*`.
 
 ## Milestones
 
-- 🚧 **v2.0 agent-native-foundation** — Phases 41-49 (in progress)
+- ✅ **v2.0 agent-native-foundation** — Phases 40.1-49 (shipped 2026-05-01)
 - ✅ **v1.11 release-followup-hardening** — Phases 38-40 (shipped 2026-04-29)
 - ✅ **v1.10 governance-debt-cleanup** — Phases 35-37 (shipped 2026-04-23)
 - ✅ **v1.9 release-governance-unification** — Phases 31-34 (shipped 2026-04-22)
@@ -19,7 +19,7 @@ Earlier milestones: see `.planning/MILESTONES.md` and `.planning/milestones/`.
 
 ## Phases
 
-<details open>
+<details>
 <summary>✅ v2.0 agent-native-foundation (Phases 40.1-49) — SHIPPED 2026-05-01</summary>
 
 ### Phase 40.1: Real-World Validation Guardrails
@@ -72,7 +72,7 @@ Earlier milestones: see `.planning/MILESTONES.md` and `.planning/milestones/`.
 **Requirements:** TRUST-01, TRUST-02, TRUST-03
 **Plans:** 1 plan
 Plans:
-- [ ] 43-01-PLAN.md — Diagnostic types, 4 checker modules, orchestrator, formatter, CLI registration, and tests
+- [x] 43-01-PLAN.md — Diagnostic types, 4 checker modules, orchestrator, formatter, CLI registration, and tests
 
 **Success criteria:**
 1. `codemap doctor` command exists and runs without errors
@@ -87,7 +87,7 @@ Plans:
 **Requirements:** AGENT-07, AGENT-08, AGENT-09
 **Plans:** 1 plan
 Plans:
-- [ ] 44-01-PLAN.md — Output mode infrastructure, migrate 3 core commands (analyze, query, deps), refactor doctor to shared infrastructure
+- [x] 44-01-PLAN.md — Output mode infrastructure, migrate 3 core commands (analyze, query, deps), refactor doctor to shared infrastructure
 
 **Success criteria:**
 1. All commands emit JSON/NDJSON on stdout by default
@@ -135,9 +135,10 @@ Plans:
 
 **Design doc:** `docs/plans/2026-04-30-install-guide-and-repo-analyzer-design.md`
 
-**Archive:** `.planning/milestones/v2.0-ROADMAP.md` (will be created at closeout)
-**Requirements:** `.planning/REQUIREMENTS.md`
-**Phases:** `.planning/phases/` (will be created per phase)
+**Archive:** `.planning/milestones/v2.0-ROADMAP.md`
+**Requirements:** `.planning/milestones/v2.0-REQUIREMENTS.md`
+**Audit:** `.planning/milestones/v2.0-MILESTONE-AUDIT.md`
+**Phases:** `.planning/phases/`
 
 ### Phase 49: Integration Wiring
 **Status:** Completed 2026-05-01
@@ -209,9 +210,10 @@ These are scoped but not yet initialized. Requirements and roadmaps will be crea
 
 ## Next Options
 
-1. **Execute Phase 49** — `/gsd-execute-phase 49` (run 2 plans to fix integration blockers)
-2. **Review Phase 49 plans** — `cat .planning/phases/49-integration-wiring/*-PLAN.md`
-3. **Review full requirements** — Read `.planning/REQUIREMENTS.md` for detailed acceptance criteria
-4. **Adjust milestone scope** — If v2.0 feels too large, use `$gsd-insert-phase` or `$gsd-remove-phase` to rebalance
+v2.0 is complete. To start the next milestone:
+
+1. **`/gsd-new-milestone`** — questioning → research → requirements → roadmap
+2. **Review archived v2.0 artifacts** — `.planning/milestones/v2.0-*`
+3. **Pick a candidate from Future Milestones** — v2.1 UX, v2.2 Agent Integration, or v3.0 Architecture Intelligence
 
 > **Deferred items mapping:** See `.planning/STATE.md` Deferred Items table for full traceability.

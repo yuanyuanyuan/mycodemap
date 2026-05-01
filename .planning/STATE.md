@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: agent-native-foundation
-current_phase: 49 — completed
-current_phase_name: integration-wiring
+current_phase: —
+current_phase_name: —
 current_plan: —
-status: completed
-last_updated: "2026-05-01T15:37:00.000Z"
+status: archived
+last_updated: "2026-05-01T16:00:00.000Z"
 last_activity: 2026-05-01
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 13
-  completed_plans: 10
+  total_phases: 10
+  completed_phases: 10
+  total_plans: 16
+  completed_plans: 16
   percent: 100
 ---
 
@@ -23,20 +23,20 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-04-30)
 
 **Core Value:** 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
-**Current Focus:** Milestone v2.0 — agent-native-foundation. Define interface contract, close MCP gap, fix trust crisis, eliminate install friction.
+**Current Focus:** No active milestone. v2.0 agent-native-foundation shipped 2026-05-01. Ready for next milestone planning.
 
 ## Position
 
 **Milestone:** v2.0 — agent-native-foundation
-**Current Phase:** 48 — completed
-**Current Phase Name:** ai-cli-install-guide-repo-analyzer-skill
+**Current Phase:** —
+**Current Phase Name:** —
 **Current Plan:** —
-**Total Phases:** 9 planned
-**Total Plans in Milestone:** 6
-**Status:** Completed
-**Progress:** [████████░░] 100% (all v2.0 phases complete)
+**Total Phases:** 10 (40.1-49)
+**Total Plans in Milestone:** 16
+**Status:** Archived
+**Progress:** [██████████] 100% (all v2.0 phases complete, milestone shipped)
 **Last Activity:** 2026-05-01
-**Last Activity Description:** Phase 48 (AI CLI Install Guide + repo-analyzer Skill) completed. Created mycodemap-repo-analyzer skill with CLI integration, added AI CLI one-click install guide to AI_ASSISTANT_SETUP.md, updated README AI docs index.
+**Last Activity Description:** Milestone v2.0 archived. All 10 phases complete, 4 audit blockers resolved by Phase 49, archive files created in .planning/milestones/v2.0-*.
 
 ## Decisions Made
 

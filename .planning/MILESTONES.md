@@ -3,7 +3,52 @@
 > **Current active planning truth** lives in `.planning/PROJECT.md`, `.planning/ROADMAP.md`, `.planning/REQUIREMENTS.md`, and `.planning/STATE.md`.
 > The shipped entries below are **historical snapshots**. Their `What's next` text records closeout-time context and must not override the current active planning surface.
 
-**Current status:** No active milestone. The latest shipped milestone is `v1.11 release-followup-hardening` (2026-04-29). Start the next milestone when ready.
+**Current status:** No active milestone. The latest shipped milestone is `v2.0 agent-native-foundation` (2026-05-01). Start the next milestone when ready.
+
+## v2.0 agent-native-foundation (Shipped: 2026-05-01)
+
+**Goal:** 把 CodeMap 从"人类 CLI + AI 可用"升级为"AI-Native 优先、人类友好的代码架构治理基础设施"，用机器可读契约统一 CLI / MCP / 文档三层表面，用结构化错误和持续诊断修复信任危机，用 WASM 回退消除安装失败的头号 drop-off。
+
+**Phases completed:** 40.1-49 (16 plans total)
+
+**Delivered:**
+
+- `src/cli/interface-contract/` 已定义正式的机器可读 CLI 契约 schema，覆盖命令、参数、标志、输出形状、错误码和示例
+- `codemap --schema` 可输出完整契约 JSON，供 agent 自省和动态适配
+- MCP server 已改为从 contract schema 动态注册工具，零手写维护
+- `codemap doctor` 提供持续健康诊断：ghost commands、native dependency、workspace drift、agent connectivity
+- `src/cli/output/` 统一输出基础设施：JSON/NDJSON 默认、`--human` 标志、TTY 自动检测、stderr progress
+- ActionableError 协议把错误转为结构化状态转移：root cause + remediation plan + confidence + nextCommand
+- Ghost commands 已从 `package.json` 诚实移除，docs guardrail 验证引用命令不是 stub
+- `tree-sitter` / `better-sqlite3` 提供 WASM 回退路径，`codemap benchmark` 可对比 WASM vs Native 性能
+- `mycodemap-repo-analyzer` skill 增强 AI CLI 安装引导体验
+- Phase 49 接线修复使所有 v2.0 audit blockers 得到闭环
+
+**Key accomplishments:**
+
+- `Phase 40.1` 把真实场景验证规则固定进 AGENTS.md、testing.md、pre-release-checklist、pre-commit 与 CI
+- `Phase 41` 建立 CLI Interface Contract Schema 作为 CLI / MCP / 文档的单一真相源
+- `Phase 42` 实现 schema-to-MCP 动态网关，新命令自动获得 MCP tool 暴露
+- `Phase 43` 交付 `codemap doctor` 持续诊断，覆盖 install / config / runtime / agent 四类检查
+- `Phase 44` 翻转输出范式：JSON 默认、`--human` 按需、TTY 自动检测、stderr NDJSON progress
+- `Phase 45` 实现 Failure-to-Action Protocol：结构化错误 + 自动修复建议 + 置信度评分
+- `Phase 46` 清理 ghost commands，把验证决策树写进 CLAUDE.md，docs guardrail 接入 CI
+- `Phase 47` 建立 WASM-first 构建基础：native/WASM 回退加载器 + benchmark 命令
+- `Phase 48` 创建 mycodemap-repo-analyzer skill 和 AI CLI 一键安装引导
+- `Phase 49` 接线修复 4 个 audit critical blockers，使所有实现真正 end-to-end 工作
+
+**Stats:**
+
+- `19/19` v2.0 requirements implemented，`10/10` phases complete
+- 50 commits, 158 files changed, 16,412 insertions(+), 1,220 deletions(-)
+- 74,544 TypeScript LOC in `src/`
+- 3 天（2026-04-29 → 2026-05-01）
+- Milestone audit: `gaps_found` → Phase 49 closed all blockers → shipped
+- Known deferred items at close: 9 (see `STATE.md` Deferred Items for v2.1/v2.2/v3.0 mapping)
+
+**What's next:** Start the next milestone when ready. Candidates: v2.1 UX Onboarding Enhancement (First-Run Concierge, Zero-Config Preview), v2.2 Agent Integration Completion (Auto-Provisioned Skills, MCP verify_contract), or v3.0 Architecture Intelligence (Auto-Generate design.md, Storage Migration).
+
+---
 
 ## v1.11 release-followup-hardening (Shipped: 2026-04-29)
 

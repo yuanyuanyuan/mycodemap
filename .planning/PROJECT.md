@@ -2,9 +2,9 @@
 
 ## What This Is
 
-CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `design validate → design map → design handoff → design verify` 收口为正式 public collaboration chain；`v1.6` 把 Agent-facing CLI 的机器契约真相继续收口；`post-v1.6` 补齐了 opt-in symbol-level graph 与 experimental local MCP 的最小可信纵向切片；`v1.7` 则把 repo-local rule control 与 `mycodemap init` 项目级 AI 基础设施收敛成可验证 contract；`v1.8` 进一步把 rules 入口文档面收敛成 constitution / router / adapter 三层结构；`v1.9` 已把 milestone closeout 与 npm release 的发布治理面收敛成统一 `/release` contract；`v1.10` 则把延后的治理债收口回现有 docs guardrail、validation truth 与 archive identity；`v1.11` 已完成 `Phase 38-40`：Codex repo-local release entry surface、独立 `publish-status` follow-up contract、以及 `readiness-gate` 三层 gate 语义重构。所有 release follow-ups 已收口，未触发真实发布动作。
+CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已把 CLI 表面升级为 schema 驱动的自描述统一接口：单一 contract schema 同时生成 parser、MCP tool 定义、`--help-json` 和 shell completion。`codemap doctor` 提供持续健康诊断，`Failure-to-Action Protocol` 把错误转为结构化状态转移，WASM-first 构建基础消除了原生依赖编译失败的头号 drop-off。人类用户通过 `--human` 标志或 TTY 自动检测获得表格/颜色输出，AI/Agent 默认获得 JSON/NDJSON。
 
-`v1.8` 已完成：`AGENTS.md`、根 `CLAUDE.md`、`.claude/CLAUDE.md` 现在分别承担宪法 / 路由 / Claude adapter 单一职责，操作性细节已迁回现有 live 文档，入口面恢复为单一权威、零重复、可导航的结构。`v1.9` 已完成 docs + skill + dry-run readiness 三个 phase，随后又用 `Phase 34` 关闭了 `pre-release-checklist.md` 中的 helper-first authority drift，使 `/release` 再次回到唯一推荐入口。`v1.10` 已继续补齐 governance backstop：entry-doc drift 现在能被现有 docs guardrail 抓到，validation quick truth 已在四份 live docs 中统一，latest archive surface 也已有清晰 snapshot 身份。
+`v1.4` 已把 `design validate → design map → design handoff → design verify` 收口为正式 public collaboration chain；`v1.6` 把 Agent-facing CLI 的机器契约真相继续收口；`post-v1.6` 补齐了 opt-in symbol-level graph 与 experimental local MCP 的最小可信纵向切片；`v1.7` 则把 repo-local rule control 与 `mycodemap init` 项目级 AI 基础设施收敛成可验证 contract；`v1.8` 进一步把 rules 入口文档面收敛成 constitution / router / adapter 三层结构；`v1.9` 已把 milestone closeout 与 npm release 的发布治理面收敛成统一 `/release` contract；`v1.10` 则把延后的治理债收口回现有 docs guardrail、validation truth 与 archive identity；`v1.11` 已完成 `Phase 38-40`：Codex repo-local release entry surface、独立 `publish-status` follow-up contract、以及 `readiness-gate` 三层 gate 语义重构。所有 release follow-ups 已收口，未触发真实发布动作。
 
 2026-04-18 起，规划边界已经调整：**Docker / ArcadeDB 原型线不再属于当前版本范围**。此前 `v1.5` 的 22-24 phase 保留为历史工件，但不会继续作为 active work。
 
@@ -12,22 +12,23 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 
 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
 
-## Current Milestone: v2.0 agent-native-foundation
+## Latest Completed Milestone: v2.0 agent-native-foundation
 
 **Goal:** 把 CodeMap 从"人类 CLI + AI 可用"升级为"AI-Native 优先、人类友好的代码架构治理基础设施"，用机器可读契约统一 CLI / MCP / 文档三层表面，用结构化错误和持续诊断修复信任危机，用 WASM 回退消除安装失败的头号 drop-off。
 
-**Target features:**
-- Machine-Readable Interface Contract：单一 schema 定义 CLI 表面，自动生成 parser / MCP tool / `--help-json` / shell completion
-- CLI-as-MCP Automatic Gateway：所有 CLI 子命令动态暴露为 MCP tool，不再手写维护
-- AI-First Default Output：JSON/NDJSON 默认输出，`--human` 或 TTY 自动检测渲染表格/颜色，progress 事件走 stderr
-- `codemap doctor`：持续健康诊断，暴露 ghost commands、native dependency 问题与 workspace drift
-- Failure-to-Action Protocol：每个错误返回结构化 root cause + remediation plan + confidence
-- Validation Router + No Ghost Commands：文档引用的命令必须真实可运行，按改动类型路由最小验证
-- WASM-First Build Foundation：`tree-sitter` / `better-sqlite3` 提供 WASM 回退，零构建工具安装
+**Status:** Shipped 2026-05-01. All 19 requirements implemented, 10 phases (40.1-49) complete.
 
-**Status:** Active — requirements defined, roadmap phased, ready to build.
+**Delivered:**
+- Machine-Readable Interface Contract：单一 schema 定义 CLI 表面，自动生成 parser / MCP tool / `--help-json` / shell completion ✅
+- CLI-as-MCP Automatic Gateway：所有 schema 定义的 CLI 子命令动态暴露为 MCP tool，不再手写维护 ✅
+- AI-First Default Output：JSON/NDJSON 默认输出，`--human` 或 TTY 自动检测渲染表格/颜色，progress 事件走 stderr ✅
+- `codemap doctor`：持续健康诊断，暴露 ghost commands、native dependency 问题与 workspace drift ✅
+- Failure-to-Action Protocol：每个错误返回结构化 root cause + remediation plan + confidence + nextCommand ✅
+- Validation Router + No Ghost Commands：文档引用的命令必须真实可运行，按改动类型路由最小验证 ✅
+- WASM-First Build Foundation：`tree-sitter` / `better-sqlite3` 提供 WASM 回退，零构建工具安装 ✅
+- Integration Wiring：Phase 49 修复 audit blockers，使所有实现真正 end-to-end 工作 ✅
 
-## Latest Completed Milestone: v1.11 release-followup-hardening
+## Previous Completed Milestone: v1.11 release-followup-hardening
 
 **Goal:** 把 `v1.9` / `v1.10` 留下的 release follow-ups 收敛为下一轮可执行范围：non-Claude runtime release entry surface、GitHub Actions publish polling / structured report，以及 release readiness gate evaluation。
 **Status:** Closed as a planning milestone on 2026-04-29; all `RELF-01~03` follow-ups completed without triggering real npm publish, tag, push, or GitHub Release
@@ -117,28 +118,35 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 - ✓ `pre-release-checklist.md` 不再把 release helper 呈现为绕过 `/release` 的推荐主入口 —— v1.9 / Phase 34
 - ✓ Codex 现在已有 repo-local release entry surface，并继续 route / delegate 到同一条 `/release` authority chain —— v1.11 / Phase 38
 - ✓ 维护者现在可以用独立 `publish-status` 命令读取 GitHub Actions publish snapshot truth，并获得 human + machine 双形态输出 —— v1.11 / Phase 39
+- ✓ CLI Interface Contract Schema 作为 CLI / MCP / 文档单一真相源 —— v2.0 / Phase 41
+- ✓ Schema 驱动生成 CLI parser，校验现有 commander 配置 —— v2.0 / Phase 41
+- ✓ Schema 驱动自动生成 MCP tool 定义 —— v2.0 / Phase 42
+- ✓ Schema 驱动生成 `--help-json` —— v2.0 / Phase 41
+- ✓ 运行时暴露 interface contract 元数据 (`codemap --schema`) —— v2.0 / Phase 41
+- ✓ 核心命令渐进迁移到 contract schema (analyze/query/deps + doctor/benchmark/init) —— v2.0 / Phase 41/49
+- ✓ JSON/NDJSON 默认输出，`--human` 按需，TTY 自动检测 —— v2.0 / Phase 44
+- ✓ Progress 事件重定向到 stderr 作为结构化 NDJSON —— v2.0 / Phase 44
+- ✓ `codemap doctor` 检测 ghost commands / native deps / workspace drift —— v2.0 / Phase 43
+- ✓ Failure-to-Action Protocol：结构化错误 + 自动修复建议 + 置信度评分 —— v2.0 / Phase 45/49
+- ✓ Validation Router：按改动类型路由最小验证 —— v2.0 / Phase 46
+- ✓ Ghost Commands 清理：echo stubs 已从 package.json 移除 —— v2.0 / Phase 46
+- ✓ 文档与真实自动化一致性验证接入 CI —— v2.0 / Phase 46
+- ✓ `tree-sitter` WASM 回退模块 —— v2.0 / Phase 47/49
+- ✓ `better-sqlite3` / `node:sqlite` WASM/纯 JS 回退路径 —— v2.0 / Phase 47
+- ✓ Native opt-in 机制与 `codemap benchmark` —— v2.0 / Phase 47
 
 ### Active
 
-- [ ] **AGENT-01**: 定义 CLI Interface Contract Schema（命令、参数、标志、输出形状、错误码）作为单一真相源
-- [ ] **AGENT-02**: Schema 驱动生成 CLI parser，替代手写 commander 配置
-- [ ] **AGENT-03**: Schema 驱动自动生成 MCP tool 定义，替代手写 `server.ts`
-- [ ] **AGENT-04**: Schema 驱动生成 `--help-json` 与 shell completion
-- [ ] **AGENT-05**: 运行时暴露 interface contract 元数据，供 agent 自省
-- [ ] **AGENT-06**: 现有核心命令渐进迁移到 contract schema（至少覆盖 `analyze` / `query` / `deps` / `design`）
-- [ ] **AGENT-07**: 所有命令默认输出 JSON/NDJSON，彻底替代不一致的 `--json` bolt-on
-- [ ] **AGENT-08**: `--human` 标志与 TTY 自动检测渲染器（表格、颜色、spinner）
-- [ ] **AGENT-09**: Progress 事件重定向到 stderr 作为结构化 NDJSON
-- [ ] **TRUST-01**: `codemap doctor` 能检测 `package.json` 中的 ghost commands / echo stubs
-- [ ] **TRUST-02**: `codemap doctor` 能检测 native dependency（`tree-sitter`、`better-sqlite3`）health
-- [ ] **TRUST-03**: `codemap doctor` 能检测 `.mycodemap/` workspace drift
-- [ ] **TRUST-04**: Failure-to-Action Protocol：错误返回包含 root cause、machine-readable remediation plan、confidence score
-- [ ] **TRUST-05**: Validation Router：根 `CLAUDE.md` 中"修改后验证"改为按改动类型决策树
-- [ ] **TRUST-06**: Ghost Commands 清理：替换 `check:architecture` / `check:unused` 为真实检查或诚实移除
-- [ ] **TRUST-07**: 文档与真实自动化的一致性验证接入 CI
-- [ ] **INST-01**: `tree-sitter` 提供 WASM 回退模块，无编译工具时自动降级
-- [ ] **INST-02**: `better-sqlite3` / `node:sqlite` 提供 WASM/纯 JS 回退路径
-- [ ] **INST-03**: Native opt-in 机制与 WASM vs Native 性能 benchmark
+- [ ] **UX-01**: First-Run Concierge + Bootstrap Profiles —— v2.1 候选
+- [ ] **UX-02**: Zero-Config Preview / Progressive Commitment —— v2.1 候选
+- [ ] **AGENT-10**: 剩余 12+ CLI 命令迁移到 contract schema —— 渐进债务
+- [ ] **AGENT-11**: benchmark 命令迁移到共享输出基础设施 —— 渐进债务
+- [ ] **INT-04**: Auto-Provisioned Agent Skills —— v2.2 候选
+- [ ] **INT-05**: MCP `verify_contract` Tool —— v2.2 候选
+- [ ] **ARCH-01**: Auto-Generate design.md from codebase —— v3.0 候选
+- [ ] **ARCH-02**: Auto-Generate Architecture Remediation Patches —— v3.0 候选
+- [ ] **ARCH-03**: Self-Healing Design Contract (Drift Approval) —— v3.0 候选
+- [ ] **ARCH-04**: SQLite + In-Memory Graph Migration (complete Kùzu removal) —— v3.0 候选
 
 ### Out of Scope
 
@@ -152,20 +160,14 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 ## Context
 
 - 当前入口文档面已固定为三层：`AGENTS.md`、根 `CLAUDE.md`、`.claude/CLAUDE.md`
-- `AGENTS.md` 只保留仓库级治理协议与证据协议；`CLAUDE.md` 只负责把 agent 路由到下一份 live doc；`.claude/CLAUDE.md` 只保留 Claude adapter 差异
 - `docs/rules/validation.md` 与 `docs/rules/engineering-with-codex-openai.md` 已承担验证顺序、工程执行与交付要求
 - `AI_GUIDE.md` 与 `docs/rules/README.md` 已分别承担产品/CLI discoverability 与 rules 路由
-- `Phase 28` migration map 是后续维护 entry-doc authority split 的长期参考基线
-- `v1.9` scope 来源于 `/home/stark/.claude/plans/ticklish-sprouting-church.md`，其中用户已锁定 milestone / npm release 1:1 绑定、版本统一与二次确认门
-- `v1.8` 已显式把 `GOV-01~03`（duplicate drift / ghost commands / archive identity）延后；`v1.9` closeout 又在 `STATE.md` 中把这些项记录为 deferred governance debt
-- `scripts/validate-docs.js` 与 `node dist/cli/index.js ci check-docs-sync` 已是现有 docs governance enforcement surface，适合作为本 milestone 的检测入口
-- `v1.10` 已把 entry-doc governance drift detection、validation quick truth 与 archive/live identity 都收敛为 closeout-ready planning truth
-- `RELF-01~03` 已在 `v1.9` / `v1.10` requirements 中沉淀为下一轮 release follow-up 候选
-- `Phase 38` 已明确选择 Codex 作为首个 non-Claude runtime target；依据是仓库已存在 `examples/codex/codemap-agent.md` 与 `.agents/skills/*` 的既有形态
-- `Phase 38` 已完成 `.agents/skills/release/SKILL.md` 与 `docs/rules/release.md` 的最小 adapter 收口，没有引入第二条 release authority chain
-- `Phase 39` 已完成独立 `publish-status` CLI、strict truth-first snapshot resolver，以及 release / AI docs 的 follow-up observability 路由
-- 当前 active milestone 已切换为 `v1.11`；root `.planning/*` 继续作为 current active planning truth，最新归档仍是 `.planning/milestones/v1.10-*`
-- 当前 active milestone 仍是 `v1.11`，下一 active phase 已切换为 `Phase 40 readiness-gate-evaluation`
+- `v2.0` 已交付：contract schema (`src/cli/interface-contract/`)、MCP 动态网关 (`src/server/mcp/schema-adapter.ts`)、统一输出基础设施 (`src/cli/output/`)、doctor 诊断 (`src/cli/doctor/`)、ActionableError 协议 (`src/cli/output/errors.ts`)、WASM 回退加载器 (`tree-sitter-loader.ts`, `sqlite-loader.ts`)
+- 74,544 TypeScript LOC in `src/`，1129 个测试全部通过
+- `v2.0` audit 原始状态为 `gaps_found`，Phase 49 接线修复后所有 4 个 critical blockers 已解决
+- 渐进债务：12+ 命令仍需 contract schema 定义；benchmark 命令需迁移到共享输出基础设施
+- 下一轮候选：v2.1 UX Onboarding、v2.2 Agent Integration Completion、v3.0 Architecture Intelligence
+- `scripts/validate-docs.js` 与 `node dist/cli/index.js ci check-docs-sync` 继续作为 docs governance enforcement surface
 
 ## Constraints
 
@@ -216,18 +218,34 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 | 启动 `v1.9 release-governance-unification` | 用户提供 `/release` 统一发布流程方案，并要求用它开启 v1.9 milestone | Shipped 2026-04-23 |
 | `v1.9` 采用 milestone / npm release 1:1 绑定 | 用户决策明确每个 milestone 对应一个 npm release，且 `v1.9` 映射 npm `1.9.0` | Shipped 2026-04-23 |
 | `/release` 必须保留两道用户确认门 | 发布属于 L3；确认门是防止 AI 自主发布和 major 版本跳跃误操作的核心安全机制 | Shipped 2026-04-23 |
+| 启动 `v2.0 agent-native-foundation` | 用户指令：把未实现的 ideation features 收敛为 v2.0 milestone | Shipped 2026-05-01 |
+| v2.0 scope 从 19 个 raw ideas 过滤到 10 个 phases | 按最高 confidence × leverage 选择，避免单 milestone 过载 | ✓ Good |
+| Phase 编号从 40 继续 | 未请求 `--reset-phase-numbers`；v2.0 使用 Phase 40.1-49 | ✓ Good |
+| Auto-Generate / Remediation / Self-Healing 延至 v3.0 | 需要超越 import graph 的语义分析；属于 "Architecture Intelligence" | Deferred 2026-04-30 |
+| SQLite-only migration 延至独立 milestone | KùzuDB 仍稳定；完整迁移值得专项 | Deferred 2026-04-30 |
+| First-Run Concierge / Zero-Config 延至 v2.1 | UX 增强依赖 doctor 和 interface contract 先到位 | Deferred 2026-04-30 |
+| Contract schema 渐进迁移（先 3 命令，后扩展） | 避免一次性重构 15+ 命令的爆炸半径；Pattern 建立后可增量吸收 | ✓ Good |
+| Phase 49 作为 audit blocker 修复专项 | 审计发现 4 个 critical blockers；创建接线 phase 而非回退整个 milestone | ✓ Good |
+| v2.0 归档时接受 3 个阶段无原始 SUMMARY | 功能已验证（VERIFICATION.md 存在），后补 SUMMARY 作为文档债务 | Shipped 2026-05-01 |
 
 ## Current State
 
-- **Completed milestones / follow-ups:** `v1.0`、`v1.1`、`v1.2`、`v1.3`、`v1.4`、`post-v1.4`、`v1.6`、`post-v1.6`、`v1.7 init-and-rule-hardening`、`v1.8 entry-docs-structure-consolidation`、`v1.9 release-governance-unification`、`v1.10 governance-debt-cleanup`、`v1.11 release-followup-hardening`
+- **Completed milestones / follow-ups:** `v1.0`→`v1.11`、`v2.0 agent-native-foundation`
 - **Historical closed branch:** `v1.5 Isolated ArcadeDB Server-backed Prototype`（22-24 不再继续）
-- **Active milestone:** `v2.0 agent-native-foundation`
-- **Current planning status:** Milestone initialized 2026-04-30; Phase 41-47 defined; ready for `$gsd-discuss-phase 41`
-- **Known remaining debt:** actual `/release v1.9` execution 与 debug artifact 仍保留在 deferred backlog；v1.11 中 deferred 的 Kimi parity 与 multi-runtime expansion 未纳入 v2.0 scope
+- **Active milestone:** None — v2.0 shipped 2026-05-01
+- **Current planning status:** All v2.0 phases (40.1-49) complete and archived. Ready for next milestone planning.
+- **Known remaining debt:** actual `/release v1.9` execution 仍保留在 deferred backlog；渐进债务（12+ 命令 contract 迁移、benchmark 输出基础设施迁移）
+- **Codebase:** 74,544 TypeScript LOC, 1129 tests all passing
+
+## Next Milestone Goals (Candidates)
+
+1. **v2.1 ux-onboarding-enhancement** — First-Run Concierge + Bootstrap Profiles, Zero-Config Preview / Progressive Commitment
+2. **v2.2 agent-integration-completion** — Auto-Provisioned Agent Skills, MCP `verify_contract` Tool
+3. **v3.0 architecture-intelligence** — Auto-Generate design.md, Architecture Remediation Patches, Self-Healing Design Contract, SQLite + In-Memory Graph Migration
 
 ## Next Execution Step
 
-- 启动 `Phase 41 interface-contract-schema`，定义 CLI 表面为机器可读契约，为后续 parser 生成、MCP 暴露和 help-json 提供单一真相源。
+- 使用 `/gsd-new-milestone` 启动下一轮 milestone（questioning → research → requirements → roadmap）
 
 ## Evolution
 
@@ -247,4 +265,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. 更新 Current State / Context / Key Decisions
 
 ---
-*Last updated: 2026-04-30 after initializing Milestone v2.0 agent-native-foundation*
+*Last updated: 2026-05-01 after shipping Milestone v2.0 agent-native-foundation*
