@@ -1,0 +1,44 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-05-01T16:47:06Z",
+  "phase": "53",
+  "phase_name": "Bootstrap Profiles + Project Detection",
+  "phase_dir": ".planning/phases/53-bootstrap-profiles-project-detection",
+  "plan": "53-03",
+  "task": null,
+  "total_tasks": 4,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": "53-01", "name": "Core detection + profile infrastructure (detect.ts, profile-loader.ts, 5 profile JSON files)", "status": "done", "commit": "merged-pre-summary"},
+    {"id": "53-02", "name": "Profile plan integration (profile-plan.ts, reconciler.ts, init.ts --profile, interface contract)", "status": "done", "commit": "merged-pre-summary"},
+    {"id": "post-merge-hotfix", "name": "Hotfix: ProjectType import + D-16 legacy-config recognition + D-04 marker fixtures", "status": "done", "commit": "881f2f4"},
+    {"id": "wave1-tracking", "name": "ROADMAP/STATE update marking Wave 1 complete", "status": "done", "commit": "386461c"},
+    {"id": "53-03/T1", "name": "detect.test.ts unit tests (7 cases)", "status": "done", "commit": "e7e9fe4"},
+    {"id": "53-03/T2", "name": "profile-loader unit tests (10 cases)", "status": "done", "commit": "da85e6a"},
+    {"id": "53-03/T3", "name": "init-profile integration tests (8 cases)", "status": "done", "commit": "94d3403"},
+    {"id": "53-03/T4", "name": "first-run-guide bootstrap-profile hint", "status": "done", "commit": "6b0bbff"},
+    {"id": "53-03/SUMMARY", "name": "Plan 53-03 SUMMARY.md", "status": "done", "commit": "62ba742"},
+    {"id": "BLOCKER+F2", "name": "Register --profile in commander; ship profile JSONs in dist via postbuild", "status": "done", "commit": "1866672"}
+  ],
+  "remaining_tasks": [
+    {"id": "commit-verification-doc", "name": "Add and commit .planning/phases/53-.../53-VERIFICATION.md (untracked, written by gsd-verifier)", "status": "not_started"},
+    {"id": "binary-smoke-test", "name": "Add binary-level smoke test that exercises commander --profile parsing (prevents future API/binary gap regressions)", "status": "not_started"},
+    {"id": "f1-decision", "name": "Decide F-1 cosmetic: legacy mycodemap.config.json + marker yields receipt message '未检测到项目类型标记' instead of '检测到已存在的 .mycodemap/config.json'. Functional behavior is correct (D-16 preservation, no overwrite). Either fix the message or file as v2.1 cleanup follow-up.", "status": "not_started"},
+    {"id": "reverify", "name": "Re-run gsd-verifier sub-agent to confirm BLOCKER + F-2 are gone and phase reaches PASS verdict", "status": "not_started"},
+    {"id": "phase-closure", "name": "Mark Phase 53 complete: ROADMAP Status -> complete, STATE progress 100%, last_activity entry, TaskUpdate #5 -> completed", "status": "not_started"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "hasCanonicalConfig() in init.ts now also detects legacy root mycodemap.config.json", "rationale": "Without this, profile-plan would race the reconciler legacy-migration write and silently overwrite user config. Honors D-16 'existing config skip' for both canonical and legacy paths.", "phase": "53"},
+    {"decision": "profile-loader resolves JSON paths relative to its own location (./profiles/), not via package root + src/", "rationale": "npm `files` ships only dist/, not src/. Old absolute-from-package-root path broke published packages. New relative path works for both src (dev) and dist (prod) layouts.", "phase": "53"},
+    {"decision": "Added scripts/copy-build-assets.mjs as postbuild step", "rationale": "tsc does not copy non-TS assets to dist/. Without copy step, profile JSONs would be missing in published packages even with the relative-path loader fix.", "phase": "53"},
+    {"decision": "Existing-config asset emits 'skipped' (not 'already-synced') with message about no markers", "rationale": "init.ts's resolveProfile short-circuits with profile:null before profile-plan sees scan.hasCanonicalConfig=true. Tests assert this current behavior; functional behavior (config preserved) is correct. Cosmetic message gap filed as F-1 follow-up.", "phase": "53"},
+    {"decision": "commander --profile registration is one-line option(); no separate sub-flag for re-detect", "rationale": "Phase 53 D-13 only requires bypass; --re-detect is mentioned in profile-plan asset details but not implemented. Defer to a future phase if user demand emerges.", "phase": "53"}
+  ],
+  "uncommitted_files": [
+    ".planning/phases/53-bootstrap-profiles-project-detection/53-VERIFICATION.md"
+  ],
+  "next_action": "Read .continue-here.md in phase dir, run `node /data/codemap/node_modules/.bin/vitest run src/cli` to confirm 478 passing, then `git add .planning/phases/53-bootstrap-profiles-project-detection/53-VERIFICATION.md` and start a new gsd-verifier sub-agent for re-verification.",
+  "context_notes": "Phase 53 landed Wave 1 + Wave 2 successfully. After Wave 2, gsd-verifier found 1 BLOCKER (commander missing --profile) and 1 packaging gap (F-2: profile JSONs not in dist). Both fixed and committed (HEAD=1866672). Verifier has NOT yet re-run to confirm PASS — that is the immediate next step on resume. The verifier's PARTIAL verdict in 53-VERIFICATION.md is based on pre-fix state; do not propagate that verdict to STATE.md without re-verification."
+}
