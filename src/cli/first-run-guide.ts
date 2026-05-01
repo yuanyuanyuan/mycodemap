@@ -73,6 +73,9 @@ export function showFirstRunGuide(): void {
   console.log(chalk.gray('     ') + chalk.cyan('mycodemap --help'));
   console.log('');
 
+  console.log(chalk.gray('  提示: ') + chalk.white('运行 `mycodemap init` 时，若检测到 package.json / pyproject.toml / go.mod / Cargo.toml，将自动推荐对应项目的 bootstrap profile。'));
+  console.log('');
+
   console.log(chalk.cyan('━'.repeat(48)));
   console.log('');
 }

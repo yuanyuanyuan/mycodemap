@@ -77,6 +77,8 @@ describe('first-run guide', () => {
     expect(output).toContain('mycodemap init');
     expect(output).toContain('mycodemap generate');
     expect(output).toContain('mycodemap --help');
+    expect(output).toContain('bootstrap profile');
+    expect(output).toContain('package.json');
     expect(output).not.toContain('hooks');
     expect(output).not.toContain('rules');
   });
