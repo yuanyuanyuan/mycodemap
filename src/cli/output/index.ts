@@ -9,3 +9,7 @@ export type { OutputMode, OutputModeOptions, ProgressEmitter, StructuredError, A
 export { isActionableError, APPLY_SUGGESTION_CONFIDENCE_THRESHOLD } from './types.js';
 export { ErrorCodes, ErrorRemediation } from './error-codes.js';
 export type { ErrorCode } from './error-codes.js';
+export { tryApplySuggestion } from './apply-suggestion.js';
+export type { SuggestionResult } from './apply-suggestion.js';
+export { checkAndActivateWasmFallback, createNativeDepError } from './wasm-fallback.js';
+export type { WasmFallbackResult } from './wasm-fallback.js';

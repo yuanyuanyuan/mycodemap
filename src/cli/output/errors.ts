@@ -50,18 +50,14 @@ export function formatError(error: unknown, mode: OutputMode, attempted?: string
   if (normalized.code && normalized.code !== 'UNKNOWN') {
     output = chalk.red('Error: ') + `[${normalized.code}] ${normalized.message}`;
   }
-  if (isActionableError(normalized)) {
-    output += '\n  ' + chalk.cyan('Attempted: ') + normalized.attempted;
-    output += '\n  ' + chalk.cyan('Root cause: ') + normalized.rootCause;
-    if (normalized.remediationPlan) {
-      const pct = Math.round(normalized.confidence * 100);
-      output += `\n  ${chalk.yellow('Suggestion: ')}${normalized.remediationPlan} (${pct}% confidence)`;
-    }
-    if (normalized.nextCommand) {
-      output += '\n  ' + chalk.green('Next: ') + normalized.nextCommand;
-    }
-  } else if (normalized.remediation) {
-    output += '\n  ' + chalk.yellow('Suggestion: ') + normalized.remediation;
+  output += '\n  ' + chalk.cyan('Attempted: ') + normalized.attempted;
+  output += '\n  ' + chalk.cyan('Root cause: ') + normalized.rootCause;
+  if (normalized.remediationPlan) {
+    const pct = Math.round(normalized.confidence * 100);
+    output += `\n  ${chalk.yellow('Suggestion: ')}${normalized.remediationPlan} (${pct}% confidence)`;
+  }
+  if (normalized.nextCommand) {
+    output += '\n  ' + chalk.green('Next: ') + normalized.nextCommand;
   }
   return output;
 }
