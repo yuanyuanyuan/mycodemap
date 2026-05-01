@@ -972,7 +972,7 @@ function validatePositioningBaselineDocs(rootDir, failures) {
 
   if (aiGuideIndex) {
     const requiredIndexSnippets = [
-      'AI-first 代码地图工具',
+      'AI-Native 优先、人类友好的代码架构治理基础设施',
       'AI/Agent 是主要消费者',
       '`server`、`watch`、`report`、`logs` 已从 public CLI 移除'
     ];

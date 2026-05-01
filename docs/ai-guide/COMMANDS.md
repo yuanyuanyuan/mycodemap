@@ -2,9 +2,9 @@
 
 > 完整的 CLI 命令详解
 >
-> CodeMap 是 AI-first 代码地图工具。以下文档记录当前公开命令，并补充已移除命令的迁移提示。  
+> CodeMap 是 AI-Native 优先、人类友好的代码架构治理基础设施。以下文档记录当前公开命令，并补充已移除命令的迁移提示。  
 > 命名规范：公开命令示例统一使用 `mycodemap`；`codemap` 只作为兼容别名保留，不作为新示例首选。  
-> 当前 CLI 过渡现实：多数命令显式使用 `--json` 输出机器可读结果；`analyze` 额外支持 `--output-mode machine|human`。
+> v2.0 AI-First Default Output：默认输出 JSON/NDJSON（非 TTY 或显式 `--json`），人类阅读使用 `--human` 或 TTY 自动检测。
 
 ---
 
@@ -125,7 +125,9 @@ mycodemap impact -f "src/cli/index.ts" -j   # JSON 输出
 
 ---
 
-### mcp - experimental 本地 MCP 集成
+### mcp - MCP 集成 (CLI-as-MCP Automatic Gateway)
+
+> v2.0 升级为 CLI-as-MCP Automatic Gateway。所有 20+ schema 定义的 CLI 命令自动暴露为 MCP tools；动态 tool 注册。
 
 ```bash
 mycodemap mcp install                     # 把当前仓库写入 .mcp.json
@@ -135,14 +137,14 @@ mycodemap generate --symbol-level         # 使用前必须先生成 symbol-leve
 
 | 子命令 | 说明 |
 |--------|------|
-| `install` | 更新当前仓库根目录 `.mcp.json`，追加 `mycodemap-experimental` server entry |
-| `start` | 启动 local-only / read-only / stdio-first experimental MCP server |
+| `install` | 更新当前仓库根目录 `.mcp.json`，追加 `mycodemap` server entry |
+| `start` | 启动 local-only / read-only / stdio-first MCP server |
 
-**首期规则**:
-- `mcp` 是 experimental surface，不要把它当成稳定长期 public API。
+**v2.0 行为**:
+- CLI-as-MCP Automatic Gateway：所有 schema 定义的命令（`generate`、`query`、`deps`、`impact`、`analyze`、`doctor`、`benchmark`、`design`、`check`、`ci`、`history`、`workflow` 等）自动映射为 MCP tools。
+- 动态 tool 注册：新增命令无需手动更新 MCP server，schema 变更后自动生效。
 - `mcp start` 的 `stdout` 只能承载 MCP 协议帧；欢迎信息、迁移提示与 runtime log 不会走这条流。
-- 当前只暴露两个工具：`codemap_query`、`codemap_impact`。
-- `codemap_query` / `codemap_impact` 都会返回 `graph_status`、`generated_at` 与显式 `error.code`。
+- 所有 MCP tools 返回 `graph_status`、`generated_at` 与显式 `error.code`。
 - 若图尚未生成，会返回 `GRAPH_NOT_FOUND`；若符号不存在，返回 `SYMBOL_NOT_FOUND`；若同名符号无法消歧，返回 `AMBIGUOUS_EDGE`。
 - 详细安装步骤见 `docs/ai-guide/INTEGRATION.md`；完整 output contract 见 `docs/ai-guide/OUTPUT.md`。
 
@@ -517,6 +519,60 @@ mycodemap workflow template recommend "任务"  # 推荐模板
 
 ---
 
+## doctor - 持续健康诊断
+
+> v2.0 新增。检测 ghost 命令、native 依赖问题、workspace drift、agent 连通性。
+
+```bash
+mycodemap doctor              # 人类可读摘要
+mycodemap doctor --json       # 机器可读完整诊断
+```
+
+| 类别 | 检查项 | 说明 |
+|------|--------|------|
+| `install` | native 依赖完整性 | 检查 `better-sqlite3` 等 native 模块是否可加载 |
+| `config` | workspace 完整性 | 检查 `.mycodemap/config.json`、图存储后端配置 |
+| `runtime` | ghost 命令检测 | 检测已注册但无实际实现的命令 |
+| `agent` | MCP 连通性 | 检查 MCP server 注册与工具发现是否正常 |
+
+- 每个类别独立返回 `ok` / `warn` / `error` 状态
+- `--json` 输出纯结构化 diagnostics，包含 `categories[]`、`summary`、`recommendations`
+- `error` 级别诊断会设置非零 exit code
+
+---
+
+## benchmark - WASM vs Native 性能对比
+
+> v2.0 新增。对比 WASM fallback 与 Native 实现的性能差异。
+
+```bash
+mycodemap benchmark           # 完整对比（WASM + Native）
+mycodemap benchmark --wasm    # 仅 WASM 性能
+mycodemap benchmark --native  # 仅 Native 性能
+mycodemap benchmark --json    # JSON 输出
+```
+
+- 输出包含各分析阶段的耗时对比（generate、query、deps、impact 等）
+- `--json` 输出结构化 benchmark 结果，便于 CI 集成与回归检测
+- 用于决定是否启用 WASM fallback 或排查性能退化
+
+---
+
+## --schema - 接口契约输出
+
+> v2.0 新增。输出完整的 Interface Contract Schema JSON，供 agent 自省与动态 tool 注册。
+
+```bash
+mycodemap --schema            # 输出完整 schema JSON
+mycodemap --schema | jq '.'   # 格式化查看
+```
+
+- 单一 schema 同时生成：parser、MCP tools、`--help-json`、shell completions
+- Agent 可通过读取 schema 动态发现所有可用命令及其参数契约
+- 输出包含所有 20+ 命令的完整接口定义（参数、类型、返回值结构）
+
+---
+
 ## 已移除的公共命令
 
 以下命令已从 public CLI 移除；直接调用时，CLI 会显式失败并给出迁移提示，而不是继续执行旧功能。
@@ -546,7 +602,7 @@ mycodemap export json -o ./output.json       # 指定输出
 
 ### ship - 一键智能发布（非代码地图首屏能力）
 
-> `ship` 负责发布整合，不是 AI-first 代码地图工具的首屏入口；首次接触项目时优先使用分析命令而非发布命令。
+> `ship` 负责发布整合，不是 CodeMap 代码分析的首屏入口；首次接触项目时优先使用分析命令而非发布命令。
 
 ```bash
 mycodemap ship                              # 完整发布流程
