@@ -2,12 +2,13 @@
 
 ## Current Planning Surface
 
-**Status:** No active milestone. The latest shipped milestone is `v2.0 agent-native-foundation` (2026-05-01).
+**Status:** Active milestone `v2.1 ux-onboarding-enhancement` (2026-05-01). Phases 50-52 remain as independent unscheduled follow-ups.
 
-All v2.0 phase directories remain in `.planning/phases/`. The milestone archive (roadmap + requirements + audit) is at `.planning/milestones/v2.0-*`.
+v2.0 milestone archive (roadmap + requirements + audit) is at `.planning/milestones/v2.0-*`.
 
 ## Milestones
 
+- ○ **v2.1 ux-onboarding-enhancement** — Phases 53-57 (defining requirements)
 - ✅ **v2.0 agent-native-foundation** — Phases 40.1-49 (shipped 2026-05-01)
 - ✅ **v1.11 release-followup-hardening** — Phases 38-40 (shipped 2026-04-29)
 - ✅ **v1.10 governance-debt-cleanup** — Phases 35-37 (shipped 2026-04-23)
@@ -156,6 +157,132 @@ Plans:
 
 </details>
 
+<details open>
+<summary>○ Unscheduled release follow-up (Phase 50) — NOT PLANNED</summary>
+
+### Phase 50: Release Local Pre-Release Check Gap
+**Status:** Not planned
+**Goal:** Close the local/CI release validation gap found during the v2.0 release attempt: `scripts/release.sh` must run the same pre-release checks locally that CI publish runs later, so changelog/version/tag/llms/index issues fail before tag or push.
+**Depends on:** Phase 34, Phase 40, Phase 49
+**Requirements:** Release governance; local/CI validation parity; pre-release check coverage
+**Plans:** Not planned yet
+
+**Success criteria:**
+1. Local release flow runs `npm run docs:check:pre-release` before any irreversible release action.
+2. The chosen implementation avoids hiding the check inside an unrelated broad script unless docs and release flow make that behavior explicit.
+3. Verification demonstrates a local failure scenario when pre-release checks fail.
+4. Verification demonstrates the normal passing path with `docs:check`, `docs:check:pre-release`, and diff hygiene.
+5. Release docs or checklist are updated if the local validation sequence changes.
+
+</details>
+
+<details open>
+<summary>○ Unscheduled post-install initialization follow-up (Phase 51) — NOT PLANNED</summary>
+
+### Phase 51: Post-Install Agent Bootstrap Configuration
+**Status:** Not planned
+**Goal:** Make `mycodemap init` the reliable post-install bootstrap for new user projects: after the package is installed, it should converge `.mycodemap/` config, hooks, rules, agent-context snippets, and verification guidance so Claude/Codex users can connect initialized assets without hand-assembling setup instructions.
+**Depends on:** Phase 40.1, Phase 43, Phase 46, Phase 48, Phase 49
+**Requirements:** Post-install onboarding; init reconciliation; agent context bootstrap
+**Plans:** Not planned yet
+
+**Success criteria:**
+1. `mycodemap init` generates or updates a new-user bootstrap package under `.mycodemap/` that includes canonical config, hooks, rules, status receipt, and agent-context snippets for Claude/Codex-style assistants.
+2. The generated rules/context assets include copy-pasteable Claude/Codex/generic assistant snippets that tell users how to reference `.mycodemap/` assets without hand-assembling setup instructions.
+3. `init` keeps team-owned `CLAUDE.md` / `AGENTS.md` safe by default: no silent rewrites; receipt output clearly reports `manual-action-needed`, copy-paste snippets, already-synced detection, and conflicts.
+4. CLI contract, help, docs, and setup guides all describe the same post-install flow: install → `mycodemap init` preview/apply → `mycodemap doctor` → generate/index → connect agent context.
+5. Verification covers a fresh temp project, an idempotent rerun, a drift/conflict case, and at least one real subprocess flow proving the generated agent rules/snippets are present and discoverable.
+
+</details>
+
+<details open>
+<summary>○ Unscheduled compliance follow-up (Phase 52) — NOT PLANNED</summary>
+
+### Phase 52: CodeMap CLI Priority Harness Guard
+**Status:** Not planned
+**Goal:** Turn the CodeMap CLI-first retrieval rule from a soft instruction into an observable harness guardrail across Claude/Codex sessions: tighten the rule text, add router discoverability, introduce a report-only guard or auditor, and verify failure / compliant / allowed-fallback scenarios.
+**Depends on:** Phase 40.1, Phase 43, Phase 46, Phase 49, Phase 51
+**Requirements:** Governance follow-up; agent harness control; CodeMap CLI compliance
+**Plans:** Not planned yet
+
+**Success criteria:**
+1. `AGENTS.md` Section 6 defines a machine-checkable CodeMap CLI priority gate for code search, project analysis, and impact analysis.
+2. `docs/rules/harness.md` documents the report-only to blocking escalation path for CLI-priority enforcement.
+3. Claude/Codex router docs point agents to the CLI priority gate without duplicating policy text.
+4. A report-only guard or auditor detects first-use `rg` / `grep` / `find` search in code paths before `mycodemap query|analyze|deps|impact`, while allowing documented fallback cases.
+5. Verification covers one failure scenario, one compliant scenario, and one allowed fallback scenario using real filesystem + subprocess evidence.
+
+</details>
+
+<details open>
+<summary>○ v2.1 ux-onboarding-enhancement (Phases 53-57) — PLANNING</summary>
+
+### Phase 53: Bootstrap Profiles + Project Detection
+**Status:** Not started
+**Goal:** Establish project type auto-detection and Bootstrap Profile system so first-time users get sensible defaults without manual configuration.
+**Depends on:** None
+**Requirements:** FRC-01, FRC-02, FRC-03, FRC-04
+**Plans:** Not planned yet
+
+**Success criteria:**
+1. `codemap` first run auto-detects project type (Node.js, Python, Go, Rust, generic)
+2. Each project type has a defined Bootstrap Profile with parser config, ignore patterns, analysis depth defaults
+3. Interactive mode allows user to review, accept, modify, or skip recommended profile
+4. Profile definitions are stored as data files, not hardcoded in source
+
+### Phase 54: Zero-Config Preview
+**Status:** Not started
+**Goal:** Let users see CodeMap value immediately without writing any configuration file.
+**Depends on:** Phase 53 (profile system provides fallback defaults)
+**Requirements:** ZCP-01, ZCP-02, ZCP-03, ZCP-04
+**Plans:** Not planned yet
+
+**Success criteria:**
+1. `codemap preview` runs without `mycodemap.config.json` in an empty or fresh project
+2. Auto-detects entry files, source directories, test directories
+3. Outputs concise summary: file count, module count, key dependencies, complexity hotspots
+4. After preview, prompts user to `--save` as formal config or `--discard`
+
+### Phase 55: Agent Bootstrap Assets
+**Status:** Not started
+**Goal:** Generate per-runtime assistant bootstrap assets during `mycodemap init` so Claude/Codex users can connect without hand-assembling setup instructions.
+**Depends on:** None
+**Requirements:** ABT-01, ABT-02, ABT-05, INI-01
+**Plans:** Not planned yet
+
+**Success criteria:**
+1. `mycodemap init` creates `.mycodemap/assistants/` directory with per-runtime subdirectories
+2. Generated assets include Claude, Codex, and generic assistant context snippets
+3. `--profile claude|codex|generic` flag selects target assistant type
+4. `mycodemap init --json` returns real machine-readable `InitReceipt` JSON (currently advertised but unimplemented)
+
+### Phase 56: Init Receipt + Next Steps
+**Status:** Not started
+**Goal:** Complete the init experience with clear receipt reporting, safe team-owned file handling, and synchronized documentation.
+**Depends on:** Phase 55 (agent assets must exist before receipt can report their status)
+**Requirements:** ABT-03, ABT-04, INI-02, INI-03
+**Plans:** Not planned yet
+
+**Success criteria:**
+1. Init receipt explicitly reports agent context connection status: generated snippets, manual references needed, already-synced detection
+2. Default behavior does NOT auto-rewrite `CLAUDE.md` / `AGENTS.md`; outputs copy-paste snippets instead
+3. After init, displays personalized next steps based on receipt (not fixed three-step welcome)
+4. Setup docs (README, SETUP_GUIDE, AI_ASSISTANT_SETUP) describe unified flow: install → init → doctor → generate → connect agent
+
+### Phase 57: Verification
+**Status:** Not started
+**Goal:** End-to-end validation of the onboarding experience across real project scenarios.
+**Depends on:** Phase 53-56
+**Requirements:** VER-01, VER-02, VER-03
+**Plans:** Not planned yet
+
+**Success criteria:**
+1. Real temp project verification: empty directory, Node.js project, and project with existing old config all pass
+2. Idempotency: repeated `mycodemap init` stably outputs `already-synced` status without false conflicts
+3. At least one verification path invokes the built CLI through a subprocess, not only in-process TypeScript
+
+</details>
+
 <details>
 <summary>✅ v1.11 release-followup-hardening (Phases 38-40) — SHIPPED 2026-04-29</summary>
 
@@ -203,17 +330,18 @@ Plans:
 
 These are scoped but not yet initialized. Requirements and roadmaps will be created when each milestone starts.
 
-- **v2.1 ux-onboarding-enhancement** — First-Run Concierge + Bootstrap Profiles, Zero-Config Preview / Progressive Commitment. Depends on v2.0 doctor and interface contract being stable.
 - **v2.2 agent-integration-completion** — Auto-Provisioned Agent Skills, MCP `verify_contract` Tool. Trivial layers on top of v2.0 interface contract schema.
 - **v3.0 architecture-intelligence** — Auto-Generate design.md from codebase, Auto-Generate Architecture Remediation Patches, Self-Healing Design Contract (Drift Approval), SQLite + In-Memory Graph Migration. Heavy semantic analysis and storage refactoring; deserves a major version boundary.
 - **Continuous** — Path-Scoped Governance, Live Rulebook, Governance Self-Audit. Ongoing docs governance improvements, not gated by any single release.
 
 ## Next Options
 
-v2.0 is complete. To start the next milestone:
+v2.1 is now active with 5 phases (53-57) and 19 requirements. To start execution:
 
-1. **`/gsd-new-milestone`** — questioning → research → requirements → roadmap
-2. **Review archived v2.0 artifacts** — `.planning/milestones/v2.0-*`
-3. **Pick a candidate from Future Milestones** — v2.1 UX, v2.2 Agent Integration, or v3.0 Architecture Intelligence
+1. **`/gsd-discuss-phase 53`** — gather context and clarify approach for Phase 53
+2. **`/gsd-plan-phase 53`** — skip discussion, plan directly
+3. **Review v2.1 requirements** — `.planning/REQUIREMENTS.md`
+
+> **Phase 50-52** remain independent unscheduled follow-ups. See `.planning/phases/50-*/`, `51-*/`, `52-*/` for gathered context.
 
 > **Deferred items mapping:** See `.planning/STATE.md` Deferred Items table for full traceability.
