@@ -218,11 +218,18 @@ Plans:
 <summary>○ v2.1 ux-onboarding-enhancement (Phases 53-57) — PLANNING</summary>
 
 ### Phase 53: Bootstrap Profiles + Project Detection
-**Status:** Not started
+**Status:** Planned
 **Goal:** Establish project type auto-detection and Bootstrap Profile system so first-time users get sensible defaults without manual configuration.
 **Depends on:** None
 **Requirements:** FRC-01, FRC-02, FRC-03, FRC-04
-**Plans:** Not planned yet
+**Plans:** 3 plans in 2 waves
+
+**Wave 1** *(no dependencies)*
+- [ ] 53-01-PLAN.md — Core detection + profile infrastructure (detect.ts, profile-loader.ts, 5 profile JSON files)
+- [ ] 53-02-PLAN.md — Profile plan integration (profile-plan.ts, reconciler.ts, init.ts --profile, interface contract)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 53-03-PLAN.md — Tests + first-run guide (detect.test.ts, profile-loader.test.ts, init-profile.test.ts, first-run-guide.ts update)
 
 **Success criteria:**
 1. `codemap` first run auto-detects project type (Node.js, Python, Go, Rust, generic)
