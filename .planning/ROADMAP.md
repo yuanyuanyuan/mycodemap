@@ -125,7 +125,7 @@ Plans:
 **Goal:** 增强 mycodemap 的 AI CLI 安装引导体验，并新增基于 repo-analyzer 的深度架构分析技能。
 **Depends on:** —
 **Plans:**
-- [ ] Plan 1: Create mycodemap-repo-analyzer skill + enhance AI_ASSISTANT_SETUP.md (not yet planned)
+- [x] Plan 1: Create mycodemap-repo-analyzer skill + enhance AI_ASSISTANT_SETUP.md (completed 2026-05-01)
 
 **Design doc:** `docs/plans/2026-04-30-install-guide-and-repo-analyzer-design.md`
 
