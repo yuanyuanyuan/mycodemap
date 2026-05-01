@@ -1,19 +1,19 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.1
-milestone_name: ux-onboarding-enhancement
-current_phase: "53"
-current_phase_name: "Bootstrap Profiles + Project Detection"
-current_plan: "53-03"
-status: "Wave 2 in flight"
-last_updated: "2026-05-02T00:15:00.000Z"
+milestone_name: milestone
+current_phase: 53 (complete)
+current_phase_name: Bootstrap Profiles + Project Detection
+current_plan: —
+status: verifying
+last_updated: "2026-05-01T17:13:38.388Z"
 last_activity: 2026-05-02
 progress:
-  total_phases: 1
-  completed_phases: 0
+  total_phases: 9
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
-  percent: 66
+  completed_plans: 3
+  percent: 100
 ---
 
 # Session State
@@ -28,15 +28,15 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 ## Position
 
 **Milestone:** v2.1 — ux-onboarding-enhancement
-**Current Phase:** 53
+**Current Phase:** 53 (complete)
 **Current Phase Name:** Bootstrap Profiles + Project Detection
-**Current Plan:** 53-03
-**Total Phases:** 1 planned (53)
-**Total Plans in Milestone:** 3
-**Status:** Wave 2 in flight
-**Progress:** [██████░░░░] 66% (Wave 1 merged + post-merge hotfix; Wave 2 starting)
+**Current Plan:** —
+**Total Phases:** 6 scoped (53-58; Phase 53 complete, 54-58 not planned)
+**Total Plans in Milestone:** 3 planned so far (all complete)
+**Status:** Phase 53 complete (verifier PASS 2026-05-02); Phases 54-58 scoped/not planned
+**Progress:** [█░░░░░░░░░] 17% phase completion (1/6); Phase 53 plans 3/3 with verifier PASS
 **Last Activity:** 2026-05-02
-**Last Activity Description:** Phase 53 Wave 1 complete and merged (53-01 detection foundation + 53-02 reconciler integration). Post-merge hotfix landed (D-16 legacy-config recognition + ProjectType import correction + D-04 marker fixtures for sibling test files). 453 cli tests green, typecheck clean. Wave 2 (Plan 53-03) now in flight: 3 test files + first-run-guide profile hint.
+**Last Activity Description:** Phase 53 closed at re-verification gate. BLOCKER B-1 (commander --profile registration) and F-2 (dist profile JSONs packaging) fixed in 1866672. Binary-level smoke test for `init --profile` added in 0e2a95a (closes API/binary gap structurally). gsd-verifier re-verified: PASS verdict, 4/4 success criteria, D-13 not-met → verified, SC-3 △ → ✓. F-1 (cosmetic legacy-config receipt message) deferred per user decision; logged below. 479 cli tests green; tsc clean; dist/cli/init/profiles/ contains 5 JSONs.
 
 ## Decisions Made
 
@@ -68,6 +68,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 |----------|------|------------------|
 | ux | First-Run Concierge + Bootstrap Profiles | v2.1 ux-onboarding-enhancement |
 | ux | Zero-Config Preview / Progressive Commitment | v2.1 ux-onboarding-enhancement |
+| ux | F-1: Phase 53 legacy-config receipt cosmetic message gap (functional D-16 honored; receipt detail "未检测到项目类型标记" misleading) | v2.1 cleanup follow-up |
 | agent-integration | Auto-Provisioned Agent Skills | v2.2 agent-integration-completion |
 | agent-integration | MCP `verify_contract` Tool | v2.2 agent-integration-completion |
 | architecture-intelligence | Auto-Generate design.md from codebase | v3.0 architecture-intelligence |
@@ -96,6 +97,8 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 - 2026-05-01: Phase 52 context gathered — locked scope around report-only session compliance detection, fallback cases, and Claude/Codex auditability
 - 2026-05-01: Phase 53 context gathered — locked scope around marker-only project type detection (D-01..D-04), built-in JSON profiles with strict schema validation (D-05..D-08), preview-default + accept/skip-only interaction (D-09..D-13), and `mycodemap init`-embedded single entry point (D-14..D-17)
 - 2026-05-01: Phase 53 planned — 3 plans in 2 waves: 53-01 (core detection + profile infrastructure), 53-02 (profile plan integration into init), 53-03 (tests + first-run guide). Research completed with zod validation, readline prompting, and RulesPlan/HookPlan pattern reuse. Verification passed with 2 documentation blockers resolved (VALIDATION.md created, RESEARCH.md open questions resolved, ROADMAP.md success criteria aligned with D-11).
+- 2026-05-02: Phase 58 added: Subagent Environment Contract Injection — make delegated-agent prompts carry RTK, commit-format, Vitest-entry, and rule-context contract up front; require real Claude/Codex sub-agent verification evidence.
+- 2026-05-02: Phase 53 closed — verifier PASS verdict (4/4 success criteria, D-01..D-17 all verified). Closure path: BLOCKER B-1 (commander --profile) + F-2 (dist profile JSONs) fixed in 1866672; binary-level smoke test added in 0e2a95a; F-1 (cosmetic legacy-config receipt message) deferred to v2.1 cleanup follow-up.
 
 ### Verified Existing Capabilities (carried forward)
 

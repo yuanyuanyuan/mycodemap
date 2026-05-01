@@ -8,7 +8,7 @@ v2.0 milestone archive (roadmap + requirements + audit) is at `.planning/milesto
 
 ## Milestones
 
-- ○ **v2.1 ux-onboarding-enhancement** — Phases 53-57 (defining requirements)
+- ○ **v2.1 ux-onboarding-enhancement** — Phases 53-58 (defining requirements)
 - ✅ **v2.0 agent-native-foundation** — Phases 40.1-49 (shipped 2026-05-01)
 - ✅ **v1.11 release-followup-hardening** — Phases 38-40 (shipped 2026-04-29)
 - ✅ **v1.10 governance-debt-cleanup** — Phases 35-37 (shipped 2026-04-23)
@@ -215,10 +215,10 @@ Plans:
 </details>
 
 <details open>
-<summary>○ v2.1 ux-onboarding-enhancement (Phases 53-57) — PLANNING</summary>
+<summary>○ v2.1 ux-onboarding-enhancement (Phases 53-58) — PLANNING</summary>
 
 ### Phase 53: Bootstrap Profiles + Project Detection
-**Status:** In progress (Wave 1 complete; Wave 2 in flight)
+**Status:** Complete (verifier PASS 2026-05-02; 4/4 success criteria, D-01..D-17 all verified)
 **Goal:** Establish project type auto-detection and Bootstrap Profile system so first-time users get sensible defaults without manual configuration.
 **Depends on:** None
 **Requirements:** FRC-01, FRC-02, FRC-03, FRC-04
@@ -229,7 +229,7 @@ Plans:
 - [x] 53-02-PLAN.md — Profile plan integration (profile-plan.ts, reconciler.ts, init.ts --profile, interface contract)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 53-03-PLAN.md — Tests + first-run guide (detect.test.ts, profile-loader.test.ts, init-profile.test.ts, first-run-guide.ts update)
+- [x] 53-03-PLAN.md — Tests + first-run guide (detect.test.ts, profile-loader.test.ts, init-profile.test.ts, first-run-guide.ts update)
 
 **Success criteria:**
 1. `codemap` first run auto-detects project type (Node.js, Python, Go, Rust, generic)
@@ -288,6 +288,22 @@ Plans:
 2. Idempotency: repeated `mycodemap init` stably outputs `already-synced` status without false conflicts
 3. At least one verification path invokes the built CLI through a subprocess, not only in-process TypeScript
 
+### Phase 58: Subagent Environment Contract Injection
+**Status:** Not started
+**Goal:** Prevent delegated-agent protocol mismatch by injecting a short Project Environment Contract into sub-agent prompts, covering RTK shell wrapping, `[TAG] scope: message`, the real Vitest entry/commands, and rule-context verification expectations before the agent starts work.
+**Depends on:** Phase 55, Phase 56, Phase 57
+**Requirements:** ABT-01, ABT-02, ABT-03, VER-03, SDC-01, SDC-02, SDC-03, SDC-04, SDC-05
+**Plans:** Not planned yet
+
+**Success criteria:**
+1. A single canonical Project Environment Contract exists for delegated prompts and includes RTK command wrapping, valid commit message format/tags, current test entry truth, and the CodeMap/rule-context priority rule.
+2. The prompt injection path emits the contract before scoped rules for edit, review, and verification delegations, including the `No scoped rules inferred` case.
+3. Claude, Codex, and generic assistant bootstrap assets route to the same contract source instead of duplicating drifting copies.
+4. Automated tests cover source-file, docs/config, and no-match `rule-context` paths, plus a failure case where a required contract line is missing.
+5. Real sub-agent verification runs through `claude -p` or `codex exec` in an isolated temp repo/worktree and captures evidence that a delegated agent received and used the RTK, commit-format, and Vitest-entry guidance.
+6. Verification includes a negative scenario where a delegated prompt without the contract is rejected or flagged before the work is accepted.
+7. Test evidence includes the command transcript, sub-agent prompt/output artifact, and clean working-tree or scoped diff hygiene check.
+
 </details>
 
 <details>
@@ -343,7 +359,7 @@ These are scoped but not yet initialized. Requirements and roadmaps will be crea
 
 ## Next Options
 
-v2.1 is now active with 5 phases (53-57) and 19 requirements. To start execution:
+v2.1 is now active with 6 phases (53-58) and 24 requirements. To start execution:
 
 1. **`/gsd-discuss-phase 53`** — gather context and clarify approach for Phase 53
 2. **`/gsd-plan-phase 53`** — skip discussion, plan directly
