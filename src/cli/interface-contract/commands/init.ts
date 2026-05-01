@@ -31,6 +31,13 @@ export const initContract: CommandContract = {
       type: 'boolean',
       defaultValue: false,
     },
+    {
+      name: 'profile',
+      long: 'profile',
+      description: '跳过检测，直接应用指定内置 profile',
+      type: 'string',
+      defaultValue: undefined,
+    },
   ],
   outputShape: {
     description: '初始化结果收据',
@@ -85,5 +92,6 @@ export const initContract: CommandContract = {
     'codemap init -y',
     'codemap init --interactive',
     'codemap init --json',
+    'codemap init --profile nodejs',
   ],
 };
