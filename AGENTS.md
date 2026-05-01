@@ -78,8 +78,9 @@
 
 ## 6. 检索与分析优先级
 
-- 涉及代码搜索、项目分析、影响评估时，优先使用 CodeMap CLI：`node dist/cli/index.js query|analyze|deps|impact`。
-- CodeMap 不足或失败时，再回退到 `rg`、`find` 等标准工具。
+- 涉及代码搜索、项目分析、影响评估时，必须先尝试 CodeMap CLI：`node dist/cli/index.js query|analyze|deps|impact`；不要把 `grep` / `rg` 作为第一搜索工具。
+- 常用映射：找符号用 `query --symbol "<Name>" --json`；模糊找代码用 `query --search "<keyword>" --json`；读代码范围用 `analyze -i read -t "<path>" --json`；影响分析用 `impact -f "<file>" --transitive --json`。
+- 只有 CodeMap 结果不足、CLI 失败，或目标是 CodeMap 未覆盖的纯文档/配置文本时，才回退到 `rg`、`find` 等标准工具。
 - 若因 CodeMap 缺陷被迫回退，且当前任务适用，应记录到 `.mycodemap/issues/codemap-issues.md`。
 
 ### 6.1 mycodemap-rules-bundle
@@ -119,6 +120,25 @@
 - 涉及 CI、规则、生成契约、提交护栏的改动，必须提供“失败场景 + 修复验证”证据。
 - 严禁使用 `--no-verify`、关闭 hooks、放宽阈值、删除检查项来过关。
 
+### 8.1 真实场景验证阈值
+
+真实场景验证为**宪法级硬约束**。最低阈值要求：
+
+- **真实 filesystem + 真实 subprocess 或真实 transport**（非纯 mock）
+- **禁止**：仅 mock 依赖后断言函数返回值；仅 `toEqual` 断言无真实端到端触发；在已污染环境中声称"通过"；无失败场景验证
+- **要求**：每个修复/功能至少 1 个失败场景验证证据
+- **分级执行控制**：pre-commit warn-only → CI blocking → pre-release 必过
+
+详细规则正文 → `docs/rules/testing.md`  
+发布门检查 → `docs/rules/pre-release-checklist.md` #12
+
+### 8.2 豁免条款
+
+- Phase 41/42 已有实现（截至本规则生效日）**不追溯合规**，但后续任何修改必须合规
+- Phase 43+ 从 inception 起必须合规
+- Phase 42 测试已使用 `StdioServerTransport` + `PassThrough` 做真实 MCP transport，符合阈值，只需补 `[证据]` 标签
+- Phase 41 测试仅为结构断言，后续修改时需补真实 CLI 调用测试
+
 ## 9. 交付与文档同步底线
 
 - 交付时至少说明：改了什么、为什么改、如何验证、还剩什么风险。
@@ -131,6 +151,7 @@
 ## 10. 当前仓库过渡说明
 
 - 当前 CLI 构建输出目录是 `dist/`，CLI bin 指向 `dist/cli/index.js`；不要把 `build/` 当成事实默认值。
+- 命名统一：产品/项目名写 `CodeMap`；公开 CLI 命令首选写 `mycodemap`；`codemap` 仅作为兼容别名或内部 MCP tool 名称出现，不作为新文档、新示例、新提示词的首选命令名。
 - 入口文档应保持短小；长命令清单、默认值、任务模板、产品使用说明应下沉到对应 live docs。
 - 历史归档位于 `docs/archive/` 与 `.planning/milestones/`；执行时以 live docs 和当前代码事实为准。
 

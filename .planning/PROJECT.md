@@ -12,9 +12,20 @@ CodeMap 仍是一个面向 AI / Agent 的代码地图工具。`v1.4` 已把 `des
 
 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
 
-## Current Milestone
+## Current Milestone: v2.0 agent-native-foundation
 
-No active milestone. Start the next milestone when ready.
+**Goal:** 把 CodeMap 从"人类 CLI + AI 可用"升级为"AI-Native 优先、人类友好的代码架构治理基础设施"，用机器可读契约统一 CLI / MCP / 文档三层表面，用结构化错误和持续诊断修复信任危机，用 WASM 回退消除安装失败的头号 drop-off。
+
+**Target features:**
+- Machine-Readable Interface Contract：单一 schema 定义 CLI 表面，自动生成 parser / MCP tool / `--help-json` / shell completion
+- CLI-as-MCP Automatic Gateway：所有 CLI 子命令动态暴露为 MCP tool，不再手写维护
+- AI-First Default Output：JSON/NDJSON 默认输出，`--human` 或 TTY 自动检测渲染表格/颜色，progress 事件走 stderr
+- `codemap doctor`：持续健康诊断，暴露 ghost commands、native dependency 问题与 workspace drift
+- Failure-to-Action Protocol：每个错误返回结构化 root cause + remediation plan + confidence
+- Validation Router + No Ghost Commands：文档引用的命令必须真实可运行，按改动类型路由最小验证
+- WASM-First Build Foundation：`tree-sitter` / `better-sqlite3` 提供 WASM 回退，零构建工具安装
+
+**Status:** Active — requirements defined, roadmap phased, ready to build.
 
 ## Latest Completed Milestone: v1.11 release-followup-hardening
 
@@ -109,8 +120,25 @@ No active milestone. Start the next milestone when ready.
 
 ### Active
 
-- [ ] `RELF-03`: 评估 release readiness 是否适合接入 CI 或 pre-release gate，并写清 hard gate / `warn-only / fallback` 边界
-- [ ] 若目标是发布，等待未来显式 `/release v1.9` 指令与双确认门
+- [ ] **AGENT-01**: 定义 CLI Interface Contract Schema（命令、参数、标志、输出形状、错误码）作为单一真相源
+- [ ] **AGENT-02**: Schema 驱动生成 CLI parser，替代手写 commander 配置
+- [ ] **AGENT-03**: Schema 驱动自动生成 MCP tool 定义，替代手写 `server.ts`
+- [ ] **AGENT-04**: Schema 驱动生成 `--help-json` 与 shell completion
+- [ ] **AGENT-05**: 运行时暴露 interface contract 元数据，供 agent 自省
+- [ ] **AGENT-06**: 现有核心命令渐进迁移到 contract schema（至少覆盖 `analyze` / `query` / `deps` / `design`）
+- [ ] **AGENT-07**: 所有命令默认输出 JSON/NDJSON，彻底替代不一致的 `--json` bolt-on
+- [ ] **AGENT-08**: `--human` 标志与 TTY 自动检测渲染器（表格、颜色、spinner）
+- [ ] **AGENT-09**: Progress 事件重定向到 stderr 作为结构化 NDJSON
+- [ ] **TRUST-01**: `codemap doctor` 能检测 `package.json` 中的 ghost commands / echo stubs
+- [ ] **TRUST-02**: `codemap doctor` 能检测 native dependency（`tree-sitter`、`better-sqlite3`）health
+- [ ] **TRUST-03**: `codemap doctor` 能检测 `.mycodemap/` workspace drift
+- [ ] **TRUST-04**: Failure-to-Action Protocol：错误返回包含 root cause、machine-readable remediation plan、confidence score
+- [ ] **TRUST-05**: Validation Router：根 `CLAUDE.md` 中"修改后验证"改为按改动类型决策树
+- [ ] **TRUST-06**: Ghost Commands 清理：替换 `check:architecture` / `check:unused` 为真实检查或诚实移除
+- [ ] **TRUST-07**: 文档与真实自动化的一致性验证接入 CI
+- [ ] **INST-01**: `tree-sitter` 提供 WASM 回退模块，无编译工具时自动降级
+- [ ] **INST-02**: `better-sqlite3` / `node:sqlite` 提供 WASM/纯 JS 回退路径
+- [ ] **INST-03**: Native opt-in 机制与 WASM vs Native 性能 benchmark
 
 ### Out of Scope
 
@@ -191,15 +219,15 @@ No active milestone. Start the next milestone when ready.
 
 ## Current State
 
-- **Completed milestones / follow-ups:** `v1.0`、`v1.1`、`v1.2`、`v1.3`、`v1.4`、`post-v1.4`、`v1.6`、`post-v1.6`、`v1.7 init-and-rule-hardening`、`v1.8 entry-docs-structure-consolidation`、`v1.9 release-governance-unification`、`v1.10 governance-debt-cleanup`
+- **Completed milestones / follow-ups:** `v1.0`、`v1.1`、`v1.2`、`v1.3`、`v1.4`、`post-v1.4`、`v1.6`、`post-v1.6`、`v1.7 init-and-rule-hardening`、`v1.8 entry-docs-structure-consolidation`、`v1.9 release-governance-unification`、`v1.10 governance-debt-cleanup`、`v1.11 release-followup-hardening`
 - **Historical closed branch:** `v1.5 Isolated ArcadeDB Server-backed Prototype`（22-24 不再继续）
-- **Active milestone:** `v1.11 release-followup-hardening`
-- **Current planning status:** `Phase 39 publish-polling-and-reporting` 已完成；下一步进入 `Phase 40 readiness-gate-evaluation`
-- **Known remaining debt:** actual `/release v1.9` execution 与 debug artifact 仍保留在当前 milestone 外的 deferred backlog
+- **Active milestone:** `v2.0 agent-native-foundation`
+- **Current planning status:** Milestone initialized 2026-04-30; Phase 41-47 defined; ready for `$gsd-discuss-phase 41`
+- **Known remaining debt:** actual `/release v1.9` execution 与 debug artifact 仍保留在 deferred backlog；v1.11 中 deferred 的 Kimi parity 与 multi-runtime expansion 未纳入 v2.0 scope
 
 ## Next Execution Step
 
-- 启动 `Phase 40`，评估 readiness gate 是否适合进入 CI / pre-release surface，并固定 hard gate / warn-only / fallback 边界。
+- 启动 `Phase 41 interface-contract-schema`，定义 CLI 表面为机器可读契约，为后续 parser 生成、MCP 暴露和 help-json 提供单一真相源。
 
 ## Evolution
 
@@ -219,4 +247,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. 更新 Current State / Context / Key Decisions
 
 ---
-*Last updated: 2026-04-23 after completing Phase 39 publish-polling-and-reporting*
+*Last updated: 2026-04-30 after initializing Milestone v2.0 agent-native-foundation*

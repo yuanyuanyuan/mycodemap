@@ -1,7 +1,7 @@
 // [META] since:2026-03 | owner:docs-team | stable:true
 // [WHY] Validate high-signal documentation facts against the current repository guardrails
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectAnalyzeDocSyncFailures } from './sync-analyze-docs.js';
@@ -835,6 +835,102 @@ function validateDesignContractDocs(rootDir, failures) {
   }
 }
 
+function validateNpmScriptsAreReal(rootDir, failures) {
+  const packageJsonText = readText(rootDir, 'package.json', failures);
+  if (!packageJsonText) {
+    return;
+  }
+
+  let packageJson;
+  try {
+    packageJson = JSON.parse(packageJsonText);
+  } catch {
+    failures.push('package.json is not valid JSON — cannot validate npm scripts');
+    return;
+  }
+
+  const scripts = packageJson.scripts;
+  if (!scripts || typeof scripts !== 'object') {
+    return;
+  }
+
+  /** Pattern matching echo stubs like: echo 'dependency-cruiser not installed, run: npm i -D dependency-cruiser' */
+  const ECHO_STUB_PATTERN = /^echo\s+['"].*not installed/i;
+
+  // Check all referenced npm scripts in docs are real (not echo stubs)
+  const docsDir = path.join(rootDir, 'docs');
+  const githubDir = path.join(rootDir, '.github');
+  const npmRunPattern = /npm\s+run\s+([a-zA-Z0-9:_-]+)/g;
+
+  function scanFileForNpmRun(filePath, label) {
+    if (!existsSync(filePath)) {
+      return;
+    }
+
+    let content;
+    try {
+      content = readFileSync(filePath, 'utf8');
+    } catch {
+      return;
+    }
+
+    let match;
+    while ((match = npmRunPattern.exec(content)) !== null) {
+      const scriptName = match[1].replace(/[.,;:!?`'"()\[\]{}]+$/, '');
+      // Skip known npm lifecycle scripts that don't need to be in package.json
+      const npmLifecycleScripts = new Set([
+        'postinstall', 'preinstall', 'prepare', 'prepublish', 'prepublishOnly',
+        'prerestart', 'postrestart', 'prestart', 'poststart', 'prestop', 'poststop',
+        'pretest', 'posttest', 'preversion', 'postversion',
+      ]);
+      if (npmLifecycleScripts.has(scriptName)) {
+        continue;
+      }
+
+      // Skip if not a defined script
+      if (!(scriptName in scripts)) {
+        failures.push(`[docs-script-ghost] ${label} references undefined npm script: "npm run ${scriptName}"`);
+        continue;
+      }
+
+      const scriptValue = scripts[scriptName];
+      if (typeof scriptValue === 'string' && ECHO_STUB_PATTERN.test(scriptValue)) {
+        failures.push(`[docs-script-stub] ${label} references npm script "${scriptName}" which is an echo stub, not a real command`);
+      }
+    }
+  }
+
+  function scanDirectory(dirPath, labelPrefix) {
+    if (!existsSync(dirPath)) {
+      return;
+    }
+
+    // Walk directory recursively
+    function walk(currentPath, relativePath) {
+      const items = readdirSync(currentPath, { withFileTypes: true });
+      for (const item of items) {
+        const itemPath = path.join(currentPath, item.name);
+        const itemRelPath = path.join(relativePath, item.name);
+        if (item.isDirectory()) {
+          // Skip historical artifact directories
+          if (item.name === 'exec-plans' || item.name === 'ideation' || item.name === 'references' || item.name === 'archive') {
+            continue;
+          }
+          walk(itemPath, itemRelPath);
+        } else if (item.isFile() && item.name.endsWith('.md')) {
+          scanFileForNpmRun(itemPath, `${labelPrefix}/${itemRelPath}`);
+        }
+      }
+    }
+    walk(dirPath, '');
+  }
+
+  scanDirectory(docsDir, 'docs');
+  scanDirectory(githubDir, '.github');
+  // Note: docs/exec-plans/ and docs/ideation/ contain historical artifacts
+  // that reference scripts from their time period — skip them
+}
+
 function validatePositioningBaselineDocs(rootDir, failures) {
   const readme = readText(rootDir, 'README.md', failures);
   const aiGuide = readText(rootDir, 'AI_GUIDE.md', failures);
@@ -1651,6 +1747,7 @@ function validateDocs(rootDir) {
   const failures = [];
 
   validatePackageScripts(rootDir, failures);
+  validateNpmScriptsAreReal(rootDir, failures);
   validatePositioningBaselineDocs(rootDir, failures);
   validateCliSurfaceDocs(rootDir, failures);
   validateConfigDocs(rootDir, failures);

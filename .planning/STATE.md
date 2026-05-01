@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: agent-native-foundation
-current_phase: 40.1
-current_phase_name: real-world-validation-guardrails
-current_plan: 40.1-01
-status: planned
-last_updated: "2026-04-30T12:00:00+08:00"
-last_activity: 2026-04-30
+current_phase: 47 — executing
+current_phase_name: wasm-first-build-foundation
+current_plan: —
+status: executing
+last_updated: "2026-05-01T03:34:14.069Z"
+last_activity: 2026-05-01
 progress:
-  total_phases: 8
-  completed_phases: 2
-  total_plans: 2
-  completed_plans: 0
-  percent: 28
+  total_phases: 9
+  completed_phases: 7
+  total_plans: 7
+  completed_plans: 7
+  percent: 78
 ---
 
 # Session State
@@ -28,15 +28,15 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 ## Position
 
 **Milestone:** v2.0 — agent-native-foundation
-**Current Phase:** 41 — not started
-**Current Phase Name:** interface-contract-schema
+**Current Phase:** 47 — executing
+**Current Phase Name:** wasm-first-build-foundation
 **Current Plan:** —
-**Total Phases:** 7 planned
-**Total Plans in Milestone:** TBD
-**Status:** Defining requirements
-**Progress:** [░░░░░░░░░░] 0%
-**Last Activity:** 2026-04-30
-**Last Activity Description:** Phase 41 (Interface Contract Schema) and Phase 42 (CLI-as-MCP Automatic Gateway) completed via $gsd-autonomous.
+**Total Phases:** 8 planned
+**Total Plans in Milestone:** 6
+**Status:** Executing plans
+**Progress:** [███████░░░] 75%
+**Last Activity:** 2026-05-01
+**Last Activity Description:** Phase 46 (Validation Router + No Ghost Commands) completed. Removed echo stubs, synced docs, added npm script guardrail, added validation decision tree to CLAUDE.md.
 
 ## Decisions Made
 

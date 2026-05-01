@@ -26,8 +26,9 @@
 ```bash
 node dist/cli/index.js deps -m "src/domain"
 node dist/cli/index.js impact -f "src/interface/types/index.ts"
-npm run check:architecture
 ```
+
+> 架构依赖检查通过 `deps` 命令完成，不再使用单独的 npm script。
 
 ## 常见误区
 

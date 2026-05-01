@@ -4,6 +4,7 @@
 > 
 > CodeMap 是一个 AI-first 代码地图工具。AI/Agent 是主要消费者；人类开发者负责配置、维护与按需阅读输出。  
 > 当前 CLI 过渡现实：多数命令通过 `--json` 输出机器可读结果；`analyze` 额外提供 `--output-mode machine|human`，`design validate` 负责校验 human-authored design contract，`design map` 负责把 design contract 映射成 candidate code scope。
+> 命名规范：产品/项目名写 `CodeMap`；公开 CLI 命令首选写 `mycodemap`；`codemap` 只作为兼容别名或内部 MCP tool 名称，不作为新示例首选。  
 > 命名边界：`Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令。  
 > 
 > 🔍 **机器可读索引**: `ai-document-index.yaml`  
@@ -35,6 +36,7 @@ cat .mycodemap/AI_MAP.md
 | 产品定位 | `CodeMap` 是一个 AI-first 代码地图工具 |
 | 主要消费者 | AI/Agent |
 | 人类角色 | 配置、维护、按需阅读输出 |
+| CLI 命名 | 对用户和 agent 写 `mycodemap`；`codemap` 仅作为 legacy alias / 内部 tool name |
 | 当前机器输出入口 | 多数命令显式使用 `--json`；`analyze` 支持 `--output-mode machine` |
 | 当前人类输出入口 | `analyze --output-mode human`，其他命令大多保留现有文本输出 |
 | 命名边界 | `Server Layer` ≠ 公共 `mycodemap server` 命令 |
@@ -556,11 +558,11 @@ node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-posi
 
 ---
 
-## 🚀 发布故障排除 (`codemap ship`)
+## 🚀 发布故障排除 (`mycodemap ship`)
 
 ### 置信度不足导致发布被阻止
 
-当运行 `codemap ship` 时，如果看到以下错误：
+当运行 `mycodemap ship` 时，如果看到以下错误：
 
 ```
 置信度: 55/100

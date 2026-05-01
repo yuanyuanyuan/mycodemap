@@ -208,6 +208,32 @@ fi
 
 echo "File headers passed"
 
+# 5a. 轻量真实验证检查（warn-only）
+# 如果新增/修改了测试文件，检查是否包含真实调用模式
+echo "Checking for real-world test patterns..."
+STAGED_TEST_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.test\.ts$' || true)
+if [ -n "$STAGED_TEST_FILES" ]; then
+    MISSING_REAL_PATTERN=0
+    for file in $STAGED_TEST_FILES; do
+        if [ ! -f "$file" ]; then
+            continue
+        fi
+        # 检查是否包含真实调用模式
+        # 注意：StdioServerTransport + PassThrough 是真实 MCP transport 测试模式
+        if ! grep -qE '(spawn|execSync|execFileSync|mktemp|StdioServerTransport|PassThrough|createServer|listen)' "$file"; then
+            echo "WARNING: $file does not appear to contain real-world invocation patterns (spawn, execSync, mktemp, StdioServerTransport, PassThrough, etc.)"
+            MISSING_REAL_PATTERN=$((MISSING_REAL_PATTERN + 1))
+        fi
+    done
+    if [ $MISSING_REAL_PATTERN -gt 0 ]; then
+        echo ""
+        echo "Consider adding integration/E2E tests with real subprocess/transport calls."
+        echo "See AGENTS.md Section 8.1 for the real-world validation threshold."
+        echo "This is a warning only; commit will proceed."
+        echo ""
+    fi
+fi
+
 # 5. 检查文档与 CLI 护栏（仅在相关文件变更时阻断）
 DOC_GUARDRAIL_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(README\.md|package\.json|docs/|src/cli/index\.ts|vitest\.config\.ts|vitest\.benchmark\.config\.ts|\.github/workflows/ci-gateway\.yml)$' || true)
 

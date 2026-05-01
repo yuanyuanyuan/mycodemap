@@ -1,0 +1,187 @@
+// [META] since:2026-04-30 | owner:cli-team | stable:false
+// [WHY] Interface contract for the `query` command family
+
+import type { CommandContract } from '../types.js';
+
+export const queryContract: CommandContract = {
+  name: 'query',
+  description: '查询代码地图中的符号、模块、依赖信息',
+  args: [],
+  flags: [
+    {
+      name: 'symbol',
+      short: 's',
+      long: 'symbol',
+      description: '精确查询符号',
+      type: 'string',
+    },
+    {
+      name: 'module',
+      short: 'm',
+      long: 'module',
+      description: '查询模块',
+      type: 'string',
+    },
+    {
+      name: 'deps',
+      short: 'd',
+      long: 'deps',
+      description: '查询依赖',
+      type: 'string',
+    },
+    {
+      name: 'search',
+      short: 'S',
+      long: 'search',
+      description: '模糊搜索',
+      type: 'string',
+    },
+    {
+      name: 'limit',
+      short: 'l',
+      long: 'limit',
+      description: '限制结果数量',
+      type: 'number',
+      defaultValue: 50,
+    },
+    {
+      name: 'json',
+      short: 'j',
+      long: 'json',
+      description: 'JSON 格式输出',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    {
+      name: 'structured',
+      long: 'structured',
+      description: '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 使用）',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    {
+      name: 'verbose',
+      short: 'v',
+      long: 'verbose',
+      description: '显示性能指标',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    {
+      name: 'regex',
+      short: 'r',
+      long: 'regex',
+      description: '使用正则表达式搜索（仅适用于 -S/--search）',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    {
+      name: 'context',
+      short: 'c',
+      long: 'context',
+      description: '显示代码上下文行数',
+      type: 'number',
+      defaultValue: 0,
+    },
+    {
+      name: 'case-sensitive',
+      long: 'case-sensitive',
+      description: '大小写敏感搜索（精确搜索默认开启）',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    {
+      name: 'include-references',
+      long: 'include-references',
+      description: '包含符号引用位置信息',
+      type: 'boolean',
+      defaultValue: false,
+    },
+    {
+      name: 'deps-format',
+      long: 'deps-format',
+      description: '依赖查询输出格式 (default|detailed)',
+      type: 'string',
+      defaultValue: 'default',
+    },
+    {
+      name: 'no-cache',
+      long: 'no-cache',
+      description: '禁用缓存，强制重新加载索引',
+      type: 'boolean',
+      defaultValue: false,
+    },
+  ],
+  outputShape: {
+    description: '查询结果',
+    type: 'object',
+    properties: [
+      {
+        name: 'type',
+        type: 'string',
+        description: '查询类型: symbol | module | deps | search',
+      },
+      {
+        name: 'query',
+        type: 'string',
+        description: '实际执行的查询字符串',
+      },
+      {
+        name: 'count',
+        type: 'number',
+        description: '结果数量',
+      },
+      {
+        name: 'results',
+        type: 'array',
+        description: '结果条目列表',
+        items: {
+          name: 'resultItem',
+          type: 'object',
+          properties: [
+            { name: 'name', type: 'string' },
+            { name: 'path', type: 'string', nullable: true },
+            { name: 'kind', type: 'string', nullable: true },
+            { name: 'details', type: 'string', nullable: true },
+            {
+              name: 'location',
+              type: 'object',
+              nullable: true,
+              properties: [
+                { name: 'file', type: 'string' },
+                { name: 'line', type: 'number', nullable: true },
+                { name: 'column', type: 'number', nullable: true },
+              ],
+            },
+            { name: 'isExported', type: 'boolean', nullable: true },
+          ],
+        },
+      },
+      {
+        name: 'metrics',
+        type: 'object',
+        description: '性能指标（verbose 模式输出）',
+        nullable: true,
+        properties: [
+          { name: 'indexLoadTime', type: 'number' },
+          { name: 'queryTime', type: 'number' },
+          { name: 'totalTime', type: 'number' },
+          { name: 'cacheHit', type: 'boolean' },
+          { name: 'indexSize', type: 'number' },
+        ],
+      },
+    ],
+  },
+  errorCodes: [
+    { code: 'INDEX_NOT_FOUND', description: '代码地图索引不存在，需先运行 generate' },
+    { code: 'INVALID_QUERY', description: '查询参数无效或冲突' },
+    { code: 'NO_RESULTS', description: '未找到匹配结果' },
+    { code: 'CACHE_ERROR', description: '缓存读写失败' },
+  ],
+  examples: [
+    'codemap query -s MyClass --json',
+    'codemap query -m src/index.ts -l 10',
+    'codemap query -S "router" --regex -j',
+    'codemap query -d lodash --deps-format detailed --json',
+  ],
+};

@@ -429,10 +429,10 @@
 
 ## 模板 9: ship 发布验证
 
-**适用场景**: 需要验证 `codemap ship` 是否会通过 tag push 触发 GitHub Actions，而不是本地直接发布
+**适用场景**: 需要验证 `mycodemap ship` 是否会通过 tag push 触发 GitHub Actions，而不是本地直接发布
 
 ```markdown
-我需要验证 `codemap ship` 的自动发布链路是否完整。
+我需要验证 `mycodemap ship` 的自动发布链路是否完整。
 
 请执行以下步骤：
 

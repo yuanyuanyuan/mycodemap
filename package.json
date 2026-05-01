@@ -43,9 +43,7 @@
     "validate-pack": "node scripts/validate-pack.js",
     "release": "./scripts/release.sh",
     "check:all": "npm run typecheck && npm run lint && npm test && npm run docs:check",
-    "check:architecture": "echo 'dependency-cruiser not installed, run: npm i -D dependency-cruiser'",
     "check:security": "npm audit",
-    "check:unused": "echo 'knip not installed, run: npm i -D knip'",
     "fix:all": "npm run lint -- --fix",
     "ai:pre-task": "npm run check:all",
     "ai:post-task": "npm run fix:all && npm run check:all"

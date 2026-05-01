@@ -68,6 +68,33 @@ jobs:
       - name: Run workflow E2E guardrail
         run: npm run test:e2e
 
+      - name: Verify real-world evidence in commits
+        if: github.event_name == 'pull_request'
+        run: |
+          # 检查 PR 的 commit messages 中是否有 [证据] 标签
+          # 仅对功能/修复类 commit 要求（非 DOCS/REFACTOR/CONFIG）
+          COMMITS=$(git log --format='%s' "${{ github.event.pull_request.base.sha }}..HEAD")
+          REQUIRE_EVIDENCE=false
+          while IFS= read -r line; do
+            if echo "$line" | grep -qE '^\[(FEATURE|BUGFIX)\]'; then
+              REQUIRE_EVIDENCE=true
+            fi
+          done <<< "$COMMITS"
+
+          if [ "$REQUIRE_EVIDENCE" = "true" ]; then
+            if ! echo "$COMMITS" | grep -q '\[证据\]'; then
+              echo "WARNING: FEATURE/BUGFIX commits detected but no [证据] tag found in commit messages."
+              echo "Please include evidence of real-world validation in your commit messages or PR description."
+              echo ""
+              echo "Expected format: [证据] path:line or [证据] command output"
+              echo "See docs/rules/testing.md for evidence requirements and AGENTS.md Section 8.1 for threshold."
+              echo ""
+              # Warn-only for now; can be made blocking after team adoption
+              exit 0
+            fi
+          fi
+          echo "Real-world evidence check passed"
+
       - name: Build CLI
         run: npm run build
 

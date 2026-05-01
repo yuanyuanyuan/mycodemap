@@ -1,0 +1,10 @@
+{
+  "name": "stub-project",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tsc",
+    "check:architecture": "echo 'dependency-cruiser not installed, run: npm i -D dependency-cruiser'",
+    "check:unused": "echo 'knip not installed, run: npm i -D knip'",
+    "test": "vitest run"
+  }
+}
