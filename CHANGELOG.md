@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2026-05-01 - Agent-Native Foundation
+
+### 🏗️ Architecture
+
+- **interface-contract**: 新增 schema-driven CLI 统一接口契约 (`src/cli/interface-contract/`)，同时生成 parser、MCP tool 定义和 shell completion
+- **mcp-gateway**: CLI-as-MCP 自动网关 (`src/server/mcp/schema-adapter.ts`)，动态注册 contract commands 为 MCP tools
+- **repo-analyzer**: 新增 `repo-analyzer` skill，支持仓库级结构化分析
+
+### 🛡️ Validation
+
+- **real-world-validation**: 添加真实场景验证规则到测试规范、发布检查清单、AGENTS.md 和 CI 护栏
+- **docs-guardrail**: AI 文档版本一致性检查成为发布前硬性门槛
+
+### 📝 Documentation
+
+- **release**: 同步 `llms.txt`、`AI_GUIDE.md`、`AI_DISCOVERY.md`、`ai-document-index.yaml` 到 `v2.0.0`
+- **changelog**: 新增 v2.0.0 发布条目，记录 agent-native foundation milestone
+
 ## [1.9.0] - 2026-04-29 - Release Governance Unification
 
 ### 🏛️ Governance
