@@ -29,6 +29,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "postbuild": "node scripts/copy-build-assets.mjs",
     "dev": "tsc --watch",
     "docs:check": "node scripts/validate-docs.js && node scripts/validate-ai-docs.js",
     "docs:check:human": "node scripts/validate-docs.js",

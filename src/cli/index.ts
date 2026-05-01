@@ -125,6 +125,7 @@ program
   .description('初始化并收敛 CodeMap 项目状态')
   .option('-y, --yes', '使用默认配置')
   .option('--interactive', '仅显示 reconciliation preview，不写入文件')
+  .option('--profile <name>', '指定 bootstrap profile（nodejs|python|go|rust|generic），跳过自动检测')
   .action(initCommand);
 
 program

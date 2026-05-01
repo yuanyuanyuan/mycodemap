@@ -43,8 +43,12 @@ export const ANALYSIS_DEPTH_TO_MODE: Record<BootstrapProfile['analysis_depth'], 
   deep: 'smart',
 };
 
-function resolvePackageRoot(): string {
-  return fileURLToPath(new URL('../../../', import.meta.url));
+function resolveProfilesDir(): string {
+  // Profile JSONs ship next to this loader (in src/ during dev, in dist/ after
+  // build). Resolving relative to `import.meta.url` keeps both layouts in sync
+  // without depending on the package layout above this directory, which is
+  // important because npm `files` only ships `dist/`, not `src/`.
+  return fileURLToPath(new URL('./profiles/', import.meta.url));
 }
 
 /**
@@ -60,7 +64,7 @@ export function resolveProfilePath(profileName: string): string {
   if (profileName.includes('/') || profileName.includes('\\') || profileName.includes('..')) {
     throw new Error(`非法 profile 名称: ${profileName}`);
   }
-  return path.join(resolvePackageRoot(), 'src', 'cli', 'init', 'profiles', `${profileName}.json`);
+  return path.join(resolveProfilesDir(), `${profileName}.json`);
 }
 
 /**
