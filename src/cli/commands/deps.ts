@@ -341,7 +341,7 @@ export async function depsCommand(options: DepsOptions) {
     renderOutput(data, () => formatDepsHuman(codeMap, targetModule, allDependencies), mode);
   } catch (error) {
     progress.fail();
-    process.stdout.write(formatError(error, mode) + '\n');
+    process.stdout.write(formatError(error, mode, 'codemap deps') + '\n');
     process.exitCode = 1;
   }
 }

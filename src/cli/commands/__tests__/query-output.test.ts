@@ -89,5 +89,27 @@ describe('query output mode integration', () => {
       expect(parsed.type).toBe('error');
       expect(parsed.code).toBe('MISSING_QUERY_TYPE');
     });
+
+    it('JSON mode includes attempted field from codemap query', () => {
+      const error = new Error('index not found');
+      const result = formatError(error, 'json', 'codemap query');
+      const parsed = JSON.parse(result);
+      expect(parsed.attempted).toBe('codemap query');
+    });
+
+    it('human mode includes Attempted label for codemap query', () => {
+      const error = new Error('index not found');
+      const result = formatError(error, 'human', 'codemap query');
+      expect(result).toContain('Attempted:');
+      expect(result).toContain('codemap query');
+    });
+
+    it('JSON mode includes rootCause and confidence for query errors', () => {
+      const error = new Error('database connection failed');
+      const result = formatError(error, 'json', 'codemap query');
+      const parsed = JSON.parse(result);
+      expect(parsed.rootCause).toBeDefined();
+      expect(parsed.confidence).toBeDefined();
+    });
   });
 });

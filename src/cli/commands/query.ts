@@ -928,7 +928,7 @@ export async function queryCommand(options: QueryOptions) {
     renderOutput(data, formatQueryHuman, mode);
   } catch (error) {
     progress.fail();
-    process.stdout.write(formatError(error, mode) + '\n');
+    process.stdout.write(formatError(error, mode, 'codemap query') + '\n');
     process.exitCode = 1;
   }
 }

@@ -115,5 +115,27 @@ describe('analyze output mode integration', () => {
       expect(result).toContain('missing target');
       expect(result).toContain('MISSING_TARGET');
     });
+
+    it('JSON mode includes attempted field from codemap analyze', () => {
+      const error = new Error('something failed');
+      const result = formatError(error, 'json', 'codemap analyze');
+      const parsed = JSON.parse(result);
+      expect(parsed.attempted).toBe('codemap analyze');
+    });
+
+    it('human mode includes Attempted label for codemap analyze', () => {
+      const error = new Error('something failed');
+      const result = formatError(error, 'human', 'codemap analyze');
+      expect(result).toContain('Attempted:');
+      expect(result).toContain('codemap analyze');
+    });
+
+    it('JSON mode includes rootCause and confidence', () => {
+      const error = new Error('tree-sitter cannot be loaded');
+      const result = formatError(error, 'json', 'codemap analyze');
+      const parsed = JSON.parse(result);
+      expect(parsed.rootCause).toBeDefined();
+      expect(parsed.confidence).toBeDefined();
+    });
   });
 });

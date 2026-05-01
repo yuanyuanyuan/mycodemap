@@ -1525,7 +1525,7 @@ export async function analyzeCommand(argv: string[]): Promise<void> {
     renderOutput(data, formatAnalyzeHuman, mode);
   } catch (error) {
     progress.fail();
-    process.stdout.write(formatError(error, mode) + '\n');
+    process.stdout.write(formatError(error, mode, 'codemap analyze') + '\n');
     process.exitCode = 1;
   }
 }
