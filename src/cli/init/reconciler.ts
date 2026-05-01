@@ -7,6 +7,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createDefaultCodemapConfigFile } from '../config-loader.js';
 import { applyHookPlan, createHookPlan, type HookPlan } from './hooks.js';
+import { applyProfilePlan, createProfilePlan, type ProfilePlan } from './profile-plan.js';
+import type { BootstrapProfile } from './profile-loader.js';
 import { applyRulesPlan, createRulesPlan, type RulesPlan } from './rules.js';
 import {
   CONFIG_FILE_CANONICAL,
@@ -62,6 +64,7 @@ export interface InitPlan {
     canonicalConfigText?: string;
     hookPlan: HookPlan;
     rulesPlan: RulesPlan;
+    profilePlan: ProfilePlan;
   };
 }
 
@@ -530,10 +533,16 @@ function buildNextSteps(assets: InitAsset[]): string[] {
   ];
 }
 
-export function createInitPlan(rootDir: string, mode: 'preview' | 'apply'): InitPlan {
+export function createInitPlan(
+  rootDir: string,
+  mode: 'preview' | 'apply',
+  profile: BootstrapProfile | null = null,
+  profileName?: string
+): InitPlan {
   const scan = scanInitState(rootDir);
   const hookPlan = createHookPlan(rootDir);
   const rulesPlan = createRulesPlan(rootDir);
+  const profilePlan = createProfilePlan(rootDir, profile, scan, mode, profileName);
   const assets: InitAsset[] = [
     buildWorkspaceAsset(scan),
     buildConfigAsset(scan),
@@ -541,6 +550,7 @@ export function createInitPlan(rootDir: string, mode: 'preview' | 'apply'): Init
     buildStatusLedgerAsset(scan, mode),
     ...hookPlan.assets,
     ...rulesPlan.assets,
+    ...profilePlan.assets,
     buildFirstRunAsset(scan),
   ];
 
@@ -573,6 +583,7 @@ export function createInitPlan(rootDir: string, mode: 'preview' | 'apply'): Init
       canonicalConfigText: !scan.hasCanonicalConfig ? buildCanonicalConfigText(scan) : undefined,
       hookPlan,
       rulesPlan,
+      profilePlan,
     },
   };
 }
@@ -602,6 +613,7 @@ export async function applyInitPlan(plan: InitPlan): Promise<InitReceipt> {
   await maybeWriteCanonicalConfig(paths, plan);
   await applyHookPlan(plan.actions.hookPlan);
   await applyRulesPlan(plan.actions.rulesPlan);
+  await applyProfilePlan(plan.actions.profilePlan);
   return plan.receipt;
 }
 

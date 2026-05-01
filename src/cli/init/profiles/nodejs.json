@@ -1,0 +1,16 @@
+{
+  "parser": {
+    "include": ["src/**/*.{ts,tsx,js,jsx,mjs,cjs}"],
+    "extensions": ["ts", "tsx", "js", "jsx", "mjs", "cjs"]
+  },
+  "ignore": [
+    "node_modules/**",
+    "dist/**",
+    "build/**",
+    "coverage/**",
+    "**/*.test.{ts,tsx,js,jsx}",
+    "**/*.spec.{ts,tsx,js,jsx}",
+    "**/*.d.ts"
+  ],
+  "analysis_depth": "standard"
+}

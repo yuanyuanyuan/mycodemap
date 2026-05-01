@@ -1,0 +1,12 @@
+{
+  "parser": {
+    "include": ["src/**/*.rs"],
+    "extensions": ["rs"]
+  },
+  "ignore": [
+    "target/**",
+    "**/Cargo.lock",
+    "**/*.rs.bk"
+  ],
+  "analysis_depth": "standard"
+}

@@ -1,0 +1,17 @@
+{
+  "parser": {
+    "include": ["src/**/*.py", "**/*.py"],
+    "extensions": ["py"]
+  },
+  "ignore": [
+    "__pycache__/**",
+    ".venv/**",
+    "venv/**",
+    "*.egg-info/**",
+    "dist/**",
+    "build/**",
+    "**/*_test.py",
+    "**/test_*.py"
+  ],
+  "analysis_depth": "standard"
+}

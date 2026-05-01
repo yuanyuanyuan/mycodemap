@@ -1,0 +1,16 @@
+{
+  "parser": {
+    "include": ["**/*.{ts,js,py,go,rs}"],
+    "extensions": ["ts", "js", "py", "go", "rs"]
+  },
+  "ignore": [
+    "node_modules/**",
+    "dist/**",
+    "build/**",
+    "coverage/**",
+    "target/**",
+    ".venv/**",
+    "venv/**"
+  ],
+  "analysis_depth": "shallow"
+}

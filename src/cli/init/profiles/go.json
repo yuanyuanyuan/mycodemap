@@ -1,0 +1,12 @@
+{
+  "parser": {
+    "include": ["**/*.go"],
+    "extensions": ["go"]
+  },
+  "ignore": [
+    "vendor/**",
+    "**/go.sum",
+    "**/*_test.go"
+  ],
+  "analysis_depth": "standard"
+}
