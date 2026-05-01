@@ -1,19 +1,19 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: milestone
+milestone: v2.1
+milestone_name: ux-onboarding-enhancement
 current_phase: —
 current_phase_name: —
 current_plan: —
-status: Archived
-last_updated: "2026-05-01T08:46:09.059Z"
+status: planning
+last_updated: "2026-05-01T10:00:00.000Z"
 last_activity: 2026-05-01
 progress:
-  total_phases: 10
-  completed_phases: 5
-  total_plans: 13
-  completed_plans: 11
-  percent: 85
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Session State
@@ -27,16 +27,16 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 
 ## Position
 
-**Milestone:** v2.0 — agent-native-foundation
-**Current Phase:** —
+**Milestone:** v2.1 — ux-onboarding-enhancement
+**Current Phase:** Not started (defining requirements)
 **Current Phase Name:** —
 **Current Plan:** —
-**Total Phases:** 10 (40.1-49)
-**Total Plans in Milestone:** 16
-**Status:** Archived
-**Progress:** [██████████] 100% (all v2.0 phases complete, milestone shipped)
+**Total Phases:** 0
+**Total Plans in Milestone:** 0
+**Status:** Defining requirements
+**Progress:** [░░░░░░░░░░] 0% (milestone initialized, requirements being defined)
 **Last Activity:** 2026-05-01
-**Last Activity Description:** Milestone v2.0 archived. All 10 phases complete, 4 audit blockers resolved by Phase 49, archive files created in .planning/milestones/v2.0-*.
+**Last Activity Description:** Milestone v2.1 initialized. Phase 51 (Post-Install Agent Bootstrap) merged into v2.1 scope. Phase 50 and 52 remain independent.
 
 ## Decisions Made
 
@@ -88,6 +88,12 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 - 2026-04-30: Phase 41 completed — Interface Contract Schema (`src/cli/interface-contract/`, 16 tests)
 - 2026-04-30: Phase 42 completed — CLI-as-MCP Automatic Gateway (`src/server/mcp/schema-adapter.ts`, 36 tests)
 - 2026-05-01: Phase 41/42 planning artifacts backfilled — STATE.md, REQUIREMENTS.md, ROADMAP.md synchronized
+- 2026-05-01: Phase 50 added: Release Local Pre-Release Check Gap — promote the v2.0 release validation gap into the active follow-up queue
+- 2026-05-01: Phase 50 context gathered — locked scope around local/CI pre-release validation parity without running real release operations
+- 2026-05-01: Phase 51 added: Post-Install Agent Bootstrap Configuration — keep `mycodemap init` post-install bootstrap separate from runtime compliance enforcement
+- 2026-05-01: Phase 51 context gathered — locked scope around init-managed config, hooks, rules, agent snippets, receipt visibility, and real temp-project verification
+- 2026-05-01: Phase 52 added: CodeMap CLI Priority Harness Guard — split runtime/session CLI-first compliance guard out from init bootstrap so the two can be planned independently
+- 2026-05-01: Phase 52 context gathered — locked scope around report-only session compliance detection, fallback cases, and Claude/Codex auditability
 
 ### Verified Existing Capabilities (carried forward)
 

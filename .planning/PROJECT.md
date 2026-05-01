@@ -12,6 +12,17 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 
 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
 
+## Current Milestone: v2.1 ux-onboarding-enhancement
+
+**Goal:** 把 CodeMap 从"安装后需要手动配置"升级为"首次运行即能提供价值"的入门体验，让新用户零配置即可预览代码库，并逐步引导完成深度配置。
+
+**Target features:**
+- **First-Run Concierge + Bootstrap Profiles** — 首次运行 `codemap` 时自动检测项目类型，推荐最佳配置模板，生成 `.mycodemap/` 引导资产
+- **Zero-Config Preview / Progressive Commitment** — 无需配置文件即可运行 `codemap preview` 获得即时价值，用户逐步决定是否保存配置
+- **Post-Install Agent Bootstrap** (原 Phase 51) — `mycodemap init` 生成 Agent 上下文片段、规则、收据，让 Claude/Codex 直接连接
+
+**Phase numbering:** Continues from Phase 49 → starts at Phase 53
+
 ## Latest Completed Milestone: v2.0 agent-native-foundation
 
 **Goal:** 把 CodeMap 从"人类 CLI + AI 可用"升级为"AI-Native 优先、人类友好的代码架构治理基础设施"，用机器可读契约统一 CLI / MCP / 文档三层表面，用结构化错误和持续诊断修复信任危机，用 WASM 回退消除安装失败的头号 drop-off。
@@ -135,12 +146,19 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 - ✓ `better-sqlite3` / `node:sqlite` WASM/纯 JS 回退路径 —— v2.0 / Phase 47
 - ✓ Native opt-in 机制与 `codemap benchmark` —— v2.0 / Phase 47
 
-### Active
+### Active (v2.1)
 
-- [ ] **UX-01**: First-Run Concierge + Bootstrap Profiles —— v2.1 候选
-- [ ] **UX-02**: Zero-Config Preview / Progressive Commitment —— v2.1 候选
+- [ ] **UX-01**: First-Run Concierge + Bootstrap Profiles —— v2.1 active
+- [ ] **UX-02**: Zero-Config Preview / Progressive Commitment —— v2.1 active
+- [ ] **UX-03**: Post-Install Agent Bootstrap Configuration (原 Phase 51) —— v2.1 active
+
+### Active (渐进债务)
+
 - [ ] **AGENT-10**: 剩余 12+ CLI 命令迁移到 contract schema —— 渐进债务
 - [ ] **AGENT-11**: benchmark 命令迁移到共享输出基础设施 —— 渐进债务
+
+### Future Milestones
+
 - [ ] **INT-04**: Auto-Provisioned Agent Skills —— v2.2 候选
 - [ ] **INT-05**: MCP `verify_contract` Tool —— v2.2 候选
 - [ ] **ARCH-01**: Auto-Generate design.md from codebase —— v3.0 候选
@@ -227,13 +245,16 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 | Contract schema 渐进迁移（先 3 命令，后扩展） | 避免一次性重构 15+ 命令的爆炸半径；Pattern 建立后可增量吸收 | ✓ Good |
 | Phase 49 作为 audit blocker 修复专项 | 审计发现 4 个 critical blockers；创建接线 phase 而非回退整个 milestone | ✓ Good |
 | v2.0 归档时接受 3 个阶段无原始 SUMMARY | 功能已验证（VERIFICATION.md 存在），后补 SUMMARY 作为文档债务 | Shipped 2026-05-01 |
+| 启动 `v2.1 ux-onboarding-enhancement` | 用户指令：选择方案 A（v2.1 专注 Onboarding，纳入 Phase 51） | Active 2026-05-01 |
+| Phase 51 合并进 v2.1 | Post-Install Agent Bootstrap 是 onboarding 核心；Phase 50/52 与 UX 方向无关，保持独立 | Active 2026-05-01 |
+| v2.1 延续 phase 编号 | 未使用 `--reset-phase-numbers`；Phase 50-52 作为未计划后续保留编号，v2.1 从 Phase 53 开始 | Active 2026-05-01 |
 
 ## Current State
 
 - **Completed milestones / follow-ups:** `v1.0`→`v1.11`、`v2.0 agent-native-foundation`
 - **Historical closed branch:** `v1.5 Isolated ArcadeDB Server-backed Prototype`（22-24 不再继续）
-- **Active milestone:** None — v2.0 shipped 2026-05-01
-- **Current planning status:** All v2.0 phases (40.1-49) complete and archived. Ready for next milestone planning.
+- **Active milestone:** v2.1 ux-onboarding-enhancement — initialized 2026-05-01
+- **Current planning status:** Requirements being defined. Phase 51 (Post-Install Agent Bootstrap) merged into v2.1 scope. Phase 50 and 52 remain independent for future scheduling.
 - **Known remaining debt:** actual `/release v1.9` execution 仍保留在 deferred backlog；渐进债务（12+ 命令 contract 迁移、benchmark 输出基础设施迁移）
 - **Codebase:** 74,544 TypeScript LOC, 1129 tests all passing
 
@@ -265,4 +286,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. 更新 Current State / Context / Key Decisions
 
 ---
-*Last updated: 2026-05-01 after shipping Milestone v2.0 agent-native-foundation*
+*Last updated: 2026-05-01 after initializing Milestone v2.1 ux-onboarding-enhancement*
