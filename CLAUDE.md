@@ -12,7 +12,6 @@
 |---------------------|-----------------------------------------------------------|--------------------------------------|
 | `AGENTS.md`         | 仓库级宪法：治理协议、证据协议、改动边界、验证/交付底线       | 不负责长命令表、任务模板、产品使用说明 |
 | `CLAUDE.md`         | 入口路由：告诉 Claude/Codex 下一份该读什么                 | 不负责执行政策正文                   |
-| `.claude/CLAUDE.md` | Claude adapter：解释 Claude 自动读取与 shared truth 的关系 | 不负责第二套规则                     |
 
 ## 加载顺序
 
@@ -28,6 +27,7 @@ AGENTS.md → docs/rules/README.md → 最相关的 1-2 份 live docs → ARCHIT
 | 改某类文件时先读哪份规则？                         | `docs/rules/README.md`                                      |
 | 计划/执行/交付怎么写，任务模板放哪？                | `docs/rules/engineering-with-codex-openai.md`               |
 | 验证顺序、hooks、CI、rule-system defaults 在哪？      | `docs/rules/validation.md`                                  |
+| Harness 设计、agent 控制、上下文分层、权限升级在哪？ | `docs/rules/harness.md`                                     |
 | 工具命名规范在哪里？                                  | `AGENTS.md` Section 10（产品名、公开 CLI、兼容别名分开写）      |
 | 架构分层、依赖方向、模块边界是什么？                 | `ARCHITECTURE.md` + `docs/rules/architecture-guardrails.md` |
 | 代码搜索、项目分析、影响评估先用什么？                | `AGENTS.md` Section 6（CodeMap CLI 优先，标准文本工具只作回退） |
@@ -54,6 +54,7 @@ AGENTS.md → docs/rules/README.md → 最相关的 1-2 份 live docs → ARCHIT
 - 改**仓库级规则**：编辑 `AGENTS.md`
 - 改**路由 / discoverability 文案**：编辑 `CLAUDE.md`
 - 改**Claude 自动读取差异**：编辑 `.claude/CLAUDE.md`
+- 改**harness 设计 / agent 控制 / 权限升级策略**：编辑 `docs/rules/harness.md`
 - 改**工程执行协议**：编辑 `docs/rules/engineering-with-codex-openai.md`
 - 改**验证 / hook / CI 规则**：编辑 `docs/rules/validation.md`
 - 改**真实场景验证规则**：编辑 `docs/rules/testing.md` 与 `docs/rules/pre-release-checklist.md`（宪法声明在 `AGENTS.md` Section 8.1）

@@ -16,6 +16,7 @@
 - `.claude/CLAUDE.md`：Claude adapter；只解释 Claude 自动读取与 shared truth 的关系。
 - `ARCHITECTURE.md`：系统地图、模块边界、关键数据流、核心依赖关系。
 - `docs/rules/`：开发、测试、验证、发布、工程执行规则正文。
+- `docs/rules/harness.md`：agent harness 的上下文装配、工具权限、反馈回路、验证门与升级路径参考。
 - `docs/design-docs/`：设计意图、权衡、验证状态、待决问题。
 - `docs/exec-plans/`：活跃计划、复盘记录、技术债跟踪。
 - `docs/generated/`：生成内容，如 schema、快照、报告。
@@ -101,16 +102,6 @@
 - 改动设计、规则、输出契约时，先检查是否需要同步相关文档。
 - 不得通过删除、注释、绕过护栏来“修复”问题。
 
-## 7.1 代码生成红线（Harness 规范）
-
-| 红线规则           | 检测方式                                                | 自动修复策略                        |
-|--------------------|---------------------------------------------------------|-------------------------------------|
-| 敏感信息硬编码     | 检测 `password` / `secret` / `api_key` / `token` 字面量 | 改成 `process.env` 读取 + 类型检查  |
-| `any` 类型使用     | TypeScript / ESLint                                     | 推导具体类型或使用 `unknown` + 守卫 |
-| 函数超过 50 行     | 静态分析行数                                            | 拆分为子函数                        |
-| 未处理 Promise     | `no-floating-promises`                                  | 加 `await` 或错误处理               |
-| `console.log` 遗留 | `no-console`（`src/cli/runtime-logger.ts` 例外）          | 改用 `runtime-logger`               |
-| 未使用 import      | TypeScript / ESLint                                     | 删除无用 import                     |
 
 ## 8. 验证与失败预演
 
@@ -134,10 +125,6 @@
 
 ### 8.2 豁免条款
 
-- Phase 41/42 已有实现（截至本规则生效日）**不追溯合规**，但后续任何修改必须合规
-- Phase 43+ 从 inception 起必须合规
-- Phase 42 测试已使用 `StdioServerTransport` + `PassThrough` 做真实 MCP transport，符合阈值，只需补 `[证据]` 标签
-- Phase 41 测试仅为结构断言，后续修改时需补真实 CLI 调用测试
 
 ## 9. 交付与文档同步底线
 
