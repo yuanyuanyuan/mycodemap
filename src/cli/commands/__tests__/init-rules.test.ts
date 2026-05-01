@@ -26,7 +26,10 @@ import { executeInitCommand } from '../init.js';
 import { buildRulesSnippet } from '../../init/rule-templates.js';
 
 function createTempProject(): string {
-  return mkdtempSync(path.join(tmpdir(), 'codemap-init-rules-'));
+  const root = mkdtempSync(path.join(tmpdir(), 'codemap-init-rules-'));
+  // Phase 53: init now requires a project-type marker (D-04).
+  writeFileSync(path.join(root, 'package.json'), '{"name":"test"}', 'utf8');
+  return root;
 }
 
 describe('init rules reconciliation', () => {

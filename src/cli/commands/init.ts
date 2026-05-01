@@ -5,8 +5,9 @@ import chalk from 'chalk';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { detectProjectType, promptForProfileSelection } from '../init/detect.js';
+import type { ProjectType } from '../init/detect.js';
 import { loadProfile } from '../init/profile-loader.js';
-import type { BootstrapProfile, ProjectType } from '../init/profile-loader.js';
+import type { BootstrapProfile } from '../init/profile-loader.js';
 import { applyInitPlan, createInitPlan, writeInitReceipt, type InitReceipt } from '../init/reconciler.js';
 import { renderInitPreview, renderInitReceipt } from '../init/receipt.js';
 import { CONFIG_FILE_CANONICAL, DEFAULT_OUTPUT_DIR_NEW } from '../paths.js';
@@ -32,7 +33,13 @@ function resolveInitMode(options: InitCommandOptions): 'preview' | 'apply' {
 }
 
 function hasCanonicalConfig(rootDir: string): boolean {
-  return existsSync(path.join(rootDir, DEFAULT_OUTPUT_DIR_NEW, CONFIG_FILE_CANONICAL));
+  // D-16: skip detection when ANY user-configured codemap config exists,
+  // including legacy root mycodemap.config.json. Otherwise the reconciler's
+  // legacy-migration write would race with profile-plan's canonical-config
+  // write and the user's explicit configuration would be silently overwritten.
+  const canonicalPath = path.join(rootDir, DEFAULT_OUTPUT_DIR_NEW, CONFIG_FILE_CANONICAL);
+  const legacyRootPath = path.join(rootDir, 'mycodemap.config.json');
+  return existsSync(canonicalPath) || existsSync(legacyRootPath);
 }
 
 const NO_MARKER_HINT =

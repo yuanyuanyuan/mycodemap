@@ -26,7 +26,10 @@ import { executeInitCommand } from '../init.js';
 import { createHookPlan } from '../../init/hooks.js';
 
 function createTempProject(): string {
-  return mkdtempSync(path.join(tmpdir(), 'codemap-init-hooks-'));
+  const root = mkdtempSync(path.join(tmpdir(), 'codemap-init-hooks-'));
+  // Phase 53: init now requires a project-type marker (D-04).
+  writeFileSync(path.join(root, 'package.json'), '{"name":"test"}', 'utf8');
+  return root;
 }
 
 function countOccurrences(text: string, pattern: string): number {
