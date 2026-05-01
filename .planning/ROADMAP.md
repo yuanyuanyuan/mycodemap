@@ -52,6 +52,7 @@ Earlier milestones: see `.planning/MILESTONES.md` and `.planning/milestones/`.
 4. Schema can generate or validate existing commander configuration
 
 ### Phase 42: CLI-as-MCP Automatic Gateway
+
 **Goal:** Auto-expose every schema-defined CLI command as an MCP tool with zero handwritten maintenance.
 **Requirements:** AGENT-03, AGENT-06
 **Success criteria:**
@@ -78,6 +79,10 @@ Plans:
 ### Phase 44: AI-First Default Output
 **Goal:** Flip the output paradigm — structured JSON by default, human rendering on demand.
 **Requirements:** AGENT-07, AGENT-08, AGENT-09
+**Plans:** 1 plan
+Plans:
+- [ ] 44-01-PLAN.md — Output mode infrastructure, migrate 3 core commands (analyze, query, deps), refactor doctor to shared infrastructure
+
 **Success criteria:**
 1. All commands emit JSON/NDJSON on stdout by default
 2. `--human` flag pipes output through built-in table/color renderer
