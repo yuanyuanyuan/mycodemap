@@ -296,19 +296,29 @@ Plans:
 
 ### Phase 58: Subagent Environment Contract Injection
 **Status:** Not started
-**Goal:** Prevent delegated-agent protocol mismatch by injecting a short Project Environment Contract into sub-agent prompts, covering RTK shell wrapping, `[TAG] scope: message`, the real Vitest entry/commands, and rule-context verification expectations before the agent starts work.
+**Goal:** At the project layer (not the platform layer), automatically discover project-specific environment contracts scattered across hooks, entry docs, package scripts, and rule-control helpers, and make them available for selective injection into sub-agent prompts. Covers RTK shell wrapping, `[TAG] scope: message`, the real Vitest entry/commands, and rule-context verification expectations — injected only to agent types that need them.
 **Depends on:** Phase 55, Phase 56, Phase 57
 **Requirements:** ABT-01, ABT-02, ABT-03, VER-03, SDC-01, SDC-02, SDC-03, SDC-04, SDC-05
 **Plans:** Not planned yet
 
+**Design doc:** `.planning/phases/58-subagent-environment-contract-injection/58-DESIGN.md`
+
+**Why the platform doesn't do this:**
+- Claude Code intentionally isolates sub-agents (`omitClaudeMd: true`); model-level prepend degrades to ~5% coverage under context pressure.
+- Codex unconditionally injects `SPAWN_AGENT_DEVELOPER_INSTRUCTIONS` but does not discover project-specific conventions (rtk, commit format, Vitest truth).
+- Both platforms treat project-level contract injection as **out of scope** for generic infrastructure; it belongs at the project/tooling layer.
+
 **Success criteria:**
-1. A single canonical Project Environment Contract exists for delegated prompts and includes RTK command wrapping, valid commit message format/tags, current test entry truth, and the CodeMap/rule-context priority rule.
-2. The prompt injection path emits the contract before scoped rules for edit, review, and verification delegations, including the `No scoped rules inferred` case.
-3. Claude, Codex, and generic assistant bootstrap assets route to the same contract source instead of duplicating drifting copies.
-4. Automated tests cover source-file, docs/config, and no-match `rule-context` paths, plus a failure case where a required contract line is missing.
-5. Real sub-agent verification runs through `claude -p` or `codex exec` in an isolated temp repo/worktree and captures evidence that a delegated agent received and used the RTK, commit-format, and Vitest-entry guidance.
-6. Verification includes a negative scenario where a delegated prompt without the contract is rejected or flagged before the work is accepted.
-7. Test evidence includes the command transcript, sub-agent prompt/output artifact, and clean working-tree or scoped diff hygiene check.
+1. A single canonical Project Environment Contract exists (`.mycodemap/env-contract.json`) with tagged items (`execution`/`commit`/`retrieval`/`validation`/`style`) and source traceability.
+2. Contract injection is **agent-type-sensitive**: Explore gets `retrieval`+`validation` only; Edit/Worker gets `execution`+`commit`+`style`+`validation`; Plan gets `validation`+`retrieval`; Verify gets `execution`+`validation`.
+3. Claude, Codex, and generic assistant bootstrap assets route to the same contract source (`.mycodemap/prompt-snippets/`) instead of duplicating drifting copies.
+4. `mycodemap env-contract --for <agent-type> --prompt-snippet` outputs a compact, prepend-ready prompt prefix (max 5-8 facts) for direct embedding into sub-agent definitions.
+5. `mycodemap doctor` detects contract drift against source files; `mycodemap init` generates contract assets.
+6. MCP server exposes `codemap_env_contract` tool for run-time query.
+7. Automated tests cover: source-file discovery, category filtering, drift detection, and missing-critical-contract failure.
+8. Real sub-agent verification runs through `claude -p` **and** `codex exec` in isolated temp repos, capturing evidence that the injected contract was received and used (RTK, commit-format, Vitest-entry).
+9. Negative case: a sub-agent prompt **without** the contract fails or produces incorrect actions (commit rejected by hook, wrong test command, bare shell without rtk).
+10. Test evidence includes: command transcript, sub-agent prompt/output artifact, and clean working-tree or scoped diff hygiene check.
 
 </details>
 
