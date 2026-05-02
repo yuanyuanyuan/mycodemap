@@ -148,4 +148,17 @@ describe('initCommand', () => {
     expect(existsSync(path.join(rootDir, '.mycodemap', 'status', 'init-last.json'))).toBe(false);
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('CodeMap init 预览'));
   });
+
+  it('renders two-section receipt with Main Agent and Subagent groups', async () => {
+    const rootDir = createTempProject();
+    tempRoots.push(rootDir);
+
+    await executeInitCommand({ yes: true, cwd: rootDir });
+
+    const output = consoleLogSpy.mock.calls.map((c) => c[0]).join('\n');
+    expect(output).toContain('Main Agent（主 Agent 上下文）');
+    expect(output).toContain('Subagent（子 Agent 配置）');
+    expect(output).toContain('基础设施');
+    expect(output).toContain('下一步');
+  });
 });
