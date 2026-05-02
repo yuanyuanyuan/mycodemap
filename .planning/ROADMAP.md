@@ -238,17 +238,17 @@ Plans:
 4. Profile definitions are stored as data files, not hardcoded in source
 
 ### Phase 54: Zero-Config Preview
-**Status:** Planned
+**Status:** Complete (2026-05-02)
 **Goal:** Let users see CodeMap value immediately without writing any configuration file.
 **Depends on:** Phase 53 (profile system provides fallback defaults)
 **Requirements:** ZCP-01, ZCP-02, ZCP-03, ZCP-04
 **Plans:** 2 plans in 2 waves
 
 **Wave 1** *(no dependencies)*
-- [ ] 54-01-PLAN.md — Service modules: dependency extractor + complexity scanner + smol-toml install
+- [x] 54-01-PLAN.md — Service modules: dependency extractor + complexity scanner + smol-toml install
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 54-02-PLAN.md — Preview command + renderer + interface contract + CLI registration + tests
+- [x] 54-02-PLAN.md — Preview command + renderer + interface contract + CLI registration + tests
 
 **Success criteria:**
 1. `codemap preview` runs without `mycodemap.config.json` in an empty or fresh project

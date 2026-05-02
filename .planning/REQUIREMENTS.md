@@ -14,10 +14,10 @@
 
 ### Zero-Config Preview (ZCP)
 
-- [ ] **ZCP-01**: 运行 `codemap preview` 无需 `mycodemap.config.json` 或任何预配置
-- [ ] **ZCP-02**: 系统自动检测项目结构（入口文件、源码目录、测试目录）并推断合理分析范围
-- [ ] **ZCP-03**: 预览输出精简摘要：文件数、模块数、关键依赖关系、复杂度热点
-- [ ] **ZCP-04**: 预览结束后提示用户 `--save` 保存为正式配置，或 `--discard` 丢弃临时分析
+- [x] **ZCP-01**: 运行 `codemap preview` 无需 `mycodemap.config.json` 或任何预配置
+- [x] **ZCP-02**: 系统自动检测项目结构（入口文件、源码目录、测试目录）并推断合理分析范围
+- [x] **ZCP-03**: 预览输出精简摘要：文件数、模块数、关键依赖关系、复杂度热点
+- [x] **ZCP-04**: 预览结束后提示用户 `--save` 保存为正式配置，或 `--discard` 丢弃临时分析
 
 ### Agent Bootstrap (ABT)
 
@@ -77,10 +77,10 @@
 | FRC-02 | 53 | — | pending |
 | FRC-03 | 53 | — | pending |
 | FRC-04 | 53 | — | pending |
-| ZCP-01 | 54 | — | pending |
-| ZCP-02 | 54 | — | pending |
-| ZCP-03 | 54 | — | pending |
-| ZCP-04 | 54 | — | pending |
+| ZCP-01 | 54 | 54-02 | complete |
+| ZCP-02 | 54 | 54-02 | complete |
+| ZCP-03 | 54 | 54-01, 54-02 | complete |
+| ZCP-04 | 54 | 54-02 | complete |
 | ABT-01 | 55 | — | pending |
 | ABT-02 | 55 | — | pending |
 | ABT-03 | 56 | — | pending |
