@@ -1,8 +1,8 @@
 # Phase 58 Context: Subagent Environment Contract Retrieval
 
 **Gathered:** 2026-05-02 (revised)
-**Status:** Ready for planning (v2 draft)
-**Source:** Cross-ecosystem agent delegation research + v2.1 milestone requirements (SDC-01~05)
+**Status:** Ready for planning (v3 revised)
+**Source:** Cross-ecosystem agent delegation research + v2.1 milestone requirements (SDC-01~05) + live issue-status recheck
 
 ---
 
@@ -20,6 +20,17 @@
 - 子代理通过自身工具能力（Bash/Read/MCP）主动检索规则。
 - 契约发现引擎保留，但角色从"编译器"变为"索引生成器"。
 
+### 2026-05-02 事实复核补丁
+
+本 context 曾写明"所有 8 个 issue 均真实存在且处于开放状态"。2026-05-02 live recheck 后，该表述不再准确：
+
+- Claude Code #49106 已关闭。
+- Claude Code #23885 已关闭为 duplicate，但其 `additionalContext` 语义仍作为设计风险参考。
+- Codex #14579 已关闭。
+- Claude Code #40459 / #39814 与 Codex #17323 / #19399 / #11004 当前仍开放。
+
+**规划含义**：Phase 58 不应依赖 issue 的开放状态作为唯一理由；真正锁定的是"平台级注入不能作为可靠项目层契约传播机制"这一风险模型。下游 researcher/planner 必须重新读取 canonical refs，而不是只复用本文件中的状态摘要。
+
 ---
 
 <domain>
@@ -33,7 +44,7 @@
 
 | 平台 | 子代理支持 | 官方注入机制 | 实际可靠性 | 社区 workaround |
 |------|-----------|-------------|-----------|----------------|
-| **Claude Code** | ✅ Agent/Tool 子代理 | `SubagentStart` hook + `additionalContext` | ❌ 低——append 到 user context，压缩后丢弃 | 手动在任务指令中重复规则 |
+| **Claude Code** | ✅ Agent/Tool 子代理 | `SubagentStart` hook + `additionalContext` | ❌ 低——append 到 user context，压缩后可能丢弃 | 手动在任务指令中重复规则 |
 | **Claude Code** | ✅ Agent/Tool 子代理 | `PreToolUse` + `updatedInput` 改 Agent prompt | ❌ **零**——静默丢弃 | 无法 workaround |
 | **Codex CLI** | ✅ Agent Thread | `.codex/agents/*.toml` 的 `developer_instructions`<br>（[官方文档](https://developers.openai.com/codex/subagents) 确认格式） | ⚠️ 中——官方机制存在，但社区报告多项缺陷 | `codex exec` 嵌套绕过 |
 | **Codex CLI** | ✅ Agent Thread | spawn 时附加的硬编码 prompt 块<br>（官方文档未描述） | ❌ 低——无条件注入，无法配置（#17323） | 忍气吞声 |
@@ -126,6 +137,14 @@
 - **Phase 53** (Profiles): 不同项目类型（Node.js/Python/Go/Rust）的契约发现规则不同
 - **Phase 54** (Preview): `codemap preview` 可展示契约概览作为项目分析的一部分
 
+### 本次补充讨论锁定 (D-06~D-10)
+
+- **D-06：从 Phase 55 seed 演进，不重开 seed 设计。** Phase 58 必须把现有 `.mycodemap/env-contract.json` seed 升级为完整 Project Environment Contract；可以迁移 schema，但不能静默丢弃 Phase 55 已生成的 manifest facts 或 assistant 示例路径。
+- **D-07：source authority 以可执行事实优先。** 冲突推荐顺序为：实际执行/验证入口（`.githooks/*`、`package.json` scripts、`vitest*.config.ts`） > `docs/rules/*` / `AGENTS.md` > generated assistant examples > brainstorm/example docs。doctor 报告冲突但不阻断，除非关键契约缺失导致 `--check` 失败。
+- **D-08：MCP 暴露首选走 interface contract 自动注册。** `mycodemap env-contract` 应注册到 `src/cli/interface-contract/commands/`，优先让 MCP 动态暴露等价工具；planner 必须验证 hyphen 命令名是否会被规范化为可用的 `codemap_env_contract` 形态。只有当命名或输出形状无法满足子代理查询时，才新增手写 native MCP tool。
+- **D-09：真实子代理验证遵循 roadmap 的更严格目标。** Requirement SDC-05 至少要求 Claude 或 Codex 一条真实子代理路径；ROADMAP success criteria 要求 Claude `claude -p` 和 Codex `codex exec` 都覆盖。Planner 应以"两者都做"为目标；若运行环境缺少其中一个平台，必须记录环境 blocker/waiver，不能静默降级。
+- **D-10：Phase 57 依赖风险必须显式处理。** ROADMAP 声明 Phase 58 depends on Phase 57，但 STATE 当前仍显示 Phase 57 ready_to_plan；planner 在开始 Phase 58 前必须确认 Phase 57 的真实状态，或把未完成依赖作为 plan 前置检查。
+
 </decisions>
 
 <canonical_refs>
@@ -135,26 +154,26 @@
 
 ### 验证记录
 
-> **验证时间**：2026-05-02  
-> **验证方式**：直接访问 GitHub issue 页面和 Codex 官方文档  
+> **验证时间**：2026-05-02
+> **验证方式**：直接访问 GitHub issue 页面和 Codex 官方文档
 > **验证人**：AI assistant（非文档原作者）
 
 | 引用 | 验证状态 | 说明 |
 |------|---------|------|
-| Claude Code #49106 | ✅ 真实存在，开放 | 子代理不继承 CLAUDE.md，多轮后规则覆盖率降至 ~5% |
+| Claude Code #49106 | ✅ 真实存在，已关闭 | 子代理不继承 CLAUDE.md，多轮后规则覆盖率降至 ~5%；关闭状态不改变该历史证据的设计参考价值 |
 | Claude Code #40459 | ✅ 真实存在，开放 | v2.1.84+ `omitClaudeMd: true`，作者做了二进制反编译分析 |
-| Claude Code #23885 | ✅ 真实存在，开放 | `additionalContext` 只能 append 到 user context（非 system prompt），原文说"可能"在压缩时丢弃 |
+| Claude Code #23885 | ✅ 真实存在，已关闭为 duplicate | `additionalContext` 只能 append 到 user context（非 system prompt），原文说"可能"在压缩时丢弃 |
 | Claude Code #39814 | ✅ 真实存在，开放 | `updatedInput` 对 Agent tool 静默丢弃，测试环境 2.1.85+/macOS |
 | Codex #17323 | ✅ 真实存在，开放 | 子代理 spawn 时无条件附加 `<spawned_agent_context>` prompt 块，代码路径 `spawn.rs` 已确认 |
-| Codex #14579 | ✅ 真实存在，开放 | 项目级 `.codex/config.toml` 自定义角色不被 `spawn_agent` 识别 |
+| Codex #14579 | ✅ 真实存在，已关闭 | 项目级 `.codex/config.toml` 自定义角色不被 `spawn_agent` 识别 |
 | Codex #19399 | ✅ 真实存在，开放 | Windows Codex desktop app 上 named subagent config 完全不生效 |
 | Codex #11004 | ✅ 真实存在，开放 | Codex App 中 `developer_instructions` 不注入（canonical refs 中遗漏，已补） |
 | Codex 官方 Subagents 文档 | ✅ 可访问 | 确认子代理机制，但**未提及**上述已知缺陷 |
 
 **重要发现**：
-- 所有 8 个 issue 均真实存在且处于开放状态，无已关闭/已修复标记。
+- 所有 8 个 issue 均真实存在，但开放状态已经分化：#49106 / #23885 / #14579 已关闭，其余引用仍开放。
 - Issue #23885 的「压缩丢弃」是文档的推论，issue 原文表述为"may be dropped"（可能性），不是确定性结论。
-- Codex 官方文档对已知缺陷（无条件注入、Windows bug、项目级 config 不生效）**零提及**。
+- Codex 官方文档确认 subagent 配置机制，但对上述社区报告的缺陷/限制没有完整风险说明。
 
 ### 平台生态调研
 - [Claude Code issue #49106](https://github.com/anthropics/claude-code/issues/49106) —— 子代理不继承 CLAUDE.md
@@ -177,8 +196,14 @@
 
 ### 现有 mycodemap 功能
 - `src/cli/init/reconciler.ts` —— init plan/apply/receipt 架构
+- `src/cli/init/env-contract-plan.ts` —— Phase 55 seed contract 生成与 InitAsset 集成
+- `src/cli/init/manifest-extractors.ts` —— manifest facts 提取，当前只覆盖 obvious manifests
+- `src/cli/init/assistant-plan.ts` —— inactive Claude/Codex assistant 示例，目前仍是 `cat .mycodemap/env-contract.json` 级别
 - `src/cli/init/rules.ts` —— rules bundle 生成
 - `src/cli/doctor/orchestrator.ts` —— doctor checker 编排
+- `src/cli/doctor/types.ts` —— doctor category/severity/report/exitCode 类型
+- `src/cli/interface-contract/commands/index.ts` —— public CLI contract registry
+- `src/cli/index.ts` —— commander public command registry
 - `src/server/mcp/server.ts` —— MCP server 工具注册
 - `src/cli/interface-contract/` —— CLI 契约 schema
 
@@ -189,6 +214,35 @@
 - `.planning/phases/54-zero-config-preview/54-CONTEXT.md` —— preview 展示契约概览
 
 </canonical_refs>
+
+<code_context>
+## Existing Code Insights
+
+### Reusable Assets
+
+- `src/cli/init/env-contract-plan.ts` already models `.mycodemap/env-contract.json` as a tool-owned `InitAsset` with preview/apply/already-synced/conflict behavior. Phase 58 should extend or migrate this path instead of creating a second contract writer.
+- `src/cli/init/manifest-extractors.ts` already extracts obvious manifest facts (`package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`) and explicitly records unknown test/build commands. This is the seed discovery baseline.
+- `src/cli/init/assistant-plan.ts` already generates inactive `claude-hook-example.json` and `codex-agent-example.toml`. Phase 58 should upgrade these examples from raw `cat .mycodemap/env-contract.json` retrieval to the new `mycodemap env-contract --for <type> --json` / MCP retrieval interface.
+- `src/cli/doctor/orchestrator.ts` runs doctor checkers in parallel and computes aggregate exit code from `DiagnosticSeverity`; `src/cli/doctor/types.ts` has the shared `agent` category needed for env-contract diagnostics.
+- `src/server/mcp/server.ts` dynamically registers tools generated from the CLI interface contract via `convertContractToMcpTools()`. Registering a first-class `env-contract` command in the interface contract may be enough to expose it to MCP without hand-writing a native MCP tool.
+
+### Established Patterns
+
+- Public CLI commands need both commander registration and interface-contract registration.
+- `mycodemap init` writes tool-owned `.mycodemap/` files, but team-owned files (`CLAUDE.md`, `AGENTS.md`, `.claude/settings.json`, `.codex/agents/*`) remain manual copy targets.
+- Existing init assets treat content drift as `conflict` and require manual review rather than automatic overwrite.
+- Doctor exit codes currently mean `0=all pass`, `1=has errors`, `2=warnings only`; Phase 58 should map env-contract drift/conflicts into that model rather than inventing a separate exit convention unless the CLI command itself needs `--check`-specific codes.
+
+### Integration Points
+
+- Add a new CLI command implementation for `mycodemap env-contract` and register it in `src/cli/index.ts`.
+- Add an interface contract file under `src/cli/interface-contract/commands/` and include it in `src/cli/interface-contract/commands/index.ts`.
+- Extend the init contract writer from Phase 55 to produce the full Project Environment Contract and keep `.mycodemap/status/env-contract-last.json` or equivalent metadata for drift checks.
+- Add a doctor checker under `src/cli/doctor/` for stale/missing/conflicting env-contract state.
+- Add/verify MCP exposure through the dynamic contract path, including generated tool naming for the hyphenated `env-contract` command; only add a native `codemap_env_contract` tool if the generated tool cannot satisfy subagent lookup ergonomics.
+- Update assistant examples so subagents retrieve filtered contract data by agent type instead of reading the full seed file blindly.
+
+</code_context>
 
 <specifics>
 ## Specific Ideas
@@ -315,7 +369,7 @@ The contract contains project-specific rules that you MUST follow, including:
 
 - 跨仓库委派时的目标仓库契约注入 → 需要更复杂的仓库发现和切换机制，v2.2+
 - 契约的自动修复/同步（检测到漂移后自动更新）→ 需要变更检测和自动写文件机制，v2.2+
-- 与 Claude Code hooks 的深层集成（`SubagentStart` 支持 `updatedPrompt`）→ 等待官方 issue #23885 解决
+- 与 Claude Code hooks 的深层集成（可靠的 `updatedPrompt` / system-level project-context 注入机制）→ 等待平台提供明确支持后重新评估
 - 与 Codex `config.toml` 的 `[agents]` 配置联动 → 等待 Codex agent config 格式稳定
 - 契约的历史版本追踪和 diff 展示 → v2.2+
 - 注入模式的重新评估 → 如果平台修复了 `additionalContext` 压缩问题或 `updatedInput` Agent tool 支持，可重新评估预注入方案
@@ -324,6 +378,6 @@ The contract contains project-specific rules that you MUST follow, including:
 
 ---
 
-*Phase: 58-subagent-environment-contract-injection*  
-*Context gathered: 2026-05-02 (revised v2)*  
+*Phase: 58-subagent-environment-contract-injection*
+*Context gathered: 2026-05-02 (revised v3)*
 *Design philosophy: retrieval over injection*
