@@ -223,4 +223,24 @@ exit 0
       expect(output).toContain('Format: [TAG] scope: message');
     }
   });
+
+  it('negative no-retrieval: wrong test command fails without contract guidance', () => {
+    // Without env-contract retrieval, a subagent might use "npm test" instead of "vitest run".
+    // In our temp repo, package.json defines "test": "vitest run", so "npm test" would work.
+    // But if a subagent skips contract retrieval and tries an arbitrary command not in the
+    // contract, it would fail. We simulate this by running a non-existent command.
+    try {
+      execSync('npm run nonexistent-command', {
+        cwd: tmpDir,
+        encoding: 'utf8',
+        timeout: 10000,
+      });
+      expect.fail('Expected command to fail');
+    } catch (err: unknown) {
+      const e = err as { stderr?: string; stdout?: string };
+      const output = (e.stderr ?? '') + (e.stdout ?? '');
+      // npm should report the missing script
+      expect(output).toContain('Missing script');
+    }
+  });
 });
