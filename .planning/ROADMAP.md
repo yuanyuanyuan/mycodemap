@@ -278,17 +278,17 @@ Plans:
 4. `mycodemap init --json` returns real machine-readable `InitReceipt` JSON reporting both main-agent context suggestions and subagent retrieval assets.
 
 ### Phase 56: Init Receipt + Next Steps
-**Status:** Planned
+**Status:** Executing (verification pending)
 **Goal:** Complete the init experience with clear receipt reporting that distinguishes main-agent setup from subagent setup, safe team-owned file handling, and synchronized documentation.
 **Depends on:** Phase 55 (assets must exist before receipt can reference them)
 **Requirements:** ABT-03, ABT-04, INI-02, INI-03
 **Plans:** 3 plans
 
 **Wave 1** *(no dependencies)*
-- [ ] 56-01-PLAN.md — Receipt enhancement: two-section layout, personalized next steps, sync detection
+- [x] 56-01-PLAN.md — Receipt enhancement: two-section layout, personalized next steps, sync detection
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 56-02-PLAN.md — Tests: receipt classification, sync detection, personalized next steps coverage
-- [ ] 56-03-PLAN.md — Doc sync: README, SETUP_GUIDE, AI_ASSISTANT_SETUP unified flow
+- [x] 56-02-PLAN.md — Tests: receipt classification, sync detection, personalized next steps coverage
+- [x] 56-03-PLAN.md — Doc sync: README, SETUP_GUIDE, AI_ASSISTANT_SETUP unified flow
 
 **Cross-cutting constraints:** Team-owned files never auto-rewritten (Plan 01 declares, Plans 02-03 reference); max 3 next steps (D-08)
 
