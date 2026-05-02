@@ -61,6 +61,42 @@ MyCodeMap 可以与多种 AI 编程助手集成，让 AI 能够：
 
 ---
 
+## 理解 Init 收据
+
+运行 `mycodemap init` 后，收据会分为两个部分，帮助你快速连接 AI 助手：
+
+### Main Agent 部分
+
+这一部分处理主 AI 助手的项目上下文连接：
+
+| 文件 | 用途 | 操作 |
+|------|------|------|
+| `claude-context.md` | Claude Code 项目上下文建议 | 复制到项目根目录 `CLAUDE.md` |
+| `agents-context.md` | 通用 Agent 上下文建议 | 复制到项目根目录 `AGENTS.md` |
+
+如果 `CLAUDE.md` 或 `AGENTS.md` 已包含 `.mycodemap/` 路径引用，收据会标记为 `already-synced`，无需重复操作。
+
+### Subagent 部分
+
+这一部分处理子 Agent 的平台配置：
+
+| 文件 | 用途 | 操作 |
+|------|------|------|
+| `claude-hook-example.json` | Claude Code SubagentStart hook 示例 | 复制到 `.claude/settings.json` |
+| `codex-agent-example.toml` | Codex agent developer_instructions 示例 | 复制到 `.codex/agents/` |
+
+### 个性化下一步
+
+收据底部的"下一步"基于实际安装状态动态生成：
+1. 冲突解决（最高优先级）
+2. 手动操作指引
+3. 已安装资产的使用指导
+4. 默认推荐步骤（`mycodemap doctor`、`mycodemap generate`）
+
+> 所有团队共管文件（`CLAUDE.md`、`AGENTS.md`、`.claude/settings.json`）不会被自动改写。收据提供可复制的片段，由你决定何时以及如何集成。
+
+---
+
 ## Kimi CLI 配置
 
 ### 步骤 1：创建 Skill 目录
