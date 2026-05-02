@@ -38,7 +38,7 @@ export function scanFileComplexity(
     const report = escomplex.analyzeModule(source);
     return {
       file: path.relative(rootDir, filePath),
-      score: report.aggregate.cyclomatic,
+      score: report.aggregate?.cyclomatic ?? 0,
       functions: report.methods.length,
     };
   } catch {
