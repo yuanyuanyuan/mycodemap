@@ -83,15 +83,20 @@ function registerContractTools(server: McpServer, contract: InterfaceContract, r
 
     for (const def of definitions) {
       let toolName = def.name;
-      // If a native tool occupies this name, register under a stable alternative
       if (registeredNames.has(toolName)) {
-        const altName = `${toolName}_contract`;
-        if (registeredNames.has(altName)) {
-          console.warn(`Contract tool "${def.name}" skipped — name reserved by native tool and alternative "${altName}" also taken`);
+        if (reservedNames.has(toolName)) {
+          // Native tool conflict — rename to stable alternative
+          const altName = `${toolName}_contract`;
+          if (registeredNames.has(altName)) {
+            console.warn(`Contract tool "${def.name}" skipped — name reserved by native tool and alternative "${altName}" also taken`);
+            continue;
+          }
+          console.warn(`Contract tool "${def.name}" renamed to "${altName}" — name reserved by native tool`);
+          toolName = altName;
+        } else {
+          // Normalized alias collision with prior contract tool — skip
           continue;
         }
-        console.warn(`Contract tool "${def.name}" renamed to "${altName}" — name reserved by native tool`);
-        toolName = altName;
       }
       registeredNames.add(toolName);
 

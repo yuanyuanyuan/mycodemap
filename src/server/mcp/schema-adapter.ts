@@ -250,6 +250,15 @@ export function convertOutputShapeToZodSchema(outputShape: OutputShape): z.ZodTy
   }
 }
 
+/**
+ * Normalize a command name segment for use in MCP tool names.
+ * Replaces any character that is not alphanumeric or underscore with underscore.
+ * This ensures hyphenated command names like 'env-contract' become 'env_contract'.
+ */
+export function normalizeToolNameSegment(value: string): string {
+  return value.replace(/[^A-Za-z0-9_]/g, '_');
+}
+
 function shellQuote(value: string): string {
   if (/^[A-Za-z0-9@+_./:-]+$/.test(value)) {
     return value;
@@ -324,7 +333,7 @@ export function convertContractToMcpTools(contract: CommandContract, programName
   const inputSchema = convertFlagsToZodShape(contract.flags);
 
   definitions.push({
-    name: `codemap_${contract.name}`,
+    name: `codemap_${normalizeToolNameSegment(contract.name)}`,
     config: {
       title: `CodeMap ${contract.name}`,
       description: `${contract.description}\n\nExamples:\n${contract.examples.join('\n')}`,
@@ -336,7 +345,7 @@ export function convertContractToMcpTools(contract: CommandContract, programName
 
   for (const alias of contract.aliases ?? []) {
     definitions.push({
-      name: `codemap_${alias}`,
+      name: `codemap_${normalizeToolNameSegment(alias)}`,
       config: {
         title: `CodeMap ${alias}`,
         description: `${contract.description} (alias for ${contract.name})\n\nExamples:\n${contract.examples.join('\n')}`,

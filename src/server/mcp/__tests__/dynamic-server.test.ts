@@ -51,6 +51,10 @@ describe('Dynamic MCP tool registration from CLI contract', () => {
     // query contract conflicts with native codemap_query, so it should be skipped
     expect(toolNames).not.toContain('codemap_query_cli');
 
+    // env-contract tool name should be normalized (hyphens → underscores)
+    expect(toolNames).toContain('codemap_env_contract');
+    expect(toolNames).not.toContain('codemap_env-contract');
+
     await connection.cleanup();
   });
 
@@ -122,6 +126,11 @@ describe('Dynamic MCP tool registration from CLI contract', () => {
     const queryTool = tools.tools.find(t => t.name === 'codemap_query');
     expect(queryTool).toBeDefined();
     expect(queryTool?.description).toContain('Experimental');
+
+    // Verify native impact tool still works
+    const impactTool = tools.tools.find(t => t.name === 'codemap_impact');
+    expect(impactTool).toBeDefined();
+    expect(impactTool?.description).toContain('Experimental');
 
     await connection.cleanup();
   });
