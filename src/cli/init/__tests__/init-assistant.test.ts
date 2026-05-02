@@ -129,7 +129,8 @@ describe('createAssistantPlan', () => {
     expect(parsed.hooks.SubagentStart).toBeDefined();
     expect(Array.isArray(parsed.hooks.SubagentStart)).toBe(true);
     expect(parsed.hooks.SubagentStart[0].hooks[0].type).toBe('command');
-    expect(parsed.hooks.SubagentStart[0].hooks[0].command).toContain('env-contract.json');
+    expect(parsed.hooks.SubagentStart[0].hooks[0].command).toContain('mycodemap env-contract --for');
+    expect(parsed.hooks.SubagentStart[0].hooks[0].command).toContain('additionalContext');
   });
 
   it('generates codex-agent-example.toml with developer_instructions', () => {
@@ -141,8 +142,9 @@ describe('createAssistantPlan', () => {
 
     expect(write).toBeDefined();
     expect(write!.content).toContain('[developer_instructions]');
-    expect(write!.content).toContain('retrieval_command');
-    expect(write!.content).toContain('env-contract.json');
+    expect(write!.content).toContain('developer_instructions = """');
+    expect(write!.content).toContain('codemap_env_contract(agentType="worker")');
+    expect(write!.content).toContain('mycodemap env-contract --for worker --json');
   });
 
   it('returns already-synced when file exists with identical content', () => {
@@ -203,6 +205,33 @@ describe('createAssistantPlan', () => {
     const claudeWrite = plan.writes.find((w) => w.targetPath.endsWith('claude-context.md'));
 
     expect(claudeWrite!.content).toContain('generic');
+  });
+
+  it('no generated template contains raw cat .mycodemap/env-contract.json', () => {
+    const rootDir = createTempDir();
+    tempRoots.push(rootDir);
+
+    const plan = createAssistantPlan(rootDir);
+
+    for (const write of plan.writes) {
+      expect(write.content).not.toContain('cat .mycodemap/env-contract.json');
+    }
+  });
+
+  it('claude-context and agents-context contain retrieval guidance with --for flag', () => {
+    const rootDir = createTempDir();
+    tempRoots.push(rootDir);
+
+    const plan = createAssistantPlan(rootDir);
+    const claudeWrite = plan.writes.find((w) => w.targetPath.endsWith('claude-context.md'));
+    const agentsWrite = plan.writes.find((w) => w.targetPath.endsWith('agents-context.md'));
+
+    expect(claudeWrite).toBeDefined();
+    expect(agentsWrite).toBeDefined();
+    expect(claudeWrite!.content).toContain('mycodemap env-contract --for default --json');
+    expect(agentsWrite!.content).toContain('mycodemap env-contract --for default --json');
+    expect(claudeWrite!.content).toContain('--for explore, --for plan, --for worker, or --for verify');
+    expect(agentsWrite!.content).toContain('--for explore, --for plan, --for worker, or --for verify');
   });
 });
 

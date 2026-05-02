@@ -56,11 +56,13 @@ mycodemap generate    # Generate code map
 mycodemap preview     # Preview without config
 \`\`\`
 
-## Agent Context
+## Subagent Retrieval
 
-For subagent retrieval of project conventions, see:
-- \`.mycodemap/env-contract.json\` — project environment contract
-- \`.mycodemap/rules/\` — project-specific rules
+Before delegated work, query the Project Environment Contract:
+
+    mycodemap env-contract --for default --json
+
+Use --for explore, --for plan, --for worker, or --for verify when the delegated role is known.
 
 > This file is a copy-paste suggestion. Do NOT auto-rewrite your CLAUDE.md.
 `;
@@ -88,10 +90,11 @@ mycodemap preview     # Preview without config
 
 ## Subagent Retrieval
 
-For delegated agents, query the environment contract:
-\`\`\`bash
-cat .mycodemap/env-contract.json
-\`\`\`
+Before delegated work, query the Project Environment Contract:
+
+    mycodemap env-contract --for default --json
+
+Use --for explore, --for plan, --for worker, or --for verify when the delegated role is known.
 
 > This file is a copy-paste suggestion. Do NOT auto-rewrite your AGENTS.md.
 `;
@@ -110,7 +113,7 @@ function generateClaudeHookExample(): string {
               {
                 type: 'command',
                 command:
-                  'cat .mycodemap/env-contract.json 2>/dev/null || echo \'{"status":"no-contract"}\'',
+                  'echo \'{"hookSpecificOutput":{"hookEventName":"SubagentStart","additionalContext":"Before starting delegated work, run: mycodemap env-contract --for default --json"}}\'',
               },
             ],
           },
@@ -127,8 +130,13 @@ function generateCodexAgentExample(): string {
 # Copy to .codex/agents/ to enable subagent contract retrieval.
 
 [developer_instructions]
-retrieval_command = "cat .mycodemap/env-contract.json 2>/dev/null || echo 'no contract'"
 description = "Retrieve project environment contract for delegated agents"
+
+developer_instructions = """
+Before starting work, retrieve the project environment contract:
+- CLI: mycodemap env-contract --for worker --json
+- MCP: codemap_env_contract(agentType="worker")
+"""
 `;
 }
 
