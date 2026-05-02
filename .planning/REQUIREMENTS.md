@@ -21,11 +21,11 @@
 
 ### Agent Bootstrap (ABT)
 
-- [ ] **ABT-01**: `mycodemap init` 生成 per-runtime assistant 引导片段（Claude / Codex / generic）
-- [ ] **ABT-02**: 生成资产写入 `.mycodemap/assistants/` 目录，按 runtime 分类存放
+- [x] **ABT-01**: `mycodemap init` 生成 per-runtime assistant 引导片段（Claude / Codex / generic） — Phase 55 verified
+- [x] **ABT-02**: 生成资产写入 `.mycodemap/assistants/` 目录，按 runtime 分类存放 — Phase 55 verified
 - [ ] **ABT-03**: Init 收据显式报告 agent 上下文连接状态：已生成片段、需手动添加的引用、已同步检测
 - [ ] **ABT-04**: 默认不自动重写用户项目的 `CLAUDE.md` / `AGENTS.md`；输出可复制的 copy-paste 片段
-- [ ] **ABT-05**: 支持 `--profile claude|codex|generic` 标志选择目标 assistant 类型
+- [x] **ABT-05**: 支持 `--profile claude|codex|generic` 标志选择目标 assistant 类型 — Phase 55 verified
 
 ### Subagent Delegation Contract (SDC)
 
@@ -81,17 +81,17 @@
 | ZCP-02 | 54 | 54-02 | complete |
 | ZCP-03 | 54 | 54-01, 54-02 | complete |
 | ZCP-04 | 54 | 54-02 | complete |
-| ABT-01 | 55 | — | pending |
-| ABT-02 | 55 | — | pending |
+| ABT-01 | 55 | 55-02 | complete |
+| ABT-02 | 55 | 55-02 | complete |
 | ABT-03 | 56 | — | pending |
 | ABT-04 | 56 | — | pending |
-| ABT-05 | 55 | — | pending |
+| ABT-05 | 55 | 55-02 | complete |
 | SDC-01 | 58 | — | pending |
 | SDC-02 | 58 | — | pending |
 | SDC-03 | 58 | — | pending |
 | SDC-04 | 58 | — | pending |
 | SDC-05 | 58 | — | pending |
-| INI-01 | 55 | — | pending |
+| INI-01 | 55 | 55-01 | partial |
 | INI-02 | 56 | — | pending |
 | INI-03 | 56 | — | pending |
 | VER-01 | 57 | — | pending |

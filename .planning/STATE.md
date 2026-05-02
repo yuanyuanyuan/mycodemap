@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: milestone
-current_phase: 54
-current_phase_name: Zero-Config Preview
+current_phase: 55
+current_phase_name: Agent Bootstrap Assets
 current_plan: —
 status: phase_complete
-last_updated: "2026-05-02T12:00:00.000Z"
+last_updated: "2026-05-02T16:30:00.000Z"
 last_activity: 2026-05-02
 progress:
   total_phases: 6
-  completed_phases: 1
-  total_plans: 5
-  completed_plans: 3
-  percent: 17
+  completed_phases: 3
+  total_plans: 7
+  completed_plans: 5
+  percent: 50
 ---
 
 # Session State
@@ -23,20 +23,20 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-04-30)
 
 **Core Value:** 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
-**Current Focus:** No active milestone. v2.0 agent-native-foundation shipped 2026-05-01. Ready for next milestone planning.
+**Current Focus:** v2.1 ux-onboarding-enhancement — Phase 55 complete, ready for Phase 56.
 
 ## Position
 
 **Milestone:** v2.1 — ux-onboarding-enhancement
-**Current Phase:** 54
-**Current Phase Name:** Zero-Config Preview
+**Current Phase:** 55
+**Current Phase Name:** Agent Bootstrap Assets
 **Current Plan:** —
-**Total Phases:** 6 scoped (53-58; Phase 53 complete, 54 context gathered, 55-58 not planned)
-**Total Plans in Milestone:** 3 planned so far (all complete)
-**Status:** Phase 54 UAT complete (5 passed, 1 skipped, 0 issues) — ready for Phase 55
-**Progress:** [██░░░░░░░░] 33% phase completion (2/6); Phase 53-54 complete (UAT verified)
+**Total Phases:** 6 scoped (53-58)
+**Total Plans in Milestone:** 7 planned (5 complete)
+**Status:** Phase 55 complete — manifest extractors + env-contract seed + assistant bootstrap assets verified
+**Progress:** [█████░░░░░] 50% phase completion (3/6); Phase 53-55 complete
 **Last Activity:** 2026-05-02
-**Last Activity Description:** Phase 54 UAT verified — 5 passed, 1 skipped (--save flow verified via unit tests). Zero-config detection, JSON/human output, hint text, interface contract all confirmed working.
+**Last Activity Description:** Phase 55 executed — 2 plans in 1 wave, 28 tests pass, 1204 total suite pass. Created manifest-extractors.ts, env-contract-plan.ts, assistant-plan.ts with full test coverage.
 
 ## Decisions Made
 
@@ -100,6 +100,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 - 2026-05-02: Phase 58 added: Subagent Environment Contract Injection — make delegated-agent prompts carry RTK, commit-format, Vitest-entry, and rule-context contract up front; require real Claude/Codex sub-agent verification evidence.
 - 2026-05-02: Phase 53 closed — verifier PASS verdict (4/4 success criteria, D-01..D-17 all verified). Closure path: BLOCKER B-1 (commander --profile) + F-2 (dist profile JSONs) fixed in 1866672; binary-level smoke test added in 0e2a95a; F-1 (cosmetic legacy-config receipt message) deferred to v2.1 cleanup follow-up.
 - 2026-05-02: Phase 54 context gathered — Zero-Config Preview. preview is a lightweight wrapper over generate, using Phase 53 detection + profile as fallback config. Output: JSON default + --human/TTY, escomplex top-5 hotspots, direct deps from marker files. --save writes config + runs generate. No --discard. End-of-output hint text.
+- 2026-05-02: Phase 55 completed — Agent Bootstrap Assets. 2 plans in 1 wave, parallel execution. Created manifest-extractors.ts (reads package.json/pyproject.toml/go.mod/Cargo.toml), env-contract-plan.ts (EnvContractSeed as InitAsset with installed/preview/already-synced/conflict states), assistant-plan.ts (4 per-runtime files: claude-context.md, agents-context.md, claude-hook-example.json, codex-agent-example.toml). 28 tests pass, full suite 1204 pass. All D-05..D-12 decisions honored. Requirements ABT-01, ABT-02, ABT-05 verified.
 
 ### Verified Existing Capabilities (carried forward)
 

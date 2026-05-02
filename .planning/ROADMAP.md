@@ -257,11 +257,15 @@ Plans:
 4. After preview, shows hint text to run `--save` to save config (no `--discard` flag per D-11)
 
 ### Phase 55: Agent Bootstrap Assets
-**Status:** Not started
+**Status:** Complete (2026-05-02)
 **Goal:** Generate assistant bootstrap assets during `mycodemap init` for both main agents (Claude/Codex parent sessions) and subagent retrieval infrastructure. Main agents consume static entry docs (CLAUDE.md / AGENTS.md); subagents consume retrievable contracts via Phase 58.
 **Depends on:** None
 **Requirements:** ABT-01, ABT-02, ABT-05, INI-01
-**Plans:** Not planned yet
+**Plans:** 2 plans in 1 wave
+
+**Wave 1** *(no dependencies)*
+- [x] 55-01-PLAN.md — Manifest extractors (package.json/pyproject.toml/go.mod/Cargo.toml) + env-contract seed generation
+- [x] 55-02-PLAN.md — Assistant bootstrap asset generator (4 per-runtime files under .mycodemap/assistants/)
 
 **Success criteria:**
 1. `mycodemap init` creates `.mycodemap/env-contract.json` — initial Project Environment Contract with bootstrap-profile-sourced items (project type, test command, build output, CLI entry).
