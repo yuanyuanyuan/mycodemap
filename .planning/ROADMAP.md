@@ -317,9 +317,21 @@ Plans:
 **Goal:** At the project layer (not the platform layer), automatically discover project-specific environment contracts scattered across hooks, entry docs, package scripts, and rule-control helpers, and make them retrievable by sub-agents via CLI or MCP. Covers RTK shell wrapping, `[TAG] scope: message`, the real Vitest entry/commands, and rule-context verification expectations — retrieved by agent types that need them, not injected by the platform.
 **Depends on:** Phase 55, Phase 56, Phase 57
 **Requirements:** ABT-01, ABT-02, ABT-03, VER-03, SDC-01, SDC-02, SDC-03, SDC-04, SDC-05
-**Plans:** Not planned yet
+**Plans:** 4 planned (Phase 57 dependency preflight required before execution)
 
 **Design doc:** `.planning/phases/58-subagent-environment-contract-injection/58-DESIGN.md`
+
+**Plan files:**
+- Wave 1 — `.planning/phases/58-subagent-environment-contract-injection/58-01-PLAN.md`: Project Environment Contract model, discovery, drift/conflict checks, and Phase 55 seed migration.
+- Wave 2 *(blocked on Wave 1 completion)* — `.planning/phases/58-subagent-environment-contract-injection/58-02-PLAN.md`: `mycodemap env-contract`, interface contract registration, MCP `codemap_env_contract`, and built CLI subprocess verification.
+- Wave 3 *(blocked on Waves 1-2 completion)* — `.planning/phases/58-subagent-environment-contract-injection/58-03-PLAN.md`: init assistant retrieval guidance and doctor env-contract diagnostics.
+- Wave 4 *(blocked on Waves 1-3 completion)* — `.planning/phases/58-subagent-environment-contract-injection/58-04-PLAN.md`: temp-repo E2E, Claude/Codex evidence harness, negative no-retrieval case, and docs sync.
+
+**Cross-cutting constraints:**
+- Retrieval-first only; do not generate `.mycodemap/prompt-snippets/`.
+- Evolve the Phase 55 env-contract seed writer instead of creating a parallel writer.
+- Treat executable facts as higher authority than generated docs when reporting conflicts.
+- Attempt both `claude -p` and `codex exec`; record explicit blockers if either runtime is unavailable.
 
 **Why the platform doesn't do this:**
 - Claude Code intentionally isolates sub-agents (`omitClaudeMd: true`); model-level prepend degrades to ~5% coverage under context pressure. `SubagentStart` hook `additionalContext` appends to user context and gets dropped during compaction. `PreToolUse` `updatedInput` for Agent tool is silently dropped (issue #39814).
