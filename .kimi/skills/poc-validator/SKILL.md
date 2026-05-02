@@ -330,6 +330,48 @@ POC 完成前必须逐条确认：
 
 ---
 
+## 附录：快速启动模板
+
+可直接复制使用。
+
+**A.1 测试 Prompt 模板（test-prompts.json）**
+```json
+[
+  {"id": 1, "prompt": "happy path 场景", "expected": "期望输出简述"},
+  {"id": 2, "prompt": "复杂/歧义场景", "expected": "期望输出简述"},
+  {"id": 3, "prompt": "边缘/反模式场景", "expected": "期望识别并纠正"}
+]
+```
+
+**A.2 实验记录模板（results.tsv）**
+```tsv
+timestamp	experiment	assumption	method	result	status	note
+2026-01-01T10:00	A:功能可用	命令不 crash	直接调用	exit 0	✅	-
+2026-01-01T10:05	B:真实数据	真实数据下正确	真实请求	字段匹配	✅	脱敏完成
+2026-01-01T10:10	C:失败场景	失败不崩溃	错误 key	401+友好提示	✅	-
+2026-01-01T10:15	D:对照验证	新方案优于旧	对比实验	新快 30%	✅	日志见 logs/
+```
+
+**A.3 常用命令片段**
+```bash
+# 隔离 + 计时 + 内存记录
+/usr/bin/time -v cp -r /data/project /tmp/project-poc
+
+# 带超时的真实 HTTP 调用
+curl -s --max-time 10 -w "\nhttp_code:%{http_code}\n" \
+  https://api.sandbox.example.com/health
+
+# 渐进压测
+for n in 1000 10000 100000; do
+  /usr/bin/time -v node process.js --input sample-${n}.jsonl 2> metrics-${n}.log
+done
+
+# 清理临时文件
+rm -rf /tmp/project-poc /tmp/poc-*
+```
+
+---
+
 ## 技能元数据
 
 - **适用范围**：API 集成、AI 代理工作流、CLI 工具链、数据流管道、性能基准
