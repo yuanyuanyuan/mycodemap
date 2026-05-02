@@ -1,0 +1,12 @@
+{
+  "platform": "negative",
+  "attempted": true,
+  "available": true,
+  "command": "git commit -m \"bad message\"",
+  "exitCode": 1,
+  "stdoutExcerpt": "",
+  "stderrExcerpt": "ERROR: Commit message must start with an uppercase tag.\nFormat: [TAG] scope: message",
+  "retrievalEvidence": null,
+  "blocker": null,
+  "note": "Without env-contract retrieval, a subagent would fail at commit validation. The hook enforces [TAG] scope: message format."
+}

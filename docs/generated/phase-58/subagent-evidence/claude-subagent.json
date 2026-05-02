@@ -1,0 +1,11 @@
+{
+  "platform": "claude",
+  "attempted": true,
+  "available": true,
+  "command": "claude -p \"Delegate a subagent to inspect this repo. Before any work, retrieve project rule...\"",
+  "exitCode": 143,
+  "stdoutExcerpt": "",
+  "stderrExcerpt": "",
+  "retrievalEvidence": null,
+  "blocker": "claude -p timed out (60s limit) — likely requires interactive auth or API key"
+}
