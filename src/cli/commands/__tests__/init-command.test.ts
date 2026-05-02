@@ -162,4 +162,31 @@ describe('initCommand', () => {
     expect(output).toContain('基础设施');
     expect(output).toContain('下一步');
   });
+
+  it('generated assistant examples contain retrieval guidance, not raw file reading', async () => {
+    const rootDir = createTempProject();
+    tempRoots.push(rootDir);
+
+    await executeInitCommand({ yes: true, cwd: rootDir });
+
+    const assistantsDir = path.join(rootDir, '.mycodemap', 'assistants');
+
+    // Read all generated assistant files
+    const claudeContext = readFileSync(path.join(assistantsDir, 'claude-context.md'), 'utf8');
+    const agentsContext = readFileSync(path.join(assistantsDir, 'agents-context.md'), 'utf8');
+    const hookExample = readFileSync(path.join(assistantsDir, 'claude-hook-example.json'), 'utf8');
+    const codexExample = readFileSync(path.join(assistantsDir, 'codex-agent-example.toml'), 'utf8');
+
+    // All files should use retrieval guidance
+    expect(claudeContext).toContain('mycodemap env-contract --for default --json');
+    expect(agentsContext).toContain('mycodemap env-contract --for default --json');
+    expect(hookExample).toContain('mycodemap env-contract --for');
+    expect(codexExample).toContain('mycodemap env-contract --for worker --json');
+
+    // No file should contain the old raw file-reading pattern
+    expect(claudeContext).not.toContain('cat .mycodemap/env-contract.json');
+    expect(agentsContext).not.toContain('cat .mycodemap/env-contract.json');
+    expect(hookExample).not.toContain('cat .mycodemap/env-contract.json');
+    expect(codexExample).not.toContain('cat .mycodemap/env-contract.json');
+  });
 });
