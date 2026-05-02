@@ -258,29 +258,35 @@ Plans:
 
 ### Phase 55: Agent Bootstrap Assets
 **Status:** Not started
-**Goal:** Generate per-runtime assistant bootstrap assets during `mycodemap init` so Claude/Codex users can connect without hand-assembling setup instructions.
+**Goal:** Generate assistant bootstrap assets during `mycodemap init` for both main agents (Claude/Codex parent sessions) and subagent retrieval infrastructure. Main agents consume static entry docs (CLAUDE.md / AGENTS.md); subagents consume retrievable contracts via Phase 58.
 **Depends on:** None
 **Requirements:** ABT-01, ABT-02, ABT-05, INI-01
 **Plans:** Not planned yet
 
 **Success criteria:**
-1. `mycodemap init` creates `.mycodemap/assistants/` directory with per-runtime subdirectories
-2. Generated assets include Claude, Codex, and generic assistant context snippets
-3. `--profile claude|codex|generic` flag selects target assistant type
-4. `mycodemap init --json` returns real machine-readable `InitReceipt` JSON (currently advertised but unimplemented)
+1. `mycodemap init` creates `.mycodemap/env-contract.json` — initial Project Environment Contract with bootstrap-profile-sourced items (project type, test command, build output, CLI entry).
+2. `mycodemap init` creates `.mycodemap/assistants/` with per-platform assets:
+   - `claude-context.md` — suggested content for project-root `CLAUDE.md` (main agent)
+   - `agents-context.md` — suggested content for project-root `AGENTS.md` (main agent)
+   - `claude-hook-example.json` — Claude Code `SubagentStart` hook config example (subagent retrieval guidance)
+   - `codex-agent-example.toml` — Codex agent `developer_instructions` retrieval prompt template (subagent retrieval guidance)
+3. `--profile claude|codex|generic` selects which platform adapter configs to generate; default generates all.
+4. `mycodemap init --json` returns real machine-readable `InitReceipt` JSON reporting both main-agent context suggestions and subagent retrieval assets.
 
 ### Phase 56: Init Receipt + Next Steps
 **Status:** Not started
-**Goal:** Complete the init experience with clear receipt reporting, safe team-owned file handling, and synchronized documentation.
-**Depends on:** Phase 55 (agent assets must exist before receipt can report their status)
+**Goal:** Complete the init experience with clear receipt reporting that distinguishes main-agent setup from subagent setup, safe team-owned file handling, and synchronized documentation.
+**Depends on:** Phase 55 (assets must exist before receipt can reference them)
 **Requirements:** ABT-03, ABT-04, INI-02, INI-03
 **Plans:** Not planned yet
 
 **Success criteria:**
-1. Init receipt explicitly reports agent context connection status: generated snippets, manual references needed, already-synced detection
-2. Default behavior does NOT auto-rewrite `CLAUDE.md` / `AGENTS.md`; outputs copy-paste snippets instead
-3. After init, displays personalized next steps based on receipt (not fixed three-step welcome)
-4. Setup docs (README, SETUP_GUIDE, AI_ASSISTANT_SETUP) describe unified flow: install → init → doctor → generate → connect agent
+1. Init receipt displays **two sections**:
+   - **Main Agent**: Reports `claude-context.md` / `agents-context.md` paths; instructs user to review and manually merge into project-root `CLAUDE.md` / `AGENTS.md` (does NOT auto-rewrite).
+   - **Subagent**: Reports `env-contract.json` generation status and adapter config examples (`claude-hook-example.json`, `codex-agent-example.toml`); instructs user to copy configs into platform settings (`.claude/settings.json`, `.codex/agents/`).
+2. Receipt explicitly reports agent context connection status: generated snippets, manual references needed, already-synced detection.
+3. After init, displays personalized next steps based on receipt (not fixed three-step welcome).
+4. Setup docs (README, SETUP_GUIDE, AI_ASSISTANT_SETUP) describe unified flow: install → init → doctor → generate → connect agent (main agent via entry docs, subagent via retrieval).
 
 ### Phase 57: Verification
 **Status:** Not started
@@ -294,9 +300,9 @@ Plans:
 2. Idempotency: repeated `mycodemap init` stably outputs `already-synced` status without false conflicts
 3. At least one verification path invokes the built CLI through a subprocess, not only in-process TypeScript
 
-### Phase 58: Subagent Environment Contract Injection
+### Phase 58: Subagent Environment Contract Retrieval
 **Status:** Not started
-**Goal:** At the project layer (not the platform layer), automatically discover project-specific environment contracts scattered across hooks, entry docs, package scripts, and rule-control helpers, and make them available for selective injection into sub-agent prompts. Covers RTK shell wrapping, `[TAG] scope: message`, the real Vitest entry/commands, and rule-context verification expectations — injected only to agent types that need them.
+**Goal:** At the project layer (not the platform layer), automatically discover project-specific environment contracts scattered across hooks, entry docs, package scripts, and rule-control helpers, and make them retrievable by sub-agents via CLI or MCP. Covers RTK shell wrapping, `[TAG] scope: message`, the real Vitest entry/commands, and rule-context verification expectations — retrieved by agent types that need them, not injected by the platform.
 **Depends on:** Phase 55, Phase 56, Phase 57
 **Requirements:** ABT-01, ABT-02, ABT-03, VER-03, SDC-01, SDC-02, SDC-03, SDC-04, SDC-05
 **Plans:** Not planned yet
@@ -304,21 +310,21 @@ Plans:
 **Design doc:** `.planning/phases/58-subagent-environment-contract-injection/58-DESIGN.md`
 
 **Why the platform doesn't do this:**
-- Claude Code intentionally isolates sub-agents (`omitClaudeMd: true`); model-level prepend degrades to ~5% coverage under context pressure.
-- Codex unconditionally injects `SPAWN_AGENT_DEVELOPER_INSTRUCTIONS` but does not discover project-specific conventions (rtk, commit format, Vitest truth).
-- Both platforms treat project-level contract injection as **out of scope** for generic infrastructure; it belongs at the project/tooling layer.
+- Claude Code intentionally isolates sub-agents (`omitClaudeMd: true`); model-level prepend degrades to ~5% coverage under context pressure. `SubagentStart` hook `additionalContext` appends to user context and gets dropped during compaction. `PreToolUse` `updatedInput` for Agent tool is silently dropped (issue #39814).
+- Codex unconditionally injects `SPAWN_AGENT_DEVELOPER_INSTRUCTIONS` but does not discover project-specific conventions. `developer_instructions` has known bugs on Windows (#19399) and project-level custom roles (#14579).
+- Both platforms treat project-level contract injection as **out of scope** for generic infrastructure; it belongs at the project/tooling layer. Phase 58 provides retrieval capability instead of relying on unreliable injection mechanisms.
 
 **Success criteria:**
-1. A single canonical Project Environment Contract exists (`.mycodemap/env-contract.json`) with tagged items (`execution`/`commit`/`retrieval`/`validation`/`style`) and source traceability.
-2. Contract injection is **agent-type-sensitive**: Explore gets `retrieval`+`validation` only; Edit/Worker gets `execution`+`commit`+`style`+`validation`; Plan gets `validation`+`retrieval`; Verify gets `execution`+`validation`.
-3. Claude, Codex, and generic assistant bootstrap assets route to the same contract source (`.mycodemap/prompt-snippets/`) instead of duplicating drifting copies.
-4. `mycodemap env-contract --for <agent-type> --prompt-snippet` outputs a compact, prepend-ready prompt prefix (max 5-8 facts) for direct embedding into sub-agent definitions.
-5. `mycodemap doctor` detects contract drift against source files; `mycodemap init` generates contract assets.
-6. MCP server exposes `codemap_env_contract` tool for run-time query.
-7. Automated tests cover: source-file discovery, category filtering, drift detection, and missing-critical-contract failure.
-8. Real sub-agent verification runs through `claude -p` **and** `codex exec` in isolated temp repos, capturing evidence that the injected contract was received and used (RTK, commit-format, Vitest-entry).
-9. Negative case: a sub-agent prompt **without** the contract fails or produces incorrect actions (commit rejected by hook, wrong test command, bare shell without rtk).
-10. Test evidence includes: command transcript, sub-agent prompt/output artifact, and clean working-tree or scoped diff hygiene check.
+1. A single canonical Project Environment Contract exists (`.mycodemap/env-contract.json`) with tagged items (`execution`/`commit`/`retrieval`/`validation`/`style`), source traceability, and conflict detection.
+2. Contract retrieval is **agent-type-sensitive**: `mycodemap env-contract --for <type>` returns filtered items; Explore gets `retrieval`+`validation` only; Edit/Worker gets `execution`+`commit`+`style`+`validation`; Plan gets `validation`+`retrieval`; Verify gets `execution`+`validation`.
+3. Claude, Codex, and generic assistant bootstrap assets receive **retrieval guidance** (how to query the contract) instead of duplicated drifting prompt snippets. No `.mycodemap/prompt-snippets/` directory is generated.
+4. `mycodemap env-contract --as-hook-config` generates Claude Code `SubagentStart` hook examples; `mycodemap env-contract --as-codex-agent` generates Codex `developer_instructions` retrieval prompt templates.
+5. `mycodemap doctor` detects contract drift against source files and reports conflicts (warn-only, not blocking); `mycodemap init` generates contract assets and platform adapter config examples.
+6. MCP server exposes `codemap_env_contract` tool for run-time query by sub-agents.
+7. Automated tests cover: source-file discovery, category filtering, conflict detection, drift detection, and missing-critical-contract failure.
+8. Real sub-agent verification runs through `claude -p` **and** `codex exec` in isolated temp repos, capturing evidence that the sub-agent **retrieved** the contract via Bash/MCP and applied the rules (RTK, commit-format, Vitest-entry).
+9. Negative case: a sub-agent **without retrieving** the contract fails or produces incorrect actions (commit rejected by hook, wrong test command, bare shell without rtk).
+10. Test evidence includes: command transcript, sub-agent query command/output artifact, and clean working-tree or scoped diff hygiene check.
 
 </details>
 
