@@ -8,6 +8,7 @@ import { doctorContract } from './doctor.js';
 import { benchmarkContract } from './benchmark.js';
 import { initContract } from './init.js';
 import { previewContract } from './preview.js';
+import { envContractContract } from './env-contract.js';
 
 export const commandContracts = [
   analyzeContract,
@@ -17,6 +18,7 @@ export const commandContracts = [
   benchmarkContract,
   initContract,
   previewContract,
+  envContractContract,
 ] as const;
 
-export { analyzeContract, queryContract, depsContract, doctorContract, benchmarkContract, initContract, previewContract };
+export { analyzeContract, queryContract, depsContract, doctorContract, benchmarkContract, initContract, previewContract, envContractContract };

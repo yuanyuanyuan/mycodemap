@@ -34,6 +34,7 @@ export {
   doctorContract,
   benchmarkContract,
   initContract,
+  envContractContract,
 } from './commands/index.js';
 
 /**
