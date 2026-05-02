@@ -511,26 +511,43 @@ function buildReceiptNotes(scan: InitScan): string[] {
 }
 
 function buildNextSteps(assets: InitAsset[]): string[] {
-  const manualSteps = assets
-    .filter((asset) => asset.status === 'manual-action-needed' && asset.manualAction)
-    .map((asset) => asset.manualAction as string);
+  const steps: string[] = [];
 
-  if (manualSteps.length > 0) {
-    return manualSteps;
+  // Priority 1: Conflict steps (highest)
+  const conflictAssets = assets.filter((a) => a.status === 'conflict' && a.manualAction);
+  for (const asset of conflictAssets) {
+    steps.push(asset.manualAction!);
   }
 
-  const conflictSteps = assets
-    .filter((asset) => asset.status === 'conflict' && asset.manualAction)
-    .map((asset) => asset.manualAction as string);
-
-  if (conflictSteps.length > 0) {
-    return conflictSteps;
+  // Priority 2: Manual action steps
+  const manualAssets = assets.filter((a) => a.status === 'manual-action-needed' && a.manualAction);
+  for (const asset of manualAssets) {
+    steps.push(asset.manualAction!);
   }
 
-  return [
-    '运行 `mycodemap generate` 生成代码地图',
-    '运行 `mycodemap --help` 查看更多命令',
-  ];
+  // Priority 3: Installed assistant asset usage guidance
+  const installedAssistants = assets.filter(
+    (a) => a.origin === 'assistant-bootstrap' && a.status === 'installed'
+  );
+  for (const asset of installedAssistants) {
+    if (/context/i.test(asset.label)) {
+      const target = /claude/i.test(asset.label) ? 'CLAUDE.md' : 'AGENTS.md';
+      steps.push(`审阅 .mycodemap/assistants/${asset.label} 并将相关部分复制到项目根目录的 ${target}`);
+    } else if (/hook/i.test(asset.label)) {
+      steps.push(`将 .mycodemap/assistants/${asset.label} 中的配置复制到 .claude/settings.json`);
+    } else if (/agent-example/i.test(asset.label)) {
+      steps.push(`将 .mycodemap/assistants/${asset.label} 中的配置复制到 .codex/agents/`);
+    }
+  }
+
+  // Priority 4: Default recommended steps (lowest, max 3 total)
+  if (steps.length === 0) {
+    steps.push('运行 `mycodemap doctor` 验证项目健康状态');
+    steps.push('运行 `mycodemap generate` 生成代码地图');
+  }
+
+  // Cap at 3 to avoid information overload (D-08)
+  return steps.slice(0, 3);
 }
 
 export function createInitPlan(
