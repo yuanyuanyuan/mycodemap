@@ -23,6 +23,7 @@ import { mcpCommand, isMcpStartInvocation } from './commands/mcp.js';
 import { doctorCommand } from './commands/doctor.js';
 import { benchmarkCommand } from './commands/benchmark.js';
 import { previewCommand } from './commands/preview.js';
+import { envContractCommand } from './commands/env-contract.js';
 import { shipCommand } from './commands/ship/index.js';
 import { ANALYZE_COMMAND_DESCRIPTION, configureAnalyzeCommand } from './commands/analyze-options.js';
 import { setupRuntimeLogging } from './runtime-logger.js';
@@ -236,6 +237,9 @@ program.addCommand(doctorCommand);
 
 // Preview command
 program.addCommand(previewCommand);
+
+// Env-contract command
+program.addCommand(envContractCommand);
 
 // Benchmark command
 program
