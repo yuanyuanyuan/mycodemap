@@ -97,6 +97,82 @@ MyCodeMap 可以与多种 AI 编程助手集成，让 AI 能够：
 
 ---
 
+## 子代理环境契约检索
+
+子代理（Claude Code 或 Codex CLI 委托的代理）不会自动继承主代理的项目规则。`mycodemap` 提供结构化的契约检索接口，让子代理能够自行发现并应用项目规则。
+
+> 注意：`mycodemap` 不会生成 `.mycodemap/prompt-snippets/` 目录。子代理通过 CLI 或 MCP 主动检索契约，而不是接收预编译的 prompt 片段。
+
+### CLI 检索
+
+```bash
+# 按代理类型过滤（返回该类型需要的规则子集）
+mycodemap env-contract --for worker --json
+mycodemap env-contract --for explore --json
+mycodemap env-contract --for review --json
+
+# 检查契约一致性（冲突和源文件漂移）
+mycodemap env-contract --check
+
+# 重新生成契约（源文件变更后）
+mycodemap env-contract --update --json
+```
+
+### MCP 检索
+
+子代理也可以通过 MCP 工具检索契约：
+
+```
+codemap_env_contract(agentType="worker")
+codemap_env_contract(agentType="explore")
+```
+
+### Claude Code SubagentStart Hook 示例
+
+在 `.claude/settings.json` 中配置 `SubagentStart` hook，让子代理在启动时自动检索契约：
+
+```json
+{
+  "hooks": {
+    "SubagentStart": [
+      {
+        "matcher": "Explore",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SubagentStart\",\"additionalContext\":\"Before exploring, query project rules: mycodemap env-contract --for explore --json\"}}'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Codex developer_instructions 示例
+
+在 `.codex/agents/worker.toml` 中配置检索指引：
+
+```toml
+name = "worker"
+description = "Execution-focused agent for implementation and fixes"
+developer_instructions = """
+You are a worker agent responsible for implementing and fixing code.
+
+Before starting any task, query the project environment contract:
+- Run: mycodemap env-contract --for worker --json
+- Or use the MCP tool: codemap_env_contract(agentType="worker")
+
+The contract contains project-specific rules that you MUST follow, including:
+- Shell command wrappers (e.g., rtk)
+- Commit message format
+- Test entry commands
+- Code style requirements
+"""
+```
+
+---
+
 ## Kimi CLI 配置
 
 ### 步骤 1：创建 Skill 目录

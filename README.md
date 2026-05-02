@@ -95,6 +95,12 @@ ls .mycodemap/
 The init receipt distinguishes **main-agent setup** (project context for your AI assistant) from **subagent setup** (platform hooks for delegated agents). See [AI Assistant Setup Guide](docs/AI_ASSISTANT_SETUP.md) for details.
 
 ```bash
+# 6. Retrieve environment contract for subagent (project-specific rules)
+mycodemap env-contract --for worker --json
+# Subagents can query this via MCP tool: codemap_env_contract(agentType="worker")
+```
+
+```bash
 # For AI/Agent: structured output is the default
 mycodemap impact -f src/cli/index.ts -j
 

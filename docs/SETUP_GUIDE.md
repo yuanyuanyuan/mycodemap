@@ -113,6 +113,38 @@ mycodemap init -y
 
 > 注意：`init` 不会自动改写 `CLAUDE.md`、`AGENTS.md` 等团队共管文件。所有需要手动操作的步骤都会在收据中明确标注。
 
+#### 环境契约（Environment Contract）
+
+`mycodemap init` 还会生成 `.mycodemap/env-contract.json`，这是一个结构化的项目规则索引，包含：
+
+- **执行规则**：shell 命令包装（rtk）、测试入口命令（vitest run）
+- **提交规则**：commit message 格式（`[TAG] scope: message`）、有效标签列表
+- **验证规则**：真实场景验证要求、代码质量标准
+- **来源追踪**：每条规则的源文件和 hash，用于漂移检测
+
+子代理（Claude Code / Codex CLI 的委托代理）通过以下方式检索契约：
+
+```bash
+# CLI 检索（按代理类型过滤）
+mycodemap env-contract --for worker --json
+mycodemap env-contract --for explore --json
+
+# MCP 检索
+codemap_env_contract(agentType="worker")
+```
+
+检查契约一致性和源文件漂移：
+
+```bash
+# 检查契约是否过期或缺失关键项
+mycodemap env-contract --check
+
+# 全面健康诊断（包含 env-contract 状态）
+mycodemap doctor
+```
+
+> 冲突（如 hook 要求大写标签但文档示例写小写）会被报告为警告，不会阻断。源文件漂移会导致 `--check` 返回非零退出码，需要运行 `mycodemap env-contract --update` 重新生成。
+
 生成的 canonical 配置文件 `.mycodemap/config.json`：
 
 ```json
