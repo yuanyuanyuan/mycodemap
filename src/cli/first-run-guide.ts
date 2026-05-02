@@ -61,19 +61,23 @@ export function showFirstRunGuide(): void {
   console.log(chalk.white('  首次使用建议顺序：'));
   console.log('');
 
-  console.log(chalk.gray('  1. ') + chalk.white('初始化项目'));
+  console.log(chalk.gray('  1. ') + chalk.white('零配置预览'));
+  console.log(chalk.gray('     ') + chalk.cyan('codemap preview'));
+  console.log('');
+
+  console.log(chalk.gray('  2. ') + chalk.white('初始化项目'));
   console.log(chalk.gray('     ') + chalk.cyan('mycodemap init'));
   console.log('');
 
-  console.log(chalk.gray('  2. ') + chalk.white('生成代码地图'));
+  console.log(chalk.gray('  3. ') + chalk.white('生成代码地图'));
   console.log(chalk.gray('     ') + chalk.cyan('mycodemap generate'));
   console.log('');
 
-  console.log(chalk.gray('  3. ') + chalk.white('查看帮助'));
+  console.log(chalk.gray('  4. ') + chalk.white('查看帮助'));
   console.log(chalk.gray('     ') + chalk.cyan('mycodemap --help'));
   console.log('');
 
-  console.log(chalk.gray('  提示: ') + chalk.white('运行 `mycodemap init` 时，若检测到 package.json / pyproject.toml / go.mod / Cargo.toml，将自动推荐对应项目的 bootstrap profile。'));
+  console.log(chalk.gray('  提示: ') + chalk.white('运行 `codemap preview` 可零配置快速预览项目结构。运行 `mycodemap init` 时，若检测到 package.json / pyproject.toml / go.mod / Cargo.toml，将自动推荐对应项目的 bootstrap profile。'));
   console.log('');
 
   console.log(chalk.cyan('━'.repeat(48)));

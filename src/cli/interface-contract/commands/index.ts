@@ -7,6 +7,7 @@ import { depsContract } from './deps.js';
 import { doctorContract } from './doctor.js';
 import { benchmarkContract } from './benchmark.js';
 import { initContract } from './init.js';
+import { previewContract } from './preview.js';
 
 export const commandContracts = [
   analyzeContract,
@@ -15,6 +16,7 @@ export const commandContracts = [
   doctorContract,
   benchmarkContract,
   initContract,
+  previewContract,
 ] as const;
 
-export { analyzeContract, queryContract, depsContract, doctorContract, benchmarkContract, initContract };
+export { analyzeContract, queryContract, depsContract, doctorContract, benchmarkContract, initContract, previewContract };
