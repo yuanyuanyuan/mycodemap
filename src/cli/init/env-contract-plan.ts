@@ -1,32 +1,14 @@
 // [META] since:2026-05-02 | owner:cli-team | stable:false
-// [WHY] Phase 55 — generate .mycodemap/env-contract.json seed from manifest
-// extraction facts. Produces EnvContractPlan with InitAsset[] and FileWriteAction[].
+// [WHY] Phase 55/58 — generate .mycodemap/env-contract.json from discovery engine.
+// Phase 55 produced env-contract.seed.v1; Phase 58 upgrades to env-contract.v1.
 
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { InitAsset } from './reconciler.js';
-import { extractManifestFacts, type ManifestItem } from './manifest-extractors.js';
-
-export interface EnvContractItem {
-  category: 'execution' | 'commit' | 'retrieval' | 'validation' | 'style';
-  key: string;
-  value?: string;
-  status?: 'unknown';
-  source: string;
-  confidence: 'high' | 'medium' | 'low' | 'none';
-}
-
-export interface EnvContractSeed {
-  schemaVersion: 'env-contract.seed.v1';
-  generatedAt: string;
-  projectProfile: {
-    name: string;
-    source: string;
-    confidence: 'high' | 'medium' | 'low' | 'none';
-  };
-  items: EnvContractItem[];
-}
+import { discoverProjectEnvironmentContract } from '../env-contract/discovery.js';
+import { validateProjectEnvironmentContract } from '../env-contract/validation.js';
+import type { ProjectEnvironmentContract } from '../env-contract/types.js';
 
 interface FileWriteAction {
   targetPath: string;
@@ -40,7 +22,7 @@ export interface EnvContractPlan {
 
 const ASSET_KEY = 'env-contract';
 const ASSET_LABEL = 'env-contract';
-const ASSET_ORIGIN = 'manifest-extraction';
+const ASSET_ORIGIN = 'discovery-engine';
 
 function makeAsset(
   status: InitAsset['status'],
@@ -66,45 +48,47 @@ function makeAsset(
   };
 }
 
-function buildSeed(
-  facts: ReturnType<typeof extractManifestFacts>,
-): EnvContractSeed {
-  return {
-    schemaVersion: 'env-contract.seed.v1',
-    generatedAt: new Date().toISOString(),
-    projectProfile: {
-      name: facts.projectType,
-      source: facts.projectSource,
-      confidence: 'high',
-    },
-    items: facts.items as EnvContractItem[],
-  };
+/**
+ * Check if existing content is a Phase 55 seed contract (env-contract.seed.v1).
+ */
+function isSeedContract(parsed: unknown): parsed is { schemaVersion: string; items?: unknown[] } {
+  return (
+    typeof parsed === 'object' &&
+    parsed !== null &&
+    (parsed as Record<string, unknown>).schemaVersion === 'env-contract.seed.v1'
+  );
 }
 
 /**
- * Build an EnvContractPlan describing the env-contract.json seed decision.
+ * Build an EnvContractPlan describing the env-contract.json decision.
  *
  * States:
- * - file exists + same content  → already-synced
- * - file exists + different     → conflict (manual review)
- * - file missing + preview mode → skipped
- * - file missing + apply mode   → installed + write action
+ * - file exists + same content          → already-synced
+ * - file exists + seed v1               → migrate + installed (deterministic)
+ * - file exists + different + not seed  → conflict (manual review)
+ * - file missing + preview mode         → skipped
+ * - file missing + apply mode           → installed + write action
  */
 export function createEnvContractPlan(
   rootDir: string,
   profileName?: string,
   mode: 'preview' | 'apply' = 'apply',
+  options?: { generatedAt?: string },
 ): EnvContractPlan {
   const targetPath = path.join(rootDir, '.mycodemap', 'env-contract.json');
-  const facts = extractManifestFacts(rootDir, profileName);
-  const seed = buildSeed(facts);
-  const seedJson = JSON.stringify(seed, null, 2);
+  const contract = discoverProjectEnvironmentContract(rootDir, {
+    profileName,
+    generatedAt: options?.generatedAt ?? new Date().toISOString(),
+  });
+  const contractJson = JSON.stringify(contract, null, 2);
 
   // File already exists — check if content matches
   if (existsSync(targetPath)) {
     try {
       const currentContent = readFileSync(targetPath, 'utf8');
-      if (currentContent === seedJson) {
+
+      // Exact match — already synced
+      if (currentContent === contractJson) {
         return {
           assets: [
             makeAsset('already-synced', [
@@ -115,7 +99,48 @@ export function createEnvContractPlan(
         };
       }
 
-      // Content differs — conflict
+      // Try to parse existing content
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(currentContent);
+      } catch {
+        // Unparseable — conflict
+        return {
+          assets: [
+            makeAsset('conflict', [
+              '无法解析 .mycodemap/env-contract.json，需手动确认',
+            ], {
+              path: targetPath,
+              manualAction: '手动审阅 .mycodemap/env-contract.json 的内容，确认后可删除该文件再重跑 init',
+            }),
+          ],
+          writes: [],
+        };
+      }
+
+      // Seed v1 migration — deterministic upgrade
+      if (isSeedContract(parsed)) {
+        return {
+          assets: [
+            makeAsset('installed', [
+              '从 env-contract.seed.v1 迁移至 env-contract.v1',
+              `发现 ${contract.items.length} 项契约`,
+              `发现 ${contract.sourceSnapshots.length} 个源快照`,
+            ], {
+              path: targetPath,
+              rollbackHint: '如需回退，可删除 `.mycodemap/env-contract.json`',
+            }),
+          ],
+          writes: [
+            {
+              targetPath,
+              content: contractJson,
+            },
+          ],
+        };
+      }
+
+      // Content differs and is not a recognized seed — conflict
       return {
         assets: [
           makeAsset('conflict', [
@@ -148,9 +173,10 @@ export function createEnvContractPlan(
     return {
       assets: [
         makeAsset('skipped', [
-          `schemaVersion: ${seed.schemaVersion}`,
-          `projectProfile: ${seed.projectProfile.name}`,
-          `items: ${seed.items.length} 项`,
+          `schemaVersion: ${contract.schemaVersion}`,
+          `projectProfile: ${contract.projectProfile.name}`,
+          `items: ${contract.items.length} 项`,
+          `sourceSnapshots: ${contract.sourceSnapshots.length} 个`,
           '预览模式不会写入 .mycodemap/env-contract.json；使用 --yes 应用',
         ]),
       ],
@@ -162,8 +188,9 @@ export function createEnvContractPlan(
   return {
     assets: [
       makeAsset('installed', [
-        '将生成 .mycodemap/env-contract.json 作为 env-contract seed',
-        `提取 ${seed.items.length} 项项目事实`,
+        '将生成 .mycodemap/env-contract.json',
+        `发现 ${contract.items.length} 项契约`,
+        `发现 ${contract.sourceSnapshots.length} 个源快照`,
       ], {
         path: targetPath,
         rollbackHint: '如需回退，可删除 `.mycodemap/env-contract.json`',
@@ -172,7 +199,7 @@ export function createEnvContractPlan(
     writes: [
       {
         targetPath,
-        content: seedJson,
+        content: contractJson,
       },
     ],
   };
