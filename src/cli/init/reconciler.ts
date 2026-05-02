@@ -7,6 +7,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createDefaultCodemapConfigFile } from '../config-loader.js';
 import { applyAssistantPlan, createAssistantPlan, type AssistantPlan } from './assistant-plan.js';
+import { applyEnvContractPlan, createEnvContractPlan, type EnvContractPlan } from './env-contract-plan.js';
 import { applyHookPlan, createHookPlan, type HookPlan } from './hooks.js';
 import { applyProfilePlan, createProfilePlan, type ProfilePlan } from './profile-plan.js';
 import type { BootstrapProfile } from './profile-loader.js';
@@ -64,6 +65,7 @@ export interface InitPlan {
     writeCanonicalConfig: boolean;
     canonicalConfigText?: string;
     assistantPlan: AssistantPlan;
+    envContractPlan: EnvContractPlan;
     hookPlan: HookPlan;
     rulesPlan: RulesPlan;
     profilePlan: ProfilePlan;
@@ -560,6 +562,7 @@ export function createInitPlan(
 ): InitPlan {
   const scan = scanInitState(rootDir);
   const assistantPlan = createAssistantPlan(rootDir, undefined, profileName);
+  const envContractPlan = createEnvContractPlan(rootDir, profileName, mode);
   const hookPlan = createHookPlan(rootDir);
   const rulesPlan = createRulesPlan(rootDir);
   const profilePlan = createProfilePlan(rootDir, profile, scan, mode, profileName);
@@ -568,6 +571,7 @@ export function createInitPlan(
     buildConfigAsset(scan),
     ...buildLegacyRootConfigAssets(scan),
     buildStatusLedgerAsset(scan, mode),
+    ...envContractPlan.assets,
     ...assistantPlan.assets,
     ...hookPlan.assets,
     ...rulesPlan.assets,
@@ -603,6 +607,7 @@ export function createInitPlan(
       writeCanonicalConfig: !scan.hasCanonicalConfig,
       canonicalConfigText: !scan.hasCanonicalConfig ? buildCanonicalConfigText(scan) : undefined,
       assistantPlan,
+      envContractPlan,
       hookPlan,
       rulesPlan,
       profilePlan,
@@ -633,6 +638,7 @@ export async function applyInitPlan(plan: InitPlan): Promise<InitReceipt> {
   const paths = receiptPaths(plan.receipt);
   await ensureWorkspaceDirectories(paths);
   await maybeWriteCanonicalConfig(paths, plan);
+  await applyEnvContractPlan(plan.actions.envContractPlan);
   await applyAssistantPlan(plan.actions.assistantPlan);
   await applyHookPlan(plan.actions.hookPlan);
   await applyRulesPlan(plan.actions.rulesPlan);

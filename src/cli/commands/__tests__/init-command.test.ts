@@ -67,6 +67,7 @@ describe('initCommand', () => {
       expect.objectContaining({ key: 'workspace', status: 'installed' }),
       expect.objectContaining({ key: 'canonical-config', status: 'installed' }),
       expect.objectContaining({ key: 'status-ledger', status: 'installed' }),
+      expect.objectContaining({ key: 'env-contract' }),
     ]));
   });
 
