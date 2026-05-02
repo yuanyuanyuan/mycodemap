@@ -54,6 +54,11 @@ Real scenario verification required.
   return tmpDir;
 }
 
+// Built CLI subprocess verification (VER-03):
+// All tests invoke `node dist/cli/index.js env-contract` as a real subprocess.
+// Tests verify JSON parsing, schemaVersion, agent filtering, drift detection,
+// template modes, and exit codes against a temp project with real source files.
+
 describe('env-contract CLI command', () => {
   let tmpDir: string;
 
