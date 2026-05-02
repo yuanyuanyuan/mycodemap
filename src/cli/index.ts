@@ -22,6 +22,7 @@ import { readinessGateCommand } from './commands/readiness-gate.js';
 import { mcpCommand, isMcpStartInvocation } from './commands/mcp.js';
 import { doctorCommand } from './commands/doctor.js';
 import { benchmarkCommand } from './commands/benchmark.js';
+import { previewCommand } from './commands/preview.js';
 import { shipCommand } from './commands/ship/index.js';
 import { ANALYZE_COMMAND_DESCRIPTION, configureAnalyzeCommand } from './commands/analyze-options.js';
 import { setupRuntimeLogging } from './runtime-logger.js';
@@ -232,6 +233,9 @@ program.addCommand(mcpCommand);
 
 // Doctor command
 program.addCommand(doctorCommand);
+
+// Preview command
+program.addCommand(previewCommand);
 
 // Benchmark command
 program
