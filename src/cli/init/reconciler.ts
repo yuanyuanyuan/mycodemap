@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createDefaultCodemapConfigFile } from '../config-loader.js';
+import { applyAssistantPlan, createAssistantPlan, type AssistantPlan } from './assistant-plan.js';
 import { applyHookPlan, createHookPlan, type HookPlan } from './hooks.js';
 import { applyProfilePlan, createProfilePlan, type ProfilePlan } from './profile-plan.js';
 import type { BootstrapProfile } from './profile-loader.js';
@@ -62,6 +63,7 @@ export interface InitPlan {
     ensureWorkspace: boolean;
     writeCanonicalConfig: boolean;
     canonicalConfigText?: string;
+    assistantPlan: AssistantPlan;
     hookPlan: HookPlan;
     rulesPlan: RulesPlan;
     profilePlan: ProfilePlan;
@@ -557,6 +559,7 @@ export function createInitPlan(
   profileName?: string
 ): InitPlan {
   const scan = scanInitState(rootDir);
+  const assistantPlan = createAssistantPlan(rootDir, undefined, profileName);
   const hookPlan = createHookPlan(rootDir);
   const rulesPlan = createRulesPlan(rootDir);
   const profilePlan = createProfilePlan(rootDir, profile, scan, mode, profileName);
@@ -565,6 +568,7 @@ export function createInitPlan(
     buildConfigAsset(scan),
     ...buildLegacyRootConfigAssets(scan),
     buildStatusLedgerAsset(scan, mode),
+    ...assistantPlan.assets,
     ...hookPlan.assets,
     ...rulesPlan.assets,
     ...profilePlan.assets,
@@ -598,6 +602,7 @@ export function createInitPlan(
       ensureWorkspace: scan.workspaceMissingDirs.length > 0,
       writeCanonicalConfig: !scan.hasCanonicalConfig,
       canonicalConfigText: !scan.hasCanonicalConfig ? buildCanonicalConfigText(scan) : undefined,
+      assistantPlan,
       hookPlan,
       rulesPlan,
       profilePlan,
@@ -628,6 +633,7 @@ export async function applyInitPlan(plan: InitPlan): Promise<InitReceipt> {
   const paths = receiptPaths(plan.receipt);
   await ensureWorkspaceDirectories(paths);
   await maybeWriteCanonicalConfig(paths, plan);
+  await applyAssistantPlan(plan.actions.assistantPlan);
   await applyHookPlan(plan.actions.hookPlan);
   await applyRulesPlan(plan.actions.rulesPlan);
   await applyProfilePlan(plan.actions.profilePlan);
