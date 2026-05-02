@@ -48,8 +48,8 @@ function createNodeProject(): string {
 }
 
 /**
- * Run the preview action handler directly (bypassing commander's CLI parsing).
- * Uses cwd option to avoid process.chdir() which is not supported in vitest workers.
+ * Run the preview command via Commander's parseAsync.
+ * Mocks process.cwd() to return the target directory (vitest workers don't support process.chdir).
  */
 async function runPreview(
   cwd: string,
@@ -61,21 +61,23 @@ async function runPreview(
   } = {},
 ): Promise<string> {
   const outputChunks: string[] = [];
-  const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+  const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
     outputChunks.push(String(chunk));
     return true;
   });
+  const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(cwd);
 
   try {
-    const action = previewCommand.actionHandler ?? previewCommand._actionHandler;
-    if (typeof action === 'function') {
-      await action({ ...options, cwd });
-    } else {
-      throw new Error('No action handler found on previewCommand');
-    }
+    const argv = ['node', 'preview'];
+    if (options.save) argv.push('--save');
+    if (options.json) argv.push('--json');
+    if (options.human) argv.push('--human');
+    if (options.profile) argv.push('--profile', options.profile);
+    await previewCommand.parseAsync(argv);
     return outputChunks.join('');
   } finally {
-    spy.mockRestore();
+    cwdSpy.mockRestore();
+    stdoutSpy.mockRestore();
   }
 }
 
@@ -218,7 +220,8 @@ describe('preview command', () => {
     tempRoots.push(rootDir);
 
     const output = await runPreview(rootDir, { profile: 'python', json: true });
-    const data = JSON.parse(output);
+    const jsonLine = output.split('\n').find(l => l.trim().startsWith('{')) ?? output;
+    const data = JSON.parse(jsonLine);
     expect(data.profile).toBe('python');
   });
 
@@ -227,7 +230,8 @@ describe('preview command', () => {
     tempRoots.push(rootDir);
 
     const output = await runPreview(rootDir, { json: true });
-    const data = JSON.parse(output);
+    const jsonLine = output.split('\n').find(l => l.trim().startsWith('{')) ?? output;
+    const data = JSON.parse(jsonLine);
     expect(data).toBeDefined();
     expect(typeof data).toBe('object');
   });
