@@ -96,6 +96,23 @@ mycodemap init -y
 
 `init` 会同步 `.mycodemap/hooks/` 与 `.mycodemap/rules/`，但不会自动改写 `CLAUDE.md` / `AGENTS.md`；相关引用片段会通过 receipt 提示你手动加入。
 
+#### 理解 Init 收据
+
+`mycodemap init` 完成后会输出一份收据，分为两个部分：
+
+**Main Agent（主 Agent 上下文）**
+- 报告已生成的上下文文件路径（如 `claude-context.md`、`agents-context.md`）
+- 指导你将相关内容手动合并到项目根目录的 `CLAUDE.md` / `AGENTS.md`
+- 检测已同步状态：如果 `CLAUDE.md` 已包含 `.mycodemap/` 引用，标记为 `already-synced`
+
+**Subagent（子 Agent 配置）**
+- 报告平台配置示例文件（如 `claude-hook-example.json`、`codex-agent-example.toml`）
+- 指导你将配置复制到对应平台设置目录
+
+收据还会显示**个性化下一步**，基于实际安装的资产生成，而非固定的三步欢迎信息。
+
+> 注意：`init` 不会自动改写 `CLAUDE.md`、`AGENTS.md` 等团队共管文件。所有需要手动操作的步骤都会在收据中明确标注。
+
 生成的 canonical 配置文件 `.mycodemap/config.json`：
 
 ```json
