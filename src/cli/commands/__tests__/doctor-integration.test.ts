@@ -3,11 +3,12 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import type { DiagnosticResult } from '../../doctor/types.js';
 
-// Mock all 4 checkers for orchestrator tests
+// Mock all 5 checkers for orchestrator tests
 const mockCheckGhostCommands = vi.fn();
 const mockCheckNativeDeps = vi.fn();
 const mockCheckWorkspaceDrift = vi.fn();
 const mockCheckAgent = vi.fn();
+const mockCheckEnvContract = vi.fn();
 
 vi.mock('../../doctor/check-ghost-commands.js', () => ({
   checkGhostCommands: (...args: unknown[]) => mockCheckGhostCommands(...args),
@@ -23,6 +24,10 @@ vi.mock('../../doctor/check-workspace-drift.js', () => ({
 
 vi.mock('../../doctor/check-agent.js', () => ({
   checkAgent: (...args: unknown[]) => mockCheckAgent(...args),
+}));
+
+vi.mock('../../doctor/check-env-contract.js', () => ({
+  checkEnvContract: (...args: unknown[]) => mockCheckEnvContract(...args),
 }));
 
 // Mock chalk for formatter tests
@@ -81,12 +86,13 @@ describe('doctor integration', () => {
     mockCheckNativeDeps.mockReturnValue([{ ...okResult, category: 'runtime', id: 'ts-ok' }]);
     mockCheckWorkspaceDrift.mockReturnValue([{ ...okResult, category: 'config', id: 'drift-ok' }]);
     mockCheckAgent.mockResolvedValue([{ ...okResult, category: 'agent', id: 'contract-ok' }]);
+    mockCheckEnvContract.mockReturnValue([{ ...okResult, category: 'agent', id: 'env-contract-fresh' }]);
 
     const { runDoctor } = await import('../../doctor/orchestrator.js');
     const report = await runDoctor({});
 
     expect(report.exitCode).toBe(0);
-    expect(report.results).toHaveLength(4);
+    expect(report.results).toHaveLength(5);
   });
 
   it('runDoctor returns exitCode 1 when any checker has error', async () => {
@@ -94,6 +100,7 @@ describe('doctor integration', () => {
     mockCheckNativeDeps.mockReturnValue([{ ...okResult, category: 'runtime' }]);
     mockCheckWorkspaceDrift.mockReturnValue([{ ...okResult, category: 'config' }]);
     mockCheckAgent.mockResolvedValue([{ ...okResult, category: 'agent' }]);
+    mockCheckEnvContract.mockReturnValue([{ ...okResult, category: 'agent', id: 'env-contract-fresh' }]);
 
     const { runDoctor } = await import('../../doctor/orchestrator.js');
     const report = await runDoctor({});
@@ -106,6 +113,7 @@ describe('doctor integration', () => {
     mockCheckNativeDeps.mockReturnValue([{ ...okResult, category: 'runtime' }]);
     mockCheckWorkspaceDrift.mockReturnValue([warnResult]);
     mockCheckAgent.mockResolvedValue([{ ...okResult, category: 'agent' }]);
+    mockCheckEnvContract.mockReturnValue([{ ...okResult, category: 'agent', id: 'env-contract-fresh' }]);
 
     const { runDoctor } = await import('../../doctor/orchestrator.js');
     const report = await runDoctor({});
@@ -210,6 +218,7 @@ describe('doctor integration', () => {
       mockCheckNativeDeps.mockReturnValue([{ ...okResult, category: 'runtime' }]);
       mockCheckWorkspaceDrift.mockReturnValue([{ ...okResult, category: 'config' }]);
       mockCheckAgent.mockResolvedValue([{ ...okResult, category: 'agent' }]);
+      mockCheckEnvContract.mockReturnValue([{ ...okResult, category: 'agent', id: 'env-contract-fresh' }]);
 
       const { runDoctor } = await import('../../doctor/orchestrator.js');
       const { formatDoctorJson } = await import('../../doctor/formatter.js');
