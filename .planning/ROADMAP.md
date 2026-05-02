@@ -238,17 +238,23 @@ Plans:
 4. Profile definitions are stored as data files, not hardcoded in source
 
 ### Phase 54: Zero-Config Preview
-**Status:** Not started
+**Status:** Planned
 **Goal:** Let users see CodeMap value immediately without writing any configuration file.
 **Depends on:** Phase 53 (profile system provides fallback defaults)
 **Requirements:** ZCP-01, ZCP-02, ZCP-03, ZCP-04
-**Plans:** Not planned yet
+**Plans:** 2 plans in 2 waves
+
+**Wave 1** *(no dependencies)*
+- [ ] 54-01-PLAN.md — Service modules: dependency extractor + complexity scanner + smol-toml install
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 54-02-PLAN.md — Preview command + renderer + interface contract + CLI registration + tests
 
 **Success criteria:**
 1. `codemap preview` runs without `mycodemap.config.json` in an empty or fresh project
-2. Auto-detects entry files, source directories, test directories
+2. Auto-detects project type via Phase 53 detection and Bootstrap Profile as fallback config
 3. Outputs concise summary: file count, module count, key dependencies, complexity hotspots
-4. After preview, prompts user to `--save` as formal config or `--discard`
+4. After preview, shows hint text to run `--save` to save config (no `--discard` flag per D-11)
 
 ### Phase 55: Agent Bootstrap Assets
 **Status:** Not started
