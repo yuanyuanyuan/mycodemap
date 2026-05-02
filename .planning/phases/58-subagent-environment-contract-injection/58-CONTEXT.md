@@ -8,9 +8,9 @@
 
 ## 调研修正声明（第二版）
 
-此前 Phase 58 的设计假设是"将契约编译成 prompt snippet 并注入子代理"。经与社区实践和官方文档交叉验证后，该假设存在根本性缺陷：
+此前 Phase 58 的设计假设是"将契约编译成 prompt snippet 并注入子代理"。经与社区实践和官方文档交叉验证后，该假设存在根本性缺陷（见下方「验证记录」）：
 
-1. **Claude Code `SubagentStart` hook 的 `additionalContext` append 到 user context**，在上下文压缩时会被丢弃（issue #23885 已确认）。
+1. **Claude Code `SubagentStart` hook 的 `additionalContext` append 到 user context**（issue #23885）。issue 原文明确指出 `additionalContext` 只能附加到 user context 而非 system prompt，在上下文压缩时**可能**被丢弃——这是机制限制，不是确定性行为。
 2. **Claude Code `PreToolUse` hook 的 `updatedInput` 对 Agent tool 静默丢弃**（issue #39814 已确认），无法直接修改子代理 prompt。
 3. **Codex `developer_instructions` 存在多项已知 bug**：Windows 上不生效（#19399）、项目级 config 自定义角色 `spawn_agent` 不认识（#14579）、Codex App 中不注入（#11004）。
 4. **Codex `SPAWN_AGENT_DEVELOPER_INSTRUCTIONS` 为硬编码无条件注入**（#17323），无法关闭或覆盖。
@@ -133,15 +133,39 @@
 
 **Downstream agents MUST read these before planning or implementing.**
 
+### 验证记录
+
+> **验证时间**：2026-05-02  
+> **验证方式**：直接访问 GitHub issue 页面和 Codex 官方文档  
+> **验证人**：AI assistant（非文档原作者）
+
+| 引用 | 验证状态 | 说明 |
+|------|---------|------|
+| Claude Code #49106 | ✅ 真实存在，开放 | 子代理不继承 CLAUDE.md，多轮后规则覆盖率降至 ~5% |
+| Claude Code #40459 | ✅ 真实存在，开放 | v2.1.84+ `omitClaudeMd: true`，作者做了二进制反编译分析 |
+| Claude Code #23885 | ✅ 真实存在，开放 | `additionalContext` 只能 append 到 user context（非 system prompt），原文说"可能"在压缩时丢弃 |
+| Claude Code #39814 | ✅ 真实存在，开放 | `updatedInput` 对 Agent tool 静默丢弃，测试环境 2.1.85+/macOS |
+| Codex #17323 | ✅ 真实存在，开放 | `SPAWN_AGENT_DEVELOPER_INSTRUCTIONS` 无条件注入，代码路径已确认 |
+| Codex #14579 | ✅ 真实存在，开放 | 项目级 `.codex/config.toml` 自定义角色不被 `spawn_agent` 识别 |
+| Codex #19399 | ✅ 真实存在，开放 | Windows Codex desktop app 上 named subagent config 完全不生效 |
+| Codex #11004 | ✅ 真实存在，开放 | Codex App 中 `developer_instructions` 不注入（canonical refs 中遗漏，已补） |
+| Codex 官方 Subagents 文档 | ✅ 可访问 | 确认子代理机制，但**未提及**上述已知缺陷 |
+
+**重要发现**：
+- 所有 8 个 issue 均真实存在且处于开放状态，无已关闭/已修复标记。
+- Issue #23885 的「压缩丢弃」是文档的推论，issue 原文表述为"may be dropped"（可能性），不是确定性结论。
+- Codex 官方文档对已知缺陷（无条件注入、Windows bug、项目级 config 不生效）**零提及**。
+
 ### 平台生态调研
 - [Claude Code issue #49106](https://github.com/anthropics/claude-code/issues/49106) —— 子代理不继承 CLAUDE.md
 - [Claude Code issue #40459](https://github.com/anthropics/claude-code/issues/40459) —— v2.1.84+ `omitClaudeMd: true` 分析
-- [Claude Code issue #23885](https://github.com/anthropics/claude-code/issues/23885) —— `additionalContext` 被压缩丢弃的问题
+- [Claude Code issue #23885](https://github.com/anthropics/claude-code/issues/23885) —— `additionalContext` append 到 user context 而非 system prompt，压缩时可能丢弃
 - [Claude Code issue #39814](https://github.com/anthropics/claude-code/issues/39814) —— `PreToolUse` `updatedInput` 对 Agent tool 静默丢弃
 - [Codex 官方 Subagents 文档](https://developers.openai.com/codex/subagents) —— Agent Thread 配置和继承模型
 - [Codex issue #17323](https://github.com/openai/codex/issues/17323) —— `SPAWN_AGENT_DEVELOPER_INSTRUCTIONS` 无条件注入问题
 - [Codex issue #14579](https://github.com/openai/codex/issues/14579) —— 项目级 agent 配置不生效
 - [Codex issue #19399](https://github.com/openai/codex/issues/19399) —— Windows 上 agent 配置不生效
+- [Codex issue #11004](https://github.com/openai/codex/issues/11004) —— Codex App 中 `developer_instructions` 不注入
 
 ### 项目规则来源
 - `AGENTS.md` —— 检索优先级（Section 6）、任务分级（Section 3.1）、证据协议（Section 5）

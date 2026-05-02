@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: milestone
-current_phase: 55
-current_phase_name: Agent Bootstrap Assets
+current_phase: 56
+current_phase_name: Init Receipt + Next Steps
 current_plan: —
-status: phase_complete
-last_updated: "2026-05-02T16:30:00.000Z"
+status: context_gathered
+last_updated: "2026-05-02T17:00:00.000Z"
 last_activity: 2026-05-02
 progress:
   total_phases: 6
@@ -23,7 +23,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-04-30)
 
 **Core Value:** 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
-**Current Focus:** v2.1 ux-onboarding-enhancement — Phase 55 complete, ready for Phase 56.
+**Current Focus:** v2.1 ux-onboarding-enhancement — Phase 56 context gathered, ready for planning.
 
 ## Position
 
@@ -33,10 +33,10 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 **Current Plan:** —
 **Total Phases:** 6 scoped (53-58)
 **Total Plans in Milestone:** 7 planned (5 complete)
-**Status:** Phase 55 complete — manifest extractors + env-contract seed + assistant bootstrap assets verified
-**Progress:** [█████░░░░░] 50% phase completion (3/6); Phase 53-55 complete
+**Status:** Phase 56 context gathered — receipt layout, next steps, sync detection, doc sync decisions locked
+**Progress:** [█████░░░░░] 50% phase completion (3/6); Phase 53-55 complete, Phase 56 ready for planning
 **Last Activity:** 2026-05-02
-**Last Activity Description:** Phase 55 executed — 2 plans in 1 wave, 28 tests pass, 1204 total suite pass. Created manifest-extractors.ts, env-contract-plan.ts, assistant-plan.ts with full test coverage.
+**Last Activity Description:** Phase 56 context gathered — 4 gray areas resolved: receipt two-section layout, personalized next steps, .mycodemap/ reference detection, 3-doc sync scope.
 
 ## Decisions Made
 
@@ -50,6 +50,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 | 2026-04-30 | First-Run Concierge / Zero-Config Preview deferred | UX enhancements depend on doctor and interface contract being in place first |
 | 2026-04-30 | Auto-Provisioned Agent Skills deferred | Trivial once interface contract exists; thin layer on top of schema-driven generation |
 | 2026-04-30 | Path-Scoped Governance / Live Rulebook / Governance Self-Audit deferred | Docs governance deepens continuously; not blocked by v2.0 shipping |
+| 2026-05-02 | Phase 56 context gathered | Receipt two-section layout, personalized next steps, .mycodemap/ reference detection, 3-doc sync scope locked |
 
 ## Blockers
 
@@ -101,6 +102,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 - 2026-05-02: Phase 53 closed — verifier PASS verdict (4/4 success criteria, D-01..D-17 all verified). Closure path: BLOCKER B-1 (commander --profile) + F-2 (dist profile JSONs) fixed in 1866672; binary-level smoke test added in 0e2a95a; F-1 (cosmetic legacy-config receipt message) deferred to v2.1 cleanup follow-up.
 - 2026-05-02: Phase 54 context gathered — Zero-Config Preview. preview is a lightweight wrapper over generate, using Phase 53 detection + profile as fallback config. Output: JSON default + --human/TTY, escomplex top-5 hotspots, direct deps from marker files. --save writes config + runs generate. No --discard. End-of-output hint text.
 - 2026-05-02: Phase 55 completed — Agent Bootstrap Assets. 2 plans in 1 wave, parallel execution. Created manifest-extractors.ts (reads package.json/pyproject.toml/go.mod/Cargo.toml), env-contract-plan.ts (EnvContractSeed as InitAsset with installed/preview/already-synced/conflict states), assistant-plan.ts (4 per-runtime files: claude-context.md, agents-context.md, claude-hook-example.json, codex-agent-example.toml). 28 tests pass, full suite 1204 pass. All D-05..D-12 decisions honored. Requirements ABT-01, ABT-02, ABT-05 verified.
+- 2026-05-02: Phase 56 context gathered — Init Receipt + Next Steps. 4 gray areas resolved: (1) Receipt two-section layout with Main Agent paths+merge and Subagent paths+copy; (2) Personalized next steps dynamically generated from installed assets; (3) Already-synced detection via .mycodemap/ reference checking in file content; (4) Doc sync scope: README + SETUP_GUIDE + AI_ASSISTANT_SETUP. Requirements ABT-03, ABT-04, INI-02, INI-03.
 
 ### Verified Existing Capabilities (carried forward)
 
