@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: milestone
-current_phase: 53 (complete)
-current_phase_name: Bootstrap Profiles + Project Detection
+current_phase: 54
+current_phase_name: Zero-Config Preview
 current_plan: —
-status: verifying
-last_updated: "2026-05-01T17:13:38.388Z"
+status: context_gathered
+last_updated: "2026-05-02T00:00:00.000Z"
 last_activity: 2026-05-02
 progress:
-  total_phases: 9
+  total_phases: 6
   completed_phases: 1
   total_plans: 3
   completed_plans: 3
-  percent: 100
+  percent: 17
 ---
 
 # Session State
@@ -28,15 +28,15 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 ## Position
 
 **Milestone:** v2.1 — ux-onboarding-enhancement
-**Current Phase:** 53 (complete)
-**Current Phase Name:** Bootstrap Profiles + Project Detection
+**Current Phase:** 54
+**Current Phase Name:** Zero-Config Preview
 **Current Plan:** —
-**Total Phases:** 6 scoped (53-58; Phase 53 complete, 54-58 not planned)
+**Total Phases:** 6 scoped (53-58; Phase 53 complete, 54 context gathered, 55-58 not planned)
 **Total Plans in Milestone:** 3 planned so far (all complete)
-**Status:** Phase 53 complete (verifier PASS 2026-05-02); Phases 54-58 scoped/not planned
-**Progress:** [█░░░░░░░░░] 17% phase completion (1/6); Phase 53 plans 3/3 with verifier PASS
+**Status:** Phase 54 context gathered; ready for planning
+**Progress:** [█░░░░░░░░░] 17% phase completion (1/6); Phase 53 complete, Phase 54 context gathered
 **Last Activity:** 2026-05-02
-**Last Activity Description:** Phase 53 closed at re-verification gate. BLOCKER B-1 (commander --profile registration) and F-2 (dist profile JSONs packaging) fixed in 1866672. Binary-level smoke test for `init --profile` added in 0e2a95a (closes API/binary gap structurally). gsd-verifier re-verified: PASS verdict, 4/4 success criteria, D-13 not-met → verified, SC-3 △ → ✓. F-1 (cosmetic legacy-config receipt message) deferred per user decision; logged below. 479 cli tests green; tsc clean; dist/cli/init/profiles/ contains 5 JSONs.
+**Last Activity Description:** Phase 54 context gathered. Key decisions: preview is a lightweight wrapper over generate (D-01), uses Phase 53 detection + profile as fallback config (D-04), outputs JSON default + --human/TTY detection (D-07), escomplex for top-5 complexity hotspots (D-08), --save writes config + runs generate (D-03), no --discard flag (D-11), end-of-output hint text (D-10).
 
 ## Decisions Made
 
@@ -99,6 +99,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 - 2026-05-01: Phase 53 planned — 3 plans in 2 waves: 53-01 (core detection + profile infrastructure), 53-02 (profile plan integration into init), 53-03 (tests + first-run guide). Research completed with zod validation, readline prompting, and RulesPlan/HookPlan pattern reuse. Verification passed with 2 documentation blockers resolved (VALIDATION.md created, RESEARCH.md open questions resolved, ROADMAP.md success criteria aligned with D-11).
 - 2026-05-02: Phase 58 added: Subagent Environment Contract Injection — make delegated-agent prompts carry RTK, commit-format, Vitest-entry, and rule-context contract up front; require real Claude/Codex sub-agent verification evidence.
 - 2026-05-02: Phase 53 closed — verifier PASS verdict (4/4 success criteria, D-01..D-17 all verified). Closure path: BLOCKER B-1 (commander --profile) + F-2 (dist profile JSONs) fixed in 1866672; binary-level smoke test added in 0e2a95a; F-1 (cosmetic legacy-config receipt message) deferred to v2.1 cleanup follow-up.
+- 2026-05-02: Phase 54 context gathered — Zero-Config Preview. preview is a lightweight wrapper over generate, using Phase 53 detection + profile as fallback config. Output: JSON default + --human/TTY, escomplex top-5 hotspots, direct deps from marker files. --save writes config + runs generate. No --discard. End-of-output hint text.
 
 ### Verified Existing Capabilities (carried forward)
 
