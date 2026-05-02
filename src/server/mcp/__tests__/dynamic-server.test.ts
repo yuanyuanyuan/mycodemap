@@ -52,6 +52,7 @@ describe('Dynamic MCP tool registration from CLI contract', () => {
     expect(toolNames).not.toContain('codemap_query_cli');
 
     // env-contract tool name should be normalized (hyphens → underscores)
+    // and registered as a native tool (not cli_redirect)
     expect(toolNames).toContain('codemap_env_contract');
     expect(toolNames).not.toContain('codemap_env-contract');
 

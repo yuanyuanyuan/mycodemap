@@ -10,6 +10,13 @@ import type { IStorage } from '../../interface/types/storage.js';
 import { createConfiguredStorage } from '../../cli/storage-runtime.js';
 import { getFullContract } from '../../cli/interface-contract/index.js';
 import type { InterfaceContract } from '../../cli/interface-contract/types.js';
+import {
+  discoverProjectEnvironmentContract,
+  filterContractForAgent,
+  checkProjectEnvironmentContract,
+  type ProjectEnvironmentContract,
+  type ContractCategory,
+} from '../../cli/env-contract/index.js';
 import { CodeMapMcpService } from './service.js';
 import { convertContractToMcpTools } from './schema-adapter.js';
 
@@ -44,6 +51,61 @@ function registerNativeTools(server: McpServer, service: CodeMapMcpService): voi
       }],
       structuredContent,
       isError: structuredContent.status !== 'ok',
+    };
+  });
+
+  server.registerTool('codemap_env_contract', {
+    title: 'CodeMap Environment Contract',
+    description: 'Query the Project Environment Contract for subagent rule retrieval. Returns filtered contract items by agent type.',
+    inputSchema: {
+      agentType: z.enum(['explore', 'plan', 'edit', 'worker', 'review', 'verify', 'default']).optional().describe('Agent type to filter contract items'),
+      category: z.enum(['execution', 'commit', 'retrieval', 'validation', 'style']).optional().describe('Contract category filter'),
+      check: z.boolean().optional().describe('Run contract freshness and critical coverage check'),
+    },
+  }, async ({ agentType, category, check }) => {
+    const rootDir = cwd();
+    let contract: ProjectEnvironmentContract;
+    try {
+      contract = discoverProjectEnvironmentContract(rootDir);
+    } catch (error) {
+      return {
+        content: [{ type: 'text', text: `Failed to discover contract: ${error instanceof Error ? error.message : String(error)}` }],
+        structuredContent: { status: 'error', message: 'Contract discovery failed' },
+        isError: true,
+      };
+    }
+
+    if (check) {
+      const checkResult = checkProjectEnvironmentContract(contract, rootDir);
+      return {
+        content: [{ type: 'text', text: renderStructuredContent(checkResult) }],
+        structuredContent: {
+          schemaVersion: contract.schemaVersion,
+          generatedAt: contract.generatedAt,
+          ...checkResult,
+        },
+        isError: checkResult.status === 'error',
+      };
+    }
+
+    let items = filterContractForAgent(contract, agentType ?? 'default');
+    if (category) {
+      items = items.filter((item) => item.category === category);
+    }
+
+    const result = {
+      schemaVersion: contract.schemaVersion,
+      generatedAt: contract.generatedAt,
+      agentType: agentType ?? 'default',
+      items,
+      conflicts: contract.conflicts,
+      sourceSnapshots: contract.sourceSnapshots,
+    };
+
+    return {
+      content: [{ type: 'text', text: renderStructuredContent(result) }],
+      structuredContent: result,
+      isError: false,
     };
   });
 
@@ -117,7 +179,7 @@ export function createCodeMapMcpServer(storage: IStorage): McpServer {
   });
   const service = new CodeMapMcpService(storage);
 
-  const reservedNames = new Set<string>(['codemap_query', 'codemap_impact']);
+  const reservedNames = new Set<string>(['codemap_query', 'codemap_impact', 'codemap_env_contract']);
 
   registerNativeTools(server, service);
   registerContractTools(server, getFullContract(), reservedNames);
