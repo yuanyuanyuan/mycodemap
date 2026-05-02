@@ -540,22 +540,25 @@ function countModules(files: string[], rootDir: string): {
 | A5 | `applyProfilePlan()` from Phase 53 can be reused directly for `--save` without modification | Architecture Patterns | `--save` path breaks; need to adapt or create a new save function |
 | A6 | Module counting by directory grouping is sufficient for "module count" in D-08 | Code Examples | Users may expect named modules rather than directory grouping |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should preview use the profile's narrow `parser.include` or broader glob patterns?**
    - What we know: Node.js profile uses `src/**/*.{ts,tsx,js,jsx,mjs,cjs}` which misses root-level files and non-src code. Generic profile uses `**/*.{ts,js,py,go,rs}` which is broader.
    - What's unclear: Whether preview should use profile-specific globs (consistent with generate) or generic broader globs (more value for a "quick overview").
    - Recommendation: Use profile-specific globs for consistency with Phase 53 behavior. If user wants broader scanning, they can use `--profile generic`. This keeps preview and init aligned.
+   - **RESOLVED:** Use profile-specific globs for consistency with Phase 53 behavior (Plan 02 Task 1 step 2b).
 
 2. **Should preview include `devDependencies` in the dependency count?**
    - What we know: CONTEXT.md D-09 says "direct dependencies from marker files" without specifying dev vs prod.
    - What's unclear: Whether "key dependencies" (ZCP-03) should include dev dependencies.
    - Recommendation: Include both `dependencies` and `devDependencies` from package.json (they're all "direct"), but label them separately in the output schema so consumers can filter.
+   - **RESOLVED:** Include both `dependencies` and `devDependencies` from package.json, labeled separately in the output schema (Plan 01 Task 1 step 4).
 
 3. **How should preview handle escomplex parse failures on non-JS files in multi-language projects?**
    - What we know: escomplex only handles JS/TS. Python/Go/Rust projects will have non-JS files.
    - What's unclear: Whether to skip complexity scoring entirely for non-JS projects, or show a partial result (JS/TS files only).
    - Recommendation: Only run escomplex on files matching JS/TS extensions. For non-JS projects where 0 JS/TS files exist, show `complexity: { hotspots: [], note: "Complexity analysis requires JavaScript/TypeScript files" }`.
+   - **RESOLVED:** Only run escomplex on files matching JS/TS extensions; per-file try-catch for parse errors; empty hotspots with note for non-JS projects (Plan 01 Task 2 steps 3-4).
 
 ## Environment Availability
 

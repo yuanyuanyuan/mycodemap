@@ -2,7 +2,7 @@
 phase: 54
 slug: zero-config-preview
 status: draft
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-05-02
 ---
@@ -38,13 +38,10 @@ created: 2026-05-02
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 54-01-01 | 01 | 1 | ZCP-01 | T-54-01 | Profile fallback provides safe defaults when no config | unit | `npx vitest run src/cli/commands/__tests__/preview-command.test.ts -t "zero-config"` | ⬜ W0 | ⬜ pending |
-| 54-01-02 | 01 | 1 | ZCP-02 | — | detectProjectType() correctly identifies project type | unit | `npx vitest run src/cli/commands/__tests__/preview-command.test.ts -t "auto-detects"` | ⬜ W0 | ⬜ pending |
-| 54-01-03 | 01 | 1 | ZCP-03 | T-54-02 | escomplex per-file try-catch prevents single-file failure from aborting | unit | `npx vitest run src/cli/preview/__tests__/complexity-scanner.test.ts -t "error handling"` | ⬜ W0 | ⬜ pending |
-| 54-02-01 | 02 | 1 | ZCP-03 | — | Dependency extraction from marker files works correctly | unit | `npx vitest run src/cli/preview/__tests__/dependency-extractor.test.ts` | ⬜ W0 | ⬜ pending |
-| 54-02-02 | 02 | 1 | ZCP-03 | — | Complexity hotspots returns top-5 by cyclomatic | unit | `npx vitest run src/cli/preview/__tests__/complexity-scanner.test.ts -t "top-5"` | ⬜ W0 | ⬜ pending |
-| 54-03-01 | 03 | 2 | ZCP-04 | — | --save writes config and triggers generate | unit | `npx vitest run src/cli/commands/__tests__/preview-command.test.ts -t "save"` | ⬜ W0 | ⬜ pending |
-| 54-03-02 | 03 | 2 | ZCP-01 | — | End-of-output hint text present | unit | `npx vitest run src/cli/commands/__tests__/preview-command.test.ts -t "hint"` | ⬜ W0 | ⬜ pending |
+| 54-01-01 | 01 | 1 | ZCP-03 | — | Dependency extraction from marker files works correctly | unit | `npx vitest run src/cli/preview/__tests__/dependency-extractor.test.ts` | ⬜ W0 | ⬜ pending |
+| 54-01-02 | 01 | 1 | ZCP-03 | T-54-02 | escomplex per-file try-catch prevents single-file failure from aborting | unit | `npx vitest run src/cli/preview/__tests__/complexity-scanner.test.ts -t "error handling"` | ⬜ W0 | ⬜ pending |
+| 54-02-01 | 02 | 2 | ZCP-01, ZCP-02, ZCP-03, ZCP-04 | T-54-01 | Profile fallback provides safe defaults when no config | unit | `npx tsc --noEmit && npx vitest run src/cli/preview/__tests__/` | ⬜ W0 | ⬜ pending |
+| 54-02-02 | 02 | 2 | ZCP-01, ZCP-02, ZCP-03, ZCP-04 | — | Preview command end-to-end: zero-config, auto-detect, four sections, --save hint | unit | `npx vitest run src/cli/commands/__tests__/preview-command.test.ts` | ⬜ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
