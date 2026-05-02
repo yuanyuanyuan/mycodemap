@@ -8,12 +8,12 @@
 
 ## 调研修正声明（第二版）
 
-此前 Phase 58 的设计假设是"将契约编译成 prompt snippet 并注入子代理"。经与社区实践和官方文档交叉验证后，该假设存在根本性缺陷（见下方「验证记录」）：
+此前 Phase 58 的设计假设是"将契约编译成 prompt snippet 并注入子代理"。经社区 issue 验证，平台提供的注入机制存在已知缺陷（见下方「验证记录」）。官方文档确认了子代理机制的存在，但未提及这些缺陷。
 
-1. **Claude Code `SubagentStart` hook 的 `additionalContext` append 到 user context**（issue #23885）。issue 原文明确指出 `additionalContext` 只能附加到 user context 而非 system prompt，在上下文压缩时**可能**被丢弃——这是机制限制，不是确定性行为。
+1. **Claude Code `SubagentStart` hook 的 `additionalContext` 只能 append 到 user context**（issue #23885）。issue 原文指出这是机制设计（非 system prompt），在上下文压缩时**可能**被丢弃。
 2. **Claude Code `PreToolUse` hook 的 `updatedInput` 对 Agent tool 静默丢弃**（issue #39814 已确认），无法直接修改子代理 prompt。
-3. **Codex `developer_instructions` 存在多项已知 bug**：Windows 上不生效（#19399）、项目级 config 自定义角色 `spawn_agent` 不认识（#14579）、Codex App 中不注入（#11004）。
-4. **Codex `SPAWN_AGENT_DEVELOPER_INSTRUCTIONS` 为硬编码无条件注入**（#17323），无法关闭或覆盖。
+3. **Codex 官方文档确认子代理可通过 `.codex/agents/*.toml` 配置 `developer_instructions`**（[官方文档「Custom agent file schema」](https://developers.openai.com/codex/subagents)），但社区 issue 报告该机制存在多项缺陷：Windows 上不生效（#19399）、项目级 `.codex/config.toml` 自定义角色不被 `spawn_agent` 识别（#14579）、Codex App 中不注入（#11004）。
+4. **Codex 子代理 spawn 时无条件附加硬编码的 `<spawned_agent_context>` prompt 块**（issue #17323 报告，代码路径 `codex-rs/core/src/tools/handlers/multi_agents_v2/spawn.rs`）。官方文档未描述此行为，且当前无配置项可关闭或覆盖。
 
 **因此 Phase 58 的目标从"注入契约"调整为"提供检索指引"：**
 - 不是把规则塞进子代理 prompt，而是告诉子代理"规则在哪，怎么查"。
@@ -35,8 +35,8 @@
 |------|-----------|-------------|-----------|----------------|
 | **Claude Code** | ✅ Agent/Tool 子代理 | `SubagentStart` hook + `additionalContext` | ❌ 低——append 到 user context，压缩后丢弃 | 手动在任务指令中重复规则 |
 | **Claude Code** | ✅ Agent/Tool 子代理 | `PreToolUse` + `updatedInput` 改 Agent prompt | ❌ **零**——静默丢弃 | 无法 workaround |
-| **Codex CLI** | ✅ Agent Thread | `.codex/agents/*.toml` 的 `developer_instructions` | ⚠️ 中——有已知 bug，不稳定 | `codex exec` 嵌套绕过 |
-| **Codex CLI** | ✅ Agent Thread | 无条件 `SPAWN_AGENT_DEVELOPER_INSTRUCTIONS` | ❌ 低——硬编码，无法配置 | 忍气吞声 |
+| **Codex CLI** | ✅ Agent Thread | `.codex/agents/*.toml` 的 `developer_instructions`<br>（[官方文档](https://developers.openai.com/codex/subagents) 确认格式） | ⚠️ 中——官方机制存在，但社区报告多项缺陷 | `codex exec` 嵌套绕过 |
+| **Codex CLI** | ✅ Agent Thread | spawn 时附加的硬编码 prompt 块<br>（官方文档未描述） | ❌ 低——无条件注入，无法配置（#17323） | 忍气吞声 |
 
 **Phase 58 的新定位**：在"平台注入不可靠"的前提下，**在 mycodemap 项目层提供"检索指引"能力**，让子代理能够自行发现并应用项目规则。
 
@@ -106,7 +106,7 @@
 - **冲突只报告不阻断**：多源矛盾时输出 warn，由使用者决定以谁为准
 
 ### 与平台机制的关系 (D-02)
-- **补充而非替代**：平台的 `omitClaudeMd`、`SPAWN_AGENT_DEVELOPER_INSTRUCTIONS` 继续生效
+- **补充而非替代**：平台的子代理隔离机制（Claude Code 的 `omitClaudeMd`、Codex 的 spawn 行为）继续生效
 - **mycodemap 是项目层索引**：提供统一查询接口，不替代平台级行为
 - **不竞争、不冲突**：适配配置可以嵌入到用户的 `.claude/settings.json` 或 `.codex/agents/*.toml`
 
@@ -145,7 +145,7 @@
 | Claude Code #40459 | ✅ 真实存在，开放 | v2.1.84+ `omitClaudeMd: true`，作者做了二进制反编译分析 |
 | Claude Code #23885 | ✅ 真实存在，开放 | `additionalContext` 只能 append 到 user context（非 system prompt），原文说"可能"在压缩时丢弃 |
 | Claude Code #39814 | ✅ 真实存在，开放 | `updatedInput` 对 Agent tool 静默丢弃，测试环境 2.1.85+/macOS |
-| Codex #17323 | ✅ 真实存在，开放 | `SPAWN_AGENT_DEVELOPER_INSTRUCTIONS` 无条件注入，代码路径已确认 |
+| Codex #17323 | ✅ 真实存在，开放 | 子代理 spawn 时无条件附加 `<spawned_agent_context>` prompt 块，代码路径 `spawn.rs` 已确认 |
 | Codex #14579 | ✅ 真实存在，开放 | 项目级 `.codex/config.toml` 自定义角色不被 `spawn_agent` 识别 |
 | Codex #19399 | ✅ 真实存在，开放 | Windows Codex desktop app 上 named subagent config 完全不生效 |
 | Codex #11004 | ✅ 真实存在，开放 | Codex App 中 `developer_instructions` 不注入（canonical refs 中遗漏，已补） |
@@ -161,8 +161,8 @@
 - [Claude Code issue #40459](https://github.com/anthropics/claude-code/issues/40459) —— v2.1.84+ `omitClaudeMd: true` 分析
 - [Claude Code issue #23885](https://github.com/anthropics/claude-code/issues/23885) —— `additionalContext` append 到 user context 而非 system prompt，压缩时可能丢弃
 - [Claude Code issue #39814](https://github.com/anthropics/claude-code/issues/39814) —— `PreToolUse` `updatedInput` 对 Agent tool 静默丢弃
-- [Codex 官方 Subagents 文档](https://developers.openai.com/codex/subagents) —— Agent Thread 配置和继承模型
-- [Codex issue #17323](https://github.com/openai/codex/issues/17323) —— `SPAWN_AGENT_DEVELOPER_INSTRUCTIONS` 无条件注入问题
+- [Codex 官方 Subagents 文档](https://developers.openai.com/codex/subagents) —— Agent Thread 配置和继承模型（确认：built-in agents、`.codex/agents/*.toml` 格式、`developer_instructions` 必填、`sandbox_mode` 继承。未提及：无条件 prompt 注入、已知缺陷）
+- [Codex issue #17323](https://github.com/openai/codex/issues/17323) —— 子代理 spawn 时无条件附加 `<spawned_agent_context>` prompt 块，代码路径 `codex-rs/core/src/tools/handlers/multi_agents_v2/spawn.rs`
 - [Codex issue #14579](https://github.com/openai/codex/issues/14579) —— 项目级 agent 配置不生效
 - [Codex issue #19399](https://github.com/openai/codex/issues/19399) —— Windows 上 agent 配置不生效
 - [Codex issue #11004](https://github.com/openai/codex/issues/11004) —— Codex App 中 `developer_instructions` 不注入
