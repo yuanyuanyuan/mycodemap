@@ -71,12 +71,19 @@ mycodemap --native <command>
 
 ```bash
 # 1. Initialize configuration in project root
-mycodemap init
+mycodemap init -y
 
-# 2. Generate code map
+# 2. Review the init receipt — it shows two sections:
+#   Main Agent: context files to merge into CLAUDE.md / AGENTS.md
+#   Subagent: platform configs to copy into .claude/settings.json / .codex/agents/
+
+# 3. Verify setup
+mycodemap doctor
+
+# 4. Generate code map
 mycodemap generate
 
-# 3. View generated files
+# 5. View generated files
 ls .mycodemap/
 # AI_MAP.md        - Project overview (for AI)
 # CONTEXT.md       - Context entry (links to context/README.md)
@@ -85,8 +92,10 @@ ls .mycodemap/
 # dependency-graph.md - Mermaid dependency graph
 ```
 
+The init receipt distinguishes **main-agent setup** (project context for your AI assistant) from **subagent setup** (platform hooks for delegated agents). See [AI Assistant Setup Guide](docs/AI_ASSISTANT_SETUP.md) for details.
+
 ```bash
-# 4. For AI/Agent: structured output is the default
+# For AI/Agent: structured output is the default
 mycodemap impact -f src/cli/index.ts -j
 
 # Human-readable output on demand
