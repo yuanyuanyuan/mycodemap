@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: milestone
-current_phase: 57
-current_phase_name: Verification
-current_plan: —
-status: ready_to_plan
-last_updated: "2026-05-02T19:00:00.000Z"
-last_activity: 2026-05-02
+current_phase: 58
+current_phase_name: subagent-environment-contract-injection
+current_plan: 4
+status: verified
+last_updated: "2026-05-03T01:36:00.000Z"
+last_activity: 2026-05-03
 progress:
-  total_phases: 6
+  total_phases: 9
   completed_phases: 4
-  total_plans: 10
-  completed_plans: 8
-  percent: 67
+  total_plans: 14
+  completed_plans: 10
+  percent: 71
 ---
 
 # Session State
@@ -23,20 +23,20 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-04-30)
 
 **Core Value:** 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
-**Current Focus:** v2.1 ux-onboarding-enhancement — Phase 56 complete, Phase 57 next.
+**Current Focus:** Phase 58 — subagent-environment-contract-injection
 
 ## Position
 
 **Milestone:** v2.1 — ux-onboarding-enhancement
-**Current Phase:** 57
-**Current Phase Name:** Verification
-**Current Plan:** —
+**Current Phase:** 58
+**Current Phase Name:** subagent-environment-contract-injection
+**Current Plan:** 1
 **Total Phases:** 6 scoped (53-58)
 **Total Plans in Milestone:** 10 planned (8 complete)
-**Status:** Phase 56 complete (verification passed 12/12), Phase 57 ready for planning
-**Progress:** [███████░░░] 67% phase completion (4/6); Phase 53-56 complete, Phase 57 next
-**Last Activity:** 2026-05-02
-**Last Activity Description:** Phase 56 verified — receipt two-section layout, personalized next steps, sync detection, 23 tests, 3 docs updated.
+**Status:** Phase 58 verified (UAT 10/10 passed)
+**Progress:** [██████████] 100% phase completion (5/5 executed); v2.1 milestone complete (Phase 57 skipped as verification-only)
+**Last Activity:** 2026-05-03
+**Last Activity Description:** Phase 58 UAT verified — env-contract retrieval system complete
 
 ## Decisions Made
 
@@ -105,6 +105,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 - 2026-05-02: Phase 55 completed — Agent Bootstrap Assets. 2 plans in 1 wave, parallel execution. Created manifest-extractors.ts (reads package.json/pyproject.toml/go.mod/Cargo.toml), env-contract-plan.ts (EnvContractSeed as InitAsset with installed/preview/already-synced/conflict states), assistant-plan.ts (4 per-runtime files: claude-context.md, agents-context.md, claude-hook-example.json, codex-agent-example.toml). 28 tests pass, full suite 1204 pass. All D-05..D-12 decisions honored. Requirements ABT-01, ABT-02, ABT-05 verified.
 - 2026-05-02: Phase 56 context gathered — Init Receipt + Next Steps. 4 gray areas resolved: (1) Receipt two-section layout with Main Agent paths+merge and Subagent paths+copy; (2) Personalized next steps dynamically generated from installed assets; (3) Already-synced detection via .mycodemap/ reference checking in file content; (4) Doc sync scope: README + SETUP_GUIDE + AI_ASSISTANT_SETUP. Requirements ABT-03, ABT-04, INI-02, INI-03.
 - 2026-05-02: Phase 56 completed — Init Receipt + Next Steps. 3 plans in 2 waves. Wave 1: receipt.ts two-section layout (classifyAsset, detectTeamFileSync, getTeamFileStatuses), reconciler.ts personalized buildNextSteps (4 priorities, cap at 3). Wave 2: 23 tests (17 receipt + 6 init-command), 3 docs updated (README, SETUP_GUIDE, AI_ASSISTANT_SETUP). 56-02 agent Rule 2 deviation: wired assistant-plan.ts into createInitPlan (classification code was unreachable without data source connection). Verification: 12/12 must-haves passed. Requirements ABT-03, ABT-04, INI-02, INI-03 verified.
+- 2026-05-03: Phase 58 verified — Subagent Environment Contract Retrieval. 4 plans in 4 waves. Built canonical env-contract.v1 schema with source discovery (5 items from AGENTS.md/.githooks/package.json/docs/rules), agent-type filtering (7 types), drift detection (sha256 snapshots), CLI command (8 options), native MCP tool (codemap_env_contract), doctor integration, init wiring, E2E tests (6 pass), evidence harness, docs sync. 10/10 UAT tests passed. v2.1 milestone complete.
 
 ### Verified Existing Capabilities (carried forward)
 

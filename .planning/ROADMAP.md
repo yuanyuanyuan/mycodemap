@@ -313,7 +313,8 @@ Plans:
 3. At least one verification path invokes the built CLI through a subprocess, not only in-process TypeScript
 
 ### Phase 58: Subagent Environment Contract Retrieval
-**Status:** Not started
+**Status:** Completed 2026-05-03
+**UAT:** 10/10 passed, 0 issues
 **Goal:** At the project layer (not the platform layer), automatically discover project-specific environment contracts scattered across hooks, entry docs, package scripts, and rule-control helpers, and make them retrievable by sub-agents via CLI or MCP. Covers RTK shell wrapping, `[TAG] scope: message`, the real Vitest entry/commands, and rule-context verification expectations — retrieved by agent types that need them, not injected by the platform.
 **Depends on:** Phase 55, Phase 56, Phase 57
 **Requirements:** ABT-01, ABT-02, ABT-03, VER-03, SDC-01, SDC-02, SDC-03, SDC-04, SDC-05
