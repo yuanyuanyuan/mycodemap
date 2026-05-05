@@ -1,15 +1,15 @@
 ---
-status: complete
+status: rework
 phase: 58-subagent-environment-contract-injection
 source: [58-01-SUMMARY.md, 58-02-SUMMARY.md, 58-03-SUMMARY.md, 58-04-SUMMARY.md]
 started: 2026-05-02T17:42:00.000Z
-updated: 2026-05-03T01:36:00.000Z
+updated: 2026-05-03T02:00:00.000Z
 ---
 
 ## Current Test
 <!-- OVERWRITE each test - shows where we are -->
 
-[testing complete]
+[rework: tests 1-2 need redesign based on official docs]
 
 ## Tests
 
@@ -58,15 +58,48 @@ expected: MCP server exposes `codemap_env_contract` tool (not cli_redirect). Too
 result: pass
 notes: "server.ts:57 registers native tool with agentType/category/check params, not cli_redirect"
 
+## Subagent Verification Tests (需要重新设计)
+
+以下子代理验证测试基于官方文档审查（2026-05-03），发现原方案有根本性问题：
+
+### 原方案问题
+
+| 问题 | 详情 |
+|------|------|
+| `claude -p` 不是子代理 | 是单次提示模式，不经过 SubagentStart 钩子 |
+| `codex exec --agent` 不存在 | `codex exec` 没有 `--agent` 参数 |
+| "可信目录"概念不存在 | 文档中无此概念，实际错误可能是不在 Git 仓库中 |
+| `additionalContext` 非强制执行 | 是文本注入，子代理不保证执行 |
+| `developer_instructions` 非强制执行 | 同上 |
+
+### 修正后的测试项
+
+#### S1. Claude 子代理 — SubagentStart 钩子 + 子代理定义
+expected: 子代理通过系统提示驱动检索 env-contract，SubagentStart 钩子辅助注入上下文
+result: [pending — 需创建 `.claude/agents/env-contract-tester.md` 并在会话中测试]
+notes: "详见 58-HUMAN-UAT.md 修正方案"
+
+#### S2. Codex 子代理 — developer_instructions + 代理 TOML
+expected: 代理通过 developer_instructions 驱动检索 env-contract
+result: [pending — 需创建 `.codex/agents/worker.toml` 并在 Git 仓库中测试]
+notes: "详见 58-HUMAN-UAT.md 修正方案"
+
+#### S3. 验证脚本重写
+expected: `scripts/verify-subagent-env-contract.mjs` 使用正确的子代理机制（非 `claude -p` / `codex exec --agent`）
+result: [pending — 需重写脚本]
+notes: "原脚本用 CLI 单次调用模拟子代理，不是真正的子代理链路验证"
+
 ## Summary
 
-total: 10
-passed: 10
+total: 10 (automated) + 3 (subagent rework)
+passed: 10 (automated)
 issues: 0
-pending: 0
+pending: 3 (subagent rework)
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-[none yet]
+- 子代理验证测试（S1-S3）需要重新设计和执行
+- 原验证脚本 `scripts/verify-subagent-env-contract.mjs` 需要重写
+- 详见 58-HUMAN-UAT.md 中的文档审查结果和修正方案

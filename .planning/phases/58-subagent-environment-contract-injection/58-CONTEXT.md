@@ -1,8 +1,8 @@
 # Phase 58 Context: Subagent Environment Contract Retrieval
 
 **Gathered:** 2026-05-02 (revised)
-**Status:** Ready for planning (v3 revised)
-**Source:** Cross-ecosystem agent delegation research + v2.1 milestone requirements (SDC-01~05) + live issue-status recheck
+**Status:** Ready for planning (v4 — docs review correction)
+**Source:** Cross-ecosystem agent delegation research + v2.1 milestone requirements (SDC-01~05) + live issue-status recheck + official docs verification (2026-05-03)
 
 ---
 
@@ -44,10 +44,13 @@
 
 | 平台 | 子代理支持 | 官方注入机制 | 实际可靠性 | 社区 workaround |
 |------|-----------|-------------|-----------|----------------|
-| **Claude Code** | ✅ Agent/Tool 子代理 | `SubagentStart` hook + `additionalContext` | ❌ 低——append 到 user context，压缩后可能丢弃 | 手动在任务指令中重复规则 |
+| **Claude Code** | ✅ Agent/Tool 子代理 | `SubagentStart` hook + `additionalContext` | ⚠️ 中——文本注入到子代理对话开头（非 system prompt），子代理**不保证执行**（官方文档确认："placed at the start of the conversation, before the first prompt"）| 在子代理定义的系统提示中明确要求检索 |
 | **Claude Code** | ✅ Agent/Tool 子代理 | `PreToolUse` + `updatedInput` 改 Agent prompt | ❌ **零**——静默丢弃 | 无法 workaround |
-| **Codex CLI** | ✅ Agent Thread | `.codex/agents/*.toml` 的 `developer_instructions`<br>（[官方文档](https://developers.openai.com/codex/subagents) 确认格式） | ⚠️ 中——官方机制存在，但社区报告多项缺陷 | `codex exec` 嵌套绕过 |
+| **Claude Code** | ✅ Agent/Tool 子代理 | 子代理定义文件 `.claude/agents/*.md` 的系统提示 | ✅ 高——子代理收到的唯一系统提示（官方文档："Subagents receive only this system prompt"） | 在 prompt 中写死检索指令 |
+| **Codex CLI** | ✅ Agent Thread | `.codex/agents/*.toml` 的 `developer_instructions`<br>（[官方文档](https://developers.openai.com/codex/subagents) 确认格式，必填字段） | ⚠️ 中——官方机制存在，但社区报告多项缺陷（#19399 Windows 不生效、#11004 App 不注入） | 在 developer_instructions 中写死检索指令 |
 | **Codex CLI** | ✅ Agent Thread | spawn 时附加的硬编码 prompt 块<br>（官方文档未描述） | ❌ 低——无条件注入，无法配置（#17323） | 忍气吞声 |
+
+> **[v4 修正]** 官方文档确认 `additionalContext` 是**文本注入**（不是强制命令执行），放在子代理对话开头。子代理是否遵循取决于 LLM 判断。同理，`developer_instructions` 是代理的"核心指令"，但也是文本，不保证执行。**最可靠的注入点是子代理定义文件的系统提示**（Claude: `.claude/agents/*.md` 的 body；Codex: `developer_instructions`），因为这是子代理收到的**唯一**系统提示。
 
 **Phase 58 的新定位**：在"平台注入不可靠"的前提下，**在 mycodemap 项目层提供"检索指引"能力**，让子代理能够自行发现并应用项目规则。
 
@@ -122,9 +125,11 @@
 - **不竞争、不冲突**：适配配置可以嵌入到用户的 `.claude/settings.json` 或 `.codex/agents/*.toml`
 
 ### 检索指引格式 (D-03)
-- **Claude Code**: `SubagentStart` hook 返回 `additionalContext`: `"Before starting work, run: mycodemap env-contract --for <type> --json"`
-- **Codex**: `developer_instructions` 嵌入 `"Query project rules via MCP tool codemap_env_contract or CLI mycodemap env-contract"`
+- **Claude Code**: 子代理定义文件 `.claude/agents/*.md` 的系统提示中写入检索指令（**最可靠**——这是子代理收到的唯一系统提示）；`SubagentStart` hook 的 `additionalContext` 作为辅助（文本注入，不保证执行）
+- **Codex**: `.codex/agents/*.toml` 的 `developer_instructions` 中嵌入检索指令（必填字段，但社区报告 Windows/App 环境下可能不生效）
 - **通用**: AGENTS.md 中可引用 `"Use mycodemap env-contract to discover project-specific operational rules"`
+
+> **[v4 修正]** 最可靠的注入点是子代理定义文件的系统提示，不是 SubagentStart 钩子。`additionalContext` 是文本注入，子代理不保证执行。
 
 ### 契约存储 (D-04)
 - **`.mycodemap/env-contract.json`**：结构化索引，机器可读，带来源追踪
@@ -142,7 +147,7 @@
 - **D-06：从 Phase 55 seed 演进，不重开 seed 设计。** Phase 58 必须把现有 `.mycodemap/env-contract.json` seed 升级为完整 Project Environment Contract；可以迁移 schema，但不能静默丢弃 Phase 55 已生成的 manifest facts 或 assistant 示例路径。
 - **D-07：source authority 以可执行事实优先。** 冲突推荐顺序为：实际执行/验证入口（`.githooks/*`、`package.json` scripts、`vitest*.config.ts`） > `docs/rules/*` / `AGENTS.md` > generated assistant examples > brainstorm/example docs。doctor 报告冲突但不阻断，除非关键契约缺失导致 `--check` 失败。
 - **D-08：MCP 暴露首选走 interface contract 自动注册。** `mycodemap env-contract` 应注册到 `src/cli/interface-contract/commands/`，优先让 MCP 动态暴露等价工具；planner 必须验证 hyphen 命令名是否会被规范化为可用的 `codemap_env_contract` 形态。只有当命名或输出形状无法满足子代理查询时，才新增手写 native MCP tool。
-- **D-09：真实子代理验证遵循 roadmap 的更严格目标。** Requirement SDC-05 至少要求 Claude 或 Codex 一条真实子代理路径；ROADMAP success criteria 要求 Claude `claude -p` 和 Codex `codex exec` 都覆盖。Planner 应以"两者都做"为目标；若运行环境缺少其中一个平台，必须记录环境 blocker/waiver，不能静默降级。
+- **D-09：真实子代理验证遵循 roadmap 的更严格目标。** Requirement SDC-05 至少要求 Claude 或 Codex 一条真实子代理路径。Planner 应以"两者都做"为目标；若运行环境缺少其中一个平台，必须记录环境 blocker/waiver，不能静默降级。**[v4 修正]** `claude -p` 是单次提示模式（print mode），**不是**子代理机制（官方文档：https://code.claude.com/docs/en/cli-reference 确认 `-p` 为 non-interactive output）。真正的 Claude 子代理通过 Agent 工具派生，或 `claude --agent <name>` 启动会话级代理。Codex 子代理通过 `.codex/agents/*.toml` 配置 + 提示触发，`codex exec` 没有 `--agent` 参数。
 - **D-10：Phase 57 依赖风险必须显式处理。** ROADMAP 声明 Phase 58 depends on Phase 57，但 STATE 当前仍显示 Phase 57 ready_to_plan；planner 在开始 Phase 58 前必须确认 Phase 57 的真实状态，或把未完成依赖作为 plan 前置检查。
 
 </decisions>
@@ -176,11 +181,24 @@
 - Codex 官方文档确认 subagent 配置机制，但对上述社区报告的缺陷/限制没有完整风险说明。
 
 ### 平台生态调研
+
+> **[v4 新增]** 官方文档直接访问验证（2026-05-03）
+
+#### 官方文档（已验证可访问）
+
+- [Claude Code Hooks 文档](https://code.claude.com/docs/en/hooks) —— 确认 SubagentStart 钩子：matcher 按代理类型过滤，`additionalContext` 放在子代理对话开头（非 system prompt），不能阻断/修改子代理，用于 side effects
+- [Claude Code Sub-agents 文档](https://code.claude.com/docs/en/sub-agents) —— 确认：子代理定义为 `.claude/agents/*.md`（YAML frontmatter + 系统提示），子代理收到的**唯一**系统提示是定义文件的 body（"not the full Claude Code system prompt"），支持 hooks/mcpServers/skills/isolation 等 frontmatter
+- [Claude Code CLI Reference](https://code.claude.com/docs/en/cli-reference) —— 确认 `-p`/`--print` 是 non-interactive output 模式，**不是**子代理机制；`--agent <name>` 以子代理身份运行整个会话
+- [Codex Subagents 文档](https://developers.openai.com/codex/subagents) —— 确认：`.codex/agents/*.toml` 配置格式，`developer_instructions` 必填字段，内置代理（default/worker/explorer），子代理继承父会话 sandbox 策略
+- [Codex Config Reference](https://developers.openai.com/codex/config-reference) —— 确认：`developer_instructions` 是 session 级可选字段，`agents.<name>.config_file` 指向代理 TOML 文件
+- [Codex CLI Reference](https://developers.openai.com/codex/cli/reference) —— 确认：`codex exec` **没有** `--agent` 参数，有 `--skip-git-repo-check`、`--sandbox`、`--profile` 等参数
+
+#### 社区 Issue（已验证存在）
+
 - [Claude Code issue #49106](https://github.com/anthropics/claude-code/issues/49106) —— 子代理不继承 CLAUDE.md
 - [Claude Code issue #40459](https://github.com/anthropics/claude-code/issues/40459) —— v2.1.84+ `omitClaudeMd: true` 分析
 - [Claude Code issue #23885](https://github.com/anthropics/claude-code/issues/23885) —— `additionalContext` append 到 user context 而非 system prompt，压缩时可能丢弃
 - [Claude Code issue #39814](https://github.com/anthropics/claude-code/issues/39814) —— `PreToolUse` `updatedInput` 对 Agent tool 静默丢弃
-- [Codex 官方 Subagents 文档](https://developers.openai.com/codex/subagents) —— Agent Thread 配置和继承模型（确认：built-in agents、`.codex/agents/*.toml` 格式、`developer_instructions` 必填、`sandbox_mode` 继承。未提及：无条件 prompt 注入、已知缺陷）
 - [Codex issue #17323](https://github.com/openai/codex/issues/17323) —— 子代理 spawn 时无条件附加 `<spawned_agent_context>` prompt 块，代码路径 `codex-rs/core/src/tools/handlers/multi_agents_v2/spawn.rs`
 - [Codex issue #14579](https://github.com/openai/codex/issues/14579) —— 项目级 agent 配置不生效
 - [Codex issue #19399](https://github.com/openai/codex/issues/19399) —— Windows 上 agent 配置不生效
@@ -325,23 +343,27 @@
 ```toml
 name = "worker"
 description = "Execution-focused agent for implementation and fixes"
-model = "gpt-5.4"
-model_reasoning_effort = "high"
-sandbox_mode = "workspace-write"
+# model = "o4-mini"  # 可选：覆盖父会话模型
+# model_reasoning_effort = "high"  # 可选
+# sandbox_mode = "workspace-write"  # 可选：覆盖父会话 sandbox 策略
 developer_instructions = """
 You are a worker agent responsible for implementing and fixing code.
 
 Before starting any task, query the project environment contract:
 - Run: mycodemap env-contract --for worker --json
-- Or use the MCP tool: codemap_env_contract(agentType="worker", format="json")
+- Or use the MCP tool: codemap_env_contract(agentType="worker")
 
 The contract contains project-specific rules that you MUST follow, including:
 - Shell command wrappers (e.g., rtk)
 - Commit message format
 - Test entry commands
 - Code style requirements
+
+IMPORTANT: The above retrieval step is MANDATORY. Do not skip it.
 """
 ```
+
+> **[v4 修正]** `model = "gpt-5.4"` 改为注释占位符（避免引用不存在的模型 ID）。`developer_instructions` 中增加 "IMPORTANT" 强调，因为官方文档确认这是文本注入，子代理不保证执行。移除 `format="json"` 参数（MCP 工具签名中无此参数）。
 
 ### 集成点
 
@@ -372,7 +394,7 @@ The contract contains project-specific rules that you MUST follow, including:
 - 与 Claude Code hooks 的深层集成（可靠的 `updatedPrompt` / system-level project-context 注入机制）→ 等待平台提供明确支持后重新评估
 - 与 Codex `config.toml` 的 `[agents]` 配置联动 → 等待 Codex agent config 格式稳定
 - 契约的历史版本追踪和 diff 展示 → v2.2+
-- 注入模式的重新评估 → 如果平台修复了 `additionalContext` 压缩问题或 `updatedInput` Agent tool 支持，可重新评估预注入方案
+- 注入模式的重新评估 → 如果平台修复了 `additionalContext` 压缩问题或 `updatedInput` Agent tool 支持，可重新评估预注入方案。当前最可靠路径是子代理定义文件的系统提示（[v4 docs review 确认](https://code.claude.com/docs/en/sub-agents)）
 
 </deferred>
 
