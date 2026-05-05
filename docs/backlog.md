@@ -1,177 +1,265 @@
+# mycodemap Backlog
 
-
-# mycodemap 产品重塑提案 v0.6
-**从"代码地图工具"到"架构契约治理引擎"**
-
-## 一、战略定位重置（Positioning）
-
-### 核心定位转变
-| 维度 | 当前（v0.5 MVP3） | **重塑后（v0.6）** |
-|------|------------------|-------------------|
-| **产品品类** | TypeScript 代码地图生成工具 | **架构契约验证与护栏系统** |
-| **核心价值** | 帮助AI理解代码结构 | **防止AI/人类破坏架构边界** |
-| **竞争差异** | 生成 JSON 地图供AI消费 | **生成决策：通过/阻断，并给出架构违反证据** |
-| **技术重心** | Tree-sitter 解析 + 图数据库 | **Tree-sitter + SQLite + 轻量内存图** |
+> **版本**: v3.0-convergence
+> **更新日期**: 2026-05-05
+> **适用范围**: v2.2-v2.6 架构收敛 + 图智能，基于 CODEMAP_GRAPH_ENHANCEMENT_ASSESSMENT.md 和 BACKLOG_mycodemap-redesign-20260505.md 的 grill-with-docs 决策
+> **核心约束**: AI Agents First | 4 语言 (TS/JS/Python/Go) | SQLite 唯一存储 | MCP 直接执行
 
 ---
 
-## 二、只做（Must Do）- 差异化护城河
+## 一、规划来源
 
-### 1. **契约护栏系统（Contract Barriers）**
-基于 `mycodemap.design.md` 的强约束验证：
-- **模块边界守护**：验证跨模块调用是否通过允许的中介
-- **依赖方向检查**：确保分层架构（如领域层→基础设施层）不被反向依赖
-- ** breaking change 预警**：当修改影响契约定义的公开 API 时自动标记
-
-```typescript
-// 新命令示例
-mycodemap verify --contract design.md --against src/
-// 输出: { "passed": false, "violations": [{ "rule": "auth禁止直接调用payment", "location": "auth/login.ts:45" }] }
-```
-
-### 2. **Git 历史融合分析（Code Archaeology）**
-利用 SQLite 存储 git blame + 变更历史：
-- **危险区域标记**：高频修改且伴随回滚的代码区域自动标记"高风险"
-- **契约漂移检测**：对比当前代码与历史契约版本，发现架构腐化趋势
-- **影响评估增强**：不仅告诉AI"这修改影响3个文件"，还告诉"这3个文件在过去6个月被修改了17次，回滚率35%"
-
-### 3. **轻量级混合存储架构**
-**放弃重型图数据库**，采用 SQLite + 内存图计算：
-
-```typescript
-// 技术架构示意
-StorageLayer {
-  // Layer 1: SQLite 负责持久化 + BM25全文搜索 + 契约元数据
-  sqlite: BetterSQLite3Wrapper;
-  
-  // Layer 2: 内存图计算（替代 NetworkX，使用 graphlib 或自研邻接表）
-  graph: DirectedGraph; // 基于 Map/Set 的轻量实现
-  
-  // 启动时从 SQLite 加载符号关系到内存图，<500ms
-  loadGraph(): void;
-  
-  // 核心操作：基于图的可达性分析（契约验证的关键）
-  computeImpact(symbol: string, depth: number): ImpactGraph;
-}
-```
-
-**为什么这个架构对 TypeScript 项目更优：**
-- `better-sqlite3`：Node.js 最快的 SQLite 绑定，零配置，单文件存储
-- 内存图计算：对于 <50K 文件的 TypeScript 项目，纯 JavaScript 图遍历（DFS/BFS）性能足够（<100ms），无需引入沉重的图数据库客户端
-
-### 4. **CI/CD 原生集成（Quality Gate）**
-专为流水线设计的"硬阻断"模式：
-- **退出码策略**：发现契约违反时返回非零退出码，直接阻断 CI 流程
-- **JSON 报告**：生成结构化报告供 GitHub/GitLab 的 Code Review 界面渲染
-- **增量验证**：仅验证 git diff 涉及的符号，<2秒完成门禁检查
+| 来源文档 | 角色 | 状态 |
+|----------|------|------|
+| `CODEMAP_GRAPH_ENHANCEMENT_ASSESSMENT.md` | 调研论文：识别什么已有/什么缺/什么可借鉴 | 已消化 |
+| `BACKLOG_mycodemap-redesign-20260505.md` | 实施蓝图：19 个任务 (P0-P3, 4 sub-milestone) | 已过滤/增强/重排 |
+| `docs/backlog.md` (v2.0-sync) | 现有待办：Must Do / Should Do / Could Do | 已合并/对齐 |
 
 ---
 
-## 三、不做（Must Not Do）- 避免与巨人正面竞争
+## 二、Milestone 总览
 
-### 1. **不追求极致的 Token 节省**
-- **不做**：与 code-review-graph 竞争的"49倍Token节省"宣传
-- **原因**：这是 code-review-graph 的核心赛道，且需要极其优化的增量算法和向量索引，投入产出比低
-- **替代**：专注"**精准上下文**"——不是给AI更少代码，而是给AI**符合架构约束**的代码上下文
-
-### 2. **不做动态运行时分析**
-- **不做**：eBPF 插桩、JavaScript 运行时追踪、调用链路采集
-- **原因**： 
-  - 技术债务极重（需维护运行时 agent）
-  - 与静态分析工具定位冲突（用户不会同时安装两类工具）
-  - 报告中提到的"运行时图谱"目前仍是学术阶段，无成熟开源方案
-
-### 3. **不做多模态支持（文档/图像/音频）**
-- **不做**：解析 PDF 架构图、会议录音转录、白板照片识别
-- **原因**：这是 graphify 的独占赛道，需集成 Whisper/OCR/LLM，架构重量与 mycodemap 的"轻量CLI"定位冲突
-
-### 4. **不做通用代码搜索引擎**
-- **不做**：支持 25 种语言的通用符号搜索、跨语言调用图
-- **原因**：竞品已覆盖（code-review-graph 支持 23 种语言，graphify 25 种）
-- **专注**：TypeScript/JavaScript 生态的**深度架构治理**，而非广度语言支持
+| Milestone | 核心主题 | 主要内容 | 预估人天 |
+|---|---|---|---|
+| **v2.2** architecture-foundation | 架构根基 + Agent 入口 | P0-1 + P0-2 + P0-3 + P1-5 | 30-40 |
+| **v2.3** schema-redesign-graph-capability | Schema 重设计 + 核心图能力 | Schema 重写 + P2-2 + P1-1 + P1-2 + P1-3 | 30-40 |
+| **v2.4** agent-graph-experience | Agent 图体验 | P1-4 + P2-1 + P2-4 | 20-25 |
+| **v2.5** deep-analysis-hooks | 深度分析 + Hook | P2-3 + P2-5 + P3-4 | 15-18 |
+| **v2.6** polish-and-stabilize | 打磨收尾 | P3-2 + P3-5 + P3-6 + IC 1.0.0 + SQLite 优化 | 10-15 |
 
 ---
 
-## 四、优化方向（Optimization Roadmap）
+## 三、v2.2 — 架构根基 + Agent 入口
 
-### Phase 1: 架构瘦身（v0.6.0）
-- **移除**：KuzuDB 依赖（如果当前有）
-- **引入**：better-sqlite3 + 内存图结构（基于 Map 的邻接表）
-- **基准**：10K 文件项目启动时间 <1s，内存占用 <200MB
+### 3.1 P0-1 Parser 统一
 
-### Phase 2: 契约系统硬化（v0.7.0）
-- **设计契约 Schema 标准化**：`design.md` → JSON Schema 验证
-- **护栏规则引擎**：支持复杂度、依赖方向、模块边界三类规则
-- **Git 融合**：SQLite 存储 git blame 信息，支持 `mycodemap history --symbol X` 查询变更轨迹
+- **删除 FastParser**：TreeSitterParser + WASM 完全替代，无需正则解析器
+- **删除 Hybrid 模式**：Tree-sitter 对所有规模够快，无需 50 文件阈值切换
+- **SmartParser 缩减为 ~300 行 TS 类型增强层**：只做 TS Compiler API 类型推断（泛型、类型别名、typeof），内部委托给 TreeSitterParser
+- **TreeSitterParser 接入主流程**：修改 `createParser` 工厂 + `analyzer.ts` 使用 ParserRegistry
+- **4 语言支持**：TS/JS/Python/Go 通过 ParserRegistry 自动生效
+- **PythonTypeEnhancer**（非阻塞验收项）：基于 docstring 的类型推断，~100-150 行
 
-### Phase 3: AI 协作协议（v0.8.0）
-- **MCP 工具增强**：从"提供上下文"转向"提供决策建议"
-  - 新增 `verify_contract` MCP 工具：AI 在修改前调用，获取"此修改是否安全"的布尔值
-- **Prompt 模板**：为 Claude Code/Cursor 提供"架构师模式"提示词，强制在修改前调用 mycodemap verify
+**验收标准**：
+- `mycodemap generate` 默认使用 Tree-sitter 解析
+- FastParser/Hybrid 不再被主流程调用
+- SmartParser 代码量 < 300 行
+- 4 语言解析可用（TS/JS/Python/Go）
+- WASM 降级路径正常工作
 
----
+**Breaking Changes**：`mode: 'fast'` / `mode: 'hybrid'` 配置失效 → 明确错误码 + 修复建议
 
-## 五、用户场景（User Scenarios）
+### 3.2 P0-2 存储收敛
 
-### 场景 A：架构师的守门员（Quality Gate）
-**角色**：资深工程师/架构师  
-**痛点**： junior 开发或 AI 工具经常破坏精心设计的模块边界  
-**使用**：
-```bash
-# 在 pre-commit 钩子中
-mycodemap verify --strict --fail-on-barrier-break
-```
-**价值**：将架构文档（design.md）从"仅供参考"变为"强制执行的代码法律"
+- **删除 KùzuDB 后端**：`UNSUPPORTED_STORAGE_TYPE`
+- **删除 FileSystem 后端**：`UNSUPPORTED_STORAGE_TYPE`
+- **`auto` 策略改为 sqlite 唯一默认**：不可用时硬着陆报错 + Failure-to-Action 引导（`--wasm-fallback` / 安装命令）
+- **SQLite 三层降级**：`better-sqlite3` native → `sql.js` WASM → `node:sqlite`（可选检测）
+- **ARCHITECTURE.md 修复**并入验收标准
 
-### 场景 B：AI 辅助开发的安全护栏
-**角色**：使用 Claude Code/Cursor 的开发者  
-**痛点**：AI 经常生成"看似正确但破坏架构"的代码（如直接跨层调用数据库）  
-**使用**：
-```typescript
-// .cursorrules 或 claude.md 配置
-"Before modifying code, run: mycodemap impact -t {target} --check-contracts"
-```
-**价值**：AI 在每次修改前自动检查，避免" AI 写代码，架构师擦屁股"的循环
+**验收标准**：
+- `StorageFactory.create('auto')` 返回 SQLiteStorage
+- 传入 `filesystem`/`kuzudb` 抛出 `UNSUPPORTED_STORAGE_TYPE`
+- 不可用时返回 `{error: {code: 'STORAGE_UNAVAILABLE', remediation: '...'}}`
 
-### 场景 C：遗留项目现代化评估
-**角色**：技术负责人  
-**痛点**：不知道当前代码与最初架构设计偏离了多远  
-**使用**：
-```bash
-mycodemap drift --since 2024-01-01 --contract original-design.md
-```
-**价值**：量化"架构腐化度"，为重构决策提供数据支撑（如"当前 23% 的调用违反了原始模块边界"）
+**Breaking Changes**：`storage: 'filesystem'` / `storage: 'kuzudb'` 配置失效
 
-### 场景 D：高风险修改预警
-**角色**：DevOps/运维  
-**痛点**：某些代码区域变更极易引发故障  
-**使用**：
-```bash
-mycodemap analyze -i modify -t "payment/" --include-history --json
-# 输出标记：该区域过去 12 个月修改 47 次，回滚 12 次，事故 3 次
-```
-**价值**：在变更发布前识别"代码墓地"区域，强制增加 review 层级
+### 3.3 P0-3 MCP 直接执行
 
----
+- **全部 20+ 命令拆分为 pure function + CLI wrapper + MCP adapter**
+- **统一接口规范**：typed object input + `ServiceResult<T>` + 统一错误码
+- **CLI 瘦身验收**：每个 CLI 命令文件 < 300 行
+- **SSE transport** 作为子任务
 
-## 六、竞品差异化对比表
+**验收标准**：
+- MCP tool 调用一次即返回结果，无需二次 CLI 执行
+- `cli_redirect` 模式彻底消灭
+- `src/cli/commands/` 下无超过 300 行的文件
 
-| 功能维度 | code-review-graph | graphify | **mycodemap (重塑后)** |
-|---------|-------------------|----------|----------------------|
-| **核心问题** | "哪些代码可能相关" | "这段代码的设计动机是什么" | **"这次修改是否破坏架构规则"** |
-| **输出形态** | 文件列表 + 置信度 | 自然语言解释 + 多模态关联 | **布尔值（通过/阻断）+ 违规证据链** |
-| **存储架构** | SQLite (极致性能) | SHA256缓存 + 大模型语义 | **SQLite + 内存图（轻量可移植）** |
-| **最佳场景** | 日常编码辅助 | 理解遗留项目 | **CI/CD 门禁 + 架构守护** |
-| **与AI关系** | AI 的"眼"（提供上下文） | AI 的"脑"（提供理解） | **AI 的"护栏"（提供约束）** |
+### 3.4 P1-5 MCP 路由门
+
+- **`codemap_context` MCP tool**：~100 tokens 路由门
+  - v2.2 先支持 3 个 task：`review` / `debug` / `default`
+  - `graphStats`：modules, symbols, edges（不含 communities，v2.3 后加入）
+  - `riskScore`：简化版（基于模块数、循环依赖数、高复杂度文件数）
+  - `nextToolSuggestions`：根据 task 推荐下一步 tool
+- **detail_level 三级**：minimal（摘要+计数） / standard（完整） / full（含代码片段）
+- **tool 过滤**：`--tools` CLI 参数 / `CODEMAP_TOOLS` 环境变量
+
+**验收标准**：
+- `codemap_context --task review` 返回 `nextToolSuggestions: ["impact", "surprising"]`
+- `detail_level=minimal` 输出比 `standard` 压缩 40-60%
 
 ---
 
-## 七、总结
+## 四、v2.3 — Schema 重设计 + 核心图能力
 
-mycodemap 的救赎之路是**放弃成为更好的"代码搜索引擎"，转而成为唯一的"架构契约执行引擎"**：
+### 4.1 SQLite Schema 重写
 
-- **不做** code-review-graph 能做到的事（快速搜索、Token节省）
-- **不做** graphify 能做到的事（多模态理解、设计动机提取）
-- **只做** 它们都做不到的事：**将架构文档转化为可执行的代码法律，并在 CI/CD 中强制执行**
+- **从 governance-v3 迁移到图优化 schema**：
+  - `nodes` 表：integer id PK + `qualified_name TEXT UNIQUE`
+  - `edges` 表：`source_qn`/`target_qn`（无外键，允许解析中临时不一致）+ `confidence_tier TEXT DEFAULT 'EXTRACTED'`
+  - `file_hashes` 表：增量更新基础
+  - `communities` 表：社区检测结果
+  - `nodes_fts` FTS5 虚拟表：全文搜索
+  - 复合索引：`edges(source_qn, kind)` / `edges(target_qn, kind)` / `nodes(file_path)`
+- **迁移脚本**：`mycodemap migrate --from v2.2 --to v2.3`
 
-这是从"工具"到"基础设施"的跃迁——不是让AI更方便地写代码，而是**确保AI写的代码不会破坏你的架构**。
+**Breaking Changes**：Schema 不兼容 → `mycodemap migrate` 脚本
+
+### 4.2 P2-2 边置信度
+
+- edges 表加 `confidence_tier` 字段
+- 解析器输出时标记每条边：EXTRACTED（AST 直接提取） / INFERRED（名称匹配解析） / AMBIGUOUS（多候选/动态调用）
+- **置信度分布目标**：EXTRACTED >60%, INFERRED <30%, AMBIGUOUS <10%, EXTRACTED precision >95%
+
+### 4.3 P1-1 增量更新
+
+- **git-diff 驱动** + 2-hop 依赖级联 + 500 文件上限
+- **`--on-change` 参数**：检测变更 + 增量更新（v2.5 通用 Hook 替换）
+- **SHA-256 哈希比对**（复用 file-hash-cache）
+- **Worker Threads 并行解析**（<8 文件串行）
+- **SQLite 原子写入**：`BEGIN IMMEDIATE` → `DELETE` → `INSERT` → `COMMIT`
+- **不需要 `--no-git`**，不需要 Watch mode
+
+**性能目标**：叶子节点 <1.5s，核心文件 <5s
+
+### 4.4 P1-2 影响分析 CTE
+
+- **SQLite Recursive CTE BFS** 替代内存图遍历
+- **分层摘要 + detail_level 三级**：
+  - minimal：summary（total_nodes, max_depth, by_confidence）~50 tokens
+  - standard：summary + 前 3 层节点 ~200 tokens
+  - full：完整分层结果
+- **`_impact_seeds` 临时表**避免 SQL 变量过多
+- **内存图 BFS 保留为 fallback**
+
+**性能目标**：1K 节点 <50ms，10K <200ms
+
+### 4.5 P1-3 社区检测
+
+- **ngraph + 自研 Louvain**（Research 阶段对比 CRG igraph / graphify graspologic / louvain npm）
+- **边权重映射**：CALLS=1.0, IMPORTS_FROM=0.7, INHERITS=0.8, IMPLEMENTS=0.7, DEPENDS_ON=0.6, TESTED_BY=0.4, CONTAINS=0.3
+- **超大社区拆分**：>25% 图节点时二次 Leiden
+- **自动命名**：路径前缀优先（>60% 覆盖率）→ 前缀::主导类名 → community_N 兜底
+  - 后续可通过白名单/配置表覆盖，v2.3 不做编辑功能
+- **凝聚力评分**：社区内实际边数 / 最大可能边数
+
+---
+
+## 五、v2.4 — Agent 图体验
+
+### 5.1 P1-4 Surprise 评分
+
+- **报告模式**：输出但不建议行动
+- **通过 `codemap_context` 路由门间接引导**（task=review 时推荐 surprising）
+- **多因子评分**：confidence_tier, 跨目录(+2), 跨社区(+1), Peripheral→Hub(+1), 历史回归(+2)
+- 阈值默认 8 分，可配置
+
+### 5.2 P2-1 执行流追踪
+
+- **两阶段交互**：
+  - `mycodemap flows --summary`：返回入口点列表 + 置信度
+  - `mycodemap flows --trace <entry>`：返回调用链
+- **三层入口点检测**：True root / 框架装饰器 / 传统命名
+- **Criticality 评分**：深度 × 节点数 × 安全关键词 × 跨社区惩罚
+- 输出带 confidence 标记，Agent 可决定信任哪些
+
+### 5.3 P2-4 裸名解析
+
+- 收集裸名 CALLS 边（target 不含 `::`）
+- 单候选 → EXTRACTED，多候选 → INFERRED，零候选 → AMBIGUOUS
+- 多候选时通过 IMPORTS_FROM 边判断源文件是否导入目标文件
+- **置信度分布目标**替代精度百分比
+
+---
+
+## 六、v2.5 — 深度分析 + Hook
+
+### 6.1 P2-3 Hub/Bridge 检测
+
+- **Hub**：degree centrality + hub_tier (critical/major/minor) + God Node 排除
+- **Bridge**：跨社区边数近似（不实时计算 betweenness，离线可选）
+- 结果持久化到 SQLite `hub_bridge_scores` 表
+
+### 6.2 P2-5 Hook 机制
+
+- **首次提醒 + 后续静默**：同一会话只在第一次 Glob/Grep 时提醒
+- **基于 Phase 58 env-contract 检索指引**：Hook 内容指向 `mycodemap env-contract` 接口
+- **⚠️ 实施前必须 double-confirm Phase 58 兼容性**
+- v2.3 的 `--on-change` 硬编码参数替换为通用 Hook 框架
+
+### 6.3 P3-4 节点去重
+
+- Layer 1（文件内）：AST extractor 维护 `seen_ids` set
+- Layer 2（跨文件）：后写入覆盖策略
+- Layer 3（缓存）：显式 `seen` set 处理缓存命中
+- 处理 TypeScript `export { x } from './y'` 重导出场景
+
+---
+
+## 七、v2.6 — 打磨收尾
+
+| 项 | 内容 |
+|---|---|
+| P3-2 复杂度计算统一 | `ast-complexity-analyzer.ts` 为唯一源，SmartParser 调用其 API |
+| P3-5 MCP 空白行过滤 | stdio transport 层过滤空白行输入 |
+| P3-6 边 ID 归一化 | `[^a-zA-Z0-9]+` → `_` + 转小写 |
+| Interface Contract 1.0.0 | 所有命令补全 outputShape/errorCodes/examples，`stable: true` |
+| SQLite+In-Memory 优化 | LRU 查询缓存，内存邻接表加速多跳查询 |
+
+---
+
+## 八、已排除项（不在 v2.2-v2.6 范围）
+
+| 项 | 排除原因 |
+|---|---|
+| FastParser / Hybrid 模式 | TreeSitterParser + WASM 完全替代 |
+| FileSystem 后端 | SQLite 唯一主线，WASM 降级兜底 |
+| KùzuDB 后端 | 与 SQLite 路线冲突 |
+| Auto Storage Heuristic | SQLite 对所有规模够快，无需启发式切换 |
+| Watch mode | 非 Agent First，推出范围 |
+| `--no-git` 模式 | 随 Watch mode 一起排除 |
+| viz 命令 | 不需要可视化 |
+| 插件系统 | 推到 v3.0+ milestone |
+| Parser 扩展 Rust/Java/C++ | 只支持 TS/JS/Python/Go |
+| 14+ 语言 parser | 与 4 语言约束冲突 |
+| LLM 语义提取 | 与纯静态分析定位冲突 |
+| Embedding / 向量检索 | 与本地优先策略冲突 |
+| 交互可视化 | Mermaid 已满足需求 |
+| Betweenness centrality 实时计算 | O(n×m) 太慢，用跨社区边数近似 |
+
+---
+
+## 九、关键设计决策记录
+
+| # | 决策 | 理由 | 日期 |
+|---|------|------|------|
+| D-01 | v2.1 保持原样 close，新规划从 v2.2 开始 | 避免 scope 膨胀 | 2026-05-05 |
+| D-02 | SSE transport 合并到 P0-3 | 不依赖 cli_redirect 消灭，但同属 MCP 正式化 | 2026-05-05 |
+| D-03 | Interface Contract 1.0.0 降到 v2.6 | 纯打磨项，不阻塞核心能力 | 2026-05-05 |
+| D-04 | ARCHITECTURE.md 修复并入 P0-2 验收 | P0-2 删存储后端后架构文档必须同步 | 2026-05-05 |
+| D-05 | 删 FileSystem + 硬着陆（不可用报错+引导） | WASM 降级覆盖绝大多数环境 | 2026-05-05 |
+| D-06 | SmartParser 保留为独立 parser（~300 行） | TS Compiler API 类型推断仍有价值 | 2026-05-05 |
+| D-07 | 删除 FastParser | TreeSitterParser + WASM 完全替代 | 2026-05-05 |
+| D-08 | 全部 20+ 命令拆分 pure function | 避免新旧模式并存的混乱期 | 2026-05-05 |
+| D-09 | Schema 一次性重写 + 单独 milestone 做重设计 | 避免在旧 schema 上写查询再重写 | 2026-05-05 |
+| D-10 | Schema 保留 integer id + UNIQUE qn 索引 | B-tree 性能优势 + qn 查询效率 | 2026-05-05 |
+| D-11 | P1-5 路由门前移到 v2.2 | Agent 体验的基石，越早做越好 | 2026-05-05 |
+| D-12 | IMPORTS_FROM 权重提升到 0.7 | import 是影响传播第一跳，比 call 更静态确定 | 2026-05-05 |
+| D-13 | 增量更新只做 CLI + Hook，不做 Watch | Agent First，Watch 服务人类 | 2026-05-05 |
+| D-14 | `--on-change` 保持简单（只做增量更新） | Agent 可自己串联命令 | 2026-05-05 |
+| D-15 | 影响 CTE 分层摘要 + detail_level 三级 | Agent token 预算有限 | 2026-05-05 |
+| D-16 | 执行流两阶段交互（summary → trace） | Agent 有选择权，不被不完整数据淹没 | 2026-05-05 |
+| D-17 | Surprise 报告模式 + 路由门间接引导 | 置信度不够，需人类确认 | 2026-05-05 |
+| D-18 | Hub/Bridge 用 degree + 跨社区边数近似 | betweenness O(n×m) 太慢 | 2026-05-05 |
+| D-19 | Hook 首次提醒+后续静默，基于 Phase 58 检索指引 | 平衡提醒与干扰 | 2026-05-05 |
+| D-20 | 边置信度提前到 v2.3 | schema 重写时一并加字段，避免后续回填 | 2026-05-05 |
+| D-21 | 置信度分布目标替代精度百分比 | Agent 根据 confidence_tier 自行判断信任度 | 2026-05-05 |
+| D-22 | 社区自动命名（路径前缀优先），后续可加白名单/配置表 | v2.3 不做编辑，保持简单 | 2026-05-05 |
+| D-23 | 每个 milestone 自行处理 breaking change | 诚实报错 + migrate 脚本 | 2026-05-05 |
+| D-24 | PythonTypeEnhancer 纳入 v2.2 非阻塞 | ~150 行，docstring 类型推断有增量价值 | 2026-05-05 |
+| D-25 | 插件系统移出 v2.2-v2.6 | 用户数极少，Agent 端价值有限 | 2026-05-05 |
+| D-26 | P2-5 依赖 Phase 58 env-contract 接口，实施前 double-confirm | Phase 58 未通过验收，需确认兼容性 | 2026-05-05 |
+| D-27 | `codemap_context` 渐进式：v2.2 简化版（3 task，无 communities），v2.3+ 扩展 | 与后端能力同步 | 2026-05-05 |
+| D-28 | Pure function 统一接口：typed object input + ServiceResult<T> + 统一错误码 | MCP adapter 统一消费 | 2026-05-05 |

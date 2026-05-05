@@ -8,7 +8,7 @@ v2.0 milestone archive (roadmap + requirements + audit) is at `.planning/milesto
 
 ## Milestones
 
-- ○ **v2.1 ux-onboarding-enhancement** — Phases 53-58 (defining requirements)
+- ○ **v2.1 ux-onboarding-enhancement** — Phases 53-58 (Phase 58 subagent verification pending rework)
 - ✅ **v2.0 agent-native-foundation** — Phases 40.1-49 (shipped 2026-05-01)
 - ✅ **v1.11 release-followup-hardening** — Phases 38-40 (shipped 2026-04-29)
 - ✅ **v1.10 governance-debt-cleanup** — Phases 35-37 (shipped 2026-04-23)
@@ -313,8 +313,8 @@ Plans:
 3. At least one verification path invokes the built CLI through a subprocess, not only in-process TypeScript
 
 ### Phase 58: Subagent Environment Contract Retrieval
-**Status:** Completed 2026-05-03
-**UAT:** 10/10 passed, 0 issues
+**Status:** Implementation complete 2026-05-03; subagent verification pending rework
+**UAT:** 10/10 automated tests passed; 0 issues. Subagent end-to-end tests (S1-S3) pending redesign after official docs review (2026-05-03).
 **Goal:** At the project layer (not the platform layer), automatically discover project-specific environment contracts scattered across hooks, entry docs, package scripts, and rule-control helpers, and make them retrievable by sub-agents via CLI or MCP. Covers RTK shell wrapping, `[TAG] scope: message`, the real Vitest entry/commands, and rule-context verification expectations — retrieved by agent types that need them, not injected by the platform.
 **Depends on:** Phase 55, Phase 56, Phase 57
 **Requirements:** ABT-01, ABT-02, ABT-03, VER-03, SDC-01, SDC-02, SDC-03, SDC-04, SDC-05
@@ -332,7 +332,7 @@ Plans:
 - Retrieval-first only; do not generate `.mycodemap/prompt-snippets/`.
 - Evolve the Phase 55 env-contract seed writer instead of creating a parallel writer.
 - Treat executable facts as higher authority than generated docs when reporting conflicts.
-- Attempt both `claude -p` and `codex exec`; record explicit blockers if either runtime is unavailable.
+- Attempt real subagent verification via Claude Code Agent tool and Codex `.codex/agents/*.toml`; record explicit blockers if either runtime is unavailable. (Docs review 2026-05-03: `claude -p` is print mode, not subagent; `codex exec --agent` does not exist.)
 
 **Why the platform doesn't do this:**
 - Claude Code intentionally isolates sub-agents (`omitClaudeMd: true`); model-level prepend degrades to ~5% coverage under context pressure. `SubagentStart` hook `additionalContext` appends to user context and gets dropped during compaction. `PreToolUse` `updatedInput` for Agent tool is silently dropped (issue #39814).
@@ -396,21 +396,47 @@ Plans:
 
 </details>
 
-## Future Milestones (Preview)
+## Future Milestones (v2.2-v2.6: Architecture Convergence + Graph Intelligence)
 
-These are scoped but not yet initialized. Requirements and roadmaps will be created when each milestone starts.
+These are scoped based on the 2026-05-05 grill-with-docs session. Core constraints: **AI Agents First**, **4 languages (TS/JS/Python/Go)**, **SQLite-only storage**, **MCP direct execution**.
 
-- **v2.2 agent-integration-completion** — Auto-Provisioned Agent Skills, MCP `verify_contract` Tool. Trivial layers on top of v2.0 interface contract schema.
-- **v3.0 architecture-intelligence** — Auto-Generate design.md from codebase, Auto-Generate Architecture Remediation Patches, Self-Healing Design Contract (Drift Approval), SQLite + In-Memory Graph Migration. Heavy semantic analysis and storage refactoring; deserves a major version boundary.
-- **Continuous** — Path-Scoped Governance, Live Rulebook, Governance Self-Audit. Ongoing docs governance improvements, not gated by any single release.
+- **v2.2 architecture-foundation** — P0-1 Parser unify (TreeSitterParser main, SmartParser TS type enhance, delete FastParser/Hybrid), P0-2 Storage converge (delete KùzuDB/FileSystem, auto→sqlite hard-land), P0-3 MCP direct execution (all 20+ commands split to pure function + CLI wrapper + MCP adapter), P1-5 MCP routing gate (`codemap_context` tool + detail_level + tool filter). ~30-40 person-days.
+- **v2.3 schema-redesign-graph-capability** — SQLite schema rewrite (governance-v3 → graph-optimized, integer id + UNIQUE qn, FTS5, file_hashes, communities table, composite indexes, migration script), P2-2 edge confidence (EXTRACTED/INFERRED/AMBIGUOUS), P1-1 incremental update (git-diff + 2-hop cascade + 500 file cap + `--on-change`), P1-2 impact CTE (recursive CTE BFS + layered summary + detail_level), P1-3 community detection (ngraph + self-built Louvain + IMPORTS_FROM=0.7 + auto-naming). ~30-40 person-days.
+- **v2.4 agent-graph-experience** — P1-4 Surprise score (report mode, routed via codemap_context), P2-1 execution flow trace (two-phase: summary→trace with confidence), P2-4 bare-name resolution (cross-file, confidence distribution targets). ~20-25 person-days.
+- **v2.5 deep-analysis-hooks** — P2-3 Hub/Bridge (degree centrality + cross-community edge count), P2-5 Hook mechanism (first-remind-then-silent, based on Phase 58 env-contract retrieval guidance, **double-confirm Phase 58 compatibility before implementation**), P3-4 node dedup (3-layer strategy). ~15-18 person-days.
+- **v2.6 polish-and-stabilize** — P3-2 complexity unify, P3-5 MCP blank-line filter, P3-6 edge ID normalization, Interface Contract 1.0.0, SQLite+In-Memory optimization. ~10-15 person-days.
+
+### Explicitly Excluded from v2.2-v2.6
+
+| Item | Reason |
+|------|--------|
+| FastParser / Hybrid mode | TreeSitterParser + WASM fully replaces |
+| FileSystem backend | SQLite-only, WASM fallback covers edge cases |
+| KùzuDB backend | Conflicts with SQLite-only direction |
+| Auto Storage Heuristic | SQLite fast enough for all scales |
+| Watch mode | Not Agent First, deferred |
+| `--no-git` mode | Deferred with Watch mode |
+| viz command | No visualization needed |
+| Plugin system | Deferred to future milestone |
+| Parser extension (Rust/Java/C++) | Only TS/JS/Python/Go supported |
+| 14+ language parsers | Conflicts with 4-language constraint |
+| LLM semantic extraction | Conflicts with pure static analysis |
+| Embedding / vector search | Conflicts with local-first strategy |
+| Interactive visualization | Mermaid sufficient |
+| Betweenness centrality real-time | O(n×m) too slow, cross-community edge count approximated |
+
+### Also Deferred (from previous milestones)
+
+- **v3.0 architecture-intelligence** — Auto-Generate design.md, Remediation Patches, Self-Healing Design Contract, plugin system, additional language parsers. Major version boundary.
+- **Continuous** — Path-Scoped Governance, Live Rulebook, Governance Self-Audit. Ongoing docs governance.
 
 ## Next Options
 
-v2.1 is now active with 6 phases (53-58) and 24 requirements. To start execution:
+v2.1 is now active with 6 phases (53-58). To start execution:
 
-1. **`/gsd-discuss-phase 53`** — gather context and clarify approach for Phase 53
-2. **`/gsd-plan-phase 53`** — skip discussion, plan directly
-3. **Review v2.1 requirements** — `.planning/REQUIREMENTS.md`
+1. **Close v2.1** — Complete Phase 58 subagent verification rework
+2. **`/gsd-new-milestone v2.2`** — Initialize architecture-foundation milestone
+3. **`/gsd-discuss-phase <first-phase>`** — Gather context for first v2.2 phase
 
 > **Phase 50-52** remain independent unscheduled follow-ups. See `.planning/phases/50-*/`, `51-*/`, `52-*/` for gathered context.
 
