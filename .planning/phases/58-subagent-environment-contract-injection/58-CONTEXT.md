@@ -1,8 +1,8 @@
 # Phase 58 Context: Subagent Environment Contract Retrieval
 
 **Gathered:** 2026-05-02 (revised)
-**Status:** Ready for planning (v4 — docs review correction)
-**Source:** Cross-ecosystem agent delegation research + v2.1 milestone requirements (SDC-01~05) + live issue-status recheck + official docs verification (2026-05-03)
+**Status:** S1-S3 rework planned (v5 — subagent verification返工决策)
+**Source:** Cross-ecosystem agent delegation research + v2.1 milestone requirements (SDC-01~05) + live issue-status recheck + official docs verification (2026-05-03) + S1-S3 返工讨论 (2026-05-05)
 
 ---
 
@@ -149,6 +149,16 @@
 - **D-08：MCP 暴露首选走 interface contract 自动注册。** `mycodemap env-contract` 应注册到 `src/cli/interface-contract/commands/`，优先让 MCP 动态暴露等价工具；planner 必须验证 hyphen 命令名是否会被规范化为可用的 `codemap_env_contract` 形态。只有当命名或输出形状无法满足子代理查询时，才新增手写 native MCP tool。
 - **D-09：真实子代理验证遵循 roadmap 的更严格目标。** Requirement SDC-05 至少要求 Claude 或 Codex 一条真实子代理路径。Planner 应以"两者都做"为目标；若运行环境缺少其中一个平台，必须记录环境 blocker/waiver，不能静默降级。**[v4 修正]** `claude -p` 是单次提示模式（print mode），**不是**子代理机制（官方文档：https://code.claude.com/docs/en/cli-reference 确认 `-p` 为 non-interactive output）。真正的 Claude 子代理通过 Agent 工具派生，或 `claude --agent <name>` 启动会话级代理。Codex 子代理通过 `.codex/agents/*.toml` 配置 + 提示触发，`codex exec` 没有 `--agent` 参数。
 - **D-10：Phase 57 依赖风险必须显式处理。** ROADMAP 声明 Phase 58 depends on Phase 57，但 STATE 当前仍显示 Phase 57 ready_to_plan；planner 在开始 Phase 58 前必须确认 Phase 57 的真实状态，或把未完成依赖作为 plan 前置检查。
+
+### S1-S3 返工决策 (D-11~D-17, 2026-05-05 讨论)
+
+- **D-11：新建 58-05 Plan，不修补已有 plan。** S1-S3 子代理验证返工以独立 plan (58-05-PLAN.md) 组织，不混入已完成的 58-01~58-04 记录。Plan 范围：全链路返工（重写验证脚本 + 创建 Claude/Codex 子代理定义文件 + 手动测试协议文档 + 证据收集机制）。代码改动仅限测试/验证层，不触及生产代码。
+- **D-12：Claude 优先 + Codex 可选。** Claude 子代理验证是 SDC-05 的必须路径；Codex 子代理验证作为 optional，若运行环境缺少 Codex CLI 则记录 environment blocker/waiver，不阻塞 plan 或 v2.1 关闭。
+- **D-13：验证通过标准为"检索调用存在即通过"。** 子代理 output 中包含 `mycodemap env-contract` 或 `codemap_env_contract` 的调用痕迹（命令输出、MCP 调用记录）即为通过。不要求规则被应用——因为 `additionalContext`/`developer_instructions` 是文本注入，LLM 不保证执行，这是已知平台限制而非代码缺陷。
+- **D-14：子代理忽略检索指令 = 已知限制 + 改进提示。** 如果子代理忽略了系统提示中的检索指令，记录为"检索指引未被遵循"（已知限制），归类为 warn 而非 failure。改善方向是优化子代理定义文件中的系统提示措辞（增加 IMPORTANT/MANDATORY 标记、缩短步骤描述），不要求反复重试直到通过。
+- **D-15：SDC-05 是 v2.1 关闭硬门。** 必须完成至少一条 Claude 真实子代理验证才能关闭 v2.1 里程碑。Codex 验证可记录 environment blocker 后 waiver。最小通过条件：Claude 子代理一条即通过。
+- **D-16：验证方式为纯手动测试协议。** 不尝试自动化子代理派生（Claude Code 会话是交互式的，无法完全脚本化）。在 58-HUMAN-UAT.md 中写清晰的测试协议：创建子代理定义 → 启动 Claude Code → 派生子代理 → 收集 output → 判断是否检索。用户按步骤操作，复制结果作为证据。
+- **D-17：重写验证脚本为准备脚本。** 现有 `scripts/verify-subagent-env-contract.mjs` 用 `claude -p` / `codex exec --agent` 测试（两者都不是真正子代理），重写为准备工作脚本：创建子代理定义文件、生成 hook 配置、打印手动测试步骤指引。不尝试自动启动子代理。保留完整证据收集机制（prompt + output + 判断结果写入 `docs/generated/phase-58/subagent-evidence/`）。
 
 </decisions>
 
@@ -401,5 +411,5 @@ IMPORTANT: The above retrieval step is MANDATORY. Do not skip it.
 ---
 
 *Phase: 58-subagent-environment-contract-injection*
-*Context gathered: 2026-05-02 (revised v3)*
+*Context gathered: 2026-05-02 (revised v5 — 2026-05-05)*
 *Design philosophy: retrieval over injection*
