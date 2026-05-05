@@ -1,1 +1,5 @@
 timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
+2026-05-02T19:18	1050c20	doc-citation-audit	63.8	67.9	keep	检查点设计	增加3个关键决策检查点	dry_run
+2026-05-02T19:19	2d2ec01	doc-citation-audit	67.9	71.9	keep	Frontmatter	补充标准YAML frontmatter	dry_run
+2026-05-02T19:21	ea136be	doc-citation-audit	71.9	75.6	keep	边界条件	新增6种异常场景处理表	dry_run
+2026-05-02T19:26	dca79e6	doc-citation-audit	75.6	80.6	keep	整体架构	探索性重写，重组结构	dry_run

@@ -1,0 +1,6 @@
+timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
+2026-05-02T18:35	baseline	poc-validator	-	74.1	baseline	-	初始基线评估（旧版无frontmatter）	full_test
+2026-05-02T18:42	ce72f4f	poc-validator	74.1	80.5	keep	Frontmatter质量	已存在：添加YAML frontmatter含name/description/触发词	full_test
+2026-05-02T18:45	d4ff8d1	poc-validator	80.5	83.3	keep	检查点设计	插入3个强制确认检查点（Pre-flight/Data/Failure）	full_test
+2026-05-02T18:47	01ac520	poc-validator	83.3	84.3	keep	资源整合度	添加附录：test-prompts.json、results.tsv、bash片段模板	full_test
+2026-05-02T18:50	e1f92c2	poc-validator	84.3	89.5	keep	探索性重写	决策树驱动+快速/深度路径+精简40%+实测提升	full_test
