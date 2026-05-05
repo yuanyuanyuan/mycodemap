@@ -3,7 +3,11 @@
 // [META] since:2026-03-03 | owner:orchestrator-team | stable:true
 // [WHY] CLI 入口点，注册命令并初始化运行日志
 
+import { createRequire } from 'module';
 import { Command } from 'commander';
+
+const require = createRequire(import.meta.url);
+const pkg = require('../../package.json');
 import { generateCommand } from './commands/generate.js';
 import { initCommand } from './commands/init.js';
 import { queryCommand } from './commands/query.js';
@@ -116,8 +120,8 @@ async function createActionHandler<TArgs extends unknown[]>(
 program
   .name('mycodemap')
   .alias('codemap')  // 兼容旧命令名
-  .description('TypeScript 代码地图工具 - 为 AI 辅助开发提供结构化上下文')
-  .version('0.1.0')
+  .description(`TypeScript 代码地图工具 v${pkg.version} - 为 AI 辅助开发提供结构化上下文`)
+  .version(pkg.version)
   .option('--apply-suggestion', 'Allow automatic execution of high-confidence remediation suggestions (confidence >= 0.8)')
   .option('--wasm-fallback', 'Automatically use WASM fallback when native dependencies fail to compile')
   .option('--native', 'Force native binary usage for tree-sitter and better-sqlite3 (disables WASM fallback)');
