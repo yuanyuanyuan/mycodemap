@@ -6,8 +6,8 @@ current_phase: 58
 current_phase_name: subagent-environment-contract-injection
 current_plan: 4
 status: rework
-last_updated: "2026-05-03T10:17:00.000Z"
-last_activity: 2026-05-03
+last_updated: "2026-05-05T12:00:00.000Z"
+last_activity: 2026-05-05
 progress:
   total_phases: 9
   completed_phases: 4
@@ -35,8 +35,8 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 **Total Plans in Milestone:** 10 planned (8 complete)
 **Status:** Phase 58 implementation complete; subagent end-to-end verification pending (S1-S3 rework required)
 **Progress:** [████████░░] ~80% phase completion (5/5 plans executed, 10/10 automated UAT passed); v2.1 milestone **not closed** — blocked on real subagent verification
-**Last Activity:** 2026-05-03
-**Last Activity Description:** Phase 58 docs review completed — official docs confirm `claude -p` is not subagent, `codex exec --agent` does not exist; subagent verification tests S1-S3 need redesign
+**Last Activity:** 2026-05-05
+**Last Activity Description:** Phase 58 context updated with S1-S3 返工 decisions (D-11~D-17): new 58-05 Plan, Claude 优先+Codex 可选, 执行即通过标准, v2.1 硬门, 纯手动测试协议, 重写验证脚本为准备脚本
 
 ## Decisions Made
 
