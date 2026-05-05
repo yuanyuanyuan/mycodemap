@@ -318,15 +318,15 @@ Plans:
 **Goal:** At the project layer (not the platform layer), automatically discover project-specific environment contracts scattered across hooks, entry docs, package scripts, and rule-control helpers, and make them retrievable by sub-agents via CLI or MCP. Covers RTK shell wrapping, `[TAG] scope: message`, the real Vitest entry/commands, and rule-context verification expectations — retrieved by agent types that need them, not injected by the platform.
 **Depends on:** Phase 55, Phase 56, Phase 57
 **Requirements:** ABT-01, ABT-02, ABT-03, VER-03, SDC-01, SDC-02, SDC-03, SDC-04, SDC-05
-**Plans:** 4 planned (Phase 57 dependency preflight required before execution)
+**Plans:** Historical implementation waves `58-01` through `58-04` are complete; the only remaining work is `58-05` for S1-S3 verification rework.
 
 **Design doc:** `.planning/phases/58-subagent-environment-contract-injection/58-DESIGN.md`
 
-**Plan files:**
-- Wave 1 — `.planning/phases/58-subagent-environment-contract-injection/58-01-PLAN.md`: Project Environment Contract model, discovery, drift/conflict checks, and Phase 55 seed migration.
-- Wave 2 *(blocked on Wave 1 completion)* — `.planning/phases/58-subagent-environment-contract-injection/58-02-PLAN.md`: `mycodemap env-contract`, interface contract registration, MCP `codemap_env_contract`, and built CLI subprocess verification.
-- Wave 3 *(blocked on Waves 1-2 completion)* — `.planning/phases/58-subagent-environment-contract-injection/58-03-PLAN.md`: init assistant retrieval guidance and doctor env-contract diagnostics.
-- Wave 4 *(blocked on Waves 1-3 completion)* — `.planning/phases/58-subagent-environment-contract-injection/58-04-PLAN.md`: temp-repo E2E, Claude/Codex evidence harness, negative no-retrieval case, and docs sync.
+**Completed historical plans:**
+- `58-01` through `58-04` delivered the shipped env-contract implementation and supporting automated coverage; their historical `PLAN/SUMMARY/RESEARCH/PATTERNS/DISCUSSION-LOG` artifacts now live under `.planning/archive/phases/58-subagent-environment-contract-injection/` to keep the active Phase 58 surface focused on the remaining `58-05` work.
+
+**Current remaining plan:**
+- Wave 5 — `.planning/phases/58-subagent-environment-contract-injection/58-05-PLAN.md`: re-baseline S1-S3 verification truth, replace the fake harness with a preparation workflow, stage Claude-required/Codex-optional evidence capture, and close Phase 58 with real subagent proof.
 
 **Cross-cutting constraints:**
 - Retrieval-first only; do not generate `.mycodemap/prompt-snippets/`.

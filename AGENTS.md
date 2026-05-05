@@ -96,6 +96,7 @@
 
 ## 7. 代码与改动规则
 
+- Commit 消息格式：`[TAG] scope: message`，TAG 必须大写。有效 TAG：`BUGFIX`、`FEATURE`、`REFACTOR`、`CONFIG`、`DOCS`、`DELETE`。示例：`[FEATURE] cli: add new command`。
 - 保持最小改动面，优先与现有风格一致。
 - TypeScript 源文件（非测试）必须保留文件头中的 `[META]` 与 `[WHY]`。
 - 默认遵守严格模式、ESM、ES2022、返回类型显式、`unknown` 优于 `any`。
@@ -129,7 +130,7 @@
 ## 9. 交付与文档同步底线
 
 - 交付时至少说明：改了什么、为什么改、如何验证、还剩什么风险。
-- 若改动会影响接口、CLI、配置、架构、规则、验证流程、输出契约或 agent 路由，必须同步对应的 authoritative docs。
+- 若改动会影响接口、CLI、配置、架构、规则、验证流程、输出契约或 agent 路由，必须同步对应的权威文档。
 - 详细文档同步触发条件、AI 友好文档 authoring 规则、任务模板与交付 checklist 统一在 `docs/rules/engineering-with-codex-openai.md` 定权。
 - AI 友好文档的**结构清晰要求**、**决策树要求**、**速查表要求**、**代码可复现要求**、**类型定义要求**与**提示词模板要求**统一在 `docs/rules/engineering-with-codex-openai.md` 定权。
 - 若判断“不需要更新文档”，也要明确写出原因。

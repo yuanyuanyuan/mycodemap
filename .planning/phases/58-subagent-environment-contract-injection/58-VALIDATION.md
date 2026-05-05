@@ -42,6 +42,10 @@ created: 2026-05-02
 | 58-03-02 | 03 | 3 | SDC-04 | T-58-07 | Doctor reports stale/missing critical contract and warn-only conflicts | unit/integration | `npx vitest run src/cli/doctor src/cli/env-contract` | W0 | pending |
 | 58-04-01 | 04 | 4 | VER-03, SDC-05 | T-58-08 | Built CLI works in temp repo and records success/failure evidence | subprocess/e2e | `npm run build && npx vitest run tests/e2e` | W0 | pending |
 | 58-04-02 | 04 | 4 | SDC-05 | T-58-09 | Claude/Codex attempts are real or explicitly blocked with evidence | manual/automated harness | `node scripts/verify-subagent-env-contract.mjs` | W0 | pending |
+| 58-05-01 | 05 | 5 | SDC-05 | T-58-17 | Verification docs no longer accept `claude -p` / blocker-only evidence as phase closure truth | docs/rebaseline | `rtk rg -n "Claude required|Codex optional|retrieval call exists" .planning/phases/58-subagent-environment-contract-injection/58-HUMAN-UAT.md .planning/phases/58-subagent-environment-contract-injection/58-UAT.md .planning/phases/58-subagent-environment-contract-injection/58-VERIFICATION.md` | W0 | pending |
+| 58-05-02 | 05 | 5 | SDC-05, VER-03 | T-58-18 | Preparation script stages real verification fixtures and evidence templates without pretending to run a subagent | subprocess/filesystem | `rtk npm run build && rtk node scripts/verify-subagent-env-contract.mjs` | W0 | pending |
+| 58-05-03 | 05 | 5 | SDC-05 | T-58-19 | Claude manual session captures retrieval-before-work evidence; Codex records pass or explicit waiver | checkpoint/manual | `See 58-HUMAN-UAT.md and verify docs/generated/phase-58/subagent-evidence/*.json` | W0 | pending |
+| 58-05-04 | 05 | 5 | SDC-05 | T-58-19 | Verification report and state reflect the checkpoint evidence exactly, without silent success | docs/rollup | `rtk rg -n "claude-subagent.json|claude-session.md|codex-subagent.json" .planning/phases/58-subagent-environment-contract-injection/58-VERIFICATION.md .planning/phases/58-subagent-environment-contract-injection/58-UAT.md .planning/STATE.md` | W0 | pending |
 
 ## Wave 0 Requirements
 
@@ -53,8 +57,8 @@ created: 2026-05-02
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| Claude Code real subagent path | SDC-05 | Requires installed/authenticated `claude` CLI and platform runtime | Run the generated harness in an isolated temp repo and verify transcript shows `mycodemap env-contract --for <type> --json` or MCP retrieval before task work. |
-| Codex real subagent path | SDC-05 | Requires installed/authenticated `codex` CLI and platform runtime | Run the generated harness in an isolated temp repo and verify transcript shows `codemap_env_contract` or `mycodemap env-contract` retrieval before task work. |
+| Claude Code real subagent path | SDC-05 | Required closure gate; the interactive Agent path cannot be automated end-to-end | Use `.claude/agents/env-contract-verifier.md`, save the session transcript to `docs/generated/phase-58/subagent-evidence/claude-session.md`, and require `claude-subagent.json` to show retrieval evidence before work. |
+| Codex real subagent path | SDC-05 | Optional parity path; absence is a waiver only if the exact blocker is captured | Use `.codex/agents/env-contract-verifier.toml` when available, or record the environment blocker/waiver in `docs/generated/phase-58/subagent-evidence/codex-subagent.json`. |
 
 ## Validation Sign-Off
 

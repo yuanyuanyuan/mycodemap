@@ -1,7 +1,11 @@
 ---
 status: rework
 phase: 58-subagent-environment-contract-injection
-source: [58-01-SUMMARY.md, 58-02-SUMMARY.md, 58-03-SUMMARY.md, 58-04-SUMMARY.md]
+source:
+  - .planning/archive/phases/58-subagent-environment-contract-injection/58-01-SUMMARY.md
+  - .planning/archive/phases/58-subagent-environment-contract-injection/58-02-SUMMARY.md
+  - .planning/archive/phases/58-subagent-environment-contract-injection/58-03-SUMMARY.md
+  - .planning/archive/phases/58-subagent-environment-contract-injection/58-04-SUMMARY.md
 started: 2026-05-02T17:42:00.000Z
 updated: 2026-05-03T02:00:00.000Z
 ---
@@ -41,7 +45,7 @@ notes: "contract-schema-ok (ok) and env-contract-conflict (warn) both present in
 ### 7. Init creates env-contract as InitAsset
 expected: Running `node dist/cli/index.js init` in a project without `.mycodemap/env-contract.json` generates the file. Init receipt lists env-contract as an InitAsset.
 result: pass
-notes: "reconciler.ts wires env-contract-plan into createInitPlan/applyInitPlan per 58-03-SUMMARY"
+notes: "reconciler.ts wires env-contract-plan into createInitPlan/applyInitPlan per archived 58-03-SUMMARY"
 
 ### 8. E2E test suite passes
 expected: Running `npm run test:e2e` passes all 6 env-contract retrieval tests (init+retrieval, --check, doctor diagnostic, drift detection, hook rejection, wrong command).

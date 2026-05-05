@@ -4,7 +4,7 @@ milestone: v2.1
 milestone_name: milestone
 current_phase: 58
 current_phase_name: subagent-environment-contract-injection
-current_plan: 4
+current_plan: 5
 status: rework
 last_updated: "2026-05-05T12:00:00.000Z"
 last_activity: 2026-05-05
@@ -30,13 +30,13 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 **Milestone:** v2.1 — ux-onboarding-enhancement
 **Current Phase:** 58
 **Current Phase Name:** subagent-environment-contract-injection
-**Current Plan:** 1
+**Current Plan:** 5
 **Total Phases:** 6 scoped (53-58)
 **Total Plans in Milestone:** 10 planned (8 complete)
 **Status:** Phase 58 implementation complete; subagent end-to-end verification pending (S1-S3 rework required)
 **Progress:** [████████░░] ~80% phase completion (5/5 plans executed, 10/10 automated UAT passed); v2.1 milestone **not closed** — blocked on real subagent verification
 **Last Activity:** 2026-05-05
-**Last Activity Description:** Phase 58 context updated with S1-S3 返工 decisions (D-11~D-17): new 58-05 Plan, Claude 优先+Codex 可选, 执行即通过标准, v2.1 硬门, 纯手动测试协议, 重写验证脚本为准备脚本
+**Last Activity Description:** Phase 58 planning scope clarified: historical 58-01~58-04 artifacts stay for record only; the sole remaining work is 58-05 (Claude-required real subagent evidence, Codex optional waiver path).
 
 ## Decisions Made
 
