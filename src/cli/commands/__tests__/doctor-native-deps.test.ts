@@ -54,11 +54,9 @@ describe('checkNativeDeps', () => {
     expect(sqliteResult!.severity).toBe('ok');
   });
 
-  it('returns error for better-sqlite3 when not available', async () => {
+  it('returns warn for better-sqlite3 when not available but fallback exists', async () => {
     mockDetectTreeSitterSync.mockReturnValue({ isAvailable: true, version: '0.21.1' });
 
-    // Mock node:module to make createRequire throw for better-sqlite3
-    // Must reset module cache and use doMock before re-importing
     vi.resetModules();
     vi.doMock('../../tree-sitter-check.js', () => ({
       detectTreeSitterSync: (...args: unknown[]) => mockDetectTreeSitterSync(...args),
@@ -82,10 +80,20 @@ describe('checkNativeDeps', () => {
     const { checkNativeDeps } = await import('../../doctor/check-native-deps.js');
     const results = checkNativeDeps();
 
-    const sqliteResult = results.find(
-      (r) => r.id === 'native-dep-missing' && r.message.includes('better-sqlite3')
-    );
-    expect(sqliteResult).toBeDefined();
-    expect(sqliteResult!.severity).toBe('error');
+    // Node >= 22 has node:sqlite fallback, so better-sqlite3 missing yields warn not error
+    const nodeMajor = Number(process.versions.node.split('.')[0]);
+    if (nodeMajor >= 22) {
+      const sqliteResult = results.find(
+        (r) => r.id === 'sqlite-family-fallback-available' && r.message.includes('better-sqlite3')
+      );
+      expect(sqliteResult).toBeDefined();
+      expect(sqliteResult!.severity).toBe('warn');
+    } else {
+      const sqliteResult = results.find(
+        (r) => r.id === 'native-dep-missing' && r.message.includes('better-sqlite3')
+      );
+      expect(sqliteResult).toBeDefined();
+      expect(sqliteResult!.severity).toBe('error');
+    }
   });
 });

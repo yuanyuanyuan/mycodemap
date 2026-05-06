@@ -226,31 +226,57 @@ mycodemap mcp start      # Start local stdio MCP server
 
 | Document | Audience | Content |
 |----------|----------|---------|
-| [🧭 Docs Index](docs/README.md) | All readers | Document layers, reading order, migration status |
-| [🏗️ Architecture](ARCHITECTURE.md) | Developers | System map, module boundaries, main execution flows |
-| [📖 Setup Guide](docs/SETUP_GUIDE.md) | Human developers | Full installation, configuration, and usage guide |
-| [📁 Examples](examples/) | All users | Ready-to-use configuration files |
+| [Docs Index](docs/README.md) | All readers | Document layers, reading order, migration status |
+| [Architecture](ARCHITECTURE.md) | Developers | System map, module boundaries, main execution flows |
+| [Setup Guide](docs/SETUP_GUIDE.md) | Human developers | Full installation, configuration, and usage guide |
+| [Examples](examples/) | All users | Ready-to-use configuration files |
 
-### 🤖 AI / Agent Docs
+### AI / Agent Docs
 
 | Document | Description |
 |----------|-------------|
-| **[📘 AI_GUIDE.md](AI_GUIDE.md)** | **AI main guide** — quick reference, command decision tree, prompt templates |
-| **[🚀 Quick Start](docs/ai-guide/QUICKSTART.md)** | Scenario-to-command mapping |
-| **[📚 Commands](docs/ai-guide/COMMANDS.md)** | Full CLI command reference |
-| **[📊 Output Schema](docs/ai-guide/OUTPUT.md)** | JSON output structure parsing |
-| **[🔧 Integration](docs/ai-guide/INTEGRATION.md)** | MCP/Agent integration, error handling |
-| **[🛡️ AGENTS.md](AGENTS.md)** | Repository-level constraints |
-| **[⚡ CLAUDE.md](CLAUDE.md)** | AI entry routing |
+| **[AI_GUIDE.md](AI_GUIDE.md)** | **AI main guide** — quick reference, command decision tree, prompt templates |
+| **[Quick Start](docs/ai-guide/QUICKSTART.md)** | Scenario-to-command mapping |
+| **[Commands](docs/ai-guide/COMMANDS.md)** | Full CLI command reference |
+| **[Output Schema](docs/ai-guide/OUTPUT.md)** | JSON output structure parsing |
+| **[Integration](docs/ai-guide/INTEGRATION.md)** | MCP/Agent integration, error handling |
+| **[AGENTS.md](AGENTS.md)** | Repository-level constraints |
+| **[CLAUDE.md](CLAUDE.md)** | AI entry routing |
 
 ---
 
 ## Contributing
 
-See [README.zh-CN.md](./README.zh-CN.md) for full development setup, commit conventions, and coding standards (中文版本包含完整的开发环境搭建、提交规范和代码规范).
+See [README.zh-CN.md](./README.zh-CN.md) for full development setup, commit conventions, and coding standards.
 
 ---
 
 ## License
 
 [MIT](LICENSE)
+
+---
+
+## v2.2 Corrections
+
+The following items in earlier sections of this README describe behavior from before Phase 59 (parser cutover) and Phase 60 (storage convergence) and are now outdated:
+
+1. **"Dual parsing modes -- `fast` (regex) and `smart` (TypeScript AST)"** (Core Capabilities) -- **Outdated.** Phase 59 cut over the parser to a single tree-sitter-based registry path. The `fast`, `smart`, and `hybrid` modes are now deprecated; passing any of them triggers a `DEPRECATED_PARSER_MODE` error (error code `DEPRECATED_PARSER_MODE`, confidence 0.98). The only active parser mode is `tree-sitter`, which uses a registry-backed parser that selects the correct language parser by file extension. Use `mycodemap generate` without a `--mode` flag.
+
+2. **`mycodemap generate` -- "Default hybrid mode" and "Analysis mode: `fast`, `smart`, or `hybrid` | `hybrid`"** (CLI Commands) -- **Outdated.** The default mode is now `tree-sitter`. The `--mode` flag still accepts `fast`/`smart`/`hybrid` for backward compatibility, but these values are rejected at runtime with the `DEPRECATED_PARSER_MODE` error. Correct usage:
+
+   ```bash
+   mycodemap generate                    # Default tree-sitter mode (registry-backed)
+   mycodemap generate -o ./docs/codemap  # Custom output directory
+   mycodemap generate --symbol-level     # Extra symbol-level call deps
+   ```
+
+   Updated option table:
+
+   | Option | Description | Default |
+   |--------|-------------|---------|
+   | `-m, --mode <mode>` | Parser mode. Only `tree-sitter` is active; `fast`/`smart`/`hybrid` are deprecated and will error | `tree-sitter` |
+   | `-o, --output <dir>` | Output directory | `.mycodemap` |
+   | `--symbol-level` | Materialize symbol-level `call` deps | `false` |
+
+3. **"Multi-format export and storage abstraction -- Export graph data with filesystem / memory / sqlite backends"** (Core Capabilities) -- **Outdated.** Phase 60 converges storage to SQLite family + memory backends. The `filesystem`, `kuzudb`, and `neo4j` storage types are now classified as `DeprecatedStorageType` and are rejected at runtime with an `UNSUPPORTED_STORAGE_TYPE` error (confidence 0.97). The active storage types are `sqlite` (recommended for persistence) and `memory` (for tests). Use `storage.type: "sqlite"` or `"auto"` in configuration.

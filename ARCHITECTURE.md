@@ -1,176 +1,163 @@
-# ARCHITECTURE.md - CodeMap 系统总图
+<!-- generated-by: gsd-doc-writer -->
 
-> 本文档只回答三个问题：系统是什么、主要模块如何协作、详细信息去哪里找。
-> 详细设计、规则与计划不在这里展开，统一下沉到 `docs/`。
+# Architecture
 
-## 1. 系统定位
+## System Overview
 
-CodeMap 是一个面向 TypeScript / JavaScript / Go 项目的 AI-Native 优先代码架构治理基础设施，`v2.0` 已把 CLI 表面升级为 schema 驱动的自描述统一接口。目标是为 AI/Agent 提供结构化、可预测、可机器消费的代码上下文。当前仓库处于 v2.0 已交付状态：Interface Contract Schema、MCP Automatic Gateway、AI-First Default Output、doctor 诊断、WASM Fallback 均已实现，legacy CLI / workflow / release surfaces 与 MVP3 分层架构并存。
+CodeMap (@mycodemap/mycodemap) is a TypeScript code map tool that provides structured context for AI-assisted development. It analyzes source code across TypeScript/JavaScript, Python, and Go projects, extracting symbols, dependencies, call graphs, and type information, then outputs the results as JSON, Markdown (AI_MAP.md), or Mermaid diagrams. The system follows an MVP3 layered architecture with five distinct layers: CLI, Server, Domain, Infrastructure, and Interface. Its primary input is a project directory on the local filesystem; its primary output is a `CodeMap` data structure that can be persisted to SQLite storage, served via HTTP API, or rendered into human/AI-readable documentation.
 
-- 作为 CLI：以代码地图生成、查询、依赖/影响/复杂度分析、导出、CI 护栏为主要产品面。
-- 作为库：通过 `dist/index.js` 暴露分析、解析与生成能力。
-- 当前公共 CLI 聚焦核心分析命令、`workflow`、`export` 与 `ship`；`server`、`watch`、`report`、`logs` 已从 public CLI 移除，但相关实现仍留在仓库中。
+## Component Diagram
 
-当前运行时与构建事实：
+```mermaid
+graph TD
+    CLI[CLI - Commander] --> Core[Core - Analyzer]
+    CLI --> Generator[Generator - Output Formats]
+    CLI --> Server[Server - Hono HTTP]
+    CLI --> Watcher[Watcher - File Watcher]
+    CLI --> Plugins[Plugins - Plugin Registry]
 
-- 语言与模块：TypeScript + JavaScript + Go
-- 编译输出：`dist/`
-- CLI 入口：`dist/cli/index.js`
-- 目标环境：Node.js >= 18
-- 命名边界：`Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令。
+    Core --> ParserFacade[Parser - RegistryBackedParser]
+    Core --> FileDiscovery[File Discovery - Globby]
+    Core --> Generator
 
-## 2. 分层原则
+    ParserFacade --> ParserRegistry[ParserRegistry]
+    ParserRegistry --> TSParser[TypeScriptParser]
+    ParserRegistry --> GoParser[GoParser]
+    ParserRegistry --> PyParser[PythonParser]
+    ParserFacade --> TSEnhancer[TypeScriptTypeEnhancer]
 
-### 2.1 MVP3 分层架构（2026-03 重构）
+    Server --> QueryHandler[QueryHandler]
+    Server --> AnalysisHandler[AnalysisHandler]
+    Server --> MCP[MCP Gateway]
 
-CodeMap 已完成 MVP3 架构重构，采用清晰的分层设计：
+    QueryHandler --> Storage[IStorage - SQLite]
+    AnalysisHandler --> DomainServices[Domain - CodeGraphBuilder]
+    DomainServices --> DomainRepos[Domain Repositories]
+    DomainRepos --> Storage
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        CLI Layer                            │
-│  命令行接口，注册命令、参数解析、用户交互                      │
-├─────────────────────────────────────────────────────────────┤
-│                      Server Layer                           │
-│  HTTP API 服务器，RESTful 端点，Handler 处理                  │
-├─────────────────────────────────────────────────────────────┤
-│                       Domain Layer                          │
-│  核心业务逻辑，领域实体 (Project/Module/Symbol/Dependency)    │
-│  领域服务 (CodeGraphBuilder)，领域事件                        │
-├─────────────────────────────────────────────────────────────┤
-│                   Infrastructure Layer                      │
-│  技术实现细节：                                              │
-│  ├── Storage (FileSystem/Memory/KùzuDB/Neo4j)              │
-│  ├── Parser (TypeScript/Go/Python + Registry)              │
-│  └── Repository (CodeGraphRepositoryImpl)                  │
-├─────────────────────────────────────────────────────────────┤
-│                     Interface Layer                         │
-│  类型定义与契约，跨层共享的接口                               │
-└─────────────────────────────────────────────────────────────┘
+    Storage --> SQLiteStorage[SQLiteStorage]
+    Storage --> MemoryStorage[MemoryStorage]
+
+    CLI --> ErrorSystem[Error System - normalizeError]
+    ErrorSystem --> ErrorCodes[ErrorCodes Registry]
 ```
 
-**分层依赖规则**（严格自上而下）：
-- CLI → Server → Domain → Infrastructure → Interface
-- 禁止跨层依赖（如 Domain 层不得导入 CLI 模块）
-- 同层内可以相互依赖
+## Data Flow
 
-**命名边界提醒：**
-- `Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令。
-- 本文件描述的是分层事实，不为某个公开 CLI 命令是否保留背书。
+A typical `mycodemap generate` invocation moves through the system as follows:
 
-### 2.2 原有分层（逐步迁移中）
+1. **CLI entry** (`src/cli/index.ts`) -- Commander parses the command and flags. The `createActionHandler` wrapper runs platform validation, tree-sitter availability checks, and delegates to the command action.
 
-- 入口层只负责接收用户意图与参数，不承载深层分析逻辑。
-- 编排层负责多工具路由、结果融合、CI 护栏与工作流协同。
-- 分析层负责文件发现、解析、全局索引、依赖图与项目摘要。
-- 生成层负责把分析结果转成 AI 可消费的文档与 JSON。
-- 支撑层负责缓存、文件监听、工作线程、插件扩展与共享类型。
+2. **Generate command** (`src/cli/commands/generate.ts`) -- Reads project config via `config-loader.ts`, resolves the root directory, and calls the core `analyze()` function.
 
-## 3. 顶层架构
+3. **File discovery** (`src/core/file-discovery.ts`) -- `discoverProjectFiles()` uses Globby with default include patterns (`src/**/*.{ts,tsx,js,jsx,py,go}`) and exclude patterns (`node_modules/**`, `dist/**`, `.venv/**`, `**/__pycache__/**`, `vendor/**`, etc.). The function is `.gitignore`-aware.
 
-```text
-User / CI / Agent
-        │
-        ▼
-src/cli/index.ts
-  ├─ commands/*        命令入口与参数解析
-  ├─ runtime-logger    运行日志
-  ├─ platform-check    平台校验
-  └─ tree-sitter-check 特定命令前置检查
-        │
-        ├──────────────► src/orchestrator/*
-        │                 多工具编排 / CI 护栏 / 工作流
-        │
-        └──────────────► src/core/* + src/parser/*
-                          文件发现 / 解析 / 全局索引 / 依赖图
-                                   │
-                                   ▼
-                       src/generator/* + src/plugins/*
-                          输出生成 / 扩展分析
-                                   │
-                     ┌─────────────┴─────────────┐
-                     ▼                           ▼
-              .mycodemap/*                CLI 屏幕输出 / 导出产物
+4. **Parsing** (`src/core/analyzer.ts`) -- The analyzer creates a `ParserRegistry` via `createDefaultParserRegistry()` which registers TypeScriptParser, GoParser, and PythonParser. For each discovered file, `registry.getParserByFile(filePath)` selects the correct parser by file extension. Each parser is initialized once per language, then `parseFile()` extracts imports, exports, symbols, call graph, and complexity data via tree-sitter.
+
+5. **TypeScript enhancement** -- After all files are parsed, `TypeScriptTypeEnhancer.enhance()` runs a second-pass over `.ts`/`.tsx` results only, using the internal SmartParser to enrich type information, call graphs, and complexity metrics. Python and Go files skip this step.
+
+6. **Global index and dependency graph** -- `createGlobalIndex()` builds a cross-file symbol index and resolves cross-file call chains. `buildDependencyGraph()` constructs the module dependency graph with proper import-path resolution, including `index.ts` variants and extension stripping.
+
+7. **Output generation** (`src/generator/index.ts`) -- The `CodeMap` result is written to `codemap.json`, `AI_MAP.md` (with Mermaid dependency diagrams), or per-file `CONTEXT.md` documents.
+
+8. **Storage** -- If persistent storage is configured, the `CodeMap` is persisted via `IStorage` to SQLite (native `better-sqlite3`, WASM `sql.js`, or `node:sqlite`).
+
+## Key Abstractions
+
+| Abstraction | Description | Location |
+|---|---|---|
+| `IParser` | Parser interface with `parseFile`, `parseFiles`, and `dispose` methods | `src/parser/interfaces/IParser.ts` |
+| `ILanguageParser` | Language-specific parser contract for the registry system | `src/interface/types/parser.ts` |
+| `IParserRegistry` | Registry that maps language IDs and file extensions to parsers | `src/interface/types/parser.ts` |
+| `ParserRegistry` | Concrete registry implementation managing parser registration and lookup | `src/infrastructure/parser/registry/ParserRegistry.ts` |
+| `IStorage` / `IStorageFactory` | Storage abstraction for code graph persistence and querying | `src/interface/types/storage.ts` |
+| `StorageFactory` | Factory that creates SQLite or Memory storage, rejecting legacy backends | `src/infrastructure/storage/StorageFactory.ts` |
+| `CodeMap` | Root data structure containing project info, modules, dependencies, and graph status | `src/interface/types/index.ts` |
+| `CodeMapServer` | Hono-based HTTP server exposing query and analysis endpoints. `Server Layer` 是内部架构层，不等于公共 `mycodemap server` 命令 | `src/server/CodeMapServer.ts` |
+| `normalizeError()` | Error normalization that preserves known ErrorCodes and maps patterns to remediation | `src/cli/output/errors.ts` |
+| `TypeScriptTypeEnhancer` | Post-parse enhancer that enriches TS/TSX results with type info, call graphs, complexity | `src/parser/enhancers/TypeScriptTypeEnhancer.ts` |
+| `CodeGraphBuilder` | Domain service for building code graphs from module analysis results | `src/domain/services/CodeGraphBuilder.ts` |
+| `AnalysisHandler` | Server handler for analysis operations; rejects deprecated parser modes with 400 | `src/server/handlers/AnalysisHandler.ts` |
+
+## Directory Structure Rationale
+
+```
+src/
+  cli/            CLI entry point, commands, config loading, error formatting, and output system
+  cli-new/        Next-generation CLI experiments (not yet active)
+  core/           Analysis orchestration, file discovery, AST complexity analysis, global symbol index
+  domain/         DDD-style domain layer: entities (Project, Module, Symbol, Dependency, CodeGraph),
+                  services (CodeGraphBuilder), repositories, and domain events
+  generator/      Output generation: AI_MAP.md, codemap.json, CONTEXT.md, Mermaid diagrams
+  infrastructure/ Infrastructure implementations: parser registry + language parsers, storage adapters
+  interface/      Interface layer (types + config): canonical type definitions shared across all layers
+  orchestrator/   Workflow orchestration: git analysis, history risk, test linking, tool orchestration
+  parser/         Parser facade: factory, IParser interface, deprecated mode handling, TypeScriptTypeEnhancer
+  plugins/        Plugin system: registry, loader, built-in integrations
+  server/         HTTP server (Hono), handlers, MCP gateway, route definitions
+  types/          Legacy type declarations (third-party module .d.ts files)
+  watcher/        File watching daemon and worker for incremental updates
+  worker/         Parse worker for offloaded parsing
+  cache/          Caching layer: LRU cache, file hash cache, parse cache
 ```
 
-## 4. 顶层模块职责
+The `interface/` directory is the dependency-inversion boundary: it defines contracts (types, config schemas) that both higher and lower layers depend on, preventing circular dependencies. The `domain/` layer owns business logic and entity definitions but depends only on interface contracts, not on infrastructure details. The `infrastructure/` layer provides concrete implementations of those contracts (parsers, storage adapters). The `cli/` and `server/` layers are application entry points that wire dependencies together.
 
-### 4.1 MVP3 新架构模块
+Layer dependency rule (strict top-down): CLI -> Server -> Domain -> Infrastructure -> Interface. Cross-layer imports are forbidden (e.g., Domain must not import from CLI).
 
-| 模块 | 层级 | 主要职责 | 关键入口 |
-|------|------|----------|----------|
-| `src/interface` | Interface | 类型定义中心，存储/解析器/配置契约 | `src/interface/types/`, `src/interface/config/` |
-| `src/infrastructure/storage` | Infrastructure | 存储适配器：FileSystem, Memory, KùzuDB, Neo4j | `src/infrastructure/storage/index.ts` |
-| `src/infrastructure/parser` | Infrastructure | 多语言解析器：TypeScript, Go, Python | `src/infrastructure/parser/index.ts` |
-| `src/infrastructure/repositories` | Infrastructure | 仓库实现，连接 Domain 与 Infrastructure | `src/infrastructure/repositories/index.ts` |
-| `src/domain/entities` | Domain | 领域实体：Project, Module, Symbol, Dependency | `src/domain/entities/` |
-| `src/domain/services` | Domain | 领域服务：CodeGraphBuilder | `src/domain/services/` |
-| `src/domain/repositories` | Domain | 仓库接口定义 | `src/domain/repositories/` |
-| `src/server` | Server | 内部 Server Layer / HTTP transport | `src/server/CodeMapServer.ts` |
-| `src/cli-new` | CLI | 过渡 CLI surface（含 server/export/query） | `src/cli-new/index.ts` |
+## Parser Architecture (Post Phase 59)
 
-### 4.2 原有模块（逐步迁移中）
+After the parser-cutover consolidation, the system uses a **single registry-backed tree-sitter path**:
 
-| 模块 | 主要职责 | 关键入口 |
-|------|----------|----------|
-| `src/cli` | 注册命令、参数解析、首次运行引导、日志与平台检查 | `src/cli/index.ts` |
-| `src/orchestrator` | analyze 统一入口、多工具适配、置信度、结果融合、CI/工作流 | `src/orchestrator/index.ts` |
-| `src/core` | 主分析流程、文件发现、依赖图、摘要、全局索引 | `src/core/analyzer.ts` |
-| `src/parser` | `fast` / `smart` / `hybrid` 解析与符号抽取 | `src/parser/index.ts` |
-| `src/generator` | 生成 `AI_MAP.md`、`CONTEXT.md`、JSON、依赖图等输出 | `src/generator/index.ts` |
-| `src/plugins` | 内置/扩展分析能力，如复杂度与调用图 | `src/plugins/index.ts` |
-| `src/cache` | LRU、文件哈希与解析缓存 | `src/cache/index.ts` |
-| `src/watcher` | watch 模式、守护进程、增量更新 | `src/watcher/file-watcher.ts` |
-| `src/worker` | 并行解析与工作线程封装 | `src/worker/index.ts` |
-| `src/types` | 跨层共享类型与输出契约 | `src/types/index.ts` |
+- **Active flow**: `createParser()` returns a `RegistryBackedParser` that delegates to `ParserRegistry`. The registry maps file extensions to language-specific tree-sitter parsers (`TypeScriptParser`, `GoParser`, `PythonParser`). The only supported `ParserMode` is `'tree-sitter'`.
 
-## 5. 核心执行流
+- **TypeScriptTypeEnhancer**: A post-parse step that enriches `.ts`/`.tsx` results with deeper type information, call graphs, and complexity metrics. It applies only to TypeScript files; Python and Go parse results pass through unchanged.
 
-### 5.1 生成 / 分析流
+- **Deprecated mode rejection**: Inputs `fast`, `smart`, or `hybrid` for the parser mode trigger a `DEPRECATED_PARSER_MODE` error. The error includes a `nextCommand: 'mycodemap doctor'` remediation hint with 98% confidence. This rejection is enforced at three levels:
+  1. `createParser()` in `src/parser/index.ts` throws before creating any parser instance.
+  2. `analyze()` in `src/core/analyzer.ts` checks `isDeprecatedParserMode()` before file discovery.
+  3. `AnalysisHandler.analyze()` in `src/server/handlers/AnalysisHandler.ts` returns HTTP 400 with `DeprecatedParserModeError` before falling through to the 501 `UnsupportedAnalysisOperationError`.
 
-1. CLI 接收命令并完成平台与运行前检查。
-2. `src/core/analyzer.ts` 发现待分析文件。
-3. 根据模式选择解析器：`fast` / `smart` / `hybrid`。
-4. `smart` 模式下额外构建全局符号索引与跨文件调用信息。
-5. 生成依赖图、项目摘要与模块信息。
-6. `src/generator/*` 输出 AI 地图、上下文、JSON 与报告。
+## Storage Architecture
 
-### 5.2 查询流
+Storage has converged to **SQLite-family only** as the persistent truth layer:
 
-1. CLI 命令层接收 `query` / `deps` / `impact` / `complexity` / `cycles` / `export`。
-2. 命令层读取 CodeMap 输出或直接分析源码。
-3. 返回结构化结果给用户、脚本或上层 agent。
+- **SQLite** (`storage.type: "sqlite"` or `"auto"`): Uses `SQLiteStorage` backed by `better-sqlite3` (native), `sql.js` (WASM), or `node:sqlite` (built-in). The `sqlite-loader.ts` module in `src/infrastructure/storage/adapters/` auto-selects the best available implementation.
 
-### 5.3 编排与 CI 流
+- **Memory** (`storage.type: "memory"`): In-memory storage for tests and ephemeral runs only.
 
-1. `analyze` 命令进入 `src/orchestrator/*`。
-2. 编排层根据意图选择工具、计算置信度并融合结果。
-3. CI 子命令执行提交格式、文件头、风险评估、输出契约检查。
-4. 工作流模块管理阶段、检查点与持久化状态。
+- **Rejected backends**: `filesystem`, `kuzudb`, and `neo4j` are explicitly rejected by `StorageFactory` with an `UNSUPPORTED_STORAGE_TYPE` error that includes migration guidance. The `FileSystemStorage.ts` and `KuzuDBStorage.ts` adapter files remain in the tree for reference but are not reachable through the factory.
 
-## 6. 当前关键约束
+## Error System
 
-- CLI 与库发布统一基于 `dist/`，不要把 `build/` 当作当前事实。
-- 代码采用 ESM、严格模式、ES2022。
-- `hybrid` 模式会根据文件规模在 `fast` 与 `smart` 之间切换。
-- `smart` 解析失败时，分析器会回退到基础解析路径，而不是整体中断。
-- 部分 CLI 命令在执行前需要通过 tree-sitter 可用性检查。
-- `src/cli/index.ts` 是高影响入口，修改它会放大到多数命令与模块。
+The error system (`src/cli/output/errors.ts` and `src/cli/output/error-codes.ts`) provides structured, actionable error reporting:
 
-## 7. 文档信息架构
+- **ErrorCodes registry**: Canonical string codes with prefix classification (`DEP_*`, `CFG_*`, `RUN_*`, `FS_*`) and a matching `ErrorRemediation` map that provides human-readable messages, `nextCommand` hints, and confidence scores.
 
-- `AGENTS.md`：仓库级执行协议与证据规范。
-- `CLAUDE.md`：Claude / Codex 入口路由。
-- `ARCHITECTURE.md`：本文件，系统地图与模块边界。
-- `docs/rules/`：开发、测试、验证、发布规则。
-- `docs/design-docs/`：设计意图、权衡、验证状态。
-- `docs/exec-plans/`：执行计划、复盘、技术债。
-- `docs/generated/`：生成物说明与归档规范。
-- `docs/product-specs/`：产品规格与验收边界。
-- `docs/references/`：外部参考与工具链资料。
+- **normalizeError()**: Converts any thrown value into an `ActionableError`. Critically, when an error carries a known `ErrorCode` (such as `DEPRECATED_PARSER_MODE`), the normalizer **preserves** it rather than collapsing to a generic `RUN_COMMAND_FAILED`. It also enriches the error with auto-detected remediation from the registry.
 
-## 8. 迁移说明
+- **Dual output modes**: `formatError()` produces either structured JSON (for machine consumers like AI agents) or chalk-colored human-readable text, both including the error code, root cause, remediation plan, confidence score, and `nextCommand`.
 
-- 主要设计文档现已迁入 `docs/design-docs/`，如 `docs/design-docs/REFACTOR_ARCHITECTURE_OVERVIEW.md`、`docs/design-docs/REFACTOR_ORCHESTRATOR_DESIGN.md`、`docs/design-docs/CI_GATEWAY_DESIGN.md`。
-- 计划文档现已迁入 `docs/exec-plans/`；`docs/archive/` 仍保留历史归档内容。
-- 查“细节设计”优先看 `docs/design-docs/`，查“需求边界”看 `docs/product-specs/`，查“新信息架构边界”看各目录 `README.md`。
-- 新增文档优先落到新目录，不再继续把新知识堆到 `docs/` 根层。
+## Server and API
+
+The HTTP server (`src/server/`) is built on Hono with `@hono/node-server`:
+
+- **CodeMapServer**: Manages server lifecycle, middleware (logging, CORS, pretty JSON), and route mounting at `/api/v1`.
+
+- **Handlers**: `QueryHandler` serves read-only queries (symbol search, module details, dependency graph, impact analysis, cycle detection, project stats). `AnalysisHandler` handles write operations (analyze, incremental update, refresh, validate, export).
+
+- **Deprecated mode rejection at API level**: When a `POST /api/v1/analysis` request includes a deprecated parser mode (`fast`/`smart`/`hybrid`), `AnalysisHandler` throws `DeprecatedParserModeError` (HTTP 400) before the `UnsupportedAnalysisOperationError` (HTTP 501) for unimplemented analysis operations.
+
+- **MCP Gateway** (`src/server/mcp/`): Model Context Protocol integration that dynamically registers code-map tools via `schema-adapter.ts`, allowing AI assistants to query the code graph through the MCP protocol.
+
+## File Discovery
+
+File discovery (`src/core/file-discovery.ts`) uses Globby with sensible defaults:
+
+- **Default includes**: `src/**/*.{ts,tsx,js,jsx,py,go}` -- covers TypeScript, JavaScript, Python, and Go source files.
+
+- **Default excludes**: `node_modules/**`, `dist/**`, `build/**`, `coverage/**`, `.venv/**`, `**/__pycache__/**`, `vendor/**`, `**/*.test.ts`, `**/*.spec.ts`, `**/*.d.ts`.
+
+- **Gitignore-aware**: Discovery respects `.gitignore` patterns when a `.git` directory is present.
+
+- **Root resolution**: `resolveDiscoveryRoot()` walks up from the starting directory to find a `package.json`, `.gitignore`, or `.git` marker.
