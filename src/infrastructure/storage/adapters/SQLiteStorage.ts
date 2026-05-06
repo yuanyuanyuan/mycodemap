@@ -97,7 +97,11 @@ export interface SQLiteStorageRuntimeOptions {
   readonly governanceGraphThresholds?: GovernanceGraphPerfThresholds;
 }
 
-import { loadSQLite } from './sqlite-loader.js';
+import {
+  getLastSQLiteLoadDiagnostics,
+  loadSQLite,
+  type SQLiteLoadDiagnostics,
+} from './sqlite-loader.js';
 
 async function loadSQLiteModule(): Promise<SQLiteConstructor> {
   return loadSQLite();
@@ -323,6 +327,10 @@ export class SQLiteStorage extends StorageBase {
     super();
     this.storageConfig = config;
     this.runtimeOptions = runtimeOptions;
+  }
+
+  static getLastLoadDiagnostics(): SQLiteLoadDiagnostics | null {
+    return getLastSQLiteLoadDiagnostics();
   }
 
   protected async doInitialize(): Promise<void> {

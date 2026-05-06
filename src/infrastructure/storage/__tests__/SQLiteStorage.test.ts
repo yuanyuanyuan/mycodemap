@@ -300,6 +300,23 @@ describe('SQLiteStorage', () => {
     await secondStorage.close();
   });
 
+  it('exposes the last SQLite loader diagnostics after initialize', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+    const storage = new SQLiteStorage({ type: 'sqlite', databasePath: '.codemap/governance.sqlite' });
+
+    await storage.initialize(rootDir);
+
+    expect(SQLiteStorage.getLastLoadDiagnostics()).toEqual(expect.objectContaining({
+      module: 'better-sqlite3',
+      implementation: expect.stringMatching(/^(native|node:sqlite|sql\.js)$/),
+      backend: expect.stringMatching(/^(better-sqlite3|node:sqlite|sql\.js)$/),
+      fallbackActivated: expect.any(Boolean),
+    }));
+
+    await storage.close();
+  });
+
   it('round-trips materialized file and symbol history signals', async () => {
     const rootDir = createTempRoot();
     tempRoots.push(rootDir);

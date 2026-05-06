@@ -11,12 +11,8 @@ export { StorageBase, StorageError } from './interfaces/StorageBase.js';
 export { StorageFactory, storageFactory } from './StorageFactory.js';
 
 // 适配器
-export { FileSystemStorage } from './adapters/FileSystemStorage.js';
 export { MemoryStorage } from './adapters/MemoryStorage.js';
-
-// 可选适配器（动态导入避免依赖问题）
-// KuzuDBStorage 需要动态导入
-// import('./adapters/KuzuDBStorage.js').then(m => m.KuzuDBStorage)
+export { SQLiteStorage } from './adapters/SQLiteStorage.js';
 
 // 重新导出 Interface Layer 的类型
 export type {

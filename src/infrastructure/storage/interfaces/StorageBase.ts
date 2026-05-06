@@ -6,7 +6,6 @@
 
 import type {
   IStorage,
-  StorageType,
   StorageConfig,
   SearchOptions,
   SearchResult,
@@ -43,7 +42,7 @@ export class StorageError extends Error {
  */
 export abstract class StorageBase implements IStorage {
   /** 存储类型标识 */
-  abstract readonly type: StorageType;
+  abstract readonly type: IStorage['type'];
 
   /** 项目路径 */
   protected projectPath: string | null = null;

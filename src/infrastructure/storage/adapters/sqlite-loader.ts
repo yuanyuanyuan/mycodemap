@@ -4,6 +4,7 @@
 
 import { createActionableError } from '../../../cli/output/errors.js';
 import { ErrorCodes } from '../../../cli/output/error-codes.js';
+import type { WasmFallbackResult } from '../../../cli/output/wasm-fallback.js';
 
 interface SQLiteStatementLike {
   run: (...params: unknown[]) => unknown;
@@ -20,6 +21,35 @@ interface SQLiteDatabaseLike {
 
 export type SQLiteConstructor = new (filename: string) => SQLiteDatabaseLike;
 
+type SQLiteFamilyImplementation = 'better-sqlite3' | 'node:sqlite' | 'sql.js';
+
+export interface SQLiteLoadDiagnostics extends WasmFallbackResult {
+  module: 'better-sqlite3';
+  implementation: 'native' | 'node:sqlite' | 'sql.js';
+  backend: SQLiteFamilyImplementation;
+  forcedByEnv: boolean;
+}
+
+export interface SQLiteLoadResult {
+  SQLite: SQLiteConstructor;
+  diagnostics: SQLiteLoadDiagnostics;
+}
+
+interface SQLiteLoadOptions {
+  forceWasm?: boolean;
+  nativeLoader?: () => SQLiteConstructor;
+  nodeSqliteLoader?: () => SQLiteConstructor;
+  sqlJsLoader?: () => Promise<SQLiteConstructor>;
+  warn?: (message: string) => void;
+  nodeMajorVersion?: number;
+}
+
+let lastSQLiteLoadDiagnostics: SQLiteLoadDiagnostics | null = null;
+
+export function getLastSQLiteLoadDiagnostics(): SQLiteLoadDiagnostics | null {
+  return lastSQLiteLoadDiagnostics;
+}
+
 /**
  * Load SQLite implementation based on environment configuration.
  *
@@ -29,25 +59,72 @@ export type SQLiteConstructor = new (filename: string) => SQLiteDatabaseLike;
  * 3. If native fails and WASM is available → auto-fallback with warning
  */
 export async function loadSQLite(): Promise<SQLiteConstructor> {
-  const forceWASM = process.env.CODEMAP_USE_WASM_BETTER_SQLITE3 === '1';
+  const result = await loadSQLiteWithDiagnostics();
+  return result.SQLite;
+}
+
+export async function loadSQLiteWithDiagnostics(options: SQLiteLoadOptions = {}): Promise<SQLiteLoadResult> {
+  const forceWASM = options.forceWasm ?? process.env.CODEMAP_USE_WASM_BETTER_SQLITE3 === '1';
+  const warn = options.warn ?? ((message: string) => {
+    // eslint-disable-next-line no-console
+    console.warn(message);
+  });
 
   if (forceWASM) {
-    return loadWASMSQLite();
+    const wasmResult = await loadWASMSQLite(options);
+    lastSQLiteLoadDiagnostics = {
+      nativeAvailable: false,
+      wasmAvailable: true,
+      fallbackActivated: true,
+      module: 'better-sqlite3',
+      implementation: wasmResult.implementation,
+      backend: wasmResult.implementation,
+      forcedByEnv: true,
+      message: `Forced SQLite-family fallback via ${wasmResult.implementation}`,
+    };
+    return {
+      SQLite: wasmResult.SQLite,
+      diagnostics: lastSQLiteLoadDiagnostics,
+    };
   }
 
-  // Try native first
   try {
-    return loadNativeSQLite();
+    const SQLite = (options.nativeLoader ?? loadNativeSQLite)();
+    lastSQLiteLoadDiagnostics = {
+      nativeAvailable: true,
+      wasmAvailable: false,
+      fallbackActivated: false,
+      module: 'better-sqlite3',
+      implementation: 'native',
+      backend: 'better-sqlite3',
+      forcedByEnv: false,
+      message: 'Native better-sqlite3 loaded successfully',
+    };
+    return {
+      SQLite,
+      diagnostics: lastSQLiteLoadDiagnostics,
+    };
   } catch (nativeError) {
-    // Native failed — try WASM fallback automatically
     try {
-      const wasmCtor = await loadWASMSQLite();
-      // eslint-disable-next-line no-console
-      console.warn(
-        '⚠️  Native better-sqlite3 unavailable, using WASM fallback. ' +
+      const wasmResult = await loadWASMSQLite(options);
+      lastSQLiteLoadDiagnostics = {
+        nativeAvailable: false,
+        wasmAvailable: true,
+        fallbackActivated: true,
+        module: 'better-sqlite3',
+        implementation: wasmResult.implementation,
+        backend: wasmResult.implementation,
+        forcedByEnv: false,
+        message: `Native better-sqlite3 unavailable — using SQLite-family fallback via ${wasmResult.implementation}`,
+      };
+      warn(
+        `⚠️  ${lastSQLiteLoadDiagnostics.message}. ` +
         'Add --native to force native (requires build tools).'
       );
-      return wasmCtor;
+      return {
+        SQLite: wasmResult.SQLite,
+        diagnostics: lastSQLiteLoadDiagnostics,
+      };
     } catch (wasmError) {
       throw createSQLiteLoaderError(nativeError as Error, wasmError as Error);
     }
@@ -65,19 +142,26 @@ function loadNativeSQLite(): SQLiteConstructor {
   }
 }
 
-async function loadWASMSQLite(): Promise<SQLiteConstructor> {
-  // Prefer node:sqlite on Node.js 22+
-  const nodeVersion = process.versions.node.split('.').map(Number);
-  if (nodeVersion[0] >= 22) {
+async function loadWASMSQLite(options: SQLiteLoadOptions = {}): Promise<{
+  SQLite: SQLiteConstructor;
+  implementation: Exclude<SQLiteFamilyImplementation, 'better-sqlite3'>;
+}> {
+  const nodeMajorVersion = options.nodeMajorVersion ?? process.versions.node.split('.').map(Number)[0];
+  if (nodeMajorVersion >= 22) {
     try {
-      return loadNodeSqlite();
+      return {
+        SQLite: (options.nodeSqliteLoader ?? loadNodeSqlite)(),
+        implementation: 'node:sqlite',
+      };
     } catch {
-      // Fall through to sql.js
+      // Fall through to sql.js.
     }
   }
 
-  // Fallback to sql.js
-  return loadSqlJs();
+  return {
+    SQLite: await (options.sqlJsLoader ?? loadSqlJs)(),
+    implementation: 'sql.js',
+  };
 }
 
 function loadNodeSqlite(): SQLiteConstructor {
@@ -232,7 +316,7 @@ function createSQLiteLoaderError(nativeError: Error, wasmError: Error): Error {
     `better-sqlite3 cannot be loaded: ${nativeError.message}`,
     'loading better-sqlite3 storage',
     {
-      rootCause: nativeError.message,
+      rootCause: `${nativeError.message}; SQLite-family fallback also failed: ${wasmError.message}`,
       remediationPlan: [
         'Install build tools (python, make, gcc) and run: npm rebuild better-sqlite3',
         'Or use Node.js 22+ (has built-in node:sqlite — no install needed)',
@@ -240,7 +324,7 @@ function createSQLiteLoaderError(nativeError: Error, wasmError: Error): Error {
         'Or use --wasm-fallback flag to auto-activate WASM on first run',
       ].join('; '),
       confidence: 0.9,
-      nextCommand: 'codemap --wasm-fallback',
+      nextCommand: 'mycodemap --wasm-fallback',
     }
   );
 }

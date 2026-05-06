@@ -3,18 +3,31 @@ import type { StorageConfig } from '../../../interface/types/storage.js';
 import { StorageFactory } from '../StorageFactory.js';
 
 describe('StorageFactory', () => {
-  it('rejects deprecated neo4j backends with a migration error', async () => {
+  it('rejects deprecated filesystem backends with a migration error', async () => {
     const factory = new StorageFactory();
 
     await expect(factory.create({
-      type: 'neo4j',
+      type: 'filesystem',
+      outputPath: '.codemap/storage',
     } as unknown as StorageConfig)).rejects.toMatchObject({
       name: 'StorageError',
       code: 'UNSUPPORTED_STORAGE_TYPE',
     });
   });
 
-  it('does not advertise neo4j as an available storage type', () => {
-    expect(StorageFactory.getAvailableStorageTypes()).not.toContain('neo4j');
+  it('rejects deprecated kuzudb backends with a migration error', async () => {
+    const factory = new StorageFactory();
+
+    await expect(factory.create({
+      type: 'kuzudb',
+      databasePath: '.codemap/kuzu',
+    } as unknown as StorageConfig)).rejects.toMatchObject({
+      name: 'StorageError',
+      code: 'UNSUPPORTED_STORAGE_TYPE',
+    });
+  });
+
+  it('does not advertise deprecated backends as available storage types', () => {
+    expect(StorageFactory.getAvailableStorageTypes()).toEqual(['sqlite', 'memory']);
   });
 });
