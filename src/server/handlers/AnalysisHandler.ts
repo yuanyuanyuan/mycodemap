@@ -7,6 +7,9 @@
 import type { IStorage } from '../../infrastructure/storage/index.js';
 import type { CodeGraphBuilder } from '../../domain/services/CodeGraphBuilder.js';
 
+const DEPRECATED_MODES = ['fast', 'smart', 'hybrid'] as const;
+type DeprecatedMode = (typeof DEPRECATED_MODES)[number];
+
 
 /**
  * 分析请求
@@ -14,7 +17,7 @@ import type { CodeGraphBuilder } from '../../domain/services/CodeGraphBuilder.js
 export interface AnalyzeRequest {
   projectPath: string;
   options?: {
-    mode?: 'fast' | 'smart';
+    mode?: 'tree-sitter' | 'fast' | 'smart' | 'hybrid';
   };
 }
 
@@ -27,7 +30,7 @@ export interface AnalyzeResponse {
   symbolsFound: number;
   dependenciesFound: number;
   duration: number;
-  mode: 'fast' | 'smart';
+  mode: 'tree-sitter';
 }
 
 /**
@@ -38,6 +41,34 @@ export interface IncrementalUpdateRequest {
     path: string;
     changeType: 'added' | 'modified' | 'deleted';
   }>;
+}
+
+export class DeprecatedParserModeError extends Error {
+  readonly name = 'DeprecatedParserModeError';
+  readonly statusCode = 400;
+  readonly code = 'DEPRECATED_PARSER_MODE';
+  readonly mode: DeprecatedMode;
+  readonly nextCommand = 'mycodemap doctor';
+
+  constructor(mode: DeprecatedMode) {
+    super(
+      `Parser mode "${mode}" is deprecated. Remove the mode option and use the default registry-backed parser flow`
+    );
+    this.mode = mode;
+  }
+}
+
+export function isDeprecatedParserModeError(
+  error: unknown
+): error is DeprecatedParserModeError {
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    'statusCode' in error &&
+    'code' in error &&
+    (error as { statusCode: unknown }).statusCode === 400 &&
+    (error as { code: unknown }).code === 'DEPRECATED_PARSER_MODE'
+  );
 }
 
 type UnsupportedAnalysisOperation = 'analyze' | 'incrementalUpdate' | 'refresh';
@@ -93,6 +124,10 @@ export class AnalysisHandler {
    * 执行完整分析
    */
   async analyze(request: AnalyzeRequest): Promise<AnalyzeResponse> {
+    const mode = request.options?.mode;
+    if (mode && DEPRECATED_MODES.includes(mode as DeprecatedMode)) {
+      throw new DeprecatedParserModeError(mode as DeprecatedMode);
+    }
     void request;
     throw new UnsupportedAnalysisOperationError('analyze');
   }

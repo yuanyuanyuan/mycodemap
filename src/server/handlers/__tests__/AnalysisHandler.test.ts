@@ -3,7 +3,7 @@
 // ============================================
 
 import { describe, expect, it } from 'vitest';
-import { AnalysisHandler, UnsupportedAnalysisOperationError } from '../AnalysisHandler.js';
+import { AnalysisHandler, UnsupportedAnalysisOperationError, DeprecatedParserModeError } from '../AnalysisHandler.js';
 import type { IStorage } from '../../../interface/types/storage.js';
 import { CodeGraphBuilder } from '../../../domain/services/CodeGraphBuilder.js';
 
@@ -65,6 +65,39 @@ describe('AnalysisHandler', () => {
 
   it('rejects analyze with an explicit unsupported error', async () => {
     await expect(handler.analyze({ projectPath: '/tmp' })).rejects.toMatchObject({
+      name: 'UnsupportedAnalysisOperationError',
+      code: 'ANALYSIS_NOT_SUPPORTED',
+      statusCode: 501,
+    } satisfies Partial<UnsupportedAnalysisOperationError>);
+  });
+
+  it('rejects deprecated mode "fast" with DEPRECATED_PARSER_MODE', async () => {
+    await expect(handler.analyze({ projectPath: '/tmp', options: { mode: 'fast' } })).rejects.toMatchObject({
+      name: 'DeprecatedParserModeError',
+      code: 'DEPRECATED_PARSER_MODE',
+      statusCode: 400,
+      nextCommand: 'mycodemap doctor',
+    } satisfies Partial<DeprecatedParserModeError>);
+  });
+
+  it('rejects deprecated mode "smart" with DEPRECATED_PARSER_MODE', async () => {
+    await expect(handler.analyze({ projectPath: '/tmp', options: { mode: 'smart' } })).rejects.toMatchObject({
+      name: 'DeprecatedParserModeError',
+      code: 'DEPRECATED_PARSER_MODE',
+      statusCode: 400,
+    } satisfies Partial<DeprecatedParserModeError>);
+  });
+
+  it('rejects deprecated mode "hybrid" with DEPRECATED_PARSER_MODE', async () => {
+    await expect(handler.analyze({ projectPath: '/tmp', options: { mode: 'hybrid' } })).rejects.toMatchObject({
+      name: 'DeprecatedParserModeError',
+      code: 'DEPRECATED_PARSER_MODE',
+      statusCode: 400,
+    } satisfies Partial<DeprecatedParserModeError>);
+  });
+
+  it('still rejects tree-sitter mode with unsupported error (analyze not yet public)', async () => {
+    await expect(handler.analyze({ projectPath: '/tmp', options: { mode: 'tree-sitter' } })).rejects.toMatchObject({
       name: 'UnsupportedAnalysisOperationError',
       code: 'ANALYSIS_NOT_SUPPORTED',
       statusCode: 501,

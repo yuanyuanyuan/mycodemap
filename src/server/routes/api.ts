@@ -7,7 +7,8 @@
 import { Hono } from 'hono';
 import type { QueryHandler } from '../handlers/QueryHandler.js';
 import type { AnalysisHandler } from '../handlers/AnalysisHandler.js';
-import { isUnsupportedAnalysisOperationError } from '../handlers/AnalysisHandler.js';
+import { isUnsupportedAnalysisOperationError, isDeprecatedParserModeError } from '../handlers/AnalysisHandler.js';
+import type { AnalyzeRequest } from '../handlers/AnalysisHandler.js';
 import type { 
   ApiResponse, 
   SearchRequest,
@@ -16,10 +17,20 @@ import type {
 } from '../types/index.js';
 
 function toAnalysisErrorResponse(error: unknown, fallbackCode: string): {
-  status: 500 | 501;
+  status: 400 | 500 | 501;
   code: string;
   message: string;
+  nextCommand?: string;
 } {
+  if (isDeprecatedParserModeError(error)) {
+    return {
+      status: error.statusCode,
+      code: error.code,
+      message: error.message,
+      nextCommand: error.nextCommand,
+    };
+  }
+
   if (isUnsupportedAnalysisOperationError(error)) {
     return {
       status: error.statusCode,
@@ -316,10 +327,10 @@ export function createApiRoutes(
   // 执行分析
   api.post('/analysis', async (c) => {
     try {
-      const body = await c.req.json<{ projectPath: string; mode?: 'fast' | 'smart' }>();
+      const body = await c.req.json<AnalyzeRequest>();
       const result = await analysisHandler.analyze({
         projectPath: body.projectPath,
-        options: { mode: body.mode ?? 'fast' },
+        options: body.options,
       });
       return c.json<ApiResponse<typeof result>>({
         success: true,
@@ -333,6 +344,7 @@ export function createApiRoutes(
         error: {
           code: failure.code,
           message: failure.message,
+          ...(failure.nextCommand ? { nextCommand: failure.nextCommand } : {}),
         },
         meta: { timestamp: new Date().toISOString(), requestId: generateRequestId() },
       }, failure.status);

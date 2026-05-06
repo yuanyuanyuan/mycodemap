@@ -151,7 +151,7 @@ describe('preview command', () => {
     mkdirSync(path.join(rootDir, '.mycodemap'), { recursive: true });
     writeFileSync(
       path.join(rootDir, '.mycodemap', 'config.json'),
-      JSON.stringify({ mode: 'smart', include: ['src/**/*.ts'] }, null, 2),
+      JSON.stringify({ mode: 'tree-sitter', include: ['src/**/*.ts'] }, null, 2),
       'utf8',
     );
 
@@ -204,7 +204,7 @@ describe('preview command', () => {
     const rootDir = createNodeProject();
     tempRoots.push(rootDir);
     mkdirSync(path.join(rootDir, '.mycodemap'), { recursive: true });
-    const existingConfig = JSON.stringify({ mode: 'smart', include: ['src/**/*.ts'] }, null, 2);
+    const existingConfig = JSON.stringify({ mode: 'tree-sitter', include: ['src/**/*.ts'] }, null, 2);
     writeFileSync(path.join(rootDir, '.mycodemap', 'config.json'), existingConfig, 'utf8');
 
     const output = await runPreview(rootDir, { save: true, json: true });
