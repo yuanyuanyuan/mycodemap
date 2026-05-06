@@ -12,6 +12,17 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 
 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
 
+## Current Milestone: v2.2 architecture-foundation
+
+**Goal:** 把 CodeMap 的解析、存储和 MCP 执行链路收敛到更少、更稳定的架构基线，为后续 graph capability 和 agent experience 打基础。
+
+**Target features:**
+- Parser 统一：TreeSitterParser 进入主流程，FastParser / Hybrid 退出主流程
+- Storage 收敛：移除 KùzuDB / FileSystem backend，`auto` 统一到 SQLite 路径
+- MCP 直接执行：去掉 `cli_redirect`，收敛到 pure function + CLI wrapper + MCP adapter
+- MCP 路由门：交付 `codemap_context` 简化版，先支持 `review` / `debug` / `default`
+- 非阻塞验收：`PythonTypeEnhancer` 可以纳入，但不阻塞 milestone 收口
+
 ## Latest Completed Milestone: v2.1 ux-onboarding-enhancement
 
 **Goal:** 把 CodeMap 从“安装后需要手动配置”升级为“首次运行即能提供价值”的入门体验，让新用户零配置即可预览代码库，并逐步引导完成深度配置。
@@ -163,8 +174,8 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 
 ### Future Milestones
 
-- [ ] **INT-04**: Auto-Provisioned Agent Skills —— v2.2 候选
-- [ ] **INT-05**: MCP `verify_contract` Tool —— v2.2 候选
+- [ ] **INT-04**: Auto-Provisioned Agent Skills —— v3.0+ 候选
+- [ ] **INT-05**: MCP `verify_contract` Tool —— v3.0+ 候选
 - [ ] **ARCH-01**: Auto-Generate design.md from codebase —— v3.0 候选
 - [ ] **ARCH-02**: Auto-Generate Architecture Remediation Patches —— v3.0 候选
 - [ ] **ARCH-03**: Self-Healing Design Contract (Drift Approval) —— v3.0 候选
@@ -188,7 +199,8 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 - 74,544 TypeScript LOC in `src/`，1129 个测试全部通过
 - `v2.0` audit 原始状态为 `gaps_found`，Phase 49 接线修复后所有 4 个 critical blockers 已解决
 - 渐进债务：12+ 命令仍需 contract schema 定义；benchmark 命令需迁移到共享输出基础设施
-- 下一轮候选：v2.1 UX Onboarding、v2.2 Agent Integration Completion、v3.0 Architecture Intelligence
+- 当前 active milestone：`v2.2 architecture-foundation`
+- 本轮聚焦 parser unify、storage converge、MCP direct execution 与 routing gate；agent-provisioning / `verify_contract` 已后移到 `v3.0+`
 - `scripts/validate-docs.js` 与 `node dist/cli/index.js ci check-docs-sync` 继续作为 docs governance enforcement surface
 
 ## Constraints
@@ -252,25 +264,28 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 | 启动 `v2.1 ux-onboarding-enhancement` | 用户指令：选择方案 A（v2.1 专注 Onboarding，纳入 Phase 51） | Active 2026-05-01 |
 | Phase 51 合并进 v2.1 | Post-Install Agent Bootstrap 是 onboarding 核心；Phase 50/52 与 UX 方向无关，保持独立 | Active 2026-05-01 |
 | v2.1 延续 phase 编号 | 未使用 `--reset-phase-numbers`；Phase 50-52 作为未计划后续保留编号，v2.1 从 Phase 53 开始 | Active 2026-05-01 |
+| 启动 `v2.2 architecture-foundation` | 用户确认以 architecture foundation 作为下一轮主线 | Active 2026-05-06 |
+| `v2.2` 聚焦 parser / storage / MCP 基线收敛 | 先清理架构根基，再进入 v2.3 图能力与 v3.0 agent/intelligence 扩展 | Active 2026-05-06 |
+| `v2.2` phase 编号从 59 继续 | 未使用 `--reset-phase-numbers`；延续最新已完成的 Phase 58 | Active 2026-05-06 |
 
 ## Current State
 
 - **Completed milestones / follow-ups:** `v1.0`→`v1.11`、`v2.0 agent-native-foundation`、`v2.1 ux-onboarding-enhancement`
 - **Historical closed branch:** `v1.5 Isolated ArcadeDB Server-backed Prototype`（22-24 不再继续）
-- **Active milestone:** none
-- **Current planning status:** v2.1 已归档；Phase 50 和 52 仍然保持独立，等待下一轮 milestone 初始化
-- **Known remaining debt:** `INI-01`（`mycodemap init --json` 机器可读 receipt）已接受为 v2.2+ gap；`F-1` 旧 receipt wording 仍是 cosmetic follow-up；actual `/release v1.9` execution 仍保留在 deferred backlog；渐进债务（12+ 命令 contract 迁移、benchmark 输出基础设施迁移）
+- **Active milestone:** `v2.2 architecture-foundation`
+- **Current planning status:** 正在定义 requirements；默认将从 Phase 59 开始，Phase 50 和 52 继续保持独立 follow-up
+- **Known remaining debt:** `INI-01`（`mycodemap init --json` 机器可读 receipt）仍保留为 cleanup gap；`F-1` 旧 receipt wording 仍是 cosmetic follow-up；actual `/release v1.9` execution 仍保留在 deferred backlog；渐进债务（12+ 命令 contract 迁移、benchmark 输出基础设施迁移）
 - **Codebase:** 74,544 TypeScript LOC, 1129 tests all passing
 
 ## Next Milestone Goals (Candidates)
 
-1. **v2.2 architecture-foundation** — Parser unify, storage converge, MCP direct execution, routing gate
-2. **v2.3 schema-redesign-graph-capability** — SQLite graph redesign, edge confidence, incremental update, impact CTE, community detection
-3. **v3.0 architecture-intelligence** — Auto-Generate design.md, Architecture Remediation Patches, Self-Healing Design Contract, plugin system, deeper language support
+1. **v2.3 schema-redesign-graph-capability** — SQLite graph redesign, edge confidence, incremental update, impact CTE, community detection
+2. **v3.0 architecture-intelligence** — Auto-Generate design.md, Architecture Remediation Patches, Self-Healing Design Contract, plugin system, deeper language support
+3. **v3.0+ agent follow-ups** — Auto-Provisioned Agent Skills, MCP `verify_contract`, deeper language support
 
 ## Next Execution Step
 
-- 使用 `/gsd-new-milestone` 启动下一轮 milestone（questioning → research → requirements → roadmap）
+- 完成 `v2.2 architecture-foundation` 的 research / requirements / roadmap 初始化，然后进入 `Phase 59`
 
 ## Evolution
 
@@ -290,4 +305,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. 更新 Current State / Context / Key Decisions
 
 ---
-*Last updated: 2026-05-06 after archiving Milestone v2.1 ux-onboarding-enhancement*
+*Last updated: 2026-05-06 after starting Milestone v2.2 architecture-foundation*

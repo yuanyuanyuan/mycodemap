@@ -1,19 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.1
-milestone_name: milestone
-current_phase: 58
-current_phase_name: subagent-environment-contract-injection
-current_plan: 5
-status: complete
-last_updated: "2026-05-06T12:00:00.000Z"
+milestone: v2.2
+milestone_name: architecture-foundation
+status: planning
+last_updated: "2026-05-06T02:19:02.000Z"
 last_activity: 2026-05-06
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 15
-  completed_plans: 15
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Session State
@@ -23,25 +20,35 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-06)
 
 **Core Value:** 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
-**Current Focus:** No active milestone; v2.1 archived
+**Current Focus:** Milestone v2.2 architecture-foundation
 
 ## Position
 
-**Milestone:** v2.1 — ux-onboarding-enhancement
-**Current Phase:** 58
-**Current Phase Name:** subagent-environment-contract-injection
-**Current Plan:** 5
-**Total Phases:** 6 scoped (53-58)
-**Total Plans in Milestone:** 15 planned (15 complete)
-**Status:** Phase 58 implementation complete; subagent end-to-end verification complete; v2.1 milestone archived with accepted INI-01 gap
-**Progress:** [██████████] 100% phase completion (5/5 plan waves executed, 10/10 automated UAT passed, manual Claude/Codex evidence complete)
+**Milestone:** v2.2 — architecture-foundation
+**Current Phase:** Not started
+**Current Phase Name:** defining requirements
+**Current Plan:** —
+**Total Phases:** 0 scoped
+**Total Plans in Milestone:** 0 planned
+**Status:** Defining requirements
+**Progress:** [----------] 0% phase completion
 **Last Activity:** 2026-05-06
-**Last Activity Description:** Phase 58 verification evidence completed and milestone closeout recorded: historical 58-01~58-04 artifacts stay for record only; 58-05 manual Claude/Codex evidence is now recorded and verified; v2.1 archived with one accepted requirement gap.
+**Last Activity Description:** Milestone v2.2 started; defining requirements for architecture-foundation.
+
+## Current Position
+
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-06 — Milestone v2.2 started
 
 ## Decisions Made
 
 | Date | Summary | Rationale |
 |------|---------|-----------|
+| 2026-05-06 | `v2.2 architecture-foundation` started | User selected architecture foundation as the next milestone |
+| 2026-05-06 | `v2.2` scope locked to parser / storage / MCP foundation work | Keep v2.2 focused on platform convergence before v2.3/v3.0 feature layers |
+| 2026-05-06 | Phase numbering continues from 58 | No `--reset-phase-numbers` requested; roadmap will start at Phase 59 |
 | 2026-04-30 | `v2.0 agent-native-foundation` started | User directive: consolidate unimplemented ideation features into v2.0 milestone |
 | 2026-04-30 | v2.0 scope filtered to 7 phases | 19 raw ideas from 4 ideation docs are too many for one milestone; selected by highest confidence × leverage |
 | 2026-04-30 | Phase numbering continues from 40 | No `--reset-phase-numbers` requested; v2.0 uses Phase 41-47 |
@@ -162,7 +169,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-06)
 - Release operations remain L3: do not run `npm version`, create tags, or push without explicit `/release v{X.Y}`
 
 ---
-*State initialized: 2026-04-30 for Milestone v2.0*
+*State initialized: 2026-05-06 for Milestone v2.2*
 
 - Phase 40.1 added: Real-World Validation Guardrails — 添加真实场景验证规则到测试规范、发布检查清单、AGENTS.md、CLAUDE.md 和 CI 护栏
 - Phase 40.1 context gathered (2026-04-30): 硬约束+CI护栏双保险、启发式grep pre-commit + [证据]标签CI、分层豁免41/42、元信息层文档增强
