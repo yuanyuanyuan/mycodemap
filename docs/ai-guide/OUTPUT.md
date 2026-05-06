@@ -243,6 +243,35 @@ CLI-as-MCP Automatic Gateway 的核心机制：
 
 > 注意：tool 定义是自动生成的。如果你看到某个命令在 CLI 可用但在 MCP 不可见，检查该命令是否已注册到 `Interface Contract Schema`。
 
+### Phase 61 直连收敛
+
+- `query` / `deps` / `analyze` 已不再把 MCP 成功响应编码为 `cli_redirect`。
+- 这三个工具现在共享 `src/execution/contract-tools/` 下的 transport-free executor，CLI wrapper 与 MCP handler 都只负责参数归一化、渲染和 transport。
+- MCP 的外层 envelope 统一为：
+
+```typescript
+interface ContractToolExecutionResult<TResult> {
+  status: "ok" | "error";
+  result?: TResult;
+  error?: {
+    code: string;
+    message: string;
+    remediation?: string;
+    details?: Record<string, unknown>;
+  };
+  diagnostics: {
+    tool: "query" | "deps" | "analyze";
+    rootDir: string;
+    dataPath?: string;
+    durationMs?: number;
+    cacheHit?: boolean;
+    notes?: string[];
+  };
+}
+```
+
+- `codemap_query` 现在承载的是 CLI `query` 的 direct-execution truth；symbol graph 专用查询保留在 `codemap_impact` 这类 native tool 中，而不再和 `query` 形成双真相。
+
 ```typescript
 type McpToolStatus = "ok" | "not_found" | "ambiguous" | "unavailable";
 type McpToolConfidence = "high" | "ambiguous" | "unavailable";
@@ -308,16 +337,19 @@ interface McpImpactResult {
 
 ```typescript
 interface CodemapQueryInput {
-  symbol: string;
-  filePath?: string;
+  symbol?: string;
+  module?: string;
+  deps?: string;
+  search?: string;
+  limit?: number;
+  structured?: boolean;
 }
 ```
 
 语义：
-- `status = "ok"`：返回 `symbol`、`callers`、`callees`
-- `status = "unavailable"` + `GRAPH_NOT_FOUND`：还没生成 symbol-level 图
-- `status = "not_found"` + `SYMBOL_NOT_FOUND`：目标符号不存在
-- `status = "ambiguous"` + `AMBIGUOUS_EDGE`：同名符号无法仅靠 `symbol` / `filePath` 消歧
+- `status = "ok"`：`result` 内返回 CLI `query` 的原生命令负载（`type/query/count/results/metrics`）
+- `status = "error"`：`error.code` 明确标识失败原因，例如 `MISSING_QUERY_TYPE`、`INDEX_NOT_FOUND`
+- `diagnostics` 持续暴露 tool 名称、根目录、耗时与缓存信息，方便 host / agent 做自动化判断
 
 ### `codemap_impact`
 

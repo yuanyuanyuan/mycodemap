@@ -16,6 +16,8 @@ CodeMap is organized as a layered TypeScript application with a single CLI entry
 | Analyzer | `src/core/analyzer.ts` | Filesystem discovery and code graph generation |
 | Parser | `src/parser/index.ts` | Tree-sitter based parsing with deprecated mode rejection |
 
+Phase 61 adds a shared direct-execution seam at `src/execution/contract-tools/` for the `query` / `deps` / `analyze` family. Both CLI wrappers and MCP handlers call this transport-free layer so result envelopes, diagnostics, and runtime bootstrap come from one execution truth instead of diverging wrapper logic.
+
 ## Layering
 
 The repository follows a top-down dependency direction:
@@ -24,6 +26,7 @@ The repository follows a top-down dependency direction:
 
 - `src/cli/` contains command entry points, config loading, docs validation hooks, and output formatting.
 - `src/server/` contains the HTTP API, handlers, and MCP integration.
+- `src/execution/` contains shared transport-free execution seams used by multiple surfaces when command logic should not live in a wrapper.
 - `src/domain/` contains core entities and graph-building logic.
 - `src/infrastructure/` contains storage and parser implementations.
 - `src/interface/` contains shared types and config contracts.
@@ -65,6 +68,10 @@ The REST API currently exposes:
 - analysis, refresh, validate, and export endpoints
 
 `ServerConfig.auth` supports `none`, `bearer`, and `api-key`. The MCP server is separate and uses stdio transport.
+
+For the Phase 61 family (`codemap_query`, `codemap_deps`, `codemap_analyze`), MCP no longer returns `cli_redirect` success stubs. Those tools execute the shared contract-tool layer directly and return one structured envelope with `status`, `result`, `error`, and `diagnostics`.
+
+Phase 62 adds one native routing tool on top of that execution surface: `codemap_context`. It lives in `src/server/mcp/context-tool.ts`, supports `review` / `debug` / `default`, and exposes `detailLevel=minimal|standard` plus a strict `allowedTools` filter. The filter is fail-closed: if it would hide a tool the route itself needs to recommend, MCP returns a structured `FILTER_CONFLICT` error instead of silently emitting inconsistent guidance.
 
 ## CLI Contract
 
@@ -110,5 +117,6 @@ The top-level CLI registers these primary commands in `src/cli/index.ts`:
 | `src/infrastructure/` | Parsers, storage adapters, and concrete implementations |
 | `src/parser/` | Parser façade and TypeScript enhancement |
 | `src/server/` | HTTP API and MCP server |
+| `src/execution/` | Shared command execution seams reused by CLI and MCP |
 | `src/generator/` | Artifact generation |
 | `src/interface/` | Shared types and config contracts |

@@ -75,6 +75,7 @@ cat .mycodemap/AI_MAP.md
 | "需要查询发布状态" | `publish-status` |
 | "需要评估发布就绪度" | `readiness-gate` |
 | "需要通过 MCP 调用任意 CLI 命令" | `mcp install` → host 启动 `mcp start`（所有 schema 命令自动暴露） |
+| "需要先拿一份轻量 routing context 再决定跑哪个 MCP tool" | `codemap_context`：`task=review|debug|default`，可选 `detailLevel=minimal|standard`、`allowedTools=[...]` |
 
 **完整决策树**: 见 [docs/ai-guide/QUICKSTART.md](./docs/ai-guide/QUICKSTART.md)
 
@@ -151,6 +152,8 @@ node dist/cli/index.js mcp start
 ```
 
 - 所有 schema 定义的 CLI 命令（20+）都可通过 MCP 调用，不再局限于 `codemap_query` / `codemap_impact`
+- 原生 `codemap_context` 提供轻量路由门：固定支持 `review` / `debug` / `default` 三类任务，`minimal` 只返回摘要/计数/风险/建议，`standard` 额外暴露 warnings、rationale 与 focus areas
+- `codemap_context.allowedTools` 是严格过滤器：它可以收窄建议集合，但如果会隐藏当前路由自身必须推荐的工具，调用会返回结构化 `FILTER_CONFLICT`
 - 动态 tool 注册：MCP server 从 `codemap --schema` 输出的 contract schema 动态构建 tool 定义
 - 添加新命令到 contract schema → 重启 MCP server → 自动获得新 tool，无需修改 MCP 代码
 - 复杂嵌套类型降级到简单 scalar 映射时，MCP 仍能优雅工作
