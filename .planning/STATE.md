@@ -1,18 +1,19 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.2
-milestone_name: architecture-foundation
-current_phase: 59
-current_phase_name: parser-cutover
-status: context-gathered
-last_updated: "2026-05-06T03:30:00.000Z"
+milestone_name: milestone
+current_phase: 60
+current_phase_name: storage-convergence
+current_plan: 60-01, 60-02, 60-03
+status: completed
+last_updated: "2026-05-06T07:41:00.094Z"
 last_activity: 2026-05-06
 progress:
   total_phases: 4
-  completed_phases: 0
-  total_plans: 11
-  completed_plans: 0
-  percent: 0
+  completed_phases: 2
+  total_plans: 10
+  completed_plans: 7
+  percent: 70
 ---
 
 # Session State
@@ -27,28 +28,31 @@ See: `.planning/PROJECT.md` (updated 2026-05-06)
 ## Position
 
 **Milestone:** v2.2 — architecture-foundation
-**Current Phase:** 59
-**Current Phase Name:** parser-cutover
-**Current Plan:** —
+**Current Phase:** 60
+**Current Phase Name:** storage-convergence
+**Current Plan:** 60-01, 60-02, 60-03
 **Total Phases:** 4 scoped (59-62)
 **Total Plans in Milestone:** 11 planned
-**Status:** Phase 59 context gathered; ready to plan
-**Progress:** [==---------] 20% phase completion
+**Status:** Phase 60 completed; ready to start Phase 61
+**Progress:** [=====-----] 50% phase completion
 **Last Activity:** 2026-05-06
-**Last Activity Description:** Phase 59 context gathered — 15 decisions across 4 gray areas (parser entry, SmartParser shrink, deprecation semantics, multi-lang routing)
+**Last Activity Description:** Phase 60 completed — 3 plans across 2 waves verified; SQLite-only persistent storage truth, config/runtime convergence, and SQLite-family fallback observability landed
 
 ## Current Position
 
-Phase: 59 (parser-cutover) — context gathered
-Plan: —
-Status: Ready to plan Phase 59
-Last activity: 2026-05-06 — Phase 59 context gathered (15 decisions, 4 areas)
+Phase: 60 (storage-convergence) — completed
+Plan: 60-01, 60-02, 60-03
+Status: Ready to start Phase 61
+Last activity: 2026-05-06 — Phase 60 completed (3 plans, 2 waves, targeted tests + typecheck passed)
 
 ## Decisions Made
 
 | Date | Summary | Rationale |
 |------|---------|-----------|
+| 2026-05-06 | Phase 60 completed | Storage runtime/config/docs now converge on SQLite-only persistence; targeted tests and `tsc --noEmit` passed |
+| 2026-05-06 | Phase 59 completed | Parser runtime/config/docs now converge on a single tree-sitter main path with deprecated-mode rejection |
 | 2026-05-06 | `v2.2 architecture-foundation` started | User selected architecture foundation as the next milestone |
+| 2026-05-06 | Phase 59 planned | 3 plans in 2 waves; requirements PAR-01..PAR-05 and decisions D-01..D-15 mapped into executable plan artifacts |
 | 2026-05-06 | Phase 59 context gathered | 15 decisions: ParserRegistry as truth, SmartParser→TypeScriptTypeEnhancer, Failure-to-Action for deprecated modes, Wave 1 full multi-lang |
 | 2026-05-06 | `v2.2` scope locked to parser / storage / MCP foundation work | Keep v2.2 focused on platform convergence before v2.3/v3.0 feature layers |
 | 2026-05-06 | Phase numbering continues from 58 | No `--reset-phase-numbers` requested; roadmap will start at Phase 59 |

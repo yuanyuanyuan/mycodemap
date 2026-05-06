@@ -18,11 +18,11 @@
 **Plans:** 3 plans in 2 waves
 
 **Wave 1** *(no dependencies)*
-- [ ] 59-01-PLAN.md — Parser orchestrator truth: `createParser()`, analyzer entry, mode deprecation contract
-- [ ] 59-02-PLAN.md — Registry integration for TypeScript/JavaScript, Python, and Go main-path routing
+- [x] 59-01-PLAN.md — Parser orchestrator truth: `createParser()`, analyzer entry, mode deprecation contract
+- [x] 59-02-PLAN.md — Registry integration for TypeScript/JavaScript, Python, and Go main-path routing
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 59-03-PLAN.md — WASM fallback verification, deprecated-mode failure coverage, docs/runtime truth sync
+- [x] 59-03-PLAN.md — WASM fallback verification, deprecated-mode failure coverage, docs/runtime truth sync
 
 **Success criteria:**
 1. `mycodemap generate` no longer relies on `FastParser` or `hybrid` switching in the active main path.
@@ -38,11 +38,11 @@
 **Plans:** 3 plans in 2 waves
 
 **Wave 1** *(no dependencies)*
-- [ ] 60-01-PLAN.md — StorageFactory truth: remove `filesystem` / `kuzudb` active support, redefine `auto`
-- [ ] 60-02-PLAN.md — Config/default/runtime migration: config-loader, defaults, error codes, remediation text
+- [x] 60-01-PLAN.md — StorageFactory truth: remove `filesystem` / `kuzudb` active support, redefine `auto`
+- [x] 60-02-PLAN.md — Config/default/runtime migration: config-loader, defaults, error codes, remediation text
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 60-03-PLAN.md — SQLite-family fallback validation across native, `sql.js`, and `node:sqlite` paths
+- [x] 60-03-PLAN.md — SQLite-family fallback validation across native, `sql.js`, and `node:sqlite` paths
 
 **Success criteria:**
 1. `storage.type: "auto"` resolves only within the SQLite family.
@@ -55,13 +55,15 @@
 **Goal:** Replace `cli_redirect` contract-tool responses with real execution for an initial high-value MCP tool set, using shared command/service seams instead of duplicated logic.
 **Depends on:** Phase 60
 **Requirements:** MCP-01, MCP-02, MCP-03, MCP-04
-**Plans:** 3 plans in 2 waves
+**Plans:** 3 plans in 3 waves
 
 **Wave 1** *(no dependencies)*
 - [ ] 61-01-PLAN.md — Shared execution seam for the first high-value contract-backed tools
+
+**Wave 2** *(blocked on 61-01 completion)*
 - [ ] 61-02-PLAN.md — MCP adapter conversion: structured success/error output replaces `cli_redirect`
 
-**Wave 2** *(blocked on Wave 1 completion)*
+**Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 61-03-PLAN.md — Thin CLI wrapper cleanup, integration tests, and failure-path evidence
 
 **Success criteria:**
@@ -101,7 +103,7 @@
 - `PAR-06` (`PythonTypeEnhancer`) remains non-blocking
 - `MCP-05` (SSE transport) remains non-blocking
 
-**Next up:** Phase 59 — Parser Cutover
+**Next up:** Phase 61 — MCP Direct Execution
 
 ---
 
