@@ -1,9 +1,38 @@
 # Project Milestones: CodeMap
 
-> **Current active planning truth** lives in `.planning/PROJECT.md`, `.planning/ROADMAP.md`, `.planning/REQUIREMENTS.md`, and `.planning/STATE.md`.
+> **Current active planning truth** lives in `.planning/PROJECT.md`, `.planning/ROADMAP.md`, and `.planning/STATE.md`. During an active milestone, `.planning/REQUIREMENTS.md` joins that set; between milestones it may be absent by design.
 > The shipped entries below are **historical snapshots**. Their `What's next` text records closeout-time context and must not override the current active planning surface.
 
-**Current status:** No active milestone. The latest shipped milestone is `v2.1 ux-onboarding-enhancement` (2026-05-06). Start the next milestone when ready.
+**Current status:** No active milestone. The latest shipped milestone is `v2.2 architecture-foundation` (2026-05-07). Start the next milestone when ready.
+
+## v2.2 architecture-foundation (Shipped: 2026-05-07)
+
+**Goal:** 把 CodeMap 的 parser、storage 和 MCP 执行表面收敛到更少、更稳定的架构基线，为后续 graph capability 和 agent experience 打基础。
+
+**Phases completed:** 59-62 (12 plans total)
+
+**Delivered:**
+
+- Parser 主路径统一到 registry-backed tree-sitter，废弃 `fast` / `hybrid` 运行时分流
+- Persistent storage 收敛为 SQLite-only truth，显式拒绝 `filesystem` / `kuzudb`
+- `codemap_query` / `codemap_deps` / `codemap_analyze` 通过共享 execution seam 直接执行，不再返回 `cli_redirect`
+- `codemap_context` 交付原生 routing gate，支持 `review` / `debug` / `default`、`minimal` / `standard` detail levels 和 fail-closed tool filtering
+
+**Key accomplishments:**
+
+- `Phase 59` 收口 parser main-path、deprecated-mode rejection、多语言入口和 server/API gap closure
+- `Phase 60` 收口 SQLite-only runtime/config/docs truth 与 fallback observability
+- `Phase 61` 收口 shared executor seam、thin CLI wrappers 和 direct-execution MCP envelope
+- `Phase 62` 收口 native routing gate、detail-level contract、strict filtering 和 docs sync
+
+**Stats:**
+
+- `17/17` milestone requirements satisfied
+- `12/12` plans complete across `4` phases
+- Change slice: `17` files changed, `2195` insertions, `158` deletions in the closeout-tracked parser/storage/MCP surface
+- Known deferred items at close: `2` operational debts (`mycodemap-install-runtime-deps`, hook double-file sync fragility)
+
+**What's next:** Start the next milestone when ready. Likely candidates now sit in `v2.3` graph capability, `v2.4+` agent graph experience, or `v3.0+` architecture intelligence / agent integration follow-ups.
 
 ## v2.1 ux-onboarding-enhancement (Shipped: 2026-05-06)
 

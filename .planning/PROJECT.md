@@ -12,18 +12,42 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 
 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
 
-## Current Milestone: v2.2 architecture-foundation
+## Current State
+
+**Status:** No active milestone. Latest shipped milestone is `v2.2 architecture-foundation` on 2026-05-07.
+
+**What shipped in v2.2:**
+- Parser 主路径收敛为 registry-backed tree-sitter，废弃 `fast` / `hybrid` runtime split
+- Persistent storage 收敛为 SQLite-only truth，deprecated backend 请求返回明确 remediation
+- `query` / `deps` / `analyze` 共享 direct-execution seam，并通过 MCP 返回真实 structured result
+- `codemap_context` 现在提供原生 routing gate、detail-level control 和 fail-closed tool filtering
+
+**Closeout status:**
+- `17/17` requirements complete
+- `12` plans across phases `59-62`
+- Residual deferred items remain explicit in `.planning/STATE.md` and `.planning/backlog.md`
+
+## Next Milestone Goals
+
+- Define the next active milestone with `$gsd-new-milestone /data/codemap`
+- Choose whether the next focus is graph capability (`v2.3+`), agent graph experience (`v2.4+` / `v2.5+`), or broader architecture intelligence / agent integration (`v3.0+`)
+- Preserve the v2.2 baseline as the stable execution foundation; avoid reopening parser/storage/MCP truth unless a new milestone scopes it explicitly
+
+## Latest Completed Milestone: v2.2 architecture-foundation
 
 **Goal:** 把 CodeMap 的解析、存储和 MCP 执行链路收敛到更少、更稳定的架构基线，为后续 graph capability 和 agent experience 打基础。
 
-**Target features:**
-- Parser 统一：TreeSitterParser 进入主流程，FastParser / Hybrid 退出主流程
-- Storage 收敛：移除 KùzuDB / FileSystem backend，`auto` 统一到 SQLite 路径
-- MCP 直接执行：去掉 `cli_redirect`，收敛到 pure function + CLI wrapper + MCP adapter
-- MCP 路由门：交付 `codemap_context` 简化版，先支持 `review` / `debug` / `default`
-- 非阻塞验收：`PythonTypeEnhancer` 可以纳入，但不阻塞 milestone 收口
+**Status:** Shipped 2026-05-07. 17/17 requirements complete; milestone audit passed after verification artifacts were closed.
 
-## Latest Completed Milestone: v2.1 ux-onboarding-enhancement
+**Delivered:**
+- Parser 统一：TreeSitterParser 进入主流程，FastParser / Hybrid 退出主流程 ✅
+- Storage 收敛：移除 KùzuDB / FileSystem backend，`auto` 统一到 SQLite 路径 ✅
+- MCP 直接执行：去掉 `cli_redirect`，收敛到 pure function + CLI wrapper + MCP adapter ✅
+- MCP 路由门：交付 `codemap_context`，支持 `review` / `debug` / `default`、detail levels 和 strict filtering ✅
+
+**Phase numbering:** Continues from Phase 58 → phases 59-62
+
+## Previous Completed Milestone: v2.1 ux-onboarding-enhancement
 
 **Goal:** 把 CodeMap 从“安装后需要手动配置”升级为“首次运行即能提供价值”的入门体验，让新用户零配置即可预览代码库，并逐步引导完成深度配置。
 

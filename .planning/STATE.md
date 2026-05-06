@@ -1,58 +1,62 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.2
-milestone_name: milestone
-current_phase: 60
-current_phase_name: storage-convergence
-current_plan: 60-01, 60-02, 60-03
-status: completed
-last_updated: "2026-05-06T07:41:00.094Z"
-last_activity: 2026-05-06
+milestone: none
+milestone_name: none
+current_phase: none
+current_phase_name: none
+current_plan: none
+status: between_milestones
+last_updated: "2026-05-07T00:10:00+08:00"
+last_activity: 2026-05-07
 progress:
-  total_phases: 4
-  completed_phases: 2
-  total_plans: 10
-  completed_plans: 7
-  percent: 70
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Session State
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-05-06)
+See: `.planning/PROJECT.md` (updated 2026-05-07)
 
 **Core Value:** 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
-**Current Focus:** Milestone v2.2 architecture-foundation
+**Current Focus:** Between milestones — `v2.2 architecture-foundation` archived, awaiting next milestone selection
 
 ## Position
 
-**Milestone:** v2.2 — architecture-foundation
-**Current Phase:** 60
-**Current Phase Name:** storage-convergence
-**Current Plan:** 60-01, 60-02, 60-03
-**Total Phases:** 4 scoped (59-62)
-**Total Plans in Milestone:** 11 planned
-**Status:** Phase 60 completed; ready to start Phase 61
-**Progress:** [=====-----] 50% phase completion
-**Last Activity:** 2026-05-06
-**Last Activity Description:** Phase 60 completed — 3 plans across 2 waves verified; SQLite-only persistent storage truth, config/runtime convergence, and SQLite-family fallback observability landed
+**Milestone:** none
+**Current Phase:** none
+**Current Phase Name:** none
+**Current Plan:** none
+**Total Phases:** 0 scoped
+**Total Plans in Milestone:** 0 planned
+**Status:** Between milestones
+**Progress:** [----------] waiting for next milestone
+**Last Activity:** 2026-05-07
+**Last Activity Description:** Milestone `v2.2 architecture-foundation` archived with audit passed; active planning surface reset for the next milestone
 
 ## Current Position
 
-Phase: 60 (storage-convergence) — completed
-Plan: 60-01, 60-02, 60-03
-Status: Ready to start Phase 61
-Last activity: 2026-05-06 — Phase 60 completed (3 plans, 2 waves, targeted tests + typecheck passed)
+Phase: none
+Plan: none
+Status: Between milestones
+Last activity: 2026-05-07 — `v2.2 architecture-foundation` archived and waiting for next milestone selection
 
 ## Decisions Made
 
 | Date | Summary | Rationale |
 |------|---------|-----------|
+| 2026-05-07 | `v2.2 architecture-foundation` archived | Milestone audit passed, roadmap/requirements were archived, and the active planning surface reset to between-milestones state |
+| 2026-05-06 | Phase 62 completed | `codemap_context` now exposes native review/debug/default routing, explicit minimal/standard detail levels, and fail-closed tool filtering with focused verification |
+| 2026-05-06 | Phase 61 completed | Query/deps/analyze now share one execution seam; MCP selected family returns real structured direct-execution results and docs/tests align |
 | 2026-05-06 | Phase 60 completed | Storage runtime/config/docs now converge on SQLite-only persistence; targeted tests and `tsc --noEmit` passed |
 | 2026-05-06 | Phase 59 completed | Parser runtime/config/docs now converge on a single tree-sitter main path with deprecated-mode rejection |
 | 2026-05-06 | `v2.2 architecture-foundation` started | User selected architecture foundation as the next milestone |
 | 2026-05-06 | Phase 59 planned | 3 plans in 2 waves; requirements PAR-01..PAR-05 and decisions D-01..D-15 mapped into executable plan artifacts |
+| 2026-05-06 | Phase 59 gap closure inserted | Added 59-04 to close the server/API deprecated parser mode rejection gap discovered during UAT, bringing milestone plan count to 12 |
 | 2026-05-06 | Phase 59 context gathered | 15 decisions: ParserRegistry as truth, SmartParser→TypeScriptTypeEnhancer, Failure-to-Action for deprecated modes, Wave 1 full multi-lang |
 | 2026-05-06 | `v2.2` scope locked to parser / storage / MCP foundation work | Keep v2.2 focused on platform convergence before v2.3/v3.0 feature layers |
 | 2026-05-06 | Phase numbering continues from 58 | No `--reset-phase-numbers` requested; roadmap will start at Phase 59 |
@@ -69,6 +73,7 @@ Last activity: 2026-05-06 — Phase 60 completed (3 plans, 2 waves, targeted tes
 
 ## Closeout Notes
 
+- **Latest shipped milestone:** `v2.2 architecture-foundation` archived on 2026-05-07. Archived roadmap/requirements now live in `.planning/milestones/v2.2-ROADMAP.md` and `.planning/milestones/v2.2-REQUIREMENTS.md`.
 - **Phase 58 subagent verification rework (2026-05-03):** Official docs review revealed fundamental test-design flaws. `claude -p` is print mode (not subagent); `codex exec --agent` does not exist; `additionalContext`/`developer_instructions` are text injection, not enforced execution. Verification script `scripts/verify-subagent-env-contract.mjs` was rewritten. Real Claude/Codex subagent tests (S1-S3) are now completed with evidence. See 58-HUMAN-UAT.md for the canonical protocol.
 - **v2.1 closeout gap:** `INI-01` (`mycodemap init --json`) remains deferred to the next milestone; this was accepted explicitly at close.
 
@@ -151,6 +156,7 @@ Last activity: 2026-05-06 — Phase 60 completed (3 plans, 2 waves, targeted tes
 - 2026-05-05: Phase 57 verification explicitly rescheduled to run after Phase 58 completion to avoid duplicate verification runs caused by the mid-stream Phase 58 insertion.
 - 2026-05-05: Phase 57 completed — built CLI E2E covers empty-dir/profile bootstrap, Node.js rerun idempotency, and legacy-root-config migration; profileName persistence plus generatedAt-insensitive env-contract comparison removed false conflicts.
 - 2026-05-06: v2.1 archived — accepted `INI-01` gap and kept F-1 cosmetic cleanup tracked as deferred technical debt.
+- 2026-05-06: Phase 61 completed — shared contract-tool executor landed, `codemap_query`/`codemap_deps`/`codemap_analyze` now execute directly through MCP, and output/architecture docs were synced to the new envelope truth.
 
 ### Verified Existing Capabilities (carried forward)
 
