@@ -35,11 +35,11 @@ describe('config-loader', () => {
     expect(result.exists).toBe(false);
     expect(result.isLegacy).toBe(false);
     expect(result.hasExplicitPluginConfig).toBe(false);
-    expect(result.config.mode).toBe('hybrid');
+    expect(result.config.mode).toBe('tree-sitter');
     expect(result.config.include).toEqual(['src/**/*.ts']);
     expect(result.config.storage).toEqual({
-      type: 'filesystem',
-      outputPath: '.mycodemap/storage',
+      type: 'sqlite',
+      databasePath: '.mycodemap/governance.sqlite',
     });
     expect(result.config.plugins).toEqual({
       builtInPlugins: true,
@@ -52,16 +52,16 @@ describe('config-loader', () => {
     const rootDir = createTempRoot();
     tempRoots.push(rootDir);
 
-    writeJson(rootDir, '.mycodemap/config.json', { mode: 'hybrid', output: '.mycodemap' });
-    writeJson(rootDir, 'mycodemap.config.json', { mode: 'smart' });
-    writeJson(rootDir, 'codemap.config.json', { mode: 'fast' });
+    writeJson(rootDir, '.mycodemap/config.json', { mode: 'tree-sitter', output: '.mycodemap' });
+    writeJson(rootDir, 'mycodemap.config.json', { mode: 'tree-sitter' });
+    writeJson(rootDir, 'codemap.config.json', { mode: 'tree-sitter' });
 
     const result = await loadCodemapConfig(rootDir);
 
     expect(result.exists).toBe(true);
     expect(result.isLegacy).toBe(false);
     expect(result.hasExplicitPluginConfig).toBe(false);
-    expect(result.config.mode).toBe('hybrid');
+    expect(result.config.mode).toBe('tree-sitter');
     expect(result.configPath).toBe(path.join(rootDir, '.mycodemap/config.json'));
   });
 
@@ -127,31 +127,23 @@ describe('config-loader', () => {
     });
   });
 
-  it('normalizes storage config with explicit supported backend fields', async () => {
+  it('normalizes auto storage config as a SQLite-family alias', async () => {
     const rootDir = createTempRoot();
     tempRoots.push(rootDir);
 
     writeJson(rootDir, 'mycodemap.config.json', {
       storage: {
-        type: 'kuzudb',
-        databasePath: '.mycodemap/graph.kuzu',
-        autoThresholds: {
-          useGraphDBWhenFileCount: 200,
-          useGraphDBWhenNodeCount: 5000,
-        },
+        type: 'auto',
       },
     });
 
     const result = await loadCodemapConfig(rootDir);
 
     expect(result.config.storage).toEqual({
-      type: 'kuzudb',
-      outputPath: '.mycodemap/storage',
-      databasePath: '.mycodemap/graph.kuzu',
-      autoThresholds: {
-        useGraphDBWhenFileCount: 200,
-        useGraphDBWhenNodeCount: 5000,
-      },
+      type: 'auto',
+      outputPath: undefined,
+      databasePath: '.mycodemap/governance.sqlite',
+      autoThresholds: undefined,
     });
   });
 
@@ -170,10 +162,46 @@ describe('config-loader', () => {
 
     expect(result.config.storage).toEqual({
       type: 'sqlite',
-      outputPath: '.mycodemap/storage',
+      outputPath: undefined,
       databasePath: '.mycodemap/governance.sqlite',
       autoThresholds: undefined,
     });
+  });
+
+  it('rejects deprecated filesystem storage with actionable unsupported-storage remediation', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+
+    writeJson(rootDir, 'mycodemap.config.json', {
+      storage: {
+        type: 'filesystem',
+        outputPath: '.mycodemap/storage',
+      },
+    });
+
+    await expect(loadCodemapConfig(rootDir)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_STORAGE_TYPE',
+      nextCommand: 'mycodemap doctor',
+    });
+    await expect(loadCodemapConfig(rootDir)).rejects.toThrow('filesystem');
+  });
+
+  it('rejects deprecated kuzudb storage with actionable unsupported-storage remediation', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+
+    writeJson(rootDir, 'mycodemap.config.json', {
+      storage: {
+        type: 'kuzudb',
+        databasePath: '.mycodemap/graph.kuzu',
+      },
+    });
+
+    await expect(loadCodemapConfig(rootDir)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_STORAGE_TYPE',
+      nextCommand: 'mycodemap doctor',
+    });
+    await expect(loadCodemapConfig(rootDir)).rejects.toThrow('kuzudb');
   });
 
   it('rejects invalid plugin config types', async () => {
@@ -206,7 +234,7 @@ describe('config-loader', () => {
 
     writeJson(rootDir, 'mycodemap.config.json', {
       storage: {
-        type: 'filesystem',
+        type: 'sqlite',
         location: '.mycodemap/storage',
       },
     });
@@ -228,5 +256,22 @@ describe('config-loader', () => {
     });
 
     await expect(loadCodemapConfig(rootDir)).rejects.toThrow('Neo4j storage 已不再受支持');
+  });
+
+  it('rejects deprecated autoThresholds storage routing config', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+
+    writeJson(rootDir, 'mycodemap.config.json', {
+      storage: {
+        type: 'auto',
+        autoThresholds: {
+          useGraphDBWhenFileCount: 200,
+          useGraphDBWhenNodeCount: 5000,
+        },
+      },
+    });
+
+    await expect(loadCodemapConfig(rootDir)).rejects.toThrow('"storage.autoThresholds" 已废弃');
   });
 });

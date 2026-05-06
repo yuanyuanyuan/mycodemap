@@ -8,6 +8,7 @@ import { cwd } from 'node:process';
 import { DEFAULT_DISCOVERY_EXCLUDES } from '../core/file-discovery.js';
 import type { CodemapConfig, CodemapPluginConfig } from '../interface/config/index.js';
 import type { StorageConfig } from '../interface/types/storage.js';
+import { ErrorCodes } from './output/error-codes.js';
 import { resolveConfigPath } from './paths.js';
 
 export interface NormalizedPluginConfig {
@@ -38,15 +39,13 @@ export interface LoadedCodemapConfig {
   hasExplicitPluginConfig: boolean;
 }
 
-const DEFAULT_CONFIG_MODE: NormalizedCodemapConfig['mode'] = 'hybrid';
+const DEFAULT_CONFIG_MODE: NormalizedCodemapConfig['mode'] = 'tree-sitter';
 const DEFAULT_CONFIG_INCLUDE = ['src/**/*.ts'] as const;
 const DEFAULT_CONFIG_OUTPUT = '.mycodemap';
 const DEFAULT_CONFIG_SCHEMA_URL = 'https://mycodemap.dev/schema/config.json';
-const VALID_MODES = new Set<NormalizedCodemapConfig['mode']>(['fast', 'smart', 'hybrid']);
+const VALID_MODES = new Set<NormalizedCodemapConfig['mode']>(['tree-sitter']);
 const VALID_STORAGE_TYPES = new Set<NormalizedStorageConfig['type']>([
-  'filesystem',
   'sqlite',
-  'kuzudb',
   'memory',
   'auto',
 ]);
@@ -62,6 +61,13 @@ const ALLOWED_AUTO_THRESHOLD_KEYS = new Set([
   'useGraphDBWhenFileCount',
   'useGraphDBWhenNodeCount',
 ]);
+
+interface ConfigError extends Error {
+  code?: string;
+  remediation?: string;
+  nextCommand?: string;
+  confidence?: number;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -127,18 +133,81 @@ function normalizeNumber(value: unknown, label: string): number {
 function normalizeMode(value: unknown): NormalizedCodemapConfig['mode'] {
   const mode = normalizeString(value, 'mode') as NormalizedCodemapConfig['mode'];
 
+  if (mode === 'fast' || mode === 'smart' || mode === 'hybrid') {
+    const error = new Error(
+      '配置文件中的 "mode" 旧值 fast/smart/hybrid 已废弃；请删除该字段或改为 tree-sitter'
+    ) as Error & { code: string };
+    error.code = 'DEPRECATED_PARSER_MODE';
+    throw error;
+  }
+
   if (!VALID_MODES.has(mode)) {
-    throw new Error('配置文件中的 "mode" 仅支持 fast、smart、hybrid');
+    throw new Error('配置文件中的 "mode" 仅支持 tree-sitter');
   }
 
   return mode;
 }
 
-function normalizeStorageType(value: unknown): NormalizedStorageConfig['type'] {
+function createConfigError(
+  message: string,
+  code: string,
+  remediation?: string,
+  nextCommand?: string,
+  confidence?: number
+): ConfigError {
+  const error = new Error(message) as ConfigError;
+  error.code = code;
+  if (remediation) {
+    error.remediation = remediation;
+  }
+  if (nextCommand) {
+    error.nextCommand = nextCommand;
+  }
+  if (confidence !== undefined) {
+    error.confidence = confidence;
+  }
+  return error;
+}
+
+function createUnsupportedStorageTypeError(
+  storageType: string,
+  rawStorageConfig: Record<string, unknown>
+): ConfigError {
+  const legacyPath = typeof rawStorageConfig.outputPath === 'string'
+    ? `storage.outputPath=${rawStorageConfig.outputPath}`
+    : typeof rawStorageConfig.databasePath === 'string'
+      ? `storage.databasePath=${rawStorageConfig.databasePath}`
+      : undefined;
+  const legacyPathHint = legacyPath ? `；检测到遗留路径 ${legacyPath}` : '';
+  const message =
+    `配置文件中的 "storage.type"="${storageType}" 已不再受支持；持久化存储已收敛到 SQLite-only${legacyPathHint}`;
+  const remediation =
+    `将 "storage.type" 改为 "sqlite"（推荐）或 "auto"，测试场景仅使用 "memory"` +
+    (legacyPath
+      ? `；如需保留旧数据，请先把 ${legacyPath} 中的数据手动迁移到 SQLite 数据库（例如 .mycodemap/governance.sqlite）`
+      : '；如需保留旧数据，请先手动迁移到 SQLite 数据库（例如 .mycodemap/governance.sqlite）');
+
+  return createConfigError(
+    message,
+    ErrorCodes.UNSUPPORTED_STORAGE_TYPE,
+    remediation,
+    'mycodemap doctor',
+    0.97
+  );
+}
+
+function normalizeStorageType(
+  value: unknown,
+  rawStorageConfig: Record<string, unknown>
+): NormalizedStorageConfig['type'] {
   const storageType = normalizeString(value, 'storage.type') as NormalizedStorageConfig['type'];
 
+  if (storageType === 'filesystem' || storageType === 'kuzudb') {
+    throw createUnsupportedStorageTypeError(storageType, rawStorageConfig);
+  }
+
   if (!VALID_STORAGE_TYPES.has(storageType)) {
-    throw new Error('配置文件中的 "storage.type" 仅支持 filesystem、sqlite、kuzudb、memory、auto');
+    throw new Error('配置文件中的 "storage.type" 仅支持 sqlite、memory、auto');
   }
 
   return storageType;
@@ -151,8 +220,12 @@ function assertNoDeprecatedNeo4jConfig(rawStorageConfig: Record<string, unknown>
     || rawStorageConfig.password !== undefined;
 
   if (containsLegacyNeo4jFields) {
-    throw new Error(
-      '配置文件中的 Neo4j storage 已不再受支持；请改用 filesystem、sqlite、kuzudb、memory 或 auto，并移除 storage.uri / storage.username / storage.password'
+    throw createConfigError(
+      '配置文件中的 Neo4j storage 已不再受支持；持久化存储已收敛到 SQLite-only',
+      ErrorCodes.UNSUPPORTED_STORAGE_TYPE,
+      '请改用 "sqlite"（推荐）或 "auto"，测试场景仅使用 "memory"，并移除 storage.uri / storage.username / storage.password',
+      'mycodemap doctor',
+      0.97
     );
   }
 }
@@ -167,8 +240,8 @@ function createDefaultPluginConfig(): NormalizedPluginConfig {
 
 export function createDefaultStorageConfig(): NormalizedStorageConfig {
   return {
-    type: 'filesystem',
-    outputPath: '.mycodemap/storage',
+    type: 'sqlite',
+    databasePath: '.mycodemap/governance.sqlite',
   };
 }
 
@@ -230,19 +303,28 @@ function normalizeStorageConfig(value: unknown): NormalizedStorageConfig {
   assertAllowedKeys(rawStorageConfig, ALLOWED_STORAGE_KEYS, 'storage');
 
   return {
-    type: rawStorageConfig.type === undefined ? defaults.type : normalizeStorageType(rawStorageConfig.type),
+    type: rawStorageConfig.type === undefined ? defaults.type : normalizeStorageType(rawStorageConfig.type, rawStorageConfig),
     outputPath:
       rawStorageConfig.outputPath === undefined
         ? defaults.outputPath
         : normalizeString(rawStorageConfig.outputPath, 'storage.outputPath'),
     databasePath:
       rawStorageConfig.databasePath === undefined
-        ? undefined
+        ? defaults.databasePath
         : normalizeString(rawStorageConfig.databasePath, 'storage.databasePath'),
     autoThresholds:
       rawStorageConfig.autoThresholds === undefined
         ? undefined
-        : normalizeAutoThresholds(rawStorageConfig.autoThresholds),
+        : (() => {
+          normalizeAutoThresholds(rawStorageConfig.autoThresholds);
+          throw createConfigError(
+            '配置文件中的 "storage.autoThresholds" 已废弃；"auto" 现在只在 SQLite family 内选择实现，不再跨后端路由',
+            ErrorCodes.CFG_INVALID_CONFIG,
+            '请删除 "storage.autoThresholds"，并改用 "sqlite"（推荐）或保留 "auto" 作为 SQLite-family alias',
+            'mycodemap doctor',
+            0.92
+          );
+        })(),
   };
 }
 

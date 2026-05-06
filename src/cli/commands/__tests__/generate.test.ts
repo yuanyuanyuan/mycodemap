@@ -90,14 +90,14 @@ describe('Generate CLI', () => {
   });
 
   const createMockConfig = () => ({
-    mode: 'hybrid' as const,
+    mode: 'tree-sitter' as const,
     include: ['src/**/*.ts'],
     exclude: ['node_modules/**', 'dist/**'],
       output: '.mycodemap',
       watch: false,
       storage: {
-        type: 'filesystem' as const,
-        outputPath: '.codemap/storage',
+        type: 'sqlite' as const,
+        databasePath: '.mycodemap/governance.sqlite',
       },
       plugins: {
         builtInPlugins: true,
@@ -128,7 +128,7 @@ describe('Generate CLI', () => {
     mockStorageSaveCodeGraph.mockResolvedValue(undefined);
     mockStorageClose.mockResolvedValue(undefined);
     mockCreateForProject.mockResolvedValue({
-      type: 'filesystem',
+      type: 'sqlite',
       saveCodeGraph: mockStorageSaveCodeGraph,
       close: mockStorageClose,
     });
@@ -155,14 +155,9 @@ describe('Generate CLI', () => {
       expect(mockAnalyze).toHaveBeenCalled();
     }, 30000);
 
-    it('should generate with fast mode', async () => {
-      await generateCommand({ mode: 'fast' });
-      expect(mockAnalyze).toHaveBeenCalledWith(expect.objectContaining({ mode: 'fast' }));
-    }, 30000);
-
-    it('should generate with smart mode', async () => {
-      await generateCommand({ mode: 'smart' });
-      expect(mockAnalyze).toHaveBeenCalledWith(expect.objectContaining({ mode: 'smart' }));
+    it('should generate with tree-sitter mode', async () => {
+      await generateCommand({ mode: 'tree-sitter' });
+      expect(mockAnalyze).toHaveBeenCalledWith(expect.objectContaining({ mode: 'tree-sitter' }));
     }, 30000);
 
     it('should use custom output directory', async () => {
@@ -174,7 +169,7 @@ describe('Generate CLI', () => {
       mockLoadCodemapConfig.mockResolvedValue({
         config: {
           ...createMockConfig(),
-          mode: 'fast',
+          mode: 'tree-sitter',
           include: ['lib/**/*.ts'],
           exclude: ['dist/**', 'coverage/**'],
           output: '.from-config',
@@ -188,7 +183,7 @@ describe('Generate CLI', () => {
       await generateCommand({});
 
       expect(mockAnalyze).toHaveBeenCalledWith(expect.objectContaining({
-        mode: 'fast',
+        mode: 'tree-sitter',
         include: ['lib/**/*.ts'],
         exclude: ['dist/**', 'coverage/**'],
         output: '.from-config',
@@ -199,7 +194,7 @@ describe('Generate CLI', () => {
       mockLoadCodemapConfig.mockResolvedValue({
         config: {
           ...createMockConfig(),
-          mode: 'fast',
+          mode: 'tree-sitter',
           output: '.from-config',
         },
         configPath: '/project/mycodemap.config.json',
@@ -208,17 +203,17 @@ describe('Generate CLI', () => {
         hasExplicitPluginConfig: false,
       });
 
-      await generateCommand({ mode: 'smart', output: 'cli-output' });
+      await generateCommand({ mode: 'tree-sitter', output: 'cli-output' });
 
       expect(mockAnalyze).toHaveBeenCalledWith(expect.objectContaining({
-        mode: 'smart',
+        mode: 'tree-sitter',
         output: 'cli-output',
       }));
     }, 30000);
 
-    it('should pass configured storage backend into MVP3 storage save path', async () => {
+    it('should pass configured sqlite storage into governance graph save path', async () => {
       mockCreateForProject.mockResolvedValueOnce({
-        type: 'kuzudb',
+        type: 'sqlite',
         saveCodeGraph: mockStorageSaveCodeGraph,
         close: mockStorageClose,
       });
@@ -226,8 +221,8 @@ describe('Generate CLI', () => {
         config: {
           ...createMockConfig(),
           storage: {
-            type: 'kuzudb',
-            databasePath: '.codemap/kuzu',
+            type: 'sqlite',
+            databasePath: '.mycodemap/governance.sqlite',
           },
         },
         configPath: '/project/mycodemap.config.json',
@@ -239,10 +234,10 @@ describe('Generate CLI', () => {
       await generateCommand({});
 
       expect(mockCreateForProject).toHaveBeenCalledWith(process.cwd(), {
-        type: 'kuzudb',
-        databasePath: '.codemap/kuzu',
+        type: 'sqlite',
+        databasePath: '.mycodemap/governance.sqlite',
       });
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('MVP3 Storage (kuzudb)'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('治理图存储 (sqlite)'));
     }, 30000);
 
     it('should handle analysis error', async () => {
@@ -258,6 +253,25 @@ describe('Generate CLI', () => {
 
       expect(mockExitCode).toBe(1);
       expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('"plugins" 必须是对象'));
+    }, 30000);
+
+    it('should surface actionable unsupported-storage remediation for deprecated backends', async () => {
+      const error = new Error('配置文件中的 "storage.type"="filesystem" 已不再受支持') as Error & {
+        code: string;
+        remediation: string;
+        nextCommand: string;
+      };
+      error.code = 'UNSUPPORTED_STORAGE_TYPE';
+      error.remediation = '将 "storage.type" 改为 "sqlite"（推荐）或 "auto"。';
+      error.nextCommand = 'mycodemap doctor';
+      mockLoadCodemapConfig.mockRejectedValue(error);
+
+      await expect(generateCommand({})).rejects.toThrow('Process exit');
+
+      expect(mockExitCode).toBe(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('[UNSUPPORTED_STORAGE_TYPE]'));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('mycodemap doctor'));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('"sqlite"（推荐）或 "auto"'));
     }, 30000);
 
     it('should surface built-in plugin metrics when explicitly enabled', async () => {
@@ -364,10 +378,9 @@ describe('Generate CLI', () => {
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('文件总数'));
     }, 30000);
 
-    it('should display actual mode when available', async () => {
-      mockAnalyze.mockResolvedValue({ ...createMockCodeMap(), actualMode: 'smart' });
-      await generateCommand({ mode: 'hybrid' });
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('解析模式'));
+    it('should announce the single parser main path', async () => {
+      await generateCommand({});
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('默认 parser 主路径'));
     }, 30000);
   });
 });

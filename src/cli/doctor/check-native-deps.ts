@@ -5,9 +5,24 @@ import { createRequire } from 'node:module';
 import { detectTreeSitterSync } from '../tree-sitter-check.js';
 import type { DiagnosticResult } from './types.js';
 
-function checkBetterSqlite3(): DiagnosticResult {
+function hasSqliteFamilyFallback(projectRequire: ReturnType<typeof createRequire>): boolean {
+  const nodeMajorVersion = Number(process.versions.node.split('.')[0] ?? '0');
+  if (nodeMajorVersion >= 22) {
+    return true;
+  }
+
   try {
-    const projectRequire = createRequire(import.meta.url);
+    projectRequire.resolve('sql.js');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function checkBetterSqlite3(): DiagnosticResult {
+  const projectRequire = createRequire(import.meta.url);
+
+  try {
     projectRequire('better-sqlite3');
     return {
       category: 'runtime',
@@ -18,12 +33,15 @@ function checkBetterSqlite3(): DiagnosticResult {
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
+    const fallbackAvailable = hasSqliteFamilyFallback(projectRequire);
     return {
       category: 'runtime',
-      severity: 'error',
-      id: 'native-dep-missing',
+      severity: fallbackAvailable ? 'warn' : 'error',
+      id: fallbackAvailable ? 'sqlite-family-fallback-available' : 'native-dep-missing',
       message: `better-sqlite3 cannot be loaded: ${errorMessage}`,
-      remediation: 'Run npm install to rebuild native dependencies, or use --wasm-fallback if available',
+      remediation: fallbackAvailable
+        ? 'SQLite-family fallback is available. Use Node.js 22+ node:sqlite or install sql.js, then rerun with --wasm-fallback if needed'
+        : 'Run npm rebuild better-sqlite3, or install Node.js 22+ / sql.js to restore SQLite-family fallback options',
     };
   }
 }

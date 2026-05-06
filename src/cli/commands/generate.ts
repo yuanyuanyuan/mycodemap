@@ -21,6 +21,7 @@ import type { ModuleInfo } from '../../types/index.js';
 import type { ModuleSymbol, SourceLocation } from '../../interface/types/index.js';
 import type { StorageConfig } from '../../interface/types/storage.js';
 import { loadCodemapConfig } from '../config-loader.js';
+import { formatError } from '../output/index.js';
 
 export interface GenerateCommandOptionSources {
   mode?: string;
@@ -231,18 +232,14 @@ export async function generateCommand(options: GenerateCommandOptions) {
   try {
     const loadedConfig = await loadCodemapConfig(process.cwd());
     const mode = hasExplicitOverride(options.mode, options.__optionSources?.mode)
-      ? (options.mode as 'fast' | 'smart' | 'hybrid')
+      ? (options.mode as AnalysisOptions['mode'])
       : loadedConfig.config.mode;
     const configuredOutput = hasExplicitOverride(options.output, options.__optionSources?.output)
       ? options.output
       : loadedConfig.config.output;
     const { outputDir, isLegacy } = resolveOutputDir(configuredOutput);
 
-    if (mode === 'hybrid') {
-      console.log(chalk.blue(`🔍 使用 Hybrid 模式生成代码地图...`));
-    } else {
-      console.log(chalk.blue(`🔍 使用 ${mode} 模式生成代码地图...`));
-    }
+    console.log(chalk.blue('🔍 使用默认 parser 主路径生成代码地图...'));
 
     if (isLegacy) {
       console.warn(chalk.yellow('⚠️  检测到使用旧目录 .codemap，请迁移到 .mycodemap'));
@@ -345,17 +342,12 @@ export async function generateCommand(options: GenerateCommandOptions) {
         : '')
     ));
 
-    // 显示实际使用的模式（Hybrid 模式下）
-    if (codeMap.actualMode) {
-      console.log(chalk.gray(`   解析模式: ${codeMap.actualMode} (自动选择)`));
-    }
-
     console.log(chalk.gray('\n📁 输出文件:'));
     console.log(chalk.gray(`   AI_MAP.md`));
     console.log(chalk.gray(`   codemap.json`));
     console.log(chalk.gray(`   dependency-graph.md`));
     console.log(chalk.gray(`   context/ (${codeMap.summary.totalFiles} 个文件)`));
-    console.log(chalk.gray(`   MVP3 Storage (${storageSaveResult.storageType})`));
+    console.log(chalk.gray(`   治理图存储 (${storageSaveResult.storageType})`));
 
     if (pluginReport) {
       console.log(chalk.gray('\n🔌 插件摘要:'));
@@ -373,7 +365,7 @@ export async function generateCommand(options: GenerateCommandOptions) {
 
   } catch (error) {
     spinner.fail(chalk.red('❌ 生成失败'));
-    console.error(chalk.red(`错误: ${error}`));
+    console.error(formatError(error, 'human', 'mycodemap generate'));
     process.exit(1);
   }
 }

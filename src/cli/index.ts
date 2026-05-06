@@ -137,7 +137,7 @@ program
 program
   .command('generate')
   .description('生成代码地图')
-  .option('-m, --mode <mode>', '分析模式 (fast|smart|hybrid)', 'hybrid')
+  .option('-m, --mode <mode>', 'Parser 兼容输入；默认使用单一路径 parser，fast/smart/hybrid 将返回废弃错误', 'tree-sitter')
   .option('-o, --output <dir>', '输出目录', '.mycodemap')
   .option('--symbol-level', '额外 materialize symbol-level 调用依赖到代码图存储', false)
   .option('--ai-context', '为每个文件生成 AI 描述（需要 AI Provider）', false)

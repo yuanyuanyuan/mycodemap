@@ -45,7 +45,7 @@ export function createCLI(): Command {
   program
     .command('generate')
     .description('生成代码地图（原有命令）')
-    .option('-m, --mode <mode>', '分析模式: fast, smart, hybrid', 'hybrid')
+    .option('-m, --mode <mode>', 'Parser 兼容输入；默认走单一路径 parser，旧 mode 会被拒绝', 'tree-sitter')
     .option('-o, --output <path>', '输出目录')
     .option('-w, --watch', '监视模式')
     .action(async () => {
