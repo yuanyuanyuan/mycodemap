@@ -3,7 +3,38 @@
 > **Current active planning truth** lives in `.planning/PROJECT.md`, `.planning/ROADMAP.md`, `.planning/REQUIREMENTS.md`, and `.planning/STATE.md`.
 > The shipped entries below are **historical snapshots**. Their `What's next` text records closeout-time context and must not override the current active planning surface.
 
-**Current status:** No active milestone. The latest shipped milestone is `v2.0 agent-native-foundation` (2026-05-01). Start the next milestone when ready.
+**Current status:** No active milestone. The latest shipped milestone is `v2.1 ux-onboarding-enhancement` (2026-05-06). Start the next milestone when ready.
+
+## v2.1 ux-onboarding-enhancement (Shipped: 2026-05-06)
+
+**Goal:** 把 CodeMap 从“安装后需要手动配置”升级为“首次运行即能提供价值”的入门体验，让新用户零配置即可预览代码库，并逐步引导完成深度配置。
+
+**Phases completed:** 53-58 (15 plans total)
+
+**Delivered:**
+
+- `mycodemap init` 现在可以生成 Bootstrap Profiles、assistant bootstrap assets 和两段式 init receipt，帮助 main agent 和 subagent 分流接入
+- `codemap preview` 支持零配置预览，用户可逐步决定是否保存配置
+- Phase 58 交付 retrieval-first 的 Project Environment Contract，让 subagent 通过 CLI / MCP 检索项目契约而不是读取脆弱的 prompt snippet
+- Phase 57 通过真实临时项目、idempotency、subprocess 路径完成 onboarding E2E 验证
+
+**Key accomplishments:**
+
+- `Phase 53` 建立项目类型检测和 Bootstrap Profile 系统
+- `Phase 54` 交付 zero-config preview / progressive commitment
+- `Phase 55` 交付 assistant bootstrap assets 与 env-contract seed
+- `Phase 56` 交付两段式 receipt、个性化 next steps 和文档同步
+- `Phase 57` 交付真实项目验证与 rerun idempotency
+- `Phase 58` 交付 subagent environment contract retrieval、MCP tool、manual Claude/Codex evidence 与 closeout rebaseline
+
+**Stats:**
+
+- `23/24` requirements satisfied，`1` accepted gap (`INI-01`)
+- `2` known deferred items at close (`INI-01` requirement gap, `F-1` cosmetic receipt wording)
+- 5 days（2026-05-01 → 2026-05-06）
+- Milestone closed after Phase 58 was completed first to avoid duplicate verification runs
+
+**What's next:** Start the next milestone when ready. Candidates now point to `v2.2` architecture / agent integration follow-up work.
 
 ## v2.0 agent-native-foundation (Shipped: 2026-05-01)
 

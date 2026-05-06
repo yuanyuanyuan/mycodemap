@@ -1,0 +1,19 @@
+{
+  "phase": "58",
+  "preparedAt": "2026-05-05T13:20:19.432Z",
+  "claudeRequired": true,
+  "codexOptional": true,
+  "requiredArtifacts": [
+    ".planning/phases/58-subagent-environment-contract-injection/58-HUMAN-UAT.md",
+    ".claude/agents/env-contract-verifier.md",
+    ".codex/agents/env-contract-verifier.toml",
+    "docs/generated/phase-58/subagent-evidence/verification-manifest.json",
+    "docs/generated/phase-58/subagent-evidence/claude-hook-example.json",
+    "docs/generated/phase-58/subagent-evidence/codex-agent-example.toml",
+    "docs/generated/phase-58/subagent-evidence/claude-subagent.json",
+    "docs/generated/phase-58/subagent-evidence/codex-subagent.json",
+    "docs/generated/phase-58/subagent-evidence/claude-session.md",
+    "docs/generated/phase-58/subagent-evidence/codex-session.md"
+  ],
+  "protocolDoc": ".planning/phases/58-subagent-environment-contract-injection/58-HUMAN-UAT.md"
+}

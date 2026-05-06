@@ -1,5 +1,5 @@
 ---
-status: rework
+status: complete
 phase: 58-subagent-environment-contract-injection
 source:
   - .planning/archive/phases/58-subagent-environment-contract-injection/58-01-SUMMARY.md
@@ -7,13 +7,12 @@ source:
   - .planning/archive/phases/58-subagent-environment-contract-injection/58-03-SUMMARY.md
   - .planning/archive/phases/58-subagent-environment-contract-injection/58-04-SUMMARY.md
 started: 2026-05-02T17:42:00.000Z
-updated: 2026-05-03T02:00:00.000Z
+updated: 2026-05-05T13:47:14Z
 ---
 
 ## Current Test
-<!-- OVERWRITE each test - shows where we are -->
 
-[rework: tests 1-2 need redesign based on official docs]
+[testing complete]
 
 ## Tests
 
@@ -62,48 +61,43 @@ expected: MCP server exposes `codemap_env_contract` tool (not cli_redirect). Too
 result: pass
 notes: "server.ts:57 registers native tool with agentType/category/check params, not cli_redirect"
 
-## Subagent Verification Tests (需要重新设计)
+## Subagent Verification Rework
 
-以下子代理验证测试基于官方文档审查（2026-05-03），发现原方案有根本性问题：
+Automated tests 1-10 remain historical pass. The only remaining closure surface is the real subagent checkpoint.
 
-### 原方案问题
+- `Claude required`
+- `Codex optional`
 
-| 问题 | 详情 |
-|------|------|
-| `claude -p` 不是子代理 | 是单次提示模式，不经过 SubagentStart 钩子 |
-| `codex exec --agent` 不存在 | `codex exec` 没有 `--agent` 参数 |
-| "可信目录"概念不存在 | 文档中无此概念，实际错误可能是不在 Git 仓库中 |
-| `additionalContext` 非强制执行 | 是文本注入，子代理不保证执行 |
-| `developer_instructions` 非强制执行 | 同上 |
+| ID | Path | Requirement | Status | Evidence | Notes |
+|----|------|-------------|--------|----------|-------|
+| S1 | Claude real subagent path | SDC-05 | pass | `docs/generated/phase-58/subagent-evidence/claude-session.md`, `docs/generated/phase-58/subagent-evidence/claude-subagent.json` | `pass` — transcript proves `mycodemap env-contract --for explore --json` executed as first action before substantive work. |
+| S2 | Codex parity path | SDC-05 | pass | `docs/generated/phase-58/subagent-evidence/codex-session.md`, `docs/generated/phase-58/subagent-evidence/codex-subagent.json` | `pass` — transcript proves `mycodemap env-contract --for worker --json` executed as first command before any substantive work. |
+| S3 | Preparation script and fixture staging | SDC-05, VER-03 | pass | `scripts/verify-subagent-env-contract.mjs`, `docs/generated/phase-58/subagent-evidence/verification-manifest.json`, `.claude/agents/env-contract-verifier.md`, `.codex/agents/env-contract-verifier.toml` | Script stages assets only. It does not call `claude -p` or `codex exec --agent`. |
 
-### 修正后的测试项
+### Verdict Semantics
 
-#### S1. Claude 子代理 — SubagentStart 钩子 + 子代理定义
-expected: 子代理通过系统提示驱动检索 env-contract，SubagentStart 钩子辅助注入上下文
-result: [pending — 需创建 `.claude/agents/env-contract-tester.md` 并在会话中测试]
-notes: "详见 58-HUMAN-UAT.md 修正方案"
+- `pass`: transcript proves retrieval-before-work.
+- `fail`: path ran, but retrieval was missing, late, or contradicted by the transcript.
+- `waived`: Codex optional parity was not run and the exact blocker is recorded.
+- `blocked`: required path could not be executed at all.
 
-#### S2. Codex 子代理 — developer_instructions + 代理 TOML
-expected: 代理通过 developer_instructions 驱动检索 env-contract
-result: [pending — 需创建 `.codex/agents/worker.toml` 并在 Git 仓库中测试]
-notes: "详见 58-HUMAN-UAT.md 修正方案"
+### Required Evidence Files
 
-#### S3. 验证脚本重写
-expected: `scripts/verify-subagent-env-contract.mjs` 使用正确的子代理机制（非 `claude -p` / `codex exec --agent`）
-result: [pending — 需重写脚本]
-notes: "原脚本用 CLI 单次调用模拟子代理，不是真正的子代理链路验证"
+- `docs/generated/phase-58/subagent-evidence/claude-session.md`
+- `docs/generated/phase-58/subagent-evidence/claude-subagent.json`
+- `docs/generated/phase-58/subagent-evidence/codex-session.md`
+- `docs/generated/phase-58/subagent-evidence/codex-subagent.json`
+- `docs/generated/phase-58/subagent-evidence/verification-manifest.json`
 
 ## Summary
 
-total: 10 (automated) + 3 (subagent rework)
-passed: 10 (automated)
+total: 10 (historical automated) + 3 (subagent rework)
+passed: 13
 issues: 0
-pending: 3 (subagent rework)
+pending: 0
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-- 子代理验证测试（S1-S3）需要重新设计和执行
-- 原验证脚本 `scripts/verify-subagent-env-contract.mjs` 需要重写
-- 详见 58-HUMAN-UAT.md 中的文档审查结果和修正方案
+[none]

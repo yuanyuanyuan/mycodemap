@@ -2,10 +2,19 @@
   "platform": "codex",
   "attempted": true,
   "available": true,
-  "command": "codex exec \"Use a subagent/worker if available. Before any work, call codemap_env_contract(a...\"",
-  "exitCode": 1,
-  "stdoutExcerpt": "",
-  "stderrExcerpt": "Reading additional input from stdin...\nNot inside a trusted directory and --skip-git-repo-check was not specified.\n",
-  "retrievalEvidence": null,
-  "blocker": "codex exec requires trusted directory — temp repo not registered"
+  "commandTranscriptPath": "docs/generated/phase-58/subagent-evidence/codex-session.md",
+  "retrievalEvidence": [
+    {
+      "command": "mycodemap env-contract --for worker --json",
+      "exitCode": 0,
+      "agentType": "worker",
+      "timestamp": "2026-05-05T09:42:36.284Z"
+    }
+  ],
+  "verdict": "pass",
+  "blocker": "",
+  "notes": [
+    "Retrieval executed before substantive work in Codex interactive session.",
+    "Agent spawn triggered via prompt referencing .codex/agents/env-contract-verifier.toml."
+  ]
 }

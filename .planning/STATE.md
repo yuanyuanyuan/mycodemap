@@ -5,25 +5,25 @@ milestone_name: milestone
 current_phase: 58
 current_phase_name: subagent-environment-contract-injection
 current_plan: 5
-status: rework
-last_updated: "2026-05-05T12:00:00.000Z"
-last_activity: 2026-05-05
+status: complete
+last_updated: "2026-05-06T12:00:00.000Z"
+last_activity: 2026-05-06
 progress:
-  total_phases: 9
-  completed_phases: 4
-  total_plans: 14
-  completed_plans: 10
-  percent: 71
+  total_phases: 6
+  completed_phases: 6
+  total_plans: 15
+  completed_plans: 15
+  percent: 100
 ---
 
 # Session State
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-04-30)
+See: `.planning/PROJECT.md` (updated 2026-05-06)
 
 **Core Value:** 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
-**Current Focus:** Phase 58 — subagent-environment-contract-injection
+**Current Focus:** No active milestone; v2.1 archived
 
 ## Position
 
@@ -32,11 +32,11 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 **Current Phase Name:** subagent-environment-contract-injection
 **Current Plan:** 5
 **Total Phases:** 6 scoped (53-58)
-**Total Plans in Milestone:** 10 planned (8 complete)
-**Status:** Phase 58 implementation complete; subagent end-to-end verification pending (S1-S3 rework required)
-**Progress:** [████████░░] ~80% phase completion (5/5 plans executed, 10/10 automated UAT passed); v2.1 milestone **not closed** — blocked on real subagent verification
-**Last Activity:** 2026-05-05
-**Last Activity Description:** Phase 58 planning scope clarified: historical 58-01~58-04 artifacts stay for record only; the sole remaining work is 58-05 (Claude-required real subagent evidence, Codex optional waiver path).
+**Total Plans in Milestone:** 15 planned (15 complete)
+**Status:** Phase 58 implementation complete; subagent end-to-end verification complete; v2.1 milestone archived with accepted INI-01 gap
+**Progress:** [██████████] 100% phase completion (5/5 plan waves executed, 10/10 automated UAT passed, manual Claude/Codex evidence complete)
+**Last Activity:** 2026-05-06
+**Last Activity Description:** Phase 58 verification evidence completed and milestone closeout recorded: historical 58-01~58-04 artifacts stay for record only; 58-05 manual Claude/Codex evidence is now recorded and verified; v2.1 archived with one accepted requirement gap.
 
 ## Decisions Made
 
@@ -53,9 +53,10 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 | 2026-05-02 | Phase 56 context gathered | Receipt two-section layout, personalized next steps, .mycodemap/ reference detection, 3-doc sync scope locked |
 | 2026-05-02 | Phase 56 completed | 3 plans, 2 waves, 23 tests, 3 docs updated. Verification: 12/12 must-haves passed. |
 
-## Blockers
+## Closeout Notes
 
-- **Phase 58 subagent verification rework (2026-05-03):** Official docs review revealed fundamental test-design flaws. `claude -p` is print mode (not subagent); `codex exec --agent` does not exist; `additionalContext`/`developer_instructions` are text injection, not enforced execution. Verification script `scripts/verify-subagent-env-contract.mjs` must be rewritten. Real Claude/Codex subagent tests (S1-S3) pending redesign and execution. See 58-HUMAN-UAT.md for corrected test procedures.
+- **Phase 58 subagent verification rework (2026-05-03):** Official docs review revealed fundamental test-design flaws. `claude -p` is print mode (not subagent); `codex exec --agent` does not exist; `additionalContext`/`developer_instructions` are text injection, not enforced execution. Verification script `scripts/verify-subagent-env-contract.mjs` was rewritten. Real Claude/Codex subagent tests (S1-S3) are now completed with evidence. See 58-HUMAN-UAT.md for the canonical protocol.
+- **v2.1 closeout gap:** `INI-01` (`mycodemap init --json`) remains deferred to the next milestone; this was accepted explicitly at close.
 
 ## Deferred Items (from previous milestones, still valid)
 
@@ -68,6 +69,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 
 | Category | Item | Target Milestone |
 |----------|------|------------------|
+| ux | INI-01: `mycodemap init --json` machine-readable receipt gap | v2.2 cleanup follow-up |
 | ux | First-Run Concierge + Bootstrap Profiles | v2.1 ux-onboarding-enhancement |
 | ux | Zero-Config Preview / Progressive Commitment | v2.1 ux-onboarding-enhancement |
 | ux | F-1: Phase 53 legacy-config receipt cosmetic message gap (functional D-16 honored; receipt detail "未检测到项目类型标记" misleading) | v2.1 cleanup follow-up |
@@ -131,7 +133,10 @@ See: `.planning/PROJECT.md` (updated 2026-04-30)
 - 2026-05-02: Phase 55 completed — Agent Bootstrap Assets. 2 plans in 1 wave, parallel execution. Created manifest-extractors.ts (reads package.json/pyproject.toml/go.mod/Cargo.toml), env-contract-plan.ts (EnvContractSeed as InitAsset with installed/preview/already-synced/conflict states), assistant-plan.ts (4 per-runtime files: claude-context.md, agents-context.md, claude-hook-example.json, codex-agent-example.toml). 28 tests pass, full suite 1204 pass. All D-05..D-12 decisions honored. Requirements ABT-01, ABT-02, ABT-05 verified.
 - 2026-05-02: Phase 56 context gathered — Init Receipt + Next Steps. 4 gray areas resolved: (1) Receipt two-section layout with Main Agent paths+merge and Subagent paths+copy; (2) Personalized next steps dynamically generated from installed assets; (3) Already-synced detection via .mycodemap/ reference checking in file content; (4) Doc sync scope: README + SETUP_GUIDE + AI_ASSISTANT_SETUP. Requirements ABT-03, ABT-04, INI-02, INI-03.
 - 2026-05-02: Phase 56 completed — Init Receipt + Next Steps. 3 plans in 2 waves. Wave 1: receipt.ts two-section layout (classifyAsset, detectTeamFileSync, getTeamFileStatuses), reconciler.ts personalized buildNextSteps (4 priorities, cap at 3). Wave 2: 23 tests (17 receipt + 6 init-command), 3 docs updated (README, SETUP_GUIDE, AI_ASSISTANT_SETUP). 56-02 agent Rule 2 deviation: wired assistant-plan.ts into createInitPlan (classification code was unreachable without data source connection). Verification: 12/12 must-haves passed. Requirements ABT-03, ABT-04, INI-02, INI-03 verified.
-- 2026-05-03: Phase 58 implementation complete — Subagent Environment Contract Retrieval. 4 plans in 4 waves. Built canonical env-contract.v1 schema with source discovery (5 items from AGENTS.md/.githooks/package.json/docs/rules), agent-type filtering (7 types), drift detection (sha256 snapshots), CLI command (8 options), native MCP tool (codemap_env_contract), doctor integration, init wiring, E2E tests (6 pass), evidence harness, docs sync. 10/10 automated UAT tests passed. **Subagent end-to-end verification (S1-S3) pending rework** after official docs review revealed test-design flaws (`claude -p` not subagent, `codex exec --agent` nonexistent). v2.1 milestone **not closed**.
+- 2026-05-03: Phase 58 implementation complete — Subagent Environment Contract Retrieval. 4 plans in 4 waves. Built canonical env-contract.v1 schema with source discovery (5 items from AGENTS.md/.githooks/package.json/docs/rules), agent-type filtering (7 types), drift detection (sha256 snapshots), CLI command (8 options), native MCP tool (codemap_env_contract), doctor integration, init wiring, E2E tests (6 pass), evidence harness, docs sync. 10/10 automated UAT tests passed. **Subagent end-to-end verification (S1-S3) now completed** with real Claude/Codex evidence and transcript capture.
+- 2026-05-05: Phase 57 verification explicitly rescheduled to run after Phase 58 completion to avoid duplicate verification runs caused by the mid-stream Phase 58 insertion.
+- 2026-05-05: Phase 57 completed — built CLI E2E covers empty-dir/profile bootstrap, Node.js rerun idempotency, and legacy-root-config migration; profileName persistence plus generatedAt-insensitive env-contract comparison removed false conflicts.
+- 2026-05-06: v2.1 archived — accepted `INI-01` gap and kept F-1 cosmetic cleanup tracked as deferred technical debt.
 
 ### Verified Existing Capabilities (carried forward)
 

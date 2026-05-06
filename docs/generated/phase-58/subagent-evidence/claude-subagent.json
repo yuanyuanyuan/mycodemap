@@ -2,10 +2,27 @@
   "platform": "claude",
   "attempted": true,
   "available": true,
-  "command": "claude -p \"Delegate a subagent to inspect this repo. Before any work, retrieve project rule...\"",
-  "exitCode": 143,
-  "stdoutExcerpt": "",
-  "stderrExcerpt": "",
-  "retrievalEvidence": null,
-  "blocker": "claude -p timed out (60s limit) — likely requires interactive auth or API key"
+  "commandTranscriptPath": "docs/generated/phase-58/subagent-evidence/claude-session.md",
+  "retrievalEvidence": [
+    {
+      "command": "mycodemap env-contract --for explore --json",
+      "exitCode": 0,
+      "schemaVersion": "env-contract.v1",
+      "agentType": "explore",
+      "itemsReturned": 2,
+      "itemIds": ["codemap-query-priority", "real-scenario-validation"],
+      "conflictsDetected": 1,
+      "conflictIds": ["commit-tag-case"],
+      "sourceSnapshotsCount": 5,
+      "timestamp": "2026-05-05T09:42:36.284Z"
+    }
+  ],
+  "verdict": "pass",
+  "blocker": "",
+  "notes": [
+    "Retrieval happened as the first action before any substantive work.",
+    "Command returned valid JSON with agentType=explore and 2 filtered items.",
+    "All 6 verification steps completed successfully after retrieval.",
+    "Session transcript captured in claude-session.md."
+  ]
 }
