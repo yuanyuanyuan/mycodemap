@@ -10,6 +10,7 @@ export interface WasmFallbackResult {
   wasmAvailable: boolean;
   fallbackActivated: boolean;
   module: 'tree-sitter' | 'better-sqlite3';
+  implementation?: 'native' | 'wasm' | 'node:sqlite' | 'sql.js';
   message: string;
 }
 

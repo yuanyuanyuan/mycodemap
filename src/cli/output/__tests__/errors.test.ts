@@ -112,6 +112,37 @@ describe('formatError', () => {
       expect(parsed.causes.length).toBe(1);
       expect(parsed.causes[0].message).toBe('root issue');
     });
+
+    it('preserves DEPRECATED_PARSER_MODE and actionable migration fields', () => {
+      const error = new Error('Parser mode "hybrid" is deprecated') as Error & { code: string };
+      error.code = ErrorCodes.DEPRECATED_PARSER_MODE;
+
+      const result = formatError(error, 'json', 'mycodemap generate');
+      const parsed = JSON.parse(result);
+
+      expect(parsed.code).toBe(ErrorCodes.DEPRECATED_PARSER_MODE);
+      expect(parsed.nextCommand).toBe('mycodemap doctor');
+      expect(parsed.rootCause).toContain('deprecated');
+      expect(parsed.remediationPlan).toContain('deprecated');
+    });
+
+    it('preserves DEP_WASM_FALLBACK_AVAILABLE actionable fallback metadata', () => {
+      const error = new Error('better-sqlite3 cannot be loaded') as Error & {
+        code: string;
+        remediation: string;
+        nextCommand: string;
+      };
+      error.code = ErrorCodes.DEP_WASM_FALLBACK_AVAILABLE;
+      error.remediation = 'SQLite-family fallback is available via node:sqlite or sql.js';
+      error.nextCommand = 'mycodemap --wasm-fallback';
+
+      const result = formatError(error, 'json', 'loading better-sqlite3');
+      const parsed = JSON.parse(result);
+
+      expect(parsed.code).toBe(ErrorCodes.DEP_WASM_FALLBACK_AVAILABLE);
+      expect(parsed.remediationPlan).toContain('SQLite-family fallback');
+      expect(parsed.nextCommand).toBe('mycodemap --wasm-fallback');
+    });
   });
 
   describe('human mode', () => {
@@ -175,6 +206,18 @@ describe('createActionableError', () => {
     expect(error.attempted).toBe('loading tree-sitter');
     expect(error.confidence).toBe(0.9);
     expect(error.nextCommand).toBe('codemap --wasm-fallback');
+  });
+
+  it('creates deprecated parser mode guidance from registry defaults', () => {
+    const error = createActionableError(
+      ErrorCodes.DEPRECATED_PARSER_MODE,
+      'parser mode removed',
+      'mycodemap generate'
+    );
+
+    expect(error.code).toBe(ErrorCodes.DEPRECATED_PARSER_MODE);
+    expect(error.nextCommand).toBe('mycodemap doctor');
+    expect(error.remediationPlan).toContain('deprecated');
   });
 
   it('allows overriding confidence and nextCommand', () => {

@@ -14,6 +14,8 @@ export const ErrorCodes = {
   CFG_WORKSPACE_DRIFT: 'CFG_WORKSPACE_DRIFT',
 
   // Runtime errors
+  DEPRECATED_PARSER_MODE: 'DEPRECATED_PARSER_MODE',
+  UNSUPPORTED_STORAGE_TYPE: 'UNSUPPORTED_STORAGE_TYPE',
   RUN_COMMAND_FAILED: 'RUN_COMMAND_FAILED',
   RUN_PARSE_ERROR: 'RUN_PARSE_ERROR',
   RUN_TIMEOUT: 'RUN_TIMEOUT',
@@ -67,6 +69,18 @@ export const ErrorRemediation: Record<
       'Workspace has drifted from receipt state. Run codemap doctor for details',
     nextCommand: 'codemap doctor',
     confidence: 0.8,
+  },
+  DEPRECATED_PARSER_MODE: {
+    message:
+      'Parser mode inputs fast/smart/hybrid are deprecated. Remove the mode flag or config value and use the default registry-backed parser flow',
+    nextCommand: 'mycodemap doctor',
+    confidence: 0.98,
+  },
+  UNSUPPORTED_STORAGE_TYPE: {
+    message:
+      'Persistent storage has converged to SQLite-only. Change storage.type to "sqlite" (recommended) or "auto"; use "memory" only for tests, and migrate legacy filesystem/Kuzu data into the SQLite database path before rerunning',
+    nextCommand: 'mycodemap doctor',
+    confidence: 0.97,
   },
   RUN_COMMAND_FAILED: {
     message: 'Command execution failed. Check the error details above',

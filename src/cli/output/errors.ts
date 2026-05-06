@@ -9,6 +9,8 @@ import { ErrorCodes, ErrorRemediation, type ErrorCode } from './error-codes.js';
 interface ErrorWithCode extends Error {
   code?: string;
   remediation?: string;
+  nextCommand?: string;
+  confidence?: number;
   syscall?: string;
   path?: string;
   cause?: unknown;
@@ -112,6 +114,20 @@ function detectErrorPattern(err: ErrorWithCode): { code: string; remediation: { 
   }
   if (errCode === 'ENOENT') {
     return { code: ErrorCodes.FS_FILE_NOT_FOUND, remediation: ErrorRemediation.FS_FILE_NOT_FOUND };
+  }
+
+  if (errCode && Object.values(ErrorCodes).includes(errCode as ErrorCode)) {
+    const registryRemediation =
+      ErrorRemediation[errCode as ErrorCode] ?? { message: 'Check the error details and try again', confidence: 0.3 };
+    return {
+      code: errCode,
+      remediation: {
+        ...registryRemediation,
+        ...(err.remediation ? { message: err.remediation } : {}),
+        ...(err.nextCommand ? { nextCommand: err.nextCommand } : {}),
+        ...(typeof err.confidence === 'number' ? { confidence: err.confidence } : {}),
+      },
+    };
   }
 
   // Preserve custom error codes from callers (e.g., MISSING_TARGET, INDEX_NOT_FOUND)
