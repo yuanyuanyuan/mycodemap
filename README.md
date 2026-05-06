@@ -1,282 +1,247 @@
+<!-- generated-by: gsd-doc-writer -->
+
 # CodeMap
 
-> AI-Native, Human-Friendly Code Architecture Governance Infrastructure — `v2.0` Milestone
+CodeMap is an AI-Native TypeScript code map tool for AI-assisted development. It analyzes a repository, builds symbol and dependency graphs, exposes the results through a CLI, HTTP API, and MCP server, and writes structured artifacts that agents can consume directly.
 
-[中文版本](./README.zh-CN.md)
+AI/Agent 是主要消费者，人类主要负责启动、审查和发布。
 
-CodeMap is an AI-Native-first, human-friendly code architecture governance infrastructure for TypeScript/JavaScript/Go projects. `v2.0` upgraded the CLI surface to a schema-driven self-describing unified interface: a single contract schema simultaneously generates the parser, MCP tool definitions, `--help-json`, and shell completions. `codemap doctor` provides continuous health diagnostics, the `Failure-to-Action Protocol` turns errors into structured state transitions, and the WASM-first build foundation eliminates the #1 installation drop-off caused by native dependency compilation failures. Human users get table/color output via `--human` or TTY auto-detection; AI/Agents receive JSON/NDJSON by default.
+## What it ships
 
----
+- `mycodemap` as the primary CLI entry point, with `codemap` kept as a compatibility alias.
+- A tree-sitter based analysis pipeline with deprecated parser modes rejected at the entry points.
+- A REST API mounted under `/api/v1` and an experimental MCP server for AI tooling.
+- Workspace artifacts under `.mycodemap/`, including `codemap.json` and generated reports.
 
-## Features
-
-### v2.0 Core Features
-
-- **Interface Contract Schema** — A single machine-readable schema defines the entire CLI surface; `codemap --schema` outputs the full contract JSON for agent introspection and dynamic adaptation
-- **CLI-as-MCP Automatic Gateway** — All schema-defined CLI commands are automatically exposed as MCP tools with zero handwritten maintenance; new commands automatically get MCP exposure
-- **AI-First Default Output** — JSON/NDJSON by default; `--human` flag renders tables/colors on demand; TTY auto-detection preserves interactive experience; progress events go to stderr
-- **`codemap doctor`** — Continuous health diagnostics detecting ghost commands, native dependency issues, workspace drift, and agent connectivity
-- **Failure-to-Action Protocol** — Every error returns structured `rootCause` + `remediationPlan` + `confidence` + `nextCommand`; agents can attempt automatic remediation
-- **Validation Router** — Routes minimal verification by change type; docs guardrail validates that referenced commands are real and runnable
-- **WASM-First Build Foundation** — `tree-sitter` / `better-sqlite3` provide WASM fallback paths; `--native` forces native mode; `codemap benchmark` compares WASM vs Native performance
-
-### Core Capabilities
-
-- **AI-first code map** — Generates `AI_MAP.md`, `CONTEXT.md`, `codemap.json`, and other AI/Agent-consumable context
-- **Core analysis commands** — `generate`, `query`, `deps`, `impact`, `complexity`, `cycles`, `analyze`, `design`, `export`, `ci`
-- **Layered architecture (MVP3)** — Clear boundaries: `Interface → Infrastructure → Domain → Server → CLI`
-- **Dual parsing modes** — `fast` (regex) and `smart` (TypeScript AST)
-- **Multi-language support** — TypeScript/JavaScript, Go, Python (extensible architecture)
-- **Dependency / impact / complexity analysis** — For change impact assessment, refactoring inventory, and architecture retrospectives
-- **CI gate and docs guardrail** — Commit format, file headers, risk assessment, docs/output contract checks
-- **Multi-format export and storage abstraction** — Export graph data with filesystem / memory / sqlite backends
-
----
-
-## Installation
+## Install
 
 ```bash
-# Using npm
-npm install @mycodemap/mycodemap
-
-# Using yarn
-yarn add @mycodemap/mycodemap
-
-# Using pnpm
-pnpm add @mycodemap/mycodemap
-
-# Global install (recommended for CLI access)
 npm install -g @mycodemap/mycodemap
 ```
 
-**Requirements**: Node.js >= 20.0.0
+Requirements:
 
-### No Build Tools? No Problem
-
-CodeMap ships with WASM-first fallback. If your system lacks `python`, `make`, or `gcc`:
-- `tree-sitter` automatically falls back to `web-tree-sitter` (WASM)
-- `better-sqlite3` automatically falls back to `node:sqlite` (Node.js 22+) or `sql.js` (WASM)
-- No manual intervention required — fallback activates on first run
-
-### Force Native (Performance)
-
-If you have build tools installed and want maximum performance:
-```bash
-mycodemap --native <command>
-```
-
----
+- Node.js `>= 20.0.0`
+- A project with source files to analyze
 
 ## Quick Start
 
 ```bash
-# 1. Initialize configuration in project root
-mycodemap init -y
-
-# 2. Review the init receipt — it shows two sections:
-#   Main Agent: context files to merge into CLAUDE.md / AGENTS.md
-#   Subagent: platform configs to copy into .claude/settings.json / .codex/agents/
-
-# 3. Verify setup
-mycodemap doctor
-
-# 4. Generate code map
+mycodemap init
+mycodemap init --yes
 mycodemap generate
-
-# 5. View generated files
-ls .mycodemap/
-# AI_MAP.md        - Project overview (for AI)
-# CONTEXT.md       - Context entry (links to context/README.md)
-# context/         - Detailed module contexts
-# codemap.json     - Structured JSON data
-# dependency-graph.md - Mermaid dependency graph
+mycodemap doctor
 ```
 
-The init receipt distinguishes **main-agent setup** (project context for your AI assistant) from **subagent setup** (platform hooks for delegated agents). See [AI Assistant Setup Guide](docs/AI_ASSISTANT_SETUP.md) for details.
+`mycodemap init` previews the reconciliation plan by default. Use `--yes` to apply it immediately, or `--profile <name>` to bypass auto-detection.
+
+`mycodemap generate` writes analysis output to `.mycodemap/` by default. The canonical config path is `.mycodemap/config.json`; the loader still accepts `mycodemap.config.json` and legacy `codemap.config.json` for compatibility.
+
+## Main Commands
+
+| Command | Purpose |
+|---|---|
+| `mycodemap generate` | Analyze the project and write the code map artifacts |
+| `mycodemap query` | Search symbols, modules, and dependencies |
+| `mycodemap deps` | Inspect module dependency relationships |
+| `mycodemap cycles` | Detect circular dependencies |
+| `mycodemap complexity` | Inspect file and function complexity |
+| `mycodemap impact` | Estimate the impact of a file change |
+| `mycodemap analyze` | Unified analysis entry with intent-driven output |
+| `mycodemap doctor` | Run health diagnostics for config, runtime, and agents |
+| `mycodemap benchmark` | Compare WASM and native startup/performance |
+| `mycodemap export` | Export graph data as JSON, GraphML, DOT, or Mermaid |
+| `mycodemap ship` | Release workflow helpers |
+
+Additional operational commands include `ci`, `check`, `workflow`, `history`, `preview`, `env-contract`, `mcp`, and `readiness-gate`.
+
+### 已移除的公共 CLI 命令
+
+- `mycodemap server`
+- `mycodemap watch`
+- `mycodemap report`
+- `mycodemap logs`
+
+These commands are no longer part of the public CLI surface. Use the current `mycodemap` entry points and the `/api/v1` HTTP server instead.
+
+`server`、`watch`、`report`、`logs` 已从 public CLI 移除，并在调用时给出迁移提示。
+
+## Documentation
+
+- [AI Guide](AI_GUIDE.md)
+- [Getting Started](docs/GETTING-STARTED.md)
+- [Development](docs/DEVELOPMENT.md)
+- [Testing](docs/TESTING.md)
+- [Configuration](docs/CONFIGURATION.md)
+- [API Reference](docs/API.md)
+- [Contributing](CONTRIBUTING.md)
+- [Architecture](ARCHITECTURE.md)
+
+## Validation
 
 ```bash
-# 6. Retrieve environment contract for subagent (project-specific rules)
-mycodemap env-contract --for worker --json
-# Subagents can query this via MCP tool: codemap_env_contract(agentType="worker")
+npm run docs:check
+node dist/cli/index.js ci check-docs-sync
+mycodemap ci check-docs-sync
+mycodemap check --contract mycodemap.design.md --against src
+npm run check:all
 ```
 
-```bash
-# For AI/Agent: structured output is the default
-mycodemap impact -f src/cli/index.ts -j
+文档/入口变更先跑 `npm run docs:check`。
+统一 docs/AI guardrail 入口：`node dist/cli/index.js ci check-docs-sync`（产品命令等价于 `mycodemap ci check-docs-sync`）。
+repo-local rules 预检：`python3 scripts/validate-rules.py code --report-only` 只报告，不阻断。
+CI / PR 超窗、fallback 或 false-positive 漂移时，`warn-only / fallback` 不是 hard gate success。
 
-# Human-readable output on demand
-mycodemap analyze -i read -t src/cli/index.ts --human
+## License
 
-# Human design → design contract → AI/Agent consumption
-cp docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md mycodemap.design.md
-mycodemap design validate mycodemap.design.md --json
-mycodemap design map mycodemap.design.md --json
-mycodemap design handoff mycodemap.design.md --json
-mycodemap design verify mycodemap.design.md --json
-```
-
-After generation, provide `.mycodemap/AI_MAP.md` to your AI assistant for rapid project understanding. For structured results, use JSON/machine mode.
+MIT. See [LICENSE](LICENSE).
 
 ---
 
-## CLI Commands
+## Validation Appendix
 
-### `mycodemap init`
-
-Initialize and reconcile the project's CodeMap workspace / config / hooks / rules state.
-
-```bash
-mycodemap init               # Show reconciliation preview (default: no write)
-mycodemap init --interactive # Explicitly show preview (same as default)
-mycodemap init -y            # Write with defaults
-```
-
-### `mycodemap generate`
-
-Analyze the project and generate code map files.
-
-```bash
-mycodemap generate                    # Default hybrid mode
-mycodemap generate -m smart           # Smart mode (AST deep analysis)
-mycodemap generate -o ./docs/codemap  # Custom output directory
-mycodemap generate --symbol-level     # Extra symbol-level call deps
-```
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-m, --mode <mode>` | Analysis mode: `fast`, `smart`, or `hybrid` | `hybrid` |
-| `-o, --output <dir>` | Output directory | `.mycodemap` |
-| `--symbol-level` | Materialize symbol-level `call` deps | `false` |
-
-### `mycodemap query`
-
-Query symbols, modules, and dependencies in the code map.
-
-```bash
-mycodemap query -s "ModuleInfo"        # Exact symbol query
-mycodemap query -m "src/parser"        # Module info
-mycodemap query -S "cache"             # Fuzzy search
-mycodemap query -S "parse" -j          # JSON output
-```
-
-### `mycodemap analyze`
-
-Unified analysis entry with four intents: `find`, `read`, `link`, `show`.
+### Analyze Examples
 
 ```bash
 mycodemap analyze -i find -k SourceLocation
-mycodemap analyze -i read -t src/cli/index.ts --scope transitive
+mycodemap analyze -i read -t src/cli/index.ts --include-tests --json
 mycodemap analyze -i link -t src/cli/index.ts
 mycodemap analyze -i show -t src/orchestrator
 ```
 
-### `mycodemap --schema`
+`refactor` 会返回 `E0001_INVALID_INTENT`
 
-Output the full Interface Contract Schema JSON for agent introspection.
-
-```bash
-mycodemap --schema           # Full contract output
-mycodemap --schema | jq '.'  # Pretty-print with jq
-```
-
-### `mycodemap doctor`
-
-Continuous health diagnostics for the CodeMap ecosystem.
+### History Risk
 
 ```bash
-mycodemap doctor              # Human-readable report
-mycodemap doctor --json       # Machine-readable JSON
+# 默认输出 machine-first JSON
+mycodemap history --symbol createCheckCommand
 ```
 
-| Category | Checks |
-|----------|--------|
-| **install** | Native deps (`tree-sitter`, `better-sqlite3`) load status |
-| **config** | `.mycodemap/` workspace configuration integrity |
-| **runtime** | Ghost commands, command stubs, package.json consistency |
-| **agent** | MCP connectivity, schema validity, tool registration |
+# 查询某个符号的历史轨迹与风险摘要
+mycodemap history --symbol createCheckCommand
 
-### `mycodemap benchmark`
+### `mycodemap history`
 
-Compare WASM vs Native performance.
+符号级 Git history / risk 查询：
 
 ```bash
-mycodemap benchmark              # Default benchmark
-mycodemap benchmark --wasm       # Force WASM mode
-mycodemap benchmark --native     # Force Native mode
+# 默认输出 machine-first JSON
+mycodemap history --symbol createCheckCommand
 ```
 
-### MCP Integration (CLI-as-MCP Gateway)
+`--include-git-history` 现在只会在 `read` intent 上附加统一的 Git history enrichment；其他 intent 会显式给出 warning，而不是 silent noop。
 
-v2.0 MCP integration has upgraded from an experimental 2-tool slice to the **CLI-as-MCP Automatic Gateway**: all schema-defined CLI commands are automatically exposed as MCP tools.
+`ci assess-risk` 现在输出 `status/confidence/freshness/source` 与统一 risk level；若 Git history 不可用，会显式打印 `unavailable` / warning，并说明阈值未被应用。
+
+`check` / `ci assess-risk` / `history` 现在共用同一套 Git history risk truth；history unavailable 时会显式给出 `unavailable` / `confidence=low`
 
 ```bash
-mycodemap mcp install    # Write local server config to `.mcp.json`
-mycodemap mcp start      # Start local stdio MCP server
+node dist/cli/index.js history --symbol createCheckCommand
+node scripts/report-high-risk-files.mjs --top 3
 ```
 
-- All 20+ schema-defined CLI commands are callable via MCP
-- Dynamic tool registration: add command to schema → restart MCP server → new tool appears automatically
-- See `docs/ai-guide/INTEGRATION.md` for details
+### Design Contract
 
----
+```bash
+mycodemap design validate mycodemap.design.md --json
+mycodemap design map mycodemap.design.md --json
+mycodemap design handoff mycodemap.design.md --json
+mycodemap design verify mycodemap.design.md --json
+mycodemap check --contract mycodemap.design.md --against src
+```
 
-## Documentation
+```bash
+--annotation-format github
+--annotation-format gitlab --annotation-file gl-code-quality-report.json
+node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10
+```
 
-### For Human Users
+`changed files <= 10`
 
-| Document | Audience | Content |
-|----------|----------|---------|
-| [Docs Index](docs/README.md) | All readers | Document layers, reading order, migration status |
-| [Architecture](ARCHITECTURE.md) | Developers | System map, module boundaries, main execution flows |
-| [Setup Guide](docs/SETUP_GUIDE.md) | Human developers | Full installation, configuration, and usage guide |
-| [Examples](examples/) | All users | Ready-to-use configuration files |
+`warn-only / fallback`
 
-### AI / Agent Docs
+`false-positive rate >10%`
 
-| Document | Description |
-|----------|-------------|
-| **[AI_GUIDE.md](AI_GUIDE.md)** | **AI main guide** — quick reference, command decision tree, prompt templates |
-| **[Quick Start](docs/ai-guide/QUICKSTART.md)** | Scenario-to-command mapping |
-| **[Commands](docs/ai-guide/COMMANDS.md)** | Full CLI command reference |
-| **[Output Schema](docs/ai-guide/OUTPUT.md)** | JSON output structure parsing |
-| **[Integration](docs/ai-guide/INTEGRATION.md)** | MCP/Agent integration, error handling |
-| **[AGENTS.md](AGENTS.md)** | Repository-level constraints |
-| **[CLAUDE.md](CLAUDE.md)** | AI entry routing |
+`docs/product-specs/DESIGN_CONTRACT_TEMPLATE.md`
 
----
+`mycodemap.design.md`
 
-## Contributing
+`design validate → design map → design handoff → design verify`
 
-See [README.zh-CN.md](./README.zh-CN.md) for full development setup, commit conventions, and coding standards.
+### Config Contract
 
----
+执行后会收敛 `.mycodemap/config.json`，并把 machine-readable receipt 写入 `.mycodemap/status/init-last.json`。
 
-## License
+`init` 还会同步 `.mycodemap/hooks/` 与 `.mycodemap/rules/`；但不会自动改写团队自有的 `CLAUDE.md` / `AGENTS.md`，只会在 receipt 中输出可复制片段。
 
-[MIT](LICENSE)
+通过 `mycodemap init` 收敛的 canonical 配置文件是 `.mycodemap/config.json`
 
----
+```json
+{
+  "$schema": "https://mycodemap.dev/schema/config.json",
+  "mode": "hybrid",
+  "plugins": {
+    "builtInPlugins": true
+  },
+  "outputPath": ".mycodemap/storage"
+}
+```
 
-## v2.2 Corrections
+| `plugins.builtInPlugins` | `boolean` | 是否启用内置插件 | `true` |
 
-The following items in earlier sections of this README describe behavior from before Phase 59 (parser cutover) and Phase 60 (storage convergence) and are now outdated:
+### Plugin Runtime
 
-1. **"Dual parsing modes -- `fast` (regex) and `smart` (TypeScript AST)"** (Core Capabilities) -- **Outdated.** Phase 59 cut over the parser to a single tree-sitter-based registry path. The `fast`, `smart`, and `hybrid` modes are now deprecated; passing any of them triggers a `DEPRECATED_PARSER_MODE` error (error code `DEPRECATED_PARSER_MODE`, confidence 0.98). The only active parser mode is `tree-sitter`, which uses a registry-backed parser that selects the correct language parser by file extension. Use `mycodemap generate` without a `--mode` flag.
+只有**显式声明了** `plugins` 段时，`generate` 才会启用插件 runtime；没有该段的旧项目保持原有行为。
 
-2. **`mycodemap generate` -- "Default hybrid mode" and "Analysis mode: `fast`, `smart`, or `hybrid` | `hybrid`"** (CLI Commands) -- **Outdated.** The default mode is now `tree-sitter`. The `--mode` flag still accepts `fast`/`smart`/`hybrid` for backward compatibility, but these values are rejected at runtime with the `DEPRECATED_PARSER_MODE` error. Correct usage:
+`AI_MAP.md` 的 `Plugin Summary` 与 `codemap.json` 的 `pluginReport`
 
-   ```bash
-   mycodemap generate                    # Default tree-sitter mode (registry-backed)
-   mycodemap generate -o ./docs/codemap  # Custom output directory
-   mycodemap generate --symbol-level     # Extra symbol-level call deps
-   ```
+已加载插件、插件生成文件数量与插件诊断摘要
 
-   Updated option table:
+### Graph Storage
 
-   | Option | Description | Default |
-   |--------|-------------|---------|
-   | `-m, --mode <mode>` | Parser mode. Only `tree-sitter` is active; `fast`/`smart`/`hybrid` are deprecated and will error | `tree-sitter` |
-   | `-o, --output <dir>` | Output directory | `.mycodemap` |
-   | `--symbol-level` | Materialize symbol-level `call` deps | `false` |
+```json
+{
+  "storage": {
+    "type": "filesystem"
+  }
+}
+```
 
-3. **"Multi-format export and storage abstraction -- Export graph data with filesystem / memory / sqlite backends"** (Core Capabilities) -- **Outdated.** Phase 60 converges storage to SQLite family + memory backends. The `filesystem`, `kuzudb`, and `neo4j` storage types are now classified as `DeprecatedStorageType` and are rejected at runtime with an `UNSUPPORTED_STORAGE_TYPE` error (confidence 0.97). The active storage types are `sqlite` (recommended for persistence) and `memory` (for tests). Use `storage.type: "sqlite"` or `"auto"` in configuration.
+| `storage.type` | `"filesystem" \| "sqlite" \| "memory" \| "auto"` | 图存储后端类型 | `"filesystem"` |
+
+`neo4j` 与 `kuzudb` 已不再是正式支持的 backend；旧配置会返回显式迁移错误，不会静默 fallback 到 `filesystem`。
+
+`storage.type = "auto"` 当前优先选择 `sqlite`；若运行时缺少 `better-sqlite3` 或 Node.js `<20` 导致 SQLite 不可用，则 warning 后回退到 `filesystem`。
+
+图存储后端生产化不等于重新开放公共 HTTP API 产品面；`Server Layer` 仍是内部架构层。
+
+### Workflow / Discovery
+
+`workflow` 是公开的 analysis-only 工作流能力，只编排分析阶段：`find → read → link → show`。
+
+共享同一套 `.gitignore` 感知排除规则
+
+```text
+"coverage/**"
+"**/*.test.ts"
+"**/*.spec.ts"
+"**/*.d.ts"
+```
+
+`mycodemap ship` 的 CHECK 阶段现在复用 `ci check-working-tree`、`ci check-branch`、`ci check-scripts`
+
+### Guardrail Commands
+
+```text
+npm run docs:check
+node dist/cli/index.js ci check-docs-sync
+mycodemap ci check-docs-sync
+mycodemap check --contract mycodemap.design.md --against src
+python3 scripts/validate-rules.py code --report-only
+```
+
+文档/入口变更先跑 `npm run docs:check`。
+统一 docs/AI guardrail 入口：`node dist/cli/index.js ci check-docs-sync`（产品命令等价于 `mycodemap ci check-docs-sync`）。
+repo-local rules 预检：`python3 scripts/validate-rules.py code --report-only` 只报告，不阻断。
+CI / PR 超窗、fallback 或 false-positive 漂移时，`warn-only / fallback` 不是 hard gate success。
