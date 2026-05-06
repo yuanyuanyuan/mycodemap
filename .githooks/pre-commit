@@ -4,36 +4,52 @@
 echo "Running pre-commit checks..."
 
 # 1. 运行与变更相关的测试（失败即阻断）
-# 使用 --changed 只运行与上次提交相比有变化的文件相关的测试
-echo "Running tests for changed files..."
-if [ -f "node_modules/vitest/vitest.mjs" ]; then
-    node node_modules/vitest/vitest.mjs run --changed
+# 只针对 staged 文件找相关测试，排除未暂存的实验代码，按变更量动态调整并发
+echo "Running tests for staged files..."
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep '\.ts$' || true)
+if [ -z "$STAGED" ]; then
+    echo "No TypeScript files staged, skipping tests"
 else
-    if [ ! -e "node_modules/vitest" ]; then
-        VITEST_PACKAGE_DIR=$(find node_modules -type d -path '*/.pnpm/*/node_modules/vitest' | head -n 1)
-        if [ -n "$VITEST_PACKAGE_DIR" ]; then
-            ln -sfn "${VITEST_PACKAGE_DIR#node_modules/}" node_modules/vitest
-        fi
+    STAGED_COUNT=$(echo "$STAGED" | wc -l)
+
+    if [ "$STAGED_COUNT" -le 3 ]; then
+        echo "Staged $STAGED_COUNT TS file(s), running related tests..."
+        VITEST_ARGS="related $STAGED --watch=false"
+    else
+        echo "Staged $STAGED_COUNT TS file(s), running related tests (single fork to reduce CPU load)..."
+        VITEST_ARGS="related $STAGED --watch=false --pool=forks --poolOptions.forks.singleFork"
     fi
 
     if [ -f "node_modules/vitest/vitest.mjs" ]; then
-        node node_modules/vitest/vitest.mjs run --changed
+        node node_modules/vitest/vitest.mjs $VITEST_ARGS
     else
-    VITEST_ENTRY=$(find node_modules -type f -path '*/.pnpm/*/node_modules/vitest/vitest.mjs' | head -n 1)
-    if [ -z "$VITEST_ENTRY" ]; then
-        VITEST_ENTRY=$(find node_modules -type f -path '*/.vitest-*/vitest.mjs' | head -n 1)
-    fi
+        if [ ! -e "node_modules/vitest" ]; then
+            VITEST_PACKAGE_DIR=$(find node_modules -type d -path '*/.pnpm/*/node_modules/vitest' | head -n 1)
+            if [ -n "$VITEST_PACKAGE_DIR" ]; then
+                ln -sfn "${VITEST_PACKAGE_DIR#node_modules/}" node_modules/vitest
+            fi
+        fi
 
-    if [ -n "$VITEST_ENTRY" ]; then
-        node "$VITEST_ENTRY" run --changed
-    else
-        npx --yes vitest run --changed
+        if [ -f "node_modules/vitest/vitest.mjs" ]; then
+            node node_modules/vitest/vitest.mjs $VITEST_ARGS
+        else
+            VITEST_ENTRY=$(find node_modules -type f -path '*/.pnpm/*/node_modules/vitest/vitest.mjs' | head -n 1)
+            if [ -z "$VITEST_ENTRY" ]; then
+                VITEST_ENTRY=$(find node_modules -type f -path '*/.vitest-*/vitest.mjs' | head -n 1)
+            fi
+
+            if [ -n "$VITEST_ENTRY" ]; then
+                node "$VITEST_ENTRY" $VITEST_ARGS
+            else
+                npx --yes vitest $VITEST_ARGS
+            fi
+        fi
     fi
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Tests failed, commit rejected"
+        exit 1
     fi
-fi
-if [ $? -ne 0 ]; then
-    echo "ERROR: Tests failed, commit rejected"
-    exit 1
 fi
 
 echo "Tests passed"
