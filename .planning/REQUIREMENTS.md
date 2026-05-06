@@ -62,29 +62,29 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PAR-01 | — | Pending |
-| PAR-02 | — | Pending |
-| PAR-03 | — | Pending |
-| PAR-04 | — | Pending |
-| PAR-05 | — | Pending |
-| STOR-01 | — | Pending |
-| STOR-02 | — | Pending |
-| STOR-03 | — | Pending |
-| STOR-04 | — | Pending |
-| MCP-01 | — | Pending |
-| MCP-02 | — | Pending |
-| MCP-03 | — | Pending |
-| MCP-04 | — | Pending |
-| CTX-01 | — | Pending |
-| CTX-02 | — | Pending |
-| CTX-03 | — | Pending |
-| CTX-04 | — | Pending |
+| PAR-01 | Phase 59 | Pending |
+| PAR-02 | Phase 59 | Pending |
+| PAR-03 | Phase 59 | Pending |
+| PAR-04 | Phase 59 | Pending |
+| PAR-05 | Phase 59 | Pending |
+| STOR-01 | Phase 60 | Pending |
+| STOR-02 | Phase 60 | Pending |
+| STOR-03 | Phase 60 | Pending |
+| STOR-04 | Phase 60 | Pending |
+| MCP-01 | Phase 61 | Pending |
+| MCP-02 | Phase 61 | Pending |
+| MCP-03 | Phase 61 | Pending |
+| MCP-04 | Phase 61 | Pending |
+| CTX-01 | Phase 62 | Pending |
+| CTX-02 | Phase 62 | Pending |
+| CTX-03 | Phase 62 | Pending |
+| CTX-04 | Phase 62 | Pending |
 
 **Coverage:**
 - v2.2 requirements: 17 total
-- Mapped to phases: 0
-- Unmapped: 17
+- Mapped to phases: 17
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-06*
-*Last updated: 2026-05-06 after v2.2 research scoping*
+*Last updated: 2026-05-06 after roadmap draft creation*
