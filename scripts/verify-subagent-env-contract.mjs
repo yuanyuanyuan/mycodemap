@@ -2,245 +2,278 @@
 
 /**
  * [META] since:2026-05-02 | owner:cli-team | stable:false
- * [WHY] Real subagent evidence harness for env-contract verification.
- * Attempts Claude and Codex subagent retrieval, records evidence or blockers.
- * Phase 58 Task 58-04-03 — T-58-14, SDC-05, D-09.
+ * [WHY] Prepare Phase 58 subagent verification fixtures and evidence templates.
+ * Stages build output, helper snippets, agent definitions, and manual-checkpoint assets.
  */
 
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
-import { execSync, execFileSync } from 'node:child_process';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..');
-const CLI_PATH = path.join(REPO_ROOT, 'dist', 'cli/index.js');
+const CLI_PATH = path.join(REPO_ROOT, 'dist', 'cli', 'index.js');
+const PHASE_DIR = path.join(
+  REPO_ROOT,
+  '.planning',
+  'phases',
+  '58-subagent-environment-contract-injection'
+);
 const EVIDENCE_DIR = path.join(REPO_ROOT, 'docs', 'generated', 'phase-58', 'subagent-evidence');
+const HUMAN_UAT_PATH = path.join(PHASE_DIR, '58-HUMAN-UAT.md');
+const CLAUDE_AGENT_PATH = path.join(REPO_ROOT, '.claude', 'agents', 'env-contract-verifier.md');
+const CODEX_AGENT_PATH = path.join(REPO_ROOT, '.codex', 'agents', 'env-contract-verifier.toml');
+const MANIFEST_PATH = path.join(EVIDENCE_DIR, 'verification-manifest.json');
+const CLAUDE_HOOK_EXAMPLE_PATH = path.join(EVIDENCE_DIR, 'claude-hook-example.json');
+const CODEX_AGENT_EXAMPLE_PATH = path.join(EVIDENCE_DIR, 'codex-agent-example.toml');
+const CLAUDE_EVIDENCE_PATH = path.join(EVIDENCE_DIR, 'claude-subagent.json');
+const CODEX_EVIDENCE_PATH = path.join(EVIDENCE_DIR, 'codex-subagent.json');
+const CLAUDE_SESSION_PATH = path.join(EVIDENCE_DIR, 'claude-session.md');
+const CODEX_SESSION_PATH = path.join(EVIDENCE_DIR, 'codex-session.md');
 
-function createTempRepo() {
-  const tmpDir = mkdtempSync(path.join(os.tmpdir(), 'subagent-evidence-'));
+const REQUIRED_ARTIFACTS = [
+  relativePath(HUMAN_UAT_PATH),
+  relativePath(CLAUDE_AGENT_PATH),
+  relativePath(CODEX_AGENT_PATH),
+  relativePath(MANIFEST_PATH),
+  relativePath(CLAUDE_HOOK_EXAMPLE_PATH),
+  relativePath(CODEX_AGENT_EXAMPLE_PATH),
+  relativePath(CLAUDE_EVIDENCE_PATH),
+  relativePath(CODEX_EVIDENCE_PATH),
+  relativePath(CLAUDE_SESSION_PATH),
+  relativePath(CODEX_SESSION_PATH),
+];
 
-  // package.json
-  writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
-    name: 'evidence-test-project',
-    version: '1.0.0',
-    scripts: { test: 'vitest run', build: 'tsc' },
-  }, null, 2));
-
-  // .githooks/commit-msg
-  mkdirSync(path.join(tmpDir, '.githooks'), { recursive: true });
-  writeFileSync(path.join(tmpDir, '.githooks', 'commit-msg'), `#!/bin/sh
-MSG_FILE=$1
-MSG=$(head -1 "$MSG_FILE")
-VALID_TAGS="BUGFIX FEATURE REFACTOR CONFIG DOCS DELETE"
-
-if ! echo "$MSG" | grep -qE '^\\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\\]'; then
-    echo "ERROR: Commit message must start with an uppercase tag."
-    echo "Format: [TAG] scope: message"
-    echo "Valid tags: $VALID_TAGS"
-    exit 1
-fi
-
-if ! echo "$MSG" | grep -qE '^\\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\\]\\s+[^:]+:\\s+.+'; then
-    echo "ERROR: scope and message are required."
-    echo "Format: [TAG] scope: message"
-    exit 1
-fi
-
-echo "Commit message validated"
-exit 0
-`);
-
-  // AGENTS.md
-  writeFileSync(path.join(tmpDir, 'AGENTS.md'), `# AGENTS.md - Evidence Test
-
-## Section 6: Code Search
-Use codemap CLI for code search: query --symbol, analyze -i read, impact -f.
-Evidence protocol: every test must have real scenario evidence.
-`);
-
-  // docs/rules/testing.md
-  mkdirSync(path.join(tmpDir, 'docs', 'rules'), { recursive: true });
-  writeFileSync(path.join(tmpDir, 'docs', 'rules', 'testing.md'), `# Testing Rules
-- Framework: Vitest
-- Run tests with \`npx vitest run\`
-- Real scenario verification required.
-`);
-
-  return tmpDir;
+function relativePath(filePath) {
+  return path.relative(REPO_ROOT, filePath).replaceAll(path.sep, '/');
 }
 
-function runCommand(cmd, args, cwd, timeoutMs = 30000) {
+function ensureParentDir(filePath) {
+  mkdirSync(path.dirname(filePath), { recursive: true });
+}
+
+function writeText(filePath, content) {
+  ensureParentDir(filePath);
+  writeFileSync(filePath, content, 'utf8');
+  console.log(`  wrote ${relativePath(filePath)}`);
+}
+
+function writeJson(filePath, value) {
+  writeText(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function captureCommand(command, args) {
+  return execFileSync(command, args, {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'inherit'],
+    env: { ...process.env, NO_COLOR: '1' },
+  });
+}
+
+function runStreaming(command, args) {
+  execFileSync(command, args, {
+    cwd: REPO_ROOT,
+    stdio: 'inherit',
+    env: { ...process.env, NO_COLOR: '1' },
+  });
+}
+
+function buildClaudeVerifierAgent() {
+  return `---
+name: env-contract-verifier
+description: Phase 58 verification-only agent. Confirm env-contract retrieval happens before any substantive work.
+tools: Read, Bash, Grep, Glob
+model: haiku
+---
+
+You are a verification-only subagent for Phase 58.
+
+Before any substantive work, retrieve the project environment contract.
+Primary path:
+1. Run \`mycodemap env-contract --for explore --json\`
+Alternate path only if CLI retrieval is unavailable:
+1. Call \`codemap_env_contract(agentType="explore")\`
+
+After retrieval:
+2. Report the retrieval command and output first.
+3. List the contract items you observed, including \`shell-rtk-wrapper\`, \`commit-format\`, and \`test-entry-vitest\`.
+4. Stop after reporting whether retrieval happened before any other substantive work.
+
+Do not edit repository files.
+Do not skip the retrieval step.
+If retrieval fails, report the exact blocker and stop.
+`;
+}
+
+function buildCodexVerifierAgent() {
+  return `name = "env-contract-verifier"
+description = "Phase 58 verification-only agent. Confirm env-contract retrieval happens before any substantive work."
+developer_instructions = """
+You are a verification-only subagent for Phase 58.
+
+Before any substantive work, retrieve the project environment contract.
+Primary path:
+1. Run: mycodemap env-contract --for worker --json
+Alternate path only if CLI retrieval is unavailable:
+1. Call: codemap_env_contract(agentType="worker")
+
+After retrieval:
+2. Report the retrieval command and output first.
+3. List the contract items you observed, including shell-rtk-wrapper, commit-format, and test-entry-vitest.
+4. Stop after reporting whether retrieval happened before any other substantive work.
+
+Do not edit repository files.
+Do not skip the retrieval step.
+If retrieval fails, report the exact blocker and stop.
+"""
+`;
+}
+
+function buildEvidenceTemplate(platform, transcriptPath, notes) {
+  return {
+    platform,
+    attempted: false,
+    available: null,
+    commandTranscriptPath: transcriptPath,
+    retrievalEvidence: [],
+    verdict: 'pending',
+    blocker: '',
+    notes,
+  };
+}
+
+function hasManualEvidence(filePath) {
+  if (!existsSync(filePath)) {
+    return false;
+  }
+
   try {
-    const stdout = execFileSync(cmd, args, {
-      cwd,
-      encoding: 'utf8',
-      timeout: timeoutMs,
-      env: { ...process.env, NO_COLOR: '1' },
-    });
-    return { stdout, stderr: '', exitCode: 0 };
-  } catch (err) {
-    return {
-      stdout: err.stdout ?? '',
-      stderr: err.stderr ?? '',
-      exitCode: err.status ?? 1,
-    };
+    const parsed = JSON.parse(readFileSync(filePath, 'utf8'));
+    const verdicts = new Set(['pass', 'fail', 'waived', 'blocked']);
+    const retrievalEvidence =
+      typeof parsed.retrievalEvidence === 'string'
+        ? parsed.retrievalEvidence.trim().length > 0
+        : Array.isArray(parsed.retrievalEvidence) && parsed.retrievalEvidence.length > 0;
+    const blocker = typeof parsed.blocker === 'string' && parsed.blocker.trim().length > 0;
+    return verdicts.has(parsed.verdict) && (retrievalEvidence || blocker);
+  } catch {
+    return false;
   }
 }
 
-function writeEvidence(platform, data) {
-  const filePath = path.join(EVIDENCE_DIR, `${platform}.json`);
-  writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n');
-  console.log(`  Evidence written: ${filePath}`);
-}
-
-async function main() {
-  console.log('=== Subagent Environment Contract Evidence Harness ===\n');
-
-  // Ensure evidence directory exists
-  mkdirSync(EVIDENCE_DIR, { recursive: true });
-
-  // Create isolated temp repo
-  const tmpDir = createTempRepo();
-  console.log(`Temp repo: ${tmpDir}\n`);
-
-  try {
-    // Step 1: Run init
-    console.log('[1/4] Running init...');
-    const initResult = runCommand('node', [CLI_PATH, 'init', '--yes', '--profile', 'nodejs'], tmpDir);
-    console.log(`  Exit code: ${initResult.exitCode}`);
-
-    // Step 2: Verify env-contract is available
-    console.log('[2/4] Verifying env-contract...');
-    const contractResult = runCommand('node', [CLI_PATH, 'env-contract', '--for', 'worker', '--json'], tmpDir);
-    console.log(`  Exit code: ${contractResult.exitCode}`);
-
-    // Step 3: Attempt Claude subagent
-    console.log('[3/4] Attempting Claude subagent...');
-    const claudeAvailable = (() => {
-      try {
-        execSync('which claude', { encoding: 'utf8', stdio: 'pipe' });
-        return true;
-      } catch {
-        return false;
-      }
-    })();
-
-    let claudeEvidence;
-    if (claudeAvailable) {
-      const claudePrompt = 'Delegate a subagent to inspect this repo. Before any work, retrieve project rules with: mycodemap env-contract --for explore --json. Report the command/output evidence.';
-      const claudeResult = runCommand('claude', ['-p', claudePrompt], tmpDir, 60000);
-      const claudeExitCode = claudeResult.exitCode;
-      const claudeSuccess = claudeExitCode === 0;
-      const claudeTimedOut = claudeExitCode === 143 || claudeExitCode === 137;
-      claudeEvidence = {
-        platform: 'claude',
-        attempted: true,
-        available: true,
-        command: `claude -p "${claudePrompt.substring(0, 80)}..."`,
-        exitCode: claudeExitCode,
-        stdoutExcerpt: claudeResult.stdout.substring(0, 500),
-        stderrExcerpt: claudeResult.stderr.substring(0, 500),
-        retrievalEvidence: claudeSuccess && claudeResult.stdout.includes('env-contract') ? 'mycodemap env-contract' : null,
-        blocker: claudeTimedOut ? 'claude -p timed out (60s limit) — likely requires interactive auth or API key' : null,
-      };
-      console.log(`  Claude exit code: ${claudeExitCode}`);
-      if (claudeTimedOut) console.log('  Claude timed out — recorded as environment blocker');
-      console.log(`  Retrieval evidence: ${claudeEvidence.retrievalEvidence ?? 'not detected'}`);
-    } else {
-      claudeEvidence = {
-        platform: 'claude',
-        attempted: true,
-        available: false,
-        command: 'claude -p',
-        exitCode: null,
-        stdoutExcerpt: '',
-        stderrExcerpt: '',
-        retrievalEvidence: null,
-        blocker: 'claude binary not found in PATH',
-      };
-      console.log('  Claude not available — recorded blocker');
-    }
-    writeEvidence('claude-subagent', claudeEvidence);
-
-    // Step 4: Attempt Codex subagent
-    console.log('[4/4] Attempting Codex subagent...');
-    const codexAvailable = (() => {
-      try {
-        execSync('which codex', { encoding: 'utf8', stdio: 'pipe' });
-        return true;
-      } catch {
-        return false;
-      }
-    })();
-
-    let codexEvidence;
-    if (codexAvailable) {
-      const codexPrompt = 'Use a subagent/worker if available. Before any work, call codemap_env_contract(agentType="worker") or run mycodemap env-contract --for worker --json. Report evidence.';
-      const codexResult = runCommand('codex', ['exec', codexPrompt], tmpDir, 60000);
-      const codexExitCode = codexResult.exitCode;
-      const codexSuccess = codexExitCode === 0;
-      const codexTrustIssue = codexResult.stderr.includes('trusted directory');
-      codexEvidence = {
-        platform: 'codex',
-        attempted: true,
-        available: true,
-        command: `codex exec "${codexPrompt.substring(0, 80)}..."`,
-        exitCode: codexExitCode,
-        stdoutExcerpt: codexResult.stdout.substring(0, 500),
-        stderrExcerpt: codexResult.stderr.substring(0, 500),
-        retrievalEvidence: codexSuccess && (codexResult.stdout.includes('env-contract') || codexResult.stdout.includes('codemap_env_contract'))
-          ? 'codemap_env_contract or mycodemap env-contract'
-          : null,
-        blocker: codexTrustIssue ? 'codex exec requires trusted directory — temp repo not registered' : null,
-      };
-      console.log(`  Codex exit code: ${codexExitCode}`);
-      if (codexTrustIssue) console.log('  Codex trust directory issue — recorded as environment blocker');
-      console.log(`  Retrieval evidence: ${codexEvidence.retrievalEvidence ?? 'not detected'}`);
-    } else {
-      codexEvidence = {
-        platform: 'codex',
-        attempted: true,
-        available: false,
-        command: 'codex exec',
-        exitCode: null,
-        stdoutExcerpt: '',
-        stderrExcerpt: '',
-        retrievalEvidence: null,
-        blocker: 'codex binary not found in PATH',
-      };
-      console.log('  Codex not available — recorded blocker');
-    }
-    writeEvidence('codex-subagent', codexEvidence);
-
-    // Write negative evidence
-    const negativeEvidence = {
-      platform: 'negative',
-      attempted: true,
-      available: true,
-      command: 'git commit -m "bad message"',
-      exitCode: 1,
-      stdoutExcerpt: '',
-      stderrExcerpt: 'ERROR: Commit message must start with an uppercase tag.\nFormat: [TAG] scope: message',
-      retrievalEvidence: null,
-      blocker: null,
-      note: 'Without env-contract retrieval, a subagent would fail at commit validation. The hook enforces [TAG] scope: message format.',
-    };
-    writeEvidence('negative-no-retrieval', negativeEvidence);
-
-    // Summary
-    console.log('\n=== Evidence Summary ===');
-    console.log(`Claude: ${claudeEvidence.available ? 'PASSED (available)' : 'BLOCKED (' + claudeEvidence.blocker + ')'}`);
-    console.log(`Codex: ${codexEvidence.available ? 'PASSED (available)' : 'BLOCKED (' + codexEvidence.blocker + ')'}`);
-    console.log(`Negative: PASSED (hook rejection verified)`);
-    console.log(`\nEvidence files: ${EVIDENCE_DIR}`);
-
-  } finally {
-    // Cleanup temp repo
-    rmSync(tmpDir, { recursive: true, force: true });
+function writeEvidenceTemplate(filePath, value) {
+  if (hasManualEvidence(filePath)) {
+    console.log(`  preserved ${relativePath(filePath)} (manual evidence already present)`);
+    return;
   }
+
+  writeJson(filePath, value);
 }
 
-main().catch((err) => {
-  console.error('Fatal error:', err);
+function writeSessionPlaceholder(filePath, title) {
+  const placeholder = `# ${title}
+
+Paste the relevant transcript here after running the manual protocol in \`${relativePath(HUMAN_UAT_PATH)}\`.
+
+- Keep the retrieval step and its output.
+- Keep the first substantive work item after retrieval.
+- Note any blocker inline if the path could not be completed.
+`;
+
+  if (existsSync(filePath)) {
+    const current = readFileSync(filePath, 'utf8');
+    if (!current.includes('Paste the relevant transcript here after running the manual protocol')) {
+      console.log(`  preserved ${relativePath(filePath)} (non-placeholder content already present)`);
+      return;
+    }
+  }
+
+  writeText(filePath, placeholder);
+}
+
+function writeHelperSnippets() {
+  const hookExample = captureCommand('rtk', [
+    'node',
+    'dist/cli/index.js',
+    'env-contract',
+    '--for',
+    'explore',
+    '--as-hook-config',
+  ]);
+  const codexExample = captureCommand('rtk', [
+    'node',
+    'dist/cli/index.js',
+    'env-contract',
+    '--for',
+    'worker',
+    '--as-codex-agent',
+  ]);
+
+  writeText(CLAUDE_HOOK_EXAMPLE_PATH, hookExample.endsWith('\n') ? hookExample : `${hookExample}\n`);
+  writeText(CODEX_AGENT_EXAMPLE_PATH, codexExample.endsWith('\n') ? codexExample : `${codexExample}\n`);
+}
+
+function writeManifest() {
+  writeJson(MANIFEST_PATH, {
+    phase: '58',
+    preparedAt: new Date().toISOString(),
+    claudeRequired: true,
+    codexOptional: true,
+    requiredArtifacts: REQUIRED_ARTIFACTS,
+    protocolDoc: relativePath(HUMAN_UAT_PATH),
+  });
+}
+
+function printChecklist() {
+  console.log('\nManual checkpoint checklist:');
+  console.log(`1. Read ${relativePath(HUMAN_UAT_PATH)}.`);
+  console.log('2. Open an authenticated Claude Code session in this repository and delegate to `env-contract-verifier`.');
+  console.log(`3. Paste the transcript into ${relativePath(CLAUDE_SESSION_PATH)}.`);
+  console.log(`4. Update ${relativePath(CLAUDE_EVIDENCE_PATH)} with pass/fail evidence.`);
+  console.log('5. If Codex is available, run the optional parity path and update the Codex session + JSON files.');
+  console.log('6. Resume the phase only after the Claude evidence file records retrieval-before-work or an exact blocker.');
+}
+
+function main() {
+  console.log('=== Phase 58 Verification Preparation ===\n');
+
+  console.log('[1/4] Building CLI output...');
+  runStreaming('rtk', ['npm', 'run', 'build']);
+  if (!existsSync(CLI_PATH)) {
+    throw new Error(`Missing built CLI at ${relativePath(CLI_PATH)}`);
+  }
+
+  console.log('\n[2/4] Generating helper snippets from the built CLI...');
+  writeHelperSnippets();
+
+  console.log('\n[3/4] Writing verification agent fixtures and evidence templates...');
+  writeText(CLAUDE_AGENT_PATH, buildClaudeVerifierAgent());
+  writeText(CODEX_AGENT_PATH, buildCodexVerifierAgent());
+  writeManifest();
+  writeEvidenceTemplate(
+    CLAUDE_EVIDENCE_PATH,
+    buildEvidenceTemplate('claude', relativePath(CLAUDE_SESSION_PATH), [
+      'Set verdict to "pass" only if an env-contract retrieval call appears before any other substantive work.',
+      'If the Claude path cannot be run, use "fail" or "blocked" and record the exact blocker.',
+    ]),
+  );
+  writeEvidenceTemplate(
+    CODEX_EVIDENCE_PATH,
+    buildEvidenceTemplate('codex', relativePath(CODEX_SESSION_PATH), [
+      'Codex parity is optional for Phase 58 closure.',
+      'Use verdict "waived" only when the exact environment blocker is recorded.',
+    ]),
+  );
+  writeSessionPlaceholder(CLAUDE_SESSION_PATH, 'Claude Session Evidence');
+  writeSessionPlaceholder(CODEX_SESSION_PATH, 'Codex Session Evidence');
+
+  console.log('\n[4/4] Preparation complete.');
+  printChecklist();
+}
+
+try {
+  main();
+} catch (error) {
+  console.error('Fatal error:', error);
   process.exit(1);
-});
+}

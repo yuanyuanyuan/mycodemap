@@ -52,6 +52,7 @@ export interface InitReceipt {
   rootDir: string;
   receiptPath: string;
   canonicalConfigPath: string;
+  profileName?: string;
   assets: InitAsset[];
   summary: Record<InitAssetStatus, number>;
   notes: string[];
@@ -566,6 +567,7 @@ export function createInitPlan(
   const hookPlan = createHookPlan(rootDir);
   const rulesPlan = createRulesPlan(rootDir);
   const profilePlan = createProfilePlan(rootDir, profile, scan, mode, profileName);
+  const receiptProfileName = profilePlan.profileName ?? profileName;
   const assets: InitAsset[] = [
     buildWorkspaceAsset(scan),
     buildConfigAsset(scan),
@@ -597,6 +599,7 @@ export function createInitPlan(
       rootDir,
       receiptPath: scan.paths.receiptPath,
       canonicalConfigPath: scan.paths.canonicalConfigPath,
+      profileName: receiptProfileName,
       assets,
       summary: summarizeAssets(assets),
       notes: buildReceiptNotes(scan),
@@ -655,4 +658,50 @@ export function readReceiptConfigPath(receiptPath: string): string | undefined {
   const parsed = safeReadJson(receiptPath);
   const value = parsed?.canonicalConfigPath;
   return typeof value === 'string' ? value : undefined;
+}
+
+export function readReceiptProfileName(receiptPath: string): string | undefined {
+  const parsed = safeReadJson(receiptPath);
+  if (!parsed) {
+    return undefined;
+  }
+
+  const directProfileName = parsed.profileName;
+  if (typeof directProfileName === 'string' && directProfileName.trim().length > 0) {
+    return directProfileName;
+  }
+
+  const assets = parsed.assets;
+  if (!Array.isArray(assets)) {
+    return undefined;
+  }
+
+  for (const asset of assets) {
+    if (!asset || typeof asset !== 'object') {
+      continue;
+    }
+
+    const record = asset as Record<string, unknown>;
+    if (record.key !== 'bootstrap-profile' && record.label !== 'bootstrap profile') {
+      continue;
+    }
+
+    const details = record.details;
+    if (!Array.isArray(details)) {
+      continue;
+    }
+
+    for (const detail of details) {
+      if (typeof detail !== 'string') {
+        continue;
+      }
+
+      const match = detail.match(/^(?:应用 profile|推荐 profile|Profile):\s*(.+)$/);
+      if (match) {
+        return match[1].trim();
+      }
+    }
+  }
+
+  return undefined;
 }

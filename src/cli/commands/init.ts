@@ -8,7 +8,13 @@ import { detectProjectType, promptForProfileSelection } from '../init/detect.js'
 import type { ProjectType } from '../init/detect.js';
 import { loadProfile } from '../init/profile-loader.js';
 import type { BootstrapProfile } from '../init/profile-loader.js';
-import { applyInitPlan, createInitPlan, writeInitReceipt, type InitReceipt } from '../init/reconciler.js';
+import {
+  applyInitPlan,
+  createInitPlan,
+  readReceiptProfileName,
+  writeInitReceipt,
+  type InitReceipt,
+} from '../init/reconciler.js';
 import { renderInitPreview, renderInitReceipt } from '../init/receipt.js';
 import { CONFIG_FILE_CANONICAL, DEFAULT_OUTPUT_DIR_NEW } from '../paths.js';
 
@@ -57,13 +63,19 @@ async function resolveProfile(
     };
   }
 
-  // Existing canonical config skips detection by default (D-16).
-  // The profile-plan handles the already-synced asset; we just return null here.
-  if (hasCanonicalConfig(rootDir)) {
-    return { profile: null };
-  }
-
   const result = detectProjectType(rootDir);
+  const receiptPath = path.join(rootDir, '.mycodemap', 'status', 'init-last.json');
+  const previousProfileName = readReceiptProfileName(receiptPath);
+
+  // Existing canonical config skips profile rewriting by default (D-16), but
+  // we still preserve the previously selected profile name so assistant and
+  // env-contract assets remain stable on rerun.
+  if (hasCanonicalConfig(rootDir)) {
+    return {
+      profile: null,
+      profileName: previousProfileName ?? result.recommended ?? 'generic',
+    };
+  }
 
   if (result.candidates.length === 0) {
     // D-04 + D-12: no silent fallback. Refuse with a clear message in every path.

@@ -106,17 +106,6 @@ export function createProfilePlan(
   mode: 'preview' | 'apply',
   profileName?: string
 ): ProfilePlan {
-  if (profile === null) {
-    return {
-      assets: [
-        buildAsset('skipped', [
-          '未检测到项目类型标记；跳过 bootstrap profile 推荐',
-        ]),
-      ],
-      writes: [],
-    };
-  }
-
   if (scan.hasCanonicalConfig) {
     return {
       assets: [
@@ -130,6 +119,17 @@ export function createProfilePlan(
       ],
       writes: [],
       profileName,
+    };
+  }
+
+  if (profile === null) {
+    return {
+      assets: [
+        buildAsset('skipped', [
+          '未检测到项目类型标记；跳过 bootstrap profile 推荐',
+        ]),
+      ],
+      writes: [],
     };
   }
 

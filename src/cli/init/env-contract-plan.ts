@@ -48,6 +48,14 @@ function makeAsset(
   };
 }
 
+function normalizeContractForComparison(
+  contract: ProjectEnvironmentContract | Record<string, unknown>
+): string {
+  const normalized = JSON.parse(JSON.stringify(contract)) as Record<string, unknown>;
+  delete normalized.generatedAt;
+  return JSON.stringify(normalized);
+}
+
 /**
  * Check if existing content is a Phase 55 seed contract (env-contract.seed.v1).
  */
@@ -87,18 +95,6 @@ export function createEnvContractPlan(
     try {
       const currentContent = readFileSync(targetPath, 'utf8');
 
-      // Exact match — already synced
-      if (currentContent === contractJson) {
-        return {
-          assets: [
-            makeAsset('already-synced', [
-              'env-contract.json 内容已同步，无需更新',
-            ], { path: targetPath }),
-          ],
-          writes: [],
-        };
-      }
-
       // Try to parse existing content
       let parsed: unknown;
       try {
@@ -113,6 +109,22 @@ export function createEnvContractPlan(
               path: targetPath,
               manualAction: '手动审阅 .mycodemap/env-contract.json 的内容，确认后可删除该文件再重跑 init',
             }),
+          ],
+          writes: [],
+        };
+      }
+
+      if (
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        normalizeContractForComparison(parsed as Record<string, unknown>) ===
+          normalizeContractForComparison(contract)
+      ) {
+        return {
+          assets: [
+            makeAsset('already-synced', [
+              'env-contract.json 内容已同步，无需更新',
+            ], { path: targetPath }),
           ],
           writes: [],
         };

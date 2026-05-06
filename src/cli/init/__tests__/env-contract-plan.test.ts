@@ -126,22 +126,25 @@ echo "Format: [TAG] scope: message"
     expect(plan.assets[0].details.join(' ')).toContain('env-contract.v1');
   });
 
-  it('returns already-synced asset when file exists with same content', () => {
+  it('returns already-synced asset when only generatedAt changes', () => {
     const dir = createTempDir();
     setupProject(dir);
 
-    const fixedTimestamp = '2026-05-02T00:00:00.000Z';
-
-    // First create the plan with a fixed timestamp
-    const plan1 = createEnvContractPlan(dir, 'nodejs', 'apply', { generatedAt: fixedTimestamp });
+    const plan1 = createEnvContractPlan(dir, 'nodejs', 'apply', {
+      generatedAt: '2026-05-02T00:00:00.000Z',
+    });
     const targetPath = plan1.writes[0].targetPath;
 
     // Write the file to disk
     mkdirSync(path.dirname(targetPath), { recursive: true });
     writeFileSync(targetPath, plan1.writes[0].content, 'utf8');
 
-    // Now create the plan again with the same timestamp — should detect matching content
-    const plan2 = createEnvContractPlan(dir, 'nodejs', 'apply', { generatedAt: fixedTimestamp });
+    // Now create the plan again with a different timestamp — the plan should
+    // still treat the contract as already-synced because generatedAt is
+    // metadata only.
+    const plan2 = createEnvContractPlan(dir, 'nodejs', 'apply', {
+      generatedAt: '2026-05-03T00:00:00.000Z',
+    });
 
     expect(plan2.assets).toHaveLength(1);
     expect(plan2.assets[0].status).toBe('already-synced');

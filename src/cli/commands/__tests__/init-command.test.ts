@@ -123,7 +123,10 @@ describe('initCommand', () => {
 
     await executeInitCommand({ yes: true, cwd: rootDir });
     const receipt = await executeInitCommand({ yes: true, cwd: rootDir });
-    const savedReceipt = readJson<{ assets: Array<{ key: string; status: string }> }>(
+    const savedReceipt = readJson<{
+      profileName?: string;
+      assets: Array<{ key: string; status: string }>;
+    }>(
       path.join(rootDir, '.mycodemap', 'status', 'init-last.json')
     );
 
@@ -131,7 +134,13 @@ describe('initCommand', () => {
       expect.objectContaining({ key: 'workspace', status: 'already-synced' }),
       expect.objectContaining({ key: 'canonical-config', status: 'already-synced' }),
       expect.objectContaining({ key: 'status-ledger', status: 'already-synced' }),
+      expect.objectContaining({ key: 'assistant:claude-context', status: 'already-synced' }),
+      expect.objectContaining({ key: 'assistant:agents-context', status: 'already-synced' }),
+      expect.objectContaining({ key: 'env-contract', status: 'already-synced' }),
+      expect.objectContaining({ key: 'bootstrap-profile', status: 'already-synced' }),
     ]));
+    expect(receipt.assets.some((asset) => asset.status === 'conflict')).toBe(false);
+    expect(savedReceipt.profileName).toBe('nodejs');
     expect(savedReceipt.assets).toEqual(expect.arrayContaining([
       expect.objectContaining({ key: 'workspace', status: 'already-synced' }),
       expect.objectContaining({ key: 'canonical-config', status: 'already-synced' }),

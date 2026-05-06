@@ -156,7 +156,7 @@ describe('init command — bootstrap profile integration', () => {
     expect(existsSync(canonicalPath)).toBe(false);
   });
 
-  it('skips profile when .mycodemap/config.json already exists', async () => {
+  it('keeps profile already-synced when .mycodemap/config.json already exists', async () => {
     const rootDir = createTempProject();
     tempRoots.push(rootDir);
     writeFileSync(path.join(rootDir, 'package.json'), '{}', 'utf8');
@@ -171,13 +171,12 @@ describe('init command — bootstrap profile integration', () => {
 
     // [Rule-3 deviation] When canonical config already exists, init.ts'
     // resolveProfile short-circuits and returns profile:null *before*
-    // loading any profile, so profile-plan emits 'skipped' (the null-profile
-    // branch), not 'already-synced' (which would require a non-null profile
-    // plus existing config). User-visible behavior — preserve existing
-    // config, do not overwrite — matches the plan's intent (D-16).
+    // loading any profile, so profile-plan now emits 'already-synced' for the
+    // canonical-config branch. User-visible behavior — preserve existing
+    // config, do not overwrite — still matches the plan's intent (D-16).
     const profileAsset = findProfileAsset(receipt.assets as AssetLike[]);
     expect(profileAsset).toBeDefined();
-    expect(profileAsset?.status).toBe('skipped');
+    expect(profileAsset?.status).toBe('already-synced');
 
     // Existing config must NOT be overwritten.
     const canonicalPath = path.join(rootDir, '.mycodemap', 'config.json');
