@@ -1,9 +1,9 @@
 ---
 status: complete
 phase: 59-parser-cutover
-source: [59-01-SUMMARY.md, 59-02-SUMMARY.md, 59-03-SUMMARY.md]
+source: [59-01-SUMMARY.md, 59-02-SUMMARY.md, 59-03-SUMMARY.md, 59-04-SUMMARY.md]
 started: 2026-05-06T04:55:36Z
-updated: 2026-05-06T05:05:00Z
+updated: 2026-05-06T05:25:00Z
 ---
 
 ## Current Test
@@ -59,9 +59,8 @@ evidence: generate.ts catch block uses `formatError(error, 'human', 'mycodemap g
 
 ### 10. Server request types aligned to rejected-compatibility
 expected: Server/API request types may still accept deprecated parser mode values for compatibility, but they are rejected at runtime with DEPRECATED_PARSER_MODE, not silently accepted as healthy modes.
-result: issue
-reported: "AnalyzeRequest type still accepts 'fast'|'smart'|'hybrid' in options.mode, but analyze() throws 501 UnsupportedAnalysisOperationError for ALL requests — deprecated modes are never validated or rejected with DEPRECATED_PARSER_MODE specifically. The type signature implies these are accepted compatibility values but there's no runtime path that processes them."
-severity: minor
+result: pass
+evidence: DeprecatedParserModeError added to AnalysisHandler; analyze() checks deprecated modes before 501; API route returns 400 with DEPRECATED_PARSER_MODE code and nextCommand remediation; 6 new tests pass covering fast/smart/hybrid → 400 and tree-sitter/no-mode → 501
 
 ### 11. Documentation sync with cutover
 expected: docs/ai-guide/OUTPUT.md and ARCHITECTURE.md describe the single tree-sitter parser path and do not reference fast/smart/hybrid as active runtime modes.
@@ -81,19 +80,9 @@ evidence: `npx tsc --noEmit` → "No errors found"
 ## Summary
 
 total: 13
-passed: 12
-issues: 1
+passed: 13
+issues: 0
 pending: 0
 skipped: 0
 
 ## Gaps
-
-- truth: "Server request types accept deprecated mode values for compatibility but reject them at runtime with DEPRECATED_PARSER_MODE"
-  status: failed
-  reason: "AnalyzeRequest type still accepts 'fast'|'smart'|'hybrid' but analyze() throws 501 for ALL requests — no specific DEPRECATED_PARSER_MODE rejection path exists for server-side deprecated modes"
-  severity: minor
-  test: 10
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
