@@ -1,26 +1,29 @@
-// ============================================
-// IParser - 解析器接口定义
-// ============================================
+// [META] since:2026-05 | owner:parser-team | stable:false
+// [WHY] Central parser interface contract shared by legacy implementations and the new registry-backed path
 
 import type { ExportInfo, ImportInfo, ModuleSymbol } from '../../types/index.js';
 
 /**
  * 解析器模式
  */
-export type ParserMode = 'fast' | 'smart';
+export type ParserMode = 'tree-sitter';
+export type DeprecatedParserMode = 'fast' | 'smart' | 'hybrid';
+export type ParserModeInput = ParserMode | DeprecatedParserMode;
 
 /**
  * 解析器选项
  */
 export interface ParserOptions {
   /** 解析模式 */
-  mode: ParserMode;
+  mode?: ParserModeInput;
   /** 根目录 */
   rootDir: string;
   /** 文件过滤 */
   include?: string[];
   /** 排除模式 */
   exclude?: string[];
+  /** 是否启用 TS 类型增强 */
+  enhanceTypes?: boolean;
 }
 
 /**
@@ -180,7 +183,7 @@ export interface IParser {
   /** 解析器名称 */
   readonly name: string;
   /** 解析模式 */
-  readonly mode: ParserMode;
+  readonly mode: string;
 
   /**
    * 解析单个文件

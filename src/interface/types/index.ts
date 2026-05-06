@@ -363,7 +363,6 @@ export interface CodeMap {
   graphStatus?: GraphStatus;
   failedFileCount?: number;
   parseFailureFiles?: string[];
-  actualMode?: 'fast' | 'smart'; // Hybrid 模式下实际使用的模式
   pluginReport?: PluginExecutionReport;
 }
 
@@ -371,15 +370,19 @@ export interface CodeMap {
 // Section 10: 分析选项
 // ============================================
 
+export type ActiveParserMode = 'tree-sitter';
+export type DeprecatedParserMode = 'fast' | 'smart' | 'hybrid';
+export type ParserModeInput = ActiveParserMode | DeprecatedParserMode;
+
 // 分析选项
 export interface AnalysisOptions {
-  mode: 'fast' | 'smart' | 'hybrid';
+  mode?: ParserModeInput;
   rootDir: string;
   include?: string[];
   exclude?: string[];
   output?: string;
   watch?: boolean;
-  actualMode?: 'fast' | 'smart'; // Hybrid 模式下实际使用的模式
+  enhanceTypes?: boolean;
 }
 
 // 文件变更

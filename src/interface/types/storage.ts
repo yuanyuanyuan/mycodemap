@@ -11,7 +11,9 @@ import type { CodeGraph, Module, Symbol, Dependency } from './index.js';
 // ============================================
 
 /** 存储后端类型 */
-export type StorageType = 'filesystem' | 'kuzudb' | 'sqlite' | 'memory';
+export type StorageType = 'sqlite' | 'memory';
+export type DeprecatedStorageType = 'filesystem' | 'kuzudb' | 'neo4j';
+export type StorageTypeInput = StorageType | DeprecatedStorageType | 'auto';
 
 // ============================================
 // Section 2: 搜索选项
@@ -92,15 +94,16 @@ export interface ProjectStatistics {
 
 /** 存储配置 */
 export interface StorageConfig {
-  type: StorageType | 'auto';
-  
-  // FileSystem 配置
+  /** auto 表示在 SQLite family 内自动选择具体实现 */
+  type: StorageTypeInput;
+
+  // 兼容旧配置读取；SQLite-only 持久化将在后续 phase 继续收敛
   outputPath?: string;
-  
-  // KùzuDB 配置
+
+  // SQLite 数据库路径；兼容 legacy config 迁移提示
   databasePath?: string;
-  
-  // 自动选择配置
+
+  // 仅为识别并拒绝遗留配置而保留
   autoThresholds?: {
     useGraphDBWhenFileCount: number;
     useGraphDBWhenNodeCount: number;
@@ -117,7 +120,7 @@ export interface StorageConfig {
  */
 export interface IStorage {
   /** 存储类型标识 */
-  readonly type: StorageType;
+  readonly type: StorageType | DeprecatedStorageType;
   
   /** 初始化存储 */
   initialize(projectPath: string): Promise<void>;

@@ -171,9 +171,6 @@ export async function generateAIMap(
   lines.push('');
   lines.push(`> Generated at: ${codeMap.generatedAt}`);
   lines.push('');
-  const mode = codeMap.actualMode || 'fast';
-  lines.push(`> Mode: ${mode === 'smart' ? 'Smart' : 'Fast'}`);
-  lines.push('');
 
   // 项目概览
   lines.push('## Project Overview');

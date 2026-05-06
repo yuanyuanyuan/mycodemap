@@ -2,18 +2,34 @@
 // [WHY] Core analysis engine that orchestrates parsing, dependency analysis, and code map generation
 import path from 'path';
 import fs from 'fs/promises';
-import { parseFile, createParser } from '../parser/index.js';
+import { createDefaultParserRegistry } from '../infrastructure/parser/index.js';
 import type { CodeMap, AnalysisOptions, ModuleInfo, DependencyGraph, ProjectInfo, ProjectSummary } from '../types/index.js';
 import type { ParseResult } from '../parser/interfaces/IParser.js';
-import { createGlobalIndex, GlobalSymbolIndexBuilder } from './global-index.js';
+import { isDeprecatedParserMode } from '../parser/index.js';
+import { TypeScriptTypeEnhancer } from '../parser/enhancers/TypeScriptTypeEnhancer.js';
+import { createGlobalIndex } from './global-index.js';
 import { discoverProjectFiles, DEFAULT_DISCOVERY_EXCLUDES } from './file-discovery.js';
+import { ErrorCodes } from '../cli/output/error-codes.js';
 
-// 阈值配置
-const HYBRID_THRESHOLD = 50; // 文件数 >= 50 时使用 Smart 模式
+const DEFAULT_ANALYSIS_INCLUDE = ['src/**/*.{ts,tsx,js,jsx,py,go}'] as const;
 
 // 主分析函数
 export async function analyze(options: AnalysisOptions): Promise<CodeMap> {
-  const { rootDir, include = ['src/**/*.ts'], exclude = DEFAULT_DISCOVERY_EXCLUDES, mode = 'hybrid' } = options;
+  const {
+    rootDir,
+    include = [...DEFAULT_ANALYSIS_INCLUDE],
+    exclude = DEFAULT_DISCOVERY_EXCLUDES,
+    mode = 'tree-sitter',
+    enhanceTypes = true,
+  } = options;
+
+  if (isDeprecatedParserMode(mode)) {
+    const error = new Error(
+      `Parser mode "${mode}" is deprecated. Remove the mode override and use the default parser flow.`
+    ) as Error & { code: string };
+    error.code = ErrorCodes.DEPRECATED_PARSER_MODE;
+    throw error;
+  }
 
   // 1. 发现文件
   const files = await discoverProjectFiles({
@@ -22,63 +38,52 @@ export async function analyze(options: AnalysisOptions): Promise<CodeMap> {
     exclude
   });
 
-  // 2. Hybrid 模式自动选择
-  let actualMode: 'fast' | 'smart' = mode === 'hybrid' ? 'fast' : (mode as 'fast' | 'smart');
-  if (mode === 'hybrid') {
-    if (files.length >= HYBRID_THRESHOLD) {
-      actualMode = 'smart';
-    } else {
-      actualMode = 'fast';
-    }
-    console.log(`[Hybrid] 检测到 ${files.length} 个文件，自动选择 ${actualMode} 模式`);
-  }
-
-  // 3. 解析文件
-  const modules: ModuleInfo[] = [];
+  // 2. Registry 主路径解析文件
+  const registry = createDefaultParserRegistry();
+  const tsEnhancer = new TypeScriptTypeEnhancer(rootDir, enhanceTypes);
+  const initializedParsers = new Set<string>();
   let parseResults: ParseResult[] = [];
 
-  // 根据实际模式选择解析器
-  if (actualMode === 'smart') {
-    // Smart 模式：使用 SmartParser 获取复杂度、调用图、完整类型信息
-    const parser = createParser({ mode: 'smart', rootDir });
+  for (const file of files) {
     try {
-      parseResults = await parser.parseFiles(files);
+      const parser = registry.getParserByFile(file);
+      if (!parser) {
+        console.warn(`Warning: No parser registered for ${file}`);
+        continue;
+      }
 
-      // 转换 ParseResult 到 ModuleInfo
-      for (const result of parseResults) {
-        const moduleInfo = convertToModuleInfo(result);
-        modules.push(moduleInfo);
+      if (!initializedParsers.has(parser.languageId)) {
+        await parser.initialize();
+        initializedParsers.add(parser.languageId);
       }
+
+      const content = await fs.readFile(file, 'utf-8');
+      const parsed = await parser.parseFile(file, content, {
+        includeCallGraph: true,
+        includeComplexity: true,
+        includeTypeInfo: true,
+      });
+
+      parseResults.push(convertRegistryResultToLegacyResult(parsed));
     } catch (error) {
-      console.warn(`Warning: Smart parse failed, falling back: ${error}`);
-      // Fallback to basic parser
-      for (const file of files) {
-        try {
-          const moduleInfo = await parseFile(file);
-          moduleInfo.id = createModuleId(moduleInfo.path);
-          moduleInfo.dependencies = Array.from(new Set(moduleInfo.dependencies));
-          modules.push(moduleInfo);
-        } catch (e) {
-          console.warn(`Warning: Failed to parse ${file}: ${e}`);
-        }
-      }
-    }
-  } else {
-    // Fast 模式：使用基础解析器
-    for (const file of files) {
-      try {
-        const moduleInfo = await parseFile(file);
-        moduleInfo.id = createModuleId(moduleInfo.path);
-        moduleInfo.dependencies = Array.from(new Set(moduleInfo.dependencies));
-        modules.push(moduleInfo);
-      } catch (error) {
-        console.warn(`Warning: Failed to parse ${file}: ${error}`);
-      }
+      console.warn(`Warning: Failed to parse ${file}: ${error}`);
     }
   }
 
-  // 4. Smart 模式下构建全局符号索引和跨文件调用链
-  if (actualMode === 'smart' && parseResults.length > 0) {
+  parseResults = await tsEnhancer.enhance(parseResults);
+  const modules = parseResults.map((result) => convertToModuleInfo(result));
+  tsEnhancer.dispose();
+  await Promise.all(
+    registry.getSupportedLanguages().map(async (language) => {
+      const parser = registry.getParser(language);
+      if (parser) {
+        await parser.dispose();
+      }
+    })
+  );
+
+  // 3. 构建全局符号索引和跨文件调用链
+  if (parseResults.length > 0) {
     try {
       console.log('[Analyzer] 构建全局符号索引...');
       const globalIndex = createGlobalIndex(parseResults, rootDir);
@@ -86,8 +91,7 @@ export async function analyze(options: AnalysisOptions): Promise<CodeMap> {
       // 将跨文件调用信息添加到模块
       for (const mod of modules) {
         const relativePath = path.relative(rootDir, mod.path);
-        const builder = new GlobalSymbolIndexBuilder(rootDir);
-        const calls = builder.getCrossFileCalls(relativePath);
+        const calls = globalIndex.files.get(relativePath)?.crossFileCalls ?? [];
         
         if (calls.length > 0 && mod.callGraph) {
           // 增强 callGraph 包含跨文件调用信息
@@ -104,15 +108,15 @@ export async function analyze(options: AnalysisOptions): Promise<CodeMap> {
     }
   }
 
-  // 5. 构建依赖图
+  // 4. 构建依赖图
   const dependencies = buildDependencyGraph(modules);
 
-  // 6. 计算摘要
+  // 5. 计算摘要
   const summary = calculateSummary(modules);
 
   const graphIntegrity = calculateGraphIntegrity(files, modules);
 
-  // 7. 获取项目信息
+  // 6. 获取项目信息
   const project = await getProjectInfo(rootDir);
 
   return {
@@ -125,7 +129,6 @@ export async function analyze(options: AnalysisOptions): Promise<CodeMap> {
     graphStatus: graphIntegrity.graphStatus,
     failedFileCount: graphIntegrity.failedFileCount,
     parseFailureFiles: graphIntegrity.parseFailureFiles,
-    actualMode
   };
 }
 
@@ -147,6 +150,50 @@ function convertToModuleInfo(result: ParseResult): ModuleInfo {
     callGraph: result.callGraph,
     typeInfo: result.typeInfo
   };
+}
+
+function convertRegistryResultToLegacyResult(
+  result: import('../interface/types/parser.js').ParseResult
+): ParseResult {
+  return {
+    path: result.filePath,
+    exports: result.exports,
+    imports: result.imports,
+    symbols: result.symbols,
+    dependencies: result.imports.map((entry) => resolveDependencyPath(result.filePath, entry.source)),
+    type: categorizeParsedFile(result.filePath),
+    stats: result.module.stats,
+    callGraph: result.callGraph
+      ? {
+          calls: result.callGraph.calls,
+          recursive: result.callGraph.recursive,
+          callCounts: result.callGraph.calls.reduce<Record<string, number>>((counts, call) => {
+            counts[call.callee] = (counts[call.callee] ?? 0) + 1;
+            return counts;
+          }, {}),
+        }
+      : undefined,
+    complexity: result.complexity,
+  };
+}
+
+function categorizeParsedFile(filePath: string): ModuleInfo['type'] {
+  if (filePath.includes('.test.') || filePath.includes('.spec.')) return 'test';
+  if (filePath.includes('config.') || filePath.endsWith('config.ts')) return 'config';
+  return 'source';
+}
+
+function resolveDependencyPath(fromPath: string, importPath: string): string {
+  if (!importPath.startsWith('.')) {
+    return importPath;
+  }
+
+  const resolved = path.resolve(path.dirname(fromPath), importPath);
+  if (/\.(ts|tsx|js|jsx|py|go)$/i.test(resolved)) {
+    return resolved;
+  }
+
+  return `${resolved}.ts`;
 }
 
 function calculateGraphIntegrity(

@@ -5,6 +5,7 @@
 // ============================================
 
 import type { StorageConfig } from '../types/storage.js';
+import type { ParserModeInput } from '../types/index.js';
 
 // ============================================
 // Section 1: CLI 配置
@@ -20,11 +21,12 @@ export interface CodemapPluginConfig {
 
 /** CLI 配置 */
 export interface CodemapConfig {
-  mode: 'fast' | 'smart' | 'hybrid';
+  mode: ParserModeInput;
   include: string[];
   exclude: string[];
   output: string;
   watch: boolean;
+  /** 持久化仅支持 sqlite / auto；memory 仅用于测试。 */
   storage?: StorageConfig;
   plugins?: CodemapPluginConfig;
 }
@@ -53,9 +55,9 @@ export interface GenerateRequest {
   exclude?: string[];
   
   /** 分析模式 */
-  mode: 'fast' | 'smart' | 'hybrid';
+  mode: ParserModeInput;
   
-  /** 存储配置 */
+  /** 存储配置。持久化仅支持 sqlite / auto；memory 仅用于测试。 */
   storage?: StorageConfig;
   
   /** 输出配置 */

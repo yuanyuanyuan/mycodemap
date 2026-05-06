@@ -166,10 +166,21 @@ interface CodeMap {
   graphStatus?: "complete" | "partial";
   failedFileCount?: number;
   parseFailureFiles?: string[];
-  actualMode?: "fast" | "smart";
   pluginReport?: PluginExecutionReport;
 }
 ```
+
+### parser 模式收敛说明
+
+- 运行时主路径已收敛到 registry-backed tree-sitter parser。
+- `fast` / `smart` / `hybrid` 不再表示健康的运行模式；显式传入时应返回 `DEPRECATED_PARSER_MODE`，并附带 remediation 与 `nextCommand`。
+- `CodeMap` 输出不再暴露 `actualMode`，因为运行时不再做 hybrid 自动切换。
+
+### storage 持久化收敛说明
+
+- 持久化后端已收敛到 SQLite family；健康配置只应使用 `storage.type = "sqlite"`，或使用 `auto` 作为 SQLite-family alias。
+- `memory` 仍可用于测试或临时运行，但不属于持久化 truth。
+- 显式请求 `filesystem` / `kuzudb` 必须失败，并返回 `UNSUPPORTED_STORAGE_TYPE`、`remediationPlan` 与 `nextCommand`，而不是静默降级继续运行。
 
 ### graph integrity 语义
 
@@ -434,7 +445,7 @@ interface DoctorOutput {
       "summary": { "pass": 1, "warn": 1, "fail": 0, "skip": 0 },
       "checks": [
         { "name": "config_file", "status": "pass", "message": "mycodemap.config.json 存在" },
-        { "name": "storage_type", "status": "warn", "message": "storage.type 未显式设置，使用 auto", "remediation": "建议显式设置为 sqlite 或 filesystem" }
+        { "name": "storage_type", "status": "warn", "message": "storage.type 未显式设置，使用 auto", "remediation": "建议显式设置为 sqlite，或保留 auto 作为 SQLite-family alias" }
       ]
     },
     {

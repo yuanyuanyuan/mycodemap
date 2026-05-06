@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { analyze } from "../analyzer.js";
-import { SmartParser } from "../../parser/implementations/smart-parser.js";
+import { TypeScriptParser } from "../../infrastructure/parser/implementations/TypeScriptParser.js";
 
 const tempDirs: string[] = [];
 
@@ -47,7 +47,7 @@ describe("analyze", () => {
 
     const codeMap = await analyze({
       rootDir,
-      mode: "fast",
+      mode: "tree-sitter",
       include: ["src/**/*.ts"],
     });
 
@@ -82,7 +82,7 @@ describe("analyze", () => {
 
     const codeMap = await analyze({
       rootDir,
-      mode: "smart",
+      mode: "tree-sitter",
       include: ["src/**/*.ts"],
     });
 
@@ -90,12 +90,12 @@ describe("analyze", () => {
     expect(ids.size).toBe(codeMap.modules.length);
   });
 
-  it("resolves smart-mode relative dependencies to local modules", async () => {
+  it("resolves registry-backed relative dependencies to local modules", async () => {
     const rootDir = await createTempProject();
 
     const codeMap = await analyze({
       rootDir,
-      mode: "smart",
+      mode: "tree-sitter",
       include: ["src/**/*.ts"],
     });
 
@@ -111,19 +111,21 @@ describe("analyze", () => {
     expect(moduleB!.dependents).toContain(moduleA!.id);
   });
 
-  it("marks graph as partial when smart parser silently skips a discovered file", async () => {
+  it("marks graph as partial when the registry-backed parser skips a discovered file", async () => {
     const rootDir = await createTempProject();
-    const parserErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const parseFilesSpy = vi.spyOn(SmartParser.prototype, "parseFiles").mockImplementation(
-      async function (filePaths: string[]) {
-        const successfulFiles = filePaths.filter((filePath) => !filePath.endsWith("/src/b.ts"));
-        return Promise.all(successfulFiles.map((filePath) => this.parseFile(filePath)));
+    const originalParseFile = TypeScriptParser.prototype.parseFile;
+    const parseFileSpy = vi.spyOn(TypeScriptParser.prototype, "parseFile").mockImplementation(
+      async function (filePath: string, content: string, options) {
+        if (filePath.endsWith("/src/b.ts")) {
+          throw new Error("simulated parse skip");
+        }
+        return originalParseFile.call(this, filePath, content, options);
       },
     );
 
     const codeMap = await analyze({
       rootDir,
-      mode: "smart",
+      mode: "tree-sitter",
       include: ["src/**/*.ts"],
     });
 
@@ -131,7 +133,6 @@ describe("analyze", () => {
     expect(codeMap.failedFileCount).toBe(1);
     expect(codeMap.parseFailureFiles).toEqual([expect.stringMatching(/src\/b\.ts$/)]);
 
-    parseFilesSpy.mockRestore();
-    parserErrorSpy.mockRestore();
+    parseFileSpy.mockRestore();
   });
 });

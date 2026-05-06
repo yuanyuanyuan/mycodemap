@@ -10,6 +10,9 @@ export const DEFAULT_DISCOVERY_EXCLUDES = [
   'dist/**',
   'build/**',
   'coverage/**',
+  '.venv/**',
+  '**/__pycache__/**',
+  'vendor/**',
   '**/*.test.ts',
   '**/*.spec.ts',
   '**/*.d.ts'

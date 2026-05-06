@@ -8,12 +8,16 @@ import ts from 'typescript';
 import fs from 'fs/promises';
 import path from 'path';
 import type { ModuleInfo, ImportInfo, ExportInfo, ModuleSymbol, SymbolKind, DecoratorInfo } from '../types/index.js';
-import type { IParser, ParserOptions, ParserMode } from './interfaces/IParser.js';
+import type { ParseResult as RegistryParseResult } from '../interface/types/parser.js';
+import { createDefaultParserRegistry } from '../infrastructure/parser/index.js';
+import { ErrorCodes } from '../cli/output/error-codes.js';
+import type { IParser, ParserOptions, ParserMode, DeprecatedParserMode } from './interfaces/IParser.js';
+import { TypeScriptTypeEnhancer } from './enhancers/TypeScriptTypeEnhancer.js';
 import { SmartParser } from './implementations/smart-parser.js';
 import { FastParser } from './implementations/fast-parser.js';
 
 // 导出接口
-export type { IParser, ParserOptions, ParserMode } from './interfaces/IParser.js';
+export type { IParser, ParserOptions, ParserMode, DeprecatedParserMode, ParserModeInput } from './interfaces/IParser.js';
 export type { ParseResult, TypeInfo, CallGraph, ComplexityMetrics } from './interfaces/IParser.js';
 
 // 导出实现
@@ -23,18 +27,94 @@ export { SmartParser, FastParser };
  * 解析器工厂 - 根据模式创建合适的解析器
  */
 export function createParser(options: ParserOptions): IParser {
-  if (options.mode === 'fast') {
-    return new FastParser(options);
-  } else {
-    return new SmartParser(options);
+  const mode = options.mode ?? 'tree-sitter';
+  if (isDeprecatedParserMode(mode)) {
+    throw createDeprecatedParserModeError(mode);
   }
+
+  return new RegistryBackedParser(options);
 }
 
 /**
  * 获取解析器支持的模式
  */
 export function getSupportedModes(): ParserMode[] {
-  return ['fast', 'smart'];
+  return ['tree-sitter'];
+}
+
+export function isDeprecatedParserMode(mode: string): mode is DeprecatedParserMode {
+  return mode === 'fast' || mode === 'smart' || mode === 'hybrid';
+}
+
+class RegistryBackedParser implements IParser {
+  readonly name = 'registry-backed-parser';
+  readonly mode = 'tree-sitter';
+  private readonly registry = createDefaultParserRegistry();
+  private readonly enhancer: TypeScriptTypeEnhancer;
+
+  constructor(private readonly options: ParserOptions) {
+    this.enhancer = new TypeScriptTypeEnhancer(
+      options.rootDir,
+      options.enhanceTypes !== false
+    );
+  }
+
+  async parseFile(filePath: string) {
+    const parser = this.registry.getParserByFile(filePath);
+    if (!parser) {
+      throw new Error(`No parser registered for ${filePath}`);
+    }
+
+    const content = await readFileContent(filePath);
+    const parsed = await parser.parseFile(filePath, content, {
+      includeCallGraph: true,
+      includeComplexity: true,
+      includeTypeInfo: true,
+    });
+
+    const [enhanced] = await this.enhancer.enhance([toLegacyParseResult(parsed)]);
+    return enhanced;
+  }
+
+  async parseFiles(filePaths: string[]) {
+    const results = await Promise.all(filePaths.map((filePath) => this.parseFile(filePath)));
+    return this.enhancer.enhance(results);
+  }
+
+  dispose(): void {
+    this.enhancer.dispose();
+  }
+}
+
+function toLegacyParseResult(result: RegistryParseResult): import('./interfaces/IParser.js').ParseResult {
+  return {
+    path: result.filePath,
+    exports: result.exports,
+    imports: result.imports,
+    symbols: result.symbols,
+    dependencies: result.imports.map((entry) => resolveImportPath(result.filePath, entry.source)),
+    type: getModuleType(result.filePath),
+    stats: result.module.stats,
+    callGraph: result.callGraph
+      ? {
+          calls: result.callGraph.calls,
+          recursive: result.callGraph.recursive,
+          callCounts: result.callGraph.calls.reduce<Record<string, number>>((counts, call) => {
+            counts[call.callee] = (counts[call.callee] ?? 0) + 1;
+            return counts;
+          }, {}),
+        }
+      : undefined,
+    complexity: result.complexity,
+  };
+}
+
+function createDeprecatedParserModeError(mode: DeprecatedParserMode): Error & { code: string } {
+  const error = new Error(
+    `Parser mode "${mode}" has been removed from the active runtime. Remove the mode setting and use the default parser flow.`
+  ) as Error & { code: string };
+  error.code = ErrorCodes.DEPRECATED_PARSER_MODE;
+  return error;
 }
 
 // ========== 保留原有实现（向后兼容）==========
