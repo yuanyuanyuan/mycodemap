@@ -4,8 +4,8 @@ milestone: v2.2
 milestone_name: architecture-foundation
 current_phase: 59
 current_phase_name: parser-cutover
-status: planning
-last_updated: "2026-05-06T02:41:07.000Z"
+status: context-gathered
+last_updated: "2026-05-06T03:30:00.000Z"
 last_activity: 2026-05-06
 progress:
   total_phases: 4
@@ -32,23 +32,24 @@ See: `.planning/PROJECT.md` (updated 2026-05-06)
 **Current Plan:** —
 **Total Phases:** 4 scoped (59-62)
 **Total Plans in Milestone:** 11 planned
-**Status:** Roadmap approved; ready to discuss Phase 59
-**Progress:** [----------] 0% phase completion
+**Status:** Phase 59 context gathered; ready to plan
+**Progress:** [==---------] 20% phase completion
 **Last Activity:** 2026-05-06
-**Last Activity Description:** Roadmap approved for Milestone v2.2; Phase 59-62 accepted and ready for Phase 59.
+**Last Activity Description:** Phase 59 context gathered — 15 decisions across 4 gray areas (parser entry, SmartParser shrink, deprecation semantics, multi-lang routing)
 
 ## Current Position
 
-Phase: 59 (parser-cutover) — ready to discuss
+Phase: 59 (parser-cutover) — context gathered
 Plan: —
-Status: Roadmap approved; ready to discuss
-Last activity: 2026-05-06 — Approved roadmap created for Milestone v2.2
+Status: Ready to plan Phase 59
+Last activity: 2026-05-06 — Phase 59 context gathered (15 decisions, 4 areas)
 
 ## Decisions Made
 
 | Date | Summary | Rationale |
 |------|---------|-----------|
 | 2026-05-06 | `v2.2 architecture-foundation` started | User selected architecture foundation as the next milestone |
+| 2026-05-06 | Phase 59 context gathered | 15 decisions: ParserRegistry as truth, SmartParser→TypeScriptTypeEnhancer, Failure-to-Action for deprecated modes, Wave 1 full multi-lang |
 | 2026-05-06 | `v2.2` scope locked to parser / storage / MCP foundation work | Keep v2.2 focused on platform convergence before v2.3/v3.0 feature layers |
 | 2026-05-06 | Phase numbering continues from 58 | No `--reset-phase-numbers` requested; roadmap will start at Phase 59 |
 | 2026-04-30 | `v2.0 agent-native-foundation` started | User directive: consolidate unimplemented ideation features into v2.0 milestone |
