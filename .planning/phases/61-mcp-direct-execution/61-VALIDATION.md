@@ -1,9 +1,9 @@
 ---
 phase: 61
 slug: mcp-direct-execution
-status: draft
+status: completed
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-05-06
 ---
 
@@ -34,19 +34,19 @@ created: 2026-05-06
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 61-01-01 | 01 | 1 | MCP-02 | T-61-01-1 | Shared executor/service seam exists outside wrappers and MCP registration | unit/integration | `rtk npx vitest run src/server/mcp/__tests__/CodeMapMcpServer.test.ts src/server/mcp/__tests__/dynamic-server.test.ts && rtk tsc --noEmit` | W0 | pending |
-| 61-01-02 | 01 | 1 | MCP-02, MCP-04 | T-61-01-2 | CLI wrappers invoke shared seam without reclaiming business logic | unit | `rtk npx vitest run src/cli/commands/__tests__/query-output.test.ts src/cli/commands/__tests__/deps-output.test.ts src/cli/commands/__tests__/analyze-command.test.ts && rtk tsc --noEmit` | W0 | pending |
-| 61-02-01 | 02 | 2 | MCP-01, MCP-03 | T-61-02-1 | MCP selected family returns real structured results instead of `cli_redirect` | integration | `rtk npx vitest run src/server/mcp/__tests__/schema-adapter.test.ts src/server/mcp/__tests__/dynamic-server.test.ts src/server/mcp/__tests__/CodeMapMcpServer.test.ts && rtk tsc --noEmit` | W0 | pending |
-| 61-02-02 | 02 | 2 | MCP-01, MCP-03 | T-61-02-2 | Success and failure paths are both structurally verified through MCP transport | integration/failure | `rtk npx vitest run src/server/mcp/__tests__/dynamic-server.test.ts -t "structured" && rtk npx vitest run src/server/mcp/__tests__/CodeMapMcpServer.test.ts -t "GRAPH_NOT_FOUND|SYMBOL_NOT_FOUND|AMBIGUOUS"` | W0 | pending |
-| 61-03-01 | 03 | 3 | MCP-02, MCP-04 | T-61-03-1 | `query`/`deps` are thin wrappers and `analyze` is materially thinner | unit | `rtk npx vitest run src/cli/commands/__tests__/query-output.test.ts src/cli/commands/__tests__/deps-output.test.ts src/cli/commands/__tests__/analyze-command.test.ts && rtk tsc --noEmit` | W0 | pending |
-| 61-03-02 | 03 | 3 | MCP-03, MCP-04 | T-61-03-2 | CLI + MCP failure-path evidence and docs truth stay aligned | integration/docs | `rtk npx vitest run src/cli/commands/__tests__/query-output.test.ts src/cli/commands/__tests__/deps-output.test.ts src/cli/commands/__tests__/analyze-command.test.ts && rtk npx vitest run src/server/mcp/__tests__/dynamic-server.test.ts -t "error|not found|ambiguous|structured" && rtk tsc --noEmit` | W0 | pending |
+| 61-01-01 | 01 | 1 | MCP-02 | T-61-01-1 | Shared executor/service seam exists outside wrappers and MCP registration | unit/integration | `rtk proxy npx vitest run src/server/mcp/__tests__/schema-adapter.test.ts src/server/mcp/__tests__/dynamic-server.test.ts src/server/mcp/__tests__/CodeMapMcpServer.test.ts && rtk tsc --noEmit` | W0 | passed |
+| 61-01-02 | 01 | 1 | MCP-02, MCP-04 | T-61-01-2 | CLI wrappers invoke shared seam without reclaiming business logic | unit | `rtk proxy npx vitest run src/cli/commands/__tests__/query-output.test.ts src/cli/commands/__tests__/deps-output.test.ts src/cli/commands/__tests__/analyze-command.test.ts && rtk tsc --noEmit` | W0 | passed |
+| 61-02-01 | 02 | 2 | MCP-01, MCP-03 | T-61-02-1 | MCP selected family returns real structured results instead of `cli_redirect` | integration | `rtk proxy npx vitest run src/server/mcp/__tests__/schema-adapter.test.ts src/server/mcp/__tests__/dynamic-server.test.ts src/server/mcp/__tests__/CodeMapMcpServer.test.ts && rtk tsc --noEmit` | W0 | passed |
+| 61-02-02 | 02 | 2 | MCP-01, MCP-03 | T-61-02-2 | Success and failure paths are both structurally verified through MCP transport | integration/failure | `rtk proxy npx vitest run src/server/mcp/__tests__/dynamic-server.test.ts src/server/mcp/__tests__/CodeMapMcpServer.test.ts && rtk tsc --noEmit` | W0 | passed |
+| 61-03-01 | 03 | 3 | MCP-02, MCP-04 | T-61-03-1 | `query`/`deps` are thin wrappers and `analyze` is materially thinner | unit | `rtk proxy npx vitest run src/cli/commands/__tests__/query-output.test.ts src/cli/commands/__tests__/deps-output.test.ts src/cli/commands/__tests__/analyze-command.test.ts && rtk tsc --noEmit` | W0 | passed |
+| 61-03-02 | 03 | 3 | MCP-03, MCP-04 | T-61-03-2 | CLI + MCP failure-path evidence and docs truth stay aligned | integration/docs | `rtk proxy npx vitest run src/cli/commands/__tests__/query-output.test.ts src/cli/commands/__tests__/deps-output.test.ts src/cli/commands/__tests__/analyze-command.test.ts && rtk proxy npx vitest run src/server/mcp/__tests__/schema-adapter.test.ts src/server/mcp/__tests__/dynamic-server.test.ts src/server/mcp/__tests__/CodeMapMcpServer.test.ts && rtk tsc --noEmit` | W0 | passed |
 
 ## Wave 0 Requirements
 
-- [ ] `61-RESEARCH.md` and `61-PATTERNS.md` must exist before implementation starts.
-- [ ] Phase 60 must remain the last completed phase in `.planning/STATE.md`; if execution begins from an older branch state, stop and reconcile first.
-- [ ] Do not accept any selected-family implementation that still treats `cli_redirect` as the success contract.
-- [ ] Do not accept MCP handlers that directly call CLI wrappers with `process.stdout` / `process.exitCode` side effects.
+- [x] `61-RESEARCH.md` and `61-PATTERNS.md` existed before implementation started.
+- [x] Execution started from a Phase-60-complete state before Phase 61 state sync was applied.
+- [x] No selected-family implementation still treats `cli_redirect` as the success contract.
+- [x] Do not accept MCP handlers that directly call CLI wrappers with `process.stdout` / `process.exitCode` side effects.
 
 ## Manual-Only Verifications
 
@@ -57,11 +57,11 @@ created: 2026-05-06
 
 ## Validation Sign-Off
 
-- [ ] All tasks have automated commands that include targeted Vitest or an explicit manual rule.
-- [ ] At least one MCP failure-path command is required before phase completion.
-- [ ] At least one CLI-focused verification command is required before phase completion.
-- [ ] `rtk tsc --noEmit` is part of the execution gate, not an optional extra.
-- [ ] No watch-mode flags are used in validation commands.
+- [x] All tasks have automated commands that include targeted Vitest or an explicit manual rule.
+- [x] At least one MCP failure-path command is required before phase completion.
+- [x] At least one CLI-focused verification command is required before phase completion.
+- [x] `rtk tsc --noEmit` is part of the execution gate, not an optional extra.
+- [x] No watch-mode flags are used in validation commands.
 - [x] `nyquist_compliant: true` set in frontmatter.
 
-**Approval:** pending
+**Approval:** passed 2026-05-06
