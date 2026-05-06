@@ -46,11 +46,11 @@ function matchesFilePath(candidatePath: string, requestedPath: string): boolean 
     || normalizedRequested.endsWith(`/${normalizedCandidate}`);
 }
 
-function toGraphStatus(metadata: GraphMetadata): McpGraphStatus {
+export function toGraphStatus(metadata: GraphMetadata): McpGraphStatus {
   return metadata.generatedAt ? metadata.graphStatus : 'missing';
 }
 
-function buildGraphEnvelope(metadata: GraphMetadata): Pick<
+export function buildGraphEnvelope(metadata: GraphMetadata): Pick<
   McpQueryResult,
   'graph_status' | 'generated_at' | 'failed_file_count' | 'parse_failure_files'
 > {

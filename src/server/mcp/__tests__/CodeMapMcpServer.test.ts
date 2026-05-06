@@ -6,14 +6,21 @@ import type { CodeGraph } from '../../../interface/types/index.js';
 import { MemoryStorage } from '../../../infrastructure/storage/adapters/MemoryStorage.js';
 import { createCodeMapMcpServer } from '../server.js';
 
-function createGraphFixture(): CodeGraph {
+function createGraphFixture(options: {
+  updatedAt?: Date;
+  graphStatus?: 'complete' | 'partial';
+  failedFileCount?: number;
+  parseFailureFiles?: string[];
+} = {}): CodeGraph {
+  const updatedAt = options.updatedAt ?? new Date();
+
   return {
     project: {
       id: 'proj-1',
       name: 'fixture',
       rootPath: '/fixture',
-      createdAt: new Date('2026-04-19T00:00:00.000Z'),
-      updatedAt: new Date('2026-04-19T00:00:00.000Z'),
+      createdAt: updatedAt,
+      updatedAt,
     },
     modules: [
       {
@@ -123,17 +130,23 @@ function createGraphFixture(): CodeGraph {
         line: 2,
       },
     ],
-    graphStatus: 'complete',
-    failedFileCount: 0,
-    parseFailureFiles: [],
+    graphStatus: options.graphStatus ?? 'complete',
+    failedFileCount: options.failedFileCount ?? 0,
+    parseFailureFiles: options.parseFailureFiles ?? [],
   };
 }
 
-async function createConnectedClient(withGraph = true) {
+async function createConnectedClient(options: {
+  withGraph?: boolean;
+  updatedAt?: Date;
+  graphStatus?: 'complete' | 'partial';
+  failedFileCount?: number;
+  parseFailureFiles?: string[];
+} = {}) {
   const storage = new MemoryStorage();
   await storage.initialize('/fixture');
-  if (withGraph) {
-    await storage.saveCodeGraph(createGraphFixture());
+  if (options.withGraph ?? true) {
+    await storage.saveCodeGraph(createGraphFixture(options));
   }
 
   const server = createCodeMapMcpServer(storage);
@@ -185,23 +198,25 @@ describe('CodeMap experimental MCP server', () => {
     openResources.push(connection);
 
     const tools = await connection.client.listTools();
-    expect(tools.tools.map(tool => tool.name)).toEqual([
+    const toolNames = tools.tools.map(tool => tool.name);
+    expect(toolNames).toEqual(expect.arrayContaining([
       'codemap_query',
       'codemap_env_contract',
       'codemap_impact',
+      'codemap_context',
       'codemap_analyze',
-      'codemap_query_contract',
       'codemap_deps',
       'codemap_doctor',
       'codemap_benchmark',
       'codemap_init',
       'codemap_preview',
       'codemap_env_contract_contract',
-    ]);
+    ]));
+    expect(toolNames).not.toContain('codemap_query_contract');
 
     await connection.client.callTool({
       name: 'codemap_query',
-      arguments: { symbol: 'target' },
+      arguments: { search: 'resolveDataPath', limit: 1 },
     });
 
     const stdoutFrames = connection.getRawStdout().trim().split('\n').filter(Boolean);
@@ -211,26 +226,25 @@ describe('CodeMap experimental MCP server', () => {
     }
   });
 
-  it('returns definition, callers and callees for codemap_query', async () => {
+  it('returns contract-backed direct execution for codemap_query', async () => {
     const connection = await createConnectedClient();
     openResources.push(connection);
 
     const result = await connection.client.callTool({
       name: 'codemap_query',
-      arguments: { symbol: 'target' },
+      arguments: { search: 'resolveDataPath', limit: 5 },
     });
     const structured = result.structuredContent as Record<string, unknown>;
+    const directResult = structured.result as Record<string, unknown>;
+    const items = directResult.results as Array<Record<string, unknown>>;
 
     expect(structured.status).toBe('ok');
-    expect(structured.graph_status).toBe('complete');
-    expect(structured.symbol).toEqual(expect.objectContaining({
-      id: 'sym-target',
-      file_path: 'src/target.ts',
+    expect((structured.diagnostics as Record<string, unknown>).tool).toBe('query');
+    expect(directResult).toEqual(expect.objectContaining({
+      type: 'search',
+      query: 'resolveDataPath',
     }));
-    expect(structured.callers).toEqual([
-      expect.objectContaining({ id: 'sym-caller' }),
-    ]);
-    expect(structured.callees).toEqual([]);
+    expect(items.length).toBeGreaterThan(0);
   });
 
   it('returns symbol-level caller impact without a second tool-layer graph walk', async () => {
@@ -261,11 +275,11 @@ describe('CodeMap experimental MCP server', () => {
   });
 
   it('returns GRAPH_NOT_FOUND when the symbol graph has not been generated', async () => {
-    const connection = await createConnectedClient(false);
+    const connection = await createConnectedClient({ withGraph: false });
     openResources.push(connection);
 
     const result = await connection.client.callTool({
-      name: 'codemap_query',
+      name: 'codemap_impact',
       arguments: { symbol: 'target' },
     });
     const structured = result.structuredContent as Record<string, unknown>;
@@ -283,11 +297,11 @@ describe('CodeMap experimental MCP server', () => {
     openResources.push(connection);
 
     const notFoundResult = await connection.client.callTool({
-      name: 'codemap_query',
+      name: 'codemap_impact',
       arguments: { symbol: 'missingSymbol' },
     });
     const ambiguousResult = await connection.client.callTool({
-      name: 'codemap_query',
+      name: 'codemap_impact',
       arguments: { symbol: 'duplicate' },
     });
 
@@ -295,5 +309,124 @@ describe('CodeMap experimental MCP server', () => {
       .toEqual(expect.objectContaining({ code: 'SYMBOL_NOT_FOUND' }));
     expect((ambiguousResult.structuredContent as Record<string, unknown>).error)
       .toEqual(expect.objectContaining({ code: 'AMBIGUOUS_EDGE' }));
+  });
+
+  it('returns structured direct-execution failures for the Phase 61 family', async () => {
+    const connection = await createConnectedClient();
+    openResources.push(connection);
+
+    const result = await connection.client.callTool({
+      name: 'codemap_query',
+      arguments: {},
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toEqual(expect.objectContaining({
+      status: 'error',
+      error: expect.objectContaining({ code: 'MISSING_QUERY_TYPE' }),
+      diagnostics: expect.objectContaining({ tool: 'query' }),
+    }));
+  });
+
+  it('returns routing context through the native codemap_context tool', async () => {
+    const connection = await createConnectedClient();
+    openResources.push(connection);
+
+    const result = await connection.client.callTool({
+      name: 'codemap_context',
+      arguments: {
+        task: 'review',
+        detailLevel: 'minimal',
+        allowedTools: ['codemap_query', 'codemap_impact', 'codemap_analyze'],
+      },
+    });
+    const structured = result.structuredContent as Record<string, unknown>;
+
+    expect(result.isError).toBe(false);
+    expect(structured.status).toBe('ok');
+    expect(structured.task).toBe('review');
+    expect(structured.detailLevel).toBe('minimal');
+    expect(structured.graphStats).toEqual(expect.objectContaining({
+      modules: 5,
+      symbols: 5,
+      edges: 2,
+    }));
+    expect(structured.nextToolSuggestions).toEqual([
+      expect.objectContaining({ tool: 'codemap_query' }),
+      expect.objectContaining({ tool: 'codemap_impact' }),
+      expect.objectContaining({ tool: 'codemap_analyze' }),
+    ]);
+  });
+
+  it('surfaces degraded routing truth when codemap_context runs without graph data', async () => {
+    const connection = await createConnectedClient({ withGraph: false });
+    openResources.push(connection);
+
+    const standard = await connection.client.callTool({
+      name: 'codemap_context',
+      arguments: { task: 'debug', detailLevel: 'standard' },
+    });
+    const minimal = await connection.client.callTool({
+      name: 'codemap_context',
+      arguments: { task: 'debug', detailLevel: 'minimal' },
+    });
+    const structured = standard.structuredContent as Record<string, unknown>;
+    const suggestions = structured.nextToolSuggestions as Array<Record<string, unknown>>;
+
+    expect(standard.isError).toBe(false);
+    expect(structured.confidence).toBe('reduced');
+    expect(structured.graph_status).toBe('missing');
+    expect(structured.warnings).toEqual(expect.arrayContaining([
+      'Graph truth missing; run mycodemap generate --symbol-level before relying on impact-heavy routing.',
+    ]));
+    expect(suggestions[0]).toEqual(expect.objectContaining({ tool: 'codemap_doctor' }));
+    expect(JSON.stringify(minimal.structuredContent).length).toBeLessThan(JSON.stringify(standard.structuredContent).length);
+  });
+
+  it('returns INVALID_TASK when codemap_context receives an unsupported task', async () => {
+    const connection = await createConnectedClient();
+    openResources.push(connection);
+
+    const result = await connection.client.callTool({
+      name: 'codemap_context',
+      arguments: { task: 'triage' },
+    });
+    const structured = result.structuredContent as Record<string, unknown>;
+
+    expect(result.isError).toBe(true);
+    expect(structured.status).toBe('invalid_input');
+    expect(structured.error).toEqual(expect.objectContaining({
+      code: 'INVALID_TASK',
+    }));
+  });
+
+  it('surfaces stale/partial truth and rejects broken tool filters through MCP transport', async () => {
+    const connection = await createConnectedClient({
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      graphStatus: 'partial',
+      failedFileCount: 1,
+      parseFailureFiles: ['src/stale.ts'],
+    });
+    openResources.push(connection);
+
+    const staleResult = await connection.client.callTool({
+      name: 'codemap_context',
+      arguments: { task: 'default', detailLevel: 'standard' },
+    });
+    const staleStructured = staleResult.structuredContent as Record<string, unknown>;
+    expect(staleStructured.warnings).toEqual(expect.arrayContaining([
+      'Graph truth is partial; parse failures may hide affected files or symbols.',
+      'Graph truth is stale relative to the current workspace; refresh before relying on precise routing.',
+    ]));
+
+    const brokenFilter = await connection.client.callTool({
+      name: 'codemap_context',
+      arguments: { task: 'review', allowedTools: ['codemap_query'] },
+    });
+    expect(brokenFilter.isError).toBe(true);
+    expect(brokenFilter.structuredContent).toEqual(expect.objectContaining({
+      status: 'invalid_input',
+      error: expect.objectContaining({ code: 'FILTER_CONFLICT' }),
+    }));
   });
 });

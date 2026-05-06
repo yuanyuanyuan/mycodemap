@@ -17,6 +17,7 @@ import {
   type ProjectEnvironmentContract,
   type ContractCategory,
 } from '../../cli/env-contract/index.js';
+import { buildContextRoutingPayload } from './context-tool.js';
 import { CodeMapMcpService } from './service.js';
 import { convertContractToMcpTools } from './schema-adapter.js';
 
@@ -33,27 +34,7 @@ function renderStructuredContent(result: unknown): string {
   return JSON.stringify(result, null, 2);
 }
 
-function registerNativeTools(server: McpServer, service: CodeMapMcpService): void {
-  server.registerTool('codemap_query', {
-    title: 'CodeMap Query',
-    description: 'Experimental: query a symbol definition plus callers and callees from the local CodeMap graph.',
-    inputSchema: {
-      symbol: z.string().min(1).describe('Exact symbol name to resolve'),
-      filePath: z.string().min(1).optional().describe('Optional file path to disambiguate same-name symbols'),
-    },
-  }, async ({ symbol, filePath }) => {
-    const structuredContent = await service.querySymbol({ symbol, filePath });
-
-    return {
-      content: [{
-        type: 'text',
-        text: renderStructuredContent(structuredContent),
-      }],
-      structuredContent,
-      isError: structuredContent.status !== 'ok',
-    };
-  });
-
+function registerNativeTools(server: McpServer, service: CodeMapMcpService, storage: IStorage): void {
   server.registerTool('codemap_env_contract', {
     title: 'CodeMap Environment Contract',
     description: 'Query the Project Environment Contract for subagent rule retrieval. Returns filtered contract items by agent type.',
@@ -135,13 +116,43 @@ function registerNativeTools(server: McpServer, service: CodeMapMcpService): voi
       isError: structuredContent.status !== 'ok',
     };
   });
+
+  server.registerTool('codemap_context', {
+    title: 'CodeMap Context Router',
+    description: 'Return lightweight review/debug/default routing context with graph stats, risk summary, and real next-step tool suggestions.',
+    inputSchema: {
+      task: z.string().min(1).optional().describe('Requested routing context task family'),
+      detailLevel: z.enum(['minimal', 'standard']).optional().describe('Controls whether the response stays aggressively thin or includes warnings/rationale.'),
+      allowedTools: z.array(z.string().min(1)).optional().describe('Strict allow-list for suggested tools. The request fails if the filter would hide a required suggestion.'),
+    },
+  }, async ({ task, detailLevel, allowedTools }) => {
+    const structuredContent = await buildContextRoutingPayload(storage, {
+      task,
+      detailLevel,
+      allowedTools,
+    });
+
+    return {
+      content: [{
+        type: 'text',
+        text: renderStructuredContent(structuredContent),
+      }],
+      structuredContent,
+      isError: structuredContent.status !== 'ok',
+    };
+  });
 }
 
-function registerContractTools(server: McpServer, contract: InterfaceContract, reservedNames: Set<string>): void {
+function registerContractTools(
+  server: McpServer,
+  contract: InterfaceContract,
+  reservedNames: Set<string>,
+  rootDir: string,
+): void {
   const registeredNames = new Set<string>(reservedNames);
 
   for (const command of contract.commands) {
-    const definitions = convertContractToMcpTools(command, contract.programName);
+    const definitions = convertContractToMcpTools(command, contract.programName, { rootDir });
 
     for (const def of definitions) {
       let toolName = def.name;
@@ -172,17 +183,17 @@ function registerContractTools(server: McpServer, contract: InterfaceContract, r
   }
 }
 
-export function createCodeMapMcpServer(storage: IStorage): McpServer {
+export function createCodeMapMcpServer(storage: IStorage, rootDir: string = cwd()): McpServer {
   const server = new McpServer({
     name: MCP_SERVER_NAME,
     version: MCP_SERVER_VERSION,
   });
   const service = new CodeMapMcpService(storage);
 
-  const reservedNames = new Set<string>(['codemap_query', 'codemap_impact', 'codemap_env_contract']);
+  const reservedNames = new Set<string>(['codemap_impact', 'codemap_env_contract', 'codemap_context']);
 
-  registerNativeTools(server, service);
-  registerContractTools(server, getFullContract(), reservedNames);
+  registerNativeTools(server, service, storage);
+  registerContractTools(server, getFullContract(), reservedNames, rootDir);
 
   return server;
 }
@@ -197,7 +208,7 @@ export async function startCodeMapMcpServer(
 }> {
   const rootDir = options.rootDir ?? cwd();
   const { storage } = await createConfiguredStorage(rootDir);
-  const server = createCodeMapMcpServer(storage);
+  const server = createCodeMapMcpServer(storage, rootDir);
   const transport = new StdioServerTransport(options.stdin, options.stdout);
 
   await server.connect(transport);

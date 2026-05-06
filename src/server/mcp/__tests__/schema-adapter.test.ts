@@ -253,7 +253,7 @@ describe('schema-adapter', () => {
       ]);
     });
 
-    it('handler returns a cli_redirect structured response', async () => {
+    it('direct-execution family handlers return structured success or error envelopes', async () => {
       const contract: CommandContract = {
         name: 'analyze',
         description: 'Analyze command',
@@ -267,22 +267,24 @@ describe('schema-adapter', () => {
         examples: ['codemap analyze --intent find'],
       };
       const tools = convertContractToMcpTools(contract);
-      const result = await tools[0].handler({ intent: 'find', json: true });
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('codemap analyze');
+      const result = await tools[0].handler({ intent: 'refactor', json: true });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('"status": "error"');
       expect(result.structuredContent).toMatchObject({
-        status: 'cli_redirect',
-        command: 'analyze',
+        status: 'error',
+        diagnostics: {
+          tool: 'analyze',
+        },
       });
     });
 
-    it('handler omits undefined and false flags from cli command line', async () => {
+    it('cli-redirect handlers omit undefined and false flags from cli command line', async () => {
       const contract: CommandContract = {
-        name: 'query',
-        description: 'Query command',
+        name: 'doctor',
+        description: 'Doctor command',
         args: [],
         flags: [
-          { name: 'symbol', long: 'symbol', description: 'Symbol', type: 'string' },
+          { name: 'category', long: 'category', description: 'Category', type: 'string' },
           { name: 'json', long: 'json', description: 'JSON', type: 'boolean' },
         ],
         outputShape: { type: 'object', properties: [] },
@@ -290,76 +292,76 @@ describe('schema-adapter', () => {
         examples: [],
       };
       const tools = convertContractToMcpTools(contract);
-      const result = await tools[0].handler({ symbol: 'MyClass', json: false });
-      expect(result.content[0].text).toBe('Command available via CLI: codemap query --symbol MyClass');
+      const result = await tools[0].handler({ category: 'runtime', json: false });
+      expect(result.content[0].text).toBe('Command available via CLI: codemap doctor --category runtime');
     });
 
-    it('handler formats array flags correctly', async () => {
+    it('cli-redirect handlers format array flags correctly', async () => {
       const contract: CommandContract = {
-        name: 'analyze',
-        description: 'Analyze command',
+        name: 'doctor',
+        description: 'Doctor command',
         args: [],
         flags: [
-          { name: 'targets', long: 'targets', description: 'Targets', type: 'string', multiple: true },
+          { name: 'checks', long: 'checks', description: 'Checks', type: 'string', multiple: true },
         ],
         outputShape: { type: 'object', properties: [] },
         errorCodes: [],
         examples: [],
       };
       const tools = convertContractToMcpTools(contract);
-      const result = await tools[0].handler({ targets: ['src/a.ts', 'src/b.ts'] });
-      expect(result.content[0].text).toContain('--targets src/a.ts --targets src/b.ts');
+      const result = await tools[0].handler({ checks: ['storage', 'mcp'] });
+      expect(result.content[0].text).toContain('--checks storage --checks mcp');
     });
 
-    it('handler quotes shell metacharacters in flag values', async () => {
+    it('cli-redirect handlers quote shell metacharacters in flag values', async () => {
       const contract: CommandContract = {
-        name: 'query',
-        description: 'Query command',
+        name: 'doctor',
+        description: 'Doctor command',
         args: [],
         flags: [
-          { name: 'symbol', long: 'symbol', description: 'Symbol', type: 'string' },
+          { name: 'category', long: 'category', description: 'Category', type: 'string' },
         ],
         outputShape: { type: 'object', properties: [] },
         errorCodes: [],
         examples: [],
       };
       const tools = convertContractToMcpTools(contract);
-      const result = await tools[0].handler({ symbol: 'Foo; rm -rf /' });
-      expect(result.content[0].text).toContain("--symbol 'Foo; rm -rf /'");
+      const result = await tools[0].handler({ category: 'Foo; rm -rf /' });
+      expect(result.content[0].text).toContain("--category 'Foo; rm -rf /'");
     });
 
-    it('handler quotes values containing spaces', async () => {
+    it('cli-redirect handlers quote values containing spaces', async () => {
       const contract: CommandContract = {
-        name: 'query',
-        description: 'Query command',
+        name: 'doctor',
+        description: 'Doctor command',
         args: [],
         flags: [
-          { name: 'symbol', long: 'symbol', description: 'Symbol', type: 'string' },
+          { name: 'category', long: 'category', description: 'Category', type: 'string' },
         ],
         outputShape: { type: 'object', properties: [] },
         errorCodes: [],
         examples: [],
       };
       const tools = convertContractToMcpTools(contract);
-      const result = await tools[0].handler({ symbol: 'my class' });
-      expect(result.content[0].text).toContain("--symbol 'my class'");
+      const result = await tools[0].handler({ category: 'my class' });
+      expect(result.content[0].text).toContain("--category 'my class'");
     });
 
-    it('handler escapes single quotes correctly', async () => {
+    it('cli-redirect handlers escape single quotes correctly', async () => {
       const contract: CommandContract = {
-        name: 'query',
-        description: 'Query command',
+        name: 'doctor',
+        description: 'Doctor command',
         args: [],
         flags: [
-          { name: 'symbol', long: 'symbol', description: 'Symbol', type: 'string' },
+          { name: 'category', long: 'category', description: 'Category', type: 'string' },
         ],
         outputShape: { type: 'object', properties: [] },
         errorCodes: [],
         examples: [],
       };
       const tools = convertContractToMcpTools(contract);
-      const result = await tools[0].handler({ symbol: "it's" });
-      expect(result.content[0].text).toContain("--symbol 'it'\\''s'");
+      const result = await tools[0].handler({ category: "it's" });
+      expect(result.content[0].text).toContain("--category 'it'\\''s'");
     });
   });
 });

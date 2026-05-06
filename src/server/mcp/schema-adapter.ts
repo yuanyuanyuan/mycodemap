@@ -8,6 +8,11 @@ import type {
   OutputProperty,
   OutputShape,
 } from '../../cli/interface-contract/types.js';
+import {
+  executeAnalyzeTool,
+  executeDepsTool,
+  executeQueryTool,
+} from '../../execution/contract-tools/index.js';
 
 export interface McpToolDefinition {
   name: string;
@@ -22,6 +27,10 @@ export interface McpToolDefinition {
     structuredContent: Record<string, unknown>;
     isError: boolean;
   }>;
+}
+
+interface McpExecutionContext {
+  rootDir?: string;
 }
 
 /**
@@ -250,6 +259,124 @@ export function convertOutputShapeToZodSchema(outputShape: OutputShape): z.ZodTy
   }
 }
 
+const directExecutionCommands = new Set(['query', 'deps', 'analyze']);
+
+const directExecutionErrorSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+  remediation: z.string().optional(),
+  details: z.record(z.string(), z.unknown()).optional(),
+});
+
+const directExecutionDiagnosticsSchema = z.object({
+  tool: z.enum(['query', 'deps', 'analyze']),
+  rootDir: z.string(),
+  dataPath: z.string().optional(),
+  durationMs: z.number().optional(),
+  cacheHit: z.boolean().optional(),
+  notes: z.array(z.string()).optional(),
+});
+
+function createDirectExecutionOutputSchema(outputShape: OutputShape): z.ZodTypeAny {
+  return z.object({
+    status: z.enum(['ok', 'error']),
+    result: z.unknown().optional().describe(outputShape.description ?? 'Command result payload'),
+    error: directExecutionErrorSchema.optional(),
+    diagnostics: directExecutionDiagnosticsSchema,
+  });
+}
+
+function toStringArray(value: unknown): string[] | undefined {
+  if (typeof value === 'string') {
+    return [value];
+  }
+
+  if (Array.isArray(value)) {
+    const items = value.filter((item): item is string => typeof item === 'string');
+    return items.length > 0 ? items : undefined;
+  }
+
+  return undefined;
+}
+
+function normalizeDirectExecutionArgs(commandName: string, args: Record<string, unknown>): Record<string, unknown> {
+  switch (commandName) {
+    case 'query':
+      return {
+        symbol: typeof args.symbol === 'string' ? args.symbol : undefined,
+        module: typeof args.module === 'string' ? args.module : undefined,
+        deps: typeof args.deps === 'string' ? args.deps : undefined,
+        search: typeof args.search === 'string' ? args.search : undefined,
+        limit: typeof args.limit === 'number' ? args.limit : undefined,
+        json: args.json === true,
+        human: args.human === true,
+        verbose: args.verbose === true,
+        cache: args['no-cache'] === true ? false : true,
+        regex: args.regex === true,
+        depsFormat: args['deps-format'] === 'detailed' ? 'detailed' : 'default',
+        caseSensitive: args['case-sensitive'] === true,
+        context: typeof args.context === 'number' || typeof args.context === 'string' ? args.context : undefined,
+        includeReferences: args['include-references'] === true,
+        structured: args.structured === true,
+      };
+    case 'deps':
+      return {
+        module: typeof args.module === 'string' ? args.module : undefined,
+        json: args.json === true,
+        human: args.human === true,
+        structured: args.structured === true,
+      };
+    case 'analyze':
+      return {
+        intent: typeof args.intent === 'string' ? args.intent : undefined,
+        targets: toStringArray(args.targets),
+        keywords: toStringArray(args.keywords),
+        scope: typeof args.scope === 'string' ? args.scope : undefined,
+        topK: typeof args.topK === 'number' ? args.topK : undefined,
+        includeTests: args['include-tests'] === true,
+        includeGitHistory: args['include-git-history'] === true,
+        json: args.json === true,
+        human: args.human === true,
+        structured: args.structured === true,
+        outputMode: typeof args['output-mode'] === 'string' ? args['output-mode'] : undefined,
+      };
+    default:
+      return args;
+  }
+}
+
+function renderDirectExecutionText(result: Record<string, unknown>): string {
+  return JSON.stringify(result, null, 2);
+}
+
+function createDirectExecutionHandler(
+  contract: CommandContract,
+  context: McpExecutionContext = {},
+) {
+  const rootDir = context.rootDir;
+
+  return async (args: Record<string, unknown>) => {
+    const normalizedArgs = normalizeDirectExecutionArgs(contract.name, args);
+
+    const execution = contract.name === 'query'
+      ? await executeQueryTool(normalizedArgs, rootDir)
+      : contract.name === 'deps'
+        ? await executeDepsTool(normalizedArgs, rootDir)
+        : await executeAnalyzeTool(normalizedArgs as Parameters<typeof executeAnalyzeTool>[0]);
+
+    const structuredContent = execution as unknown as Record<string, unknown>;
+
+    return {
+      content: [{
+        type: 'text' as const,
+        text: renderDirectExecutionText(structuredContent),
+      }],
+      structuredContent,
+      isError: execution.status !== 'ok',
+    };
+  };
+}
+
 /**
  * Normalize a command name segment for use in MCP tool names.
  * Replaces any character that is not alphanumeric or underscore with underscore.
@@ -328,9 +455,20 @@ const cliRedirectOutputSchema = z.object({
  * Convert a CommandContract into one or more MCP tool definitions.
  * The primary command and any aliases each get their own tool name.
  */
-export function convertContractToMcpTools(contract: CommandContract, programName = 'codemap'): McpToolDefinition[] {
+export function convertContractToMcpTools(
+  contract: CommandContract,
+  programName = 'codemap',
+  context: McpExecutionContext = {},
+): McpToolDefinition[] {
   const definitions: McpToolDefinition[] = [];
   const inputSchema = convertFlagsToZodShape(contract.flags);
+  const isDirectExecution = directExecutionCommands.has(contract.name);
+  const outputSchema = isDirectExecution
+    ? createDirectExecutionOutputSchema(contract.outputShape)
+    : cliRedirectOutputSchema;
+  const handler = isDirectExecution
+    ? createDirectExecutionHandler(contract, context)
+    : createCliAvailabilityHandler(contract, programName);
 
   definitions.push({
     name: `codemap_${normalizeToolNameSegment(contract.name)}`,
@@ -338,9 +476,9 @@ export function convertContractToMcpTools(contract: CommandContract, programName
       title: `CodeMap ${contract.name}`,
       description: `${contract.description}\n\nExamples:\n${contract.examples.join('\n')}`,
       inputSchema,
-      outputSchema: cliRedirectOutputSchema,
+      outputSchema,
     },
-    handler: createCliAvailabilityHandler(contract, programName),
+    handler,
   });
 
   for (const alias of contract.aliases ?? []) {
@@ -350,9 +488,11 @@ export function convertContractToMcpTools(contract: CommandContract, programName
         title: `CodeMap ${alias}`,
         description: `${contract.description} (alias for ${contract.name})\n\nExamples:\n${contract.examples.join('\n')}`,
         inputSchema,
-        outputSchema: cliRedirectOutputSchema,
+        outputSchema,
       },
-      handler: createCliAvailabilityHandler({ ...contract, name: alias }, programName),
+      handler: isDirectExecution
+        ? createDirectExecutionHandler(contract, context)
+        : createCliAvailabilityHandler({ ...contract, name: alias }, programName),
     });
   }
 
