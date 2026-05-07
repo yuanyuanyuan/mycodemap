@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: none
-milestone_name: none
+milestone: v2.3
+milestone_name: graph-capability
 current_phase: none
 current_phase_name: none
 current_plan: none
-status: between_milestones
-last_updated: "2026-05-07T00:10:00+08:00"
+status: planning
+last_updated: "2026-05-07T00:45:00+08:00"
 last_activity: 2026-05-07
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
-  total_plans: 0
+  total_plans: 4
   completed_plans: 0
   percent: 0
 ---
@@ -23,32 +23,35 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-07)
 
 **Core Value:** 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
-**Current Focus:** Between milestones — `v2.2 architecture-foundation` archived, awaiting next milestone selection
+**Current Focus:** Milestone `v2.3 graph-capability` — defining graph-native schema, incremental refresh, recursive impact traversal, and community detection
 
 ## Position
 
-**Milestone:** none
+**Milestone:** v2.3
 **Current Phase:** none
 **Current Phase Name:** none
 **Current Plan:** none
-**Total Phases:** 0 scoped
-**Total Plans in Milestone:** 0 planned
-**Status:** Between milestones
-**Progress:** [----------] waiting for next milestone
+**Total Phases:** 4 scoped
+**Total Plans in Milestone:** 4 planned
+**Status:** Planning
+**Progress:** [----------] requirements and roadmap defined, phase execution not started
 **Last Activity:** 2026-05-07
-**Last Activity Description:** Milestone `v2.2 architecture-foundation` archived with audit passed; active planning surface reset for the next milestone
+**Last Activity Description:** Milestone `v2.3 graph-capability` started; requirements and roadmap were defined from existing graph-related deferred items
 
 ## Current Position
 
-Phase: none
-Plan: none
-Status: Between milestones
-Last activity: 2026-05-07 — `v2.2 architecture-foundation` archived and waiting for next milestone selection
+Phase: Not started (defining requirements complete)
+Plan: -
+Status: Defining requirements complete; ready for `Phase 63` planning
+Last activity: 2026-05-07 — Milestone `v2.3 graph-capability` started
 
 ## Decisions Made
 
 | Date | Summary | Rationale |
 |------|---------|-----------|
+| 2026-05-07 | `v2.3 graph-capability` started | User directed the workflow to use the existing v2.3 graph-related deferred items as milestone scope |
+| 2026-05-07 | `v2.3` skips extra research | Brownfield planning truth already identified schema redesign, edge confidence, incremental update, impact CTE, and community detection as the committed slice |
+| 2026-05-07 | Phase numbering continues from 62 | No `--reset-phase-numbers` requested; roadmap starts at `Phase 63` |
 | 2026-05-07 | `v2.2 architecture-foundation` archived | Milestone audit passed, roadmap/requirements were archived, and the active planning surface reset to between-milestones state |
 | 2026-05-06 | Phase 62 completed | `codemap_context` now exposes native review/debug/default routing, explicit minimal/standard detail levels, and fail-closed tool filtering with focused verification |
 | 2026-05-06 | Phase 61 completed | Query/deps/analyze now share one execution seam; MCP selected family returns real structured direct-execution results and docs/tests align |
@@ -74,6 +77,7 @@ Last activity: 2026-05-07 — `v2.2 architecture-foundation` archived and waitin
 ## Closeout Notes
 
 - **Latest shipped milestone:** `v2.2 architecture-foundation` archived on 2026-05-07. Archived roadmap/requirements now live in `.planning/milestones/v2.2-ROADMAP.md` and `.planning/milestones/v2.2-REQUIREMENTS.md`.
+- **Current milestone kickoff:** `v2.3 graph-capability` started on 2026-05-07 with no extra research pass; active planning truth now lives in `.planning/PROJECT.md`, `.planning/REQUIREMENTS.md`, `.planning/ROADMAP.md`, and `.planning/STATE.md`.
 - **Phase 58 subagent verification rework (2026-05-03):** Official docs review revealed fundamental test-design flaws. `claude -p` is print mode (not subagent); `codex exec --agent` does not exist; `additionalContext`/`developer_instructions` are text injection, not enforced execution. Verification script `scripts/verify-subagent-env-contract.mjs` was rewritten. Real Claude/Codex subagent tests (S1-S3) are now completed with evidence. See 58-HUMAN-UAT.md for the canonical protocol.
 - **v2.1 closeout gap:** `INI-01` (`mycodemap init --json`) remains deferred to the next milestone; this was accepted explicitly at close.
 
@@ -84,32 +88,23 @@ Last activity: 2026-05-07 — `v2.2 architecture-foundation` archived and waitin
 | debug | mycodemap-install-runtime-deps | awaiting_human_verify |
 | release | actual npm/GitHub release for v1.9.0 | out_of_scope_until_explicit_release_command |
 
-## Deferred Items (new for v2.0, assigned to future milestones)
+## Deferred Items (still open after v2.3 kickoff)
 
 | Category | Item | Target Milestone |
 |----------|------|------------------|
 | ux | INI-01: `mycodemap init --json` machine-readable receipt gap | v2.2 cleanup follow-up |
-| ux | First-Run Concierge + Bootstrap Profiles | v2.1 ux-onboarding-enhancement |
-| ux | Zero-Config Preview / Progressive Commitment | v2.1 ux-onboarding-enhancement |
 | ux | F-1: Phase 53 legacy-config receipt cosmetic message gap (functional D-16 honored; receipt detail "未检测到项目类型标记" misleading) | v2.1 cleanup follow-up |
 | agent-integration | Auto-Provisioned Agent Skills | v3.0+ (renumbered from v2.2) |
 | agent-integration | MCP `verify_contract` Tool | v3.0+ (renumbered from v2.2) |
-| storage | KùzuDB removal + SQLite-only (complete Kùzu removal) | v2.2 architecture-foundation |
-| storage | FileSystem backend removal | v2.2 architecture-foundation |
-| storage | SQLite schema redesign (governance-v3 → graph-optimized) | v2.3 schema-redesign-graph-capability |
+| storage | SQLite schema redesign (governance-v3 → graph-optimized) | v2.3 graph-capability |
 | storage | SQLite + In-Memory Graph optimization | v2.6 polish-and-stabilize |
-| parser | FastParser / Hybrid mode removal | v2.2 architecture-foundation |
-| parser | TreeSitterParser main flow integration | v2.2 architecture-foundation |
-| parser | SmartParser reduction to TS type enhance layer | v2.2 architecture-foundation |
 | parser | PythonTypeEnhancer (docstring type inference) | v2.2 (non-blocking acceptance) |
 | parser | Parser extension Rust/Java/C++ (Tree-sitter grammar) | v3.0+ |
-| mcp | MCP direct execution (kill cli_redirect) | v2.2 architecture-foundation |
-| mcp | MCP routing gate + detail_level + tool filter | v2.2 architecture-foundation |
 | mcp | SSE transport | v2.2 architecture-foundation |
-| graph | Edge confidence (EXTRACTED/INFERRED/AMBIGUOUS) | v2.3 schema-redesign-graph-capability |
-| graph | Incremental update (git-diff + 2-hop cascade) | v2.3 schema-redesign-graph-capability |
-| graph | Impact CTE (recursive BFS + layered summary) | v2.3 schema-redesign-graph-capability |
-| graph | Community detection (ngraph + self-built Louvain) | v2.3 schema-redesign-graph-capability |
+| graph | Edge confidence (EXTRACTED/INFERRED/AMBIGUOUS) | v2.3 graph-capability |
+| graph | Incremental update (git-diff + 2-hop cascade) | v2.3 graph-capability |
+| graph | Impact CTE (recursive BFS + layered summary) | v2.3 graph-capability |
+| graph | Community detection (ngraph + self-built Louvain) | v2.3 graph-capability |
 | graph | Surprise score (report mode) | v2.4 agent-graph-experience |
 | graph | Execution flow trace (two-phase) | v2.4 agent-graph-experience |
 | graph | Bare-name resolution | v2.4 agent-graph-experience |
@@ -157,6 +152,7 @@ Last activity: 2026-05-07 — `v2.2 architecture-foundation` archived and waitin
 - 2026-05-05: Phase 57 completed — built CLI E2E covers empty-dir/profile bootstrap, Node.js rerun idempotency, and legacy-root-config migration; profileName persistence plus generatedAt-insensitive env-contract comparison removed false conflicts.
 - 2026-05-06: v2.1 archived — accepted `INI-01` gap and kept F-1 cosmetic cleanup tracked as deferred technical debt.
 - 2026-05-06: Phase 61 completed — shared contract-tool executor landed, `codemap_query`/`codemap_deps`/`codemap_analyze` now execute directly through MCP, and output/architecture docs were synced to the new envelope truth.
+- 2026-05-07: `v2.3 graph-capability` initialized from existing deferred items; roadmap fixed to phases 63-66 for schema redesign, incremental refresh, impact traversal, and community detection.
 
 ### Verified Existing Capabilities (carried forward)
 
@@ -182,7 +178,7 @@ Last activity: 2026-05-07 — `v2.2 architecture-foundation` archived and waitin
 - Release operations remain L3: do not run `npm version`, create tags, or push without explicit `/release v{X.Y}`
 
 ---
-*State initialized: 2026-05-06 for Milestone v2.2*
+*State initialized: 2026-05-07 for Milestone v2.3*
 
 - Phase 40.1 added: Real-World Validation Guardrails — 添加真实场景验证规则到测试规范、发布检查清单、AGENTS.md、CLAUDE.md 和 CI 护栏
 - Phase 40.1 context gathered (2026-04-30): 硬约束+CI护栏双保险、启发式grep pre-commit + [证据]标签CI、分层豁免41/42、元信息层文档增强

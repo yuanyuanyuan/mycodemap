@@ -12,9 +12,20 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 
 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
 
+## Current Milestone: v2.3 graph-capability
+
+**Goal:** 在 `v2.2` 已收敛的 parser / SQLite / MCP 基线上，补齐 CodeMap 的 graph-native 数据模型与核心图分析能力，让后续 agent graph experience 建立在可计算、可增量、可解释的 graph truth 上。
+
+**Target features:**
+- SQLite graph schema redesign
+- Edge confidence (`EXTRACTED` / `INFERRED` / `AMBIGUOUS`)
+- Incremental update (`git diff` + scoped recompute)
+- Recursive impact traversal + layered summary
+- Community detection baseline
+
 ## Current State
 
-**Status:** No active milestone. Latest shipped milestone is `v2.2 architecture-foundation` on 2026-05-07.
+**Status:** Active milestone is `v2.3 graph-capability` (planning started 2026-05-07). Latest shipped milestone remains `v2.2 architecture-foundation`.
 
 **What shipped in v2.2:**
 - Parser 主路径收敛为 registry-backed tree-sitter，废弃 `fast` / `hybrid` runtime split
@@ -27,11 +38,11 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 - `12` plans across phases `59-62`
 - Residual deferred items remain explicit in `.planning/STATE.md` and `.planning/backlog.md`
 
-## Next Milestone Goals
+## Milestone Focus
 
-- Define the next active milestone with `$gsd-new-milestone /data/codemap`
-- Choose whether the next focus is graph capability (`v2.3+`), agent graph experience (`v2.4+` / `v2.5+`), or broader architecture intelligence / agent integration (`v3.0+`)
-- Preserve the v2.2 baseline as the stable execution foundation; avoid reopening parser/storage/MCP truth unless a new milestone scopes it explicitly
+- Preserve `v2.2` parser/storage/MCP baseline; do not reopen that convergence work unless graph capability exposes a concrete blocker
+- Land a graph-optimized SQLite schema that can support traversal, clustering, and incremental refresh without changing the public CLI/MCP success contract
+- Use `v2.3` to establish durable graph truth for `v2.4+` agent graph experience and `v3.0+` architecture intelligence, rather than shipping UI polish or workflow extras early
 
 ## Latest Completed Milestone: v2.2 architecture-foundation
 
@@ -191,12 +202,24 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 - [x] **UX-02**: Zero-Config Preview / Progressive Commitment —— v2.1 shipped
 - [x] **UX-03**: Post-Install Agent Bootstrap Configuration (原 Phase 51) —— v2.1 shipped
 
-### Active (渐进债务)
+### Active (v2.3 graph-capability)
 
-- [ ] **AGENT-10**: 剩余 12+ CLI 命令迁移到 contract schema —— 渐进债务
-- [ ] **AGENT-11**: benchmark 命令迁移到共享输出基础设施 —— 渐进债务
+- [ ] **GRAPH-01**: SQLite graph schema 针对 symbol / dependency / impact traversal 重构为 graph-optimized truth
+- [ ] **GRAPH-02**: persisted edges 暴露 `EXTRACTED` / `INFERRED` / `AMBIGUOUS` confidence 语义
+- [ ] **INCR-01**: graph generation 支持基于 `git diff` 或 changed-file set 的 scoped incremental update
+- [ ] **IMPT-01**: impact analysis 提供 recursive traversal + layered summary 主能力
+- [ ] **COMM-01**: community detection 提供基础模块聚类能力并暴露到可消费表面
 
 ### Future Milestones
+
+- [ ] **GRAPH-03**: Surprise score (`report` mode) —— `v2.4 agent-graph-experience` 候选
+- [ ] **GRAPH-04**: Execution flow trace (two-phase) —— `v2.4 agent-graph-experience` 候选
+- [ ] **GRAPH-05**: Bare-name resolution —— `v2.4 agent-graph-experience` 候选
+- [ ] **GRAPH-06**: Hub / Bridge detection —— `v2.5 deep-analysis-hooks` 候选
+- [ ] **GRAPH-07**: Hook mechanism (first-remind-then-silent) —— `v2.5 deep-analysis-hooks` 候选
+- [ ] **GRAPH-08**: Node dedup (3-layer) —— `v2.5 deep-analysis-hooks` 候选
+- [ ] **AGENT-10**: 剩余 12+ CLI 命令迁移到 contract schema —— 渐进债务
+- [ ] **AGENT-11**: benchmark 命令迁移到共享输出基础设施 —— 渐进债务
 
 - [ ] **INT-04**: Auto-Provisioned Agent Skills —— v3.0+ 候选
 - [ ] **INT-05**: MCP `verify_contract` Tool —— v3.0+ 候选
@@ -223,8 +246,8 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 - 74,544 TypeScript LOC in `src/`，1129 个测试全部通过
 - `v2.0` audit 原始状态为 `gaps_found`，Phase 49 接线修复后所有 4 个 critical blockers 已解决
 - 渐进债务：12+ 命令仍需 contract schema 定义；benchmark 命令需迁移到共享输出基础设施
-- 当前 active milestone：`v2.2 architecture-foundation`
-- 本轮聚焦 parser unify、storage converge、MCP direct execution 与 routing gate；agent-provisioning / `verify_contract` 已后移到 `v3.0+`
+- 当前 active milestone：`v2.3 graph-capability`
+- 本轮聚焦 graph-native SQLite schema、edge confidence、incremental update、impact traversal 与 community detection；agent-provisioning / `verify_contract` 继续后移到 `v3.0+`
 - `scripts/validate-docs.js` 与 `node dist/cli/index.js ci check-docs-sync` 继续作为 docs governance enforcement surface
 
 ## Constraints
@@ -238,11 +261,18 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 - **Version Binding**: milestone `vX.Y` 映射为 npm `X.Y.0`，major 跳跃必须在确认门中特别提示
 - **Reuse Existing Guardrails**: 新的治理检测优先接入 `docs:check` 与 `ci check-docs-sync`，不要再造平行治理入口
 - **Archive Identity**: archive 文档只能作为 historical snapshot / index，不得重新声明 current truth
+- **Baseline Preservation**: `v2.3` 不能为 graph capability 重新打开 `v2.2` 已收敛的 parser/storage/MCP 范围，除非出现明确 blocker
+- **Graph Truth First**: 先交付可计算的 graph schema / traversal / clustering truth，再考虑更高层的 agent UX 包装
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
+| 启动 `v2.3 graph-capability` | 用户要求直接基于现有 deferred items 启动 `v2.3`，不另做 research 分流 | Active 2026-05-07 |
+| `v2.3` 直接消费现有 graph-related deferred items | `.planning/STATE.md` 已有明确候选：schema redesign、edge confidence、incremental update、impact CTE、community detection | ✓ Good |
+| `v2.3` 跳过额外 research | 当前是 brownfield capability 收敛，仓库 planning truth 已足够定义范围 | ✓ Good |
+| roadmap 延续 `Phase 63+` | 本次未使用 `--reset-phase-numbers`，`v2.2` 已在 `Phase 62` 收尾 | ✓ Good |
+| `v2.3` 不重新打开 parser/storage/MCP baseline | 这一轮目标是建在稳定执行基础上的 graph capability，而不是回到底座收敛 | Active 2026-05-07 |
 | 启动 `v1.11 release-followup-hardening` | 用户接受“直接开 `v1.11` milestone 骨架”的建议 | Active 2026-04-23 |
 | 本 milestone 先收口 `RELF-01~03` | 这是当前唯一已有明确命名、已在 requirements 中沉淀的下一轮候选 | Active 2026-04-23 |
 | `Phase 38` 选择 Codex 作为首个 non-Claude runtime | 仓库已有 `examples/codex`、`.agents/skills/*` 形态，且当前执行环境本身就是 Codex，最适合先验证 authority-preserving wrapper 模式 | Active 2026-04-23 |
@@ -309,7 +339,7 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 
 ## Next Execution Step
 
-- 完成 `v2.2 architecture-foundation` 的 research / requirements / roadmap 初始化，然后进入 `Phase 59`
+- 完成 `v2.3 graph-capability` 的 requirements / roadmap 初始化，然后进入 `Phase 63`
 
 ## Evolution
 
@@ -329,4 +359,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. 更新 Current State / Context / Key Decisions
 
 ---
-*Last updated: 2026-05-06 after starting Milestone v2.2 architecture-foundation*
+*Last updated: 2026-05-07 after starting Milestone v2.3 graph-capability*
