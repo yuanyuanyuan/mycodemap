@@ -294,7 +294,7 @@ describe('generate command', () => {
     expect(callDependencies[0]).toEqual(expect.objectContaining({
       sourceEntityType: 'symbol',
       targetEntityType: 'symbol',
-      confidence: 'high',
+      confidence: 'EXTRACTED',
       filePath: '/test/src/a.ts',
       line: 2,
     }));
