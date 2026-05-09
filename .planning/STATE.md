@@ -4,14 +4,14 @@ milestone: v2.4
 milestone_name: parser-multilang-depth
 current_phase: 67
 current_phase_name: tree-sitter-python-grammar
-current_plan: none
-status: planning
-last_updated: "2026-05-09T12:30:00+08:00"
+current_plan: TREE-SITTER-PYTHON
+status: ready_to_execute
+last_updated: "2026-05-09T15:00:00+08:00"
 last_activity: 2026-05-09
 progress:
-  total_phases: 4
+  total_phases: 5
   completed_phases: 0
-  total_plans: 0
+  total_plans: 3
   completed_plans: 0
   percent: 0
 ---
@@ -31,7 +31,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-09)
 **Current Phase:** 67
 **Current Phase Name:** tree-sitter-python-grammar
 **Current Plan:** none
-**Total Phases:** 4 scoped
+**Total Phases:** 5 scoped (67-71)
 **Total Plans in Milestone:** TBD
 **Status:** Planning
 **Progress:** [----------] Phase 67 ready for context gathering
@@ -51,6 +51,7 @@ Last activity: 2026-05-09 — Phase 67 context gathered (WASM dual-path, indepen
 |------|---------|-----------|
 | 2026-05-09 | Phase 67 context gathered | Discussed WASM grammar, parser architecture, fallback strategy, AST features; captured 20 decisions in CONTEXT.md |
 | 2026-05-09 | v2.4 parser-multilang-depth initialized | User confirmed Python deep parsing has no phase coverage; created dedicated milestone at v2.4 position |
+| 2026-05-09 | Phase 71 scoped | User requested parser legacy cleanup phase to address IParser/ILanguageParser duality, adapter shims, and Core→Infrastructure coupling; created 71-CONTEXT.md, 71-RESEARCH.md, 71-01/02/03-PLAN.md, 71-UAT.md |
 | 2026-05-09 | v2.3 graph-capability closed | All 4 phases (63-66) complete; graph-native schema, incremental refresh, impact traversal, and community detection shipped |
 | 2026-05-09 | confidence assertion test fix | Phase 63 changed dependency confidence from 'high' to 'EXTRACTED'; test updated to match |
 
@@ -109,6 +110,7 @@ Last activity: 2026-05-09 — Phase 67 context gathered (WASM dual-path, indepen
 - 2026-05-08: Phase 63-65 completed — graph schema, incremental refresh, recursive impact analysis
 - 2026-05-09: Phase 66 completed — community detection baseline with Louvain algorithm
 - 2026-05-09: `v2.4 parser-multilang-depth` initialized — Python deep parsing as dedicated milestone
+- 2026-05-09: Phase 71 scoped — parser legacy cleanup for interface unification, adapter removal, and layer decoupling
 
 ### Verified Existing Capabilities (carried forward)
 
