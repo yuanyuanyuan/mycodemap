@@ -21,6 +21,9 @@ import type {
 } from '../../../interface/types/index.js';
 import { ParserBase, ParseError } from '../interfaces/ParserBase.js';
 
+// 模块级缓存：web-tree-sitter 是单例，init() 只能安全调用一次
+let _wasmParserCtor: any = null;
+
 /**
  * Python Tree-sitter 解析器
  *
@@ -71,30 +74,38 @@ export class PythonTreeSitterParser extends ParserBase {
       const treeSitterModule = await import('tree-sitter');
       const pythonModule = await import('tree-sitter-python');
       this.parser = new (treeSitterModule.default as any)();
-      this.pythonLanguage = (pythonModule as any).python;
+      this.pythonLanguage = (pythonModule as any).language;
       this.parser.setLanguage(this.pythonLanguage);
+      // 验证 parse + node 访问正常（ABI 不兼容时 setLanguage 成功但 node 访问失败）
+      const testTree = this.parser.parse('x = 1');
+      void testTree.rootNode.type;
       this.grammarLoaded = true;
       return;
     } catch {
-      // native 失败，尝试 WASM
+      // native 失败（ABI 不兼容或模块缺失），尝试 WASM
     }
 
-    // 尝试 WASM 加载
+    // 尝试 WASM 加载（web-tree-sitter 是单例，使用模块级缓存）
     try {
-      const wasmParserModule = await import('web-tree-sitter');
-      const wasmParser = (wasmParserModule as any).default || wasmParserModule;
+      if (!_wasmParserCtor) {
+        const wasmParserModule = await import('web-tree-sitter');
+        _wasmParserCtor = (wasmParserModule as any).default || wasmParserModule;
+        if (typeof _wasmParserCtor.init === 'function') {
+          await _wasmParserCtor.init();
+        }
+      }
 
-      if (typeof wasmParser.init === 'function') {
-        await wasmParser.init();
+      const Lang = (_wasmParserCtor as any).Language;
+      if (!Lang) {
+        throw new Error('web-tree-sitter Language not available after init()');
       }
 
       const { createRequire } = await import('node:module');
       const require = createRequire(import.meta.url);
       const pyWasmPath = require.resolve('tree-sitter-python/tree-sitter-python.wasm');
-      const Lang = (wasmParser as any).Language;
       this.pythonLanguage = await Lang.load(pyWasmPath);
 
-      this.parser = new wasmParser();
+      this.parser = new _wasmParserCtor();
       this.parser.setLanguage(this.pythonLanguage);
       this.grammarLoaded = true;
       return;
@@ -280,13 +291,25 @@ export class PythonTreeSitterParser extends ParserBase {
       }
     }
 
-    // 提取 name 字段中的 specifiers
-    const nameField = node.childForFieldName('name');
-    const specifiers = nameField ? this.extractImportSpecifiers(nameField) : [];
+    // 遍历 namedChildren 提取 specifiers（跳过第一个，即 module_name）
+    const specifiers: ImportInfo['specifiers'] = [];
+    const children = node.namedChildren;
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
+      // 跳过第一个 namedChild（module_name / relative_import）
+      if (i === 0) continue;
 
-    // 检查是否有 wildcard_import
-    for (const child of node.children) {
-      if (child.type === 'wildcard_import') {
+      if (child.type === 'dotted_name' || child.type === 'identifier') {
+        specifiers.push({ name: child.text, isTypeOnly: false });
+      } else if (child.type === 'aliased_import') {
+        const name = child.childForFieldName('name');
+        const alias = child.childForFieldName('alias');
+        specifiers.push({
+          name: name?.text || '',
+          alias: alias?.text,
+          isTypeOnly: false,
+        });
+      } else if (child.type === 'wildcard_import') {
         specifiers.push({ name: '*', isTypeOnly: false });
       }
     }
@@ -305,12 +328,25 @@ export class PythonTreeSitterParser extends ParserBase {
 
   /**
    * 解析 future_import_statement: from __future__ import annotations
+   * AST: 无 module_name 字段，namedChildren 全部是 specifiers
    */
   private parseFutureImportStatement(node: any): ImportInfo[] {
     const results: ImportInfo[] = [];
 
-    const nameField = node.childForFieldName('name');
-    const specifiers = nameField ? this.extractImportSpecifiers(nameField) : [];
+    const specifiers: ImportInfo['specifiers'] = [];
+    for (const child of node.namedChildren) {
+      if (child.type === 'dotted_name' || child.type === 'identifier') {
+        specifiers.push({ name: child.text, isTypeOnly: false });
+      } else if (child.type === 'aliased_import') {
+        const name = child.childForFieldName('name');
+        const alias = child.childForFieldName('alias');
+        specifiers.push({
+          name: name?.text || '',
+          alias: alias?.text,
+          isTypeOnly: false,
+        });
+      }
+    }
 
     if (specifiers.length > 0) {
       results.push({
@@ -511,15 +547,9 @@ export class PythonTreeSitterParser extends ParserBase {
       return;
     }
 
-    // 递归遍历其他节点
+    // 递归遍历其他节点（不过滤定义类型——顶层 if/return 已处理）
     for (const child of node.namedChildren) {
-      if (
-        child.type !== 'class_definition' &&
-        child.type !== 'function_definition' &&
-        child.type !== 'decorated_definition'
-      ) {
-        this.walkNode(child, symbols, depth);
-      }
+      this.walkNode(child, symbols, depth);
     }
   }
 
