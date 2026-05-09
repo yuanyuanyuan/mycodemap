@@ -1,104 +1,87 @@
-# Milestone v2.3: graph-capability
+# Milestone v2.4: parser-multilang-depth
 
-**Status:** PLANNING
-**Phases:** 63-66
-**Total Plans:** 4 planned
+**Status:** IN PROGRESS
+**Phases:** 67-70
+**Total Plans:** TBD
 
 ## Overview
 
-在 `v2.2 architecture-foundation` 已完成 parser、storage、MCP 执行基线收敛之后，`v2.3` 的目标是把 CodeMap 的 graph truth 从“可存储”推进到“可计算、可增量、可解释”。本里程碑聚焦 graph-optimized SQLite schema、edge confidence、incremental update、recursive impact traversal 与 community detection，作为后续 `v2.4+` agent graph experience 的前置基础。
+在 `v2.2` 已收敛 parser registry 路由和 `v2.3` 已建立 graph-native schema 的基础上，`v2.4` 的目标是把 Python 解析从 regex-based MVP 升级为 Tree-sitter AST-based 深度解析，并建立多语言 parser 切换机制，让 CodeMap 对 Python 项目的分析质量达到 TypeScript 同等水平。
 
 ## Phases
 
-### Phase 63: Graph Schema Foundation
+### Phase 67: Tree-sitter Python Grammar Integration
 
-**Goal:** Replace the current governance-oriented graph persistence shape with a graph-optimized SQLite schema that can serve traversal, clustering, and downstream graph analysis without breaking the shipped CLI/MCP success contract.
+**Goal:** Install `tree-sitter-python` WASM grammar and create a Python-specific Tree-sitter parser that can produce full AST-based analysis for Python files, replacing the regex-based PythonParser for the main analysis path.
 **Depends on:** None
-**Requirements:** GRAPH-01, GRAPH-02, GRAPH-03
-**Plans:** 1 plan
-
-Plans:
-
-- [ ] 63-01: Schema redesign, persistence migration path, edge confidence model, compatibility verification
+**Requirements:** PY-01, PY-02
+**Plans:** TBD
 
 **Success Criteria:**
-1. Graph generation persists the repo graph into a graph-optimized SQLite schema that is intentionally shaped for node/edge traversal.
-2. Existing `generate` / `query` / `deps` / `analyze` success paths continue to work on the new persisted truth without changing their stable success envelope.
-3. Persisted edges expose `EXTRACTED` / `INFERRED` / `AMBIGUOUS` confidence semantics that later phases can consume directly.
-4. At least one failure scenario proves schema migration or compatibility errors fail with diagnosable evidence rather than silent partial truth.
+1. `tree-sitter-python` WASM grammar is installed and loadable at runtime.
+2. A Python Tree-sitter parser can extract imports, exports, symbols, classes, functions, decorators, and async definitions from Python files using AST rather than regex.
+3. The existing `PythonParser` regex-based implementation remains as a fallback path when Tree-sitter WASM is unavailable.
+4. At least one test proves that nested class/function definitions and multi-line imports are correctly parsed by the Tree-sitter path but missed by the regex path.
 
-### Phase 64: Incremental Graph Refresh
+### Phase 68: Multi-language Parser Switching
 
-**Goal:** Introduce scoped graph recomputation so maintainers can refresh only the affected graph neighborhoods from a changed-file set instead of rebuilding the full repository graph every time.
-**Depends on:** Phase 63
-**Requirements:** INCR-01, INCR-02
-**Plans:** 1 plan
-
-Plans:
-
-- [ ] 64-01: Changed-file detection, invalidation rules, scoped recompute engine, observability for reused vs recomputed graph slices
+**Goal:** Generalize the `TreeSitterParser` from its current TypeScript-hardcoded implementation to a language-agnostic parser that can switch Tree-sitter grammars based on file extension, enabling a single parser class to serve TypeScript, JavaScript, Python, and future languages.
+**Depends on:** Phase 67
+**Requirements:** PY-03, PY-04
+**Plans:** TBD
 
 **Success Criteria:**
-1. A maintainer can trigger graph refresh from `git diff` or an explicit changed-file set and avoid mandatory full regeneration.
-2. Incremental refresh recomputes only the affected graph neighborhoods while preserving unchanged graph truth.
-3. Output or logs make reused, recomputed, and invalidated graph slices observable enough to debug bad propagation.
-4. At least one failure scenario proves stale or unsupported incremental inputs degrade safely instead of corrupting stored graph truth.
+1. `TreeSitterParser` accepts a language parameter or auto-detects language from file extension, and loads the corresponding Tree-sitter grammar.
+2. The parser registry routes `.py` files to the Tree-sitter Python parser when the grammar is available, falling back to regex when not.
+3. TypeScript/JavaScript parsing behavior is unchanged — no regression in existing Tree-sitter analysis quality.
+4. At least one test proves that the same `TreeSitterParser` class can parse both `.ts` and `.py` files with correct language-specific AST output.
 
-### Phase 65: Recursive Impact Analysis
+### Phase 69: PythonTypeEnhancer
 
-**Goal:** Ship graph-native impact traversal that can explain direct and transitive downstream reachability from a file or symbol entrypoint.
-**Depends on:** Phase 64
-**Requirements:** IMPT-01, IMPT-02
-**Plans:** 1 plan
-
-Plans:
-
-- [ ] 65-01: Recursive traversal query, layered impact summary, CLI/MCP-readable result shaping, direct-vs-transitive verification
+**Goal:** Build a `PythonTypeEnhancer` (following the `TypeScriptTypeEnhancer` pattern) that infers type information from Python docstrings, type annotations, and common patterns, enriching the graph truth with type metadata for Python symbols.
+**Depends on:** Phase 67
+**Requirements:** PY-05, PY-06
+**Plans:** TBD
 
 **Success Criteria:**
-1. A maintainer can start from a file or symbol and retrieve recursive downstream impact results from stored graph truth.
-2. Impact output distinguishes direct impact from transitive impact instead of collapsing everything into one flat list.
-3. Layered summary output is compact enough for human or agent consumption without post-processing raw graph tables.
-4. At least one failure scenario proves missing entrypoints or incomplete graph state return explicit remediation rather than misleading empty success.
+1. `PythonTypeEnhancer` extracts type information from Python docstrings (Google, NumPy, Sphinx styles) and PEP 484 type annotations.
+2. Enhanced type metadata is persisted in the graph alongside symbol definitions, matching the shape that `TypeScriptTypeEnhancer` produces for `.ts` files.
+3. The enhancer handles common patterns: function return types, parameter types, class attribute types, and Optional/Union types.
+4. At least one test proves that a Python file with docstring types produces richer graph metadata than the same file without enhancement.
 
-### Phase 66: Community Detection Baseline
+### Phase 70: Python Call-graph & Complexity
 
-**Goal:** Add a first community-detection capability so CodeMap can describe module/group structure beyond raw dependency chains and unlock richer agent-facing graph experiences later.
-**Depends on:** Phase 65
-**Requirements:** COMM-01, COMM-02
-**Plans:** 1 plan
-
-Plans:
-
-- [ ] 66-01: Community detection algorithm baseline, cluster materialization, consumable output surface, cluster-quality verification
+**Goal:** Implement the call-graph, cross-file-analysis, and complexity-metrics features for Python that are currently declared in `supportedFeatures` but have empty method bodies, making Python analysis quality comparable to TypeScript.
+**Depends on:** Phase 67, Phase 68
+**Requirements:** PY-07, PY-08
+**Plans:** TBD
 
 **Success Criteria:**
-1. The stored graph can produce basic community or cluster results that reveal meaningful module boundaries.
-2. Community results are exposed through at least one CLI or agent-facing surface without requiring raw SQL access.
-3. Cluster output remains interpretable alongside existing graph facts rather than becoming an opaque score dump.
-4. At least one failure scenario proves sparse or low-signal graphs are reported honestly instead of overclaiming precise communities.
+1. Python call-graph extraction identifies function/method calls within and across files, producing dependency edges in the graph.
+2. Python complexity metrics (cyclomatic complexity, cognitive complexity) are computed and persisted alongside symbol definitions.
+3. Cross-file analysis for Python resolves import references to actual symbol definitions in the same project.
+4. At least one test proves that a Python project with cross-file imports produces a connected dependency graph, not isolated per-file fragments.
 
 ## Milestone Summary
 
 **Key Objectives:**
 
-- Upgrade SQLite persistence from a governance-friendly store to a graph-native analysis substrate.
-- Make graph truth incrementally refreshable so the system can support real iterative engineering workflows.
-- Ship recursive impact traversal and community clustering as core graph capabilities rather than future speculation.
-- Preserve the `v2.2` parser/storage/MCP baseline while extending what the graph can express.
+- Upgrade Python parsing from regex-based MVP to Tree-sitter AST-based deep analysis.
+- Establish a multi-language parser switching mechanism that serves TypeScript, Python, and future languages from a single parser class.
+- Build PythonTypeEnancer for docstring/annotation-based type inference.
+- Implement Python call-graph, complexity metrics, and cross-file analysis.
+- Preserve the v2.2 parser/storage/MCP baseline and v2.3 graph schema while extending Python analysis depth.
 
 **Coverage:**
 
 - `4` phases
-- `4` planned implementation slices
-- `9/9` v2.3 requirements mapped
-- Phase numbering continues from `62` to `63-66`
+- Phase numbering continues from `66` to `67-70`
 
-**Deferred Beyond v2.3:**
+**Deferred Beyond v2.4:**
 
-- `v2.4+`: surprise score, execution flow trace, bare-name resolution
 - `v2.5+`: hub/bridge detection, hook mechanism, node dedup
-- `v3.0+`: Auto-Provisioned Agent Skills, MCP `verify_contract`, architecture-intelligence features
+- `v2.6+`: complexity calculation unify, MCP blank-line filter, edge ID normalization
+- `v3.0+`: Auto-Provisioned Agent Skills, architecture-intelligence features, Parser extension for Rust/Java/C++ (Tree-sitter grammar)
 
 ---
 

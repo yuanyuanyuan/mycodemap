@@ -12,20 +12,26 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 
 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
 
-## Current Milestone: v2.3 graph-capability
+## Current Milestone: v2.4 parser-multilang-depth
 
-**Goal:** 在 `v2.2` 已收敛的 parser / SQLite / MCP 基线上，补齐 CodeMap 的 graph-native 数据模型与核心图分析能力，让后续 agent graph experience 建立在可计算、可增量、可解释的 graph truth 上。
+**Goal:** 把 Python 解析从 regex-based MVP 升级为 Tree-sitter AST-based 深度解析，建立多语言 parser 切换机制，让 CodeMap 对 Python 项目的分析质量达到 TypeScript 同等水平。
 
 **Target features:**
-- SQLite graph schema redesign
-- Edge confidence (`EXTRACTED` / `INFERRED` / `AMBIGUOUS`)
-- Incremental update (`git diff` + scoped recompute)
-- Recursive impact traversal + layered summary
-- Community detection baseline
+- Tree-sitter Python grammar integration (WASM)
+- Multi-language parser switching mechanism
+- PythonTypeEnhancer (docstring/annotation type inference)
+- Python call-graph, complexity metrics, and cross-file analysis
 
 ## Current State
 
-**Status:** Active milestone is `v2.3 graph-capability` (planning started 2026-05-07). Latest shipped milestone remains `v2.2 architecture-foundation`.
+**Status:** Active milestone is `v2.4 parser-multilang-depth` (planning started 2026-05-09). Latest shipped milestone is `v2.3 graph-capability`.
+
+**What shipped in v2.3:**
+- Graph-optimized SQLite schema 支持 node/edge traversal ✅
+- Edge confidence (`EXTRACTED` / `INFERRED` / `AMBIGUOUS`) 持久化到 graph ✅
+- Incremental graph refresh 支持 scoped recompute from `git diff` ✅
+- Recursive impact traversal 提供 direct vs transitive 分层结果 ✅
+- Community detection baseline 通过 Louvain 算法暴露模块聚类 ✅
 
 **What shipped in v2.2:**
 - Parser 主路径收敛为 registry-backed tree-sitter，废弃 `fast` / `hybrid` runtime split
@@ -40,11 +46,27 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 
 ## Milestone Focus
 
-- Preserve `v2.2` parser/storage/MCP baseline; do not reopen that convergence work unless graph capability exposes a concrete blocker
-- Land a graph-optimized SQLite schema that can support traversal, clustering, and incremental refresh without changing the public CLI/MCP success contract
-- Use `v2.3` to establish durable graph truth for `v2.4+` agent graph experience and `v3.0+` architecture intelligence, rather than shipping UI polish or workflow extras early
+- Preserve `v2.2` parser/storage/MCP baseline and `v2.3` graph schema; do not reopen those converged foundations
+- Upgrade Python parsing from regex-based MVP to Tree-sitter AST-based deep analysis
+- Establish multi-language parser switching mechanism for TypeScript, Python, and future languages
+- Build PythonTypeEnhancer and Python call-graph/complexity to bring Python analysis quality to TypeScript parity
 
-## Latest Completed Milestone: v2.2 architecture-foundation
+## Latest Completed Milestone: v2.3 graph-capability
+
+**Goal:** 在 `v2.2` 已收敛的 parser / SQLite / MCP 基线上，补齐 CodeMap 的 graph-native 数据模型与核心图分析能力，让后续 agent graph experience 建立在可计算、可增量、可解释的 graph truth 上。
+
+**Status:** Shipped 2026-05-09. 9/9 requirements complete; all 4 phases (63-66) delivered.
+
+**Delivered:**
+- Graph-optimized SQLite schema 替换旧 governance-oriented 结构 ✅
+- Edge confidence 语义 (`EXTRACTED` / `INFERRED` / `AMBIGUOUS`) 持久化 ✅
+- Incremental graph refresh 支持 scoped recompute from `git diff` ✅
+- Recursive impact traversal 提供 direct vs transitive 分层结果 ✅
+- Community detection baseline 通过 Louvain 算法暴露模块聚类 ✅
+
+**Phase numbering:** Continues from Phase 62 → phases 63-66
+
+## Previous Completed Milestone: v2.2 architecture-foundation
 
 **Goal:** 把 CodeMap 的解析、存储和 MCP 执行链路收敛到更少、更稳定的架构基线，为后续 graph capability 和 agent experience 打基础。
 
@@ -246,8 +268,8 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 - 74,544 TypeScript LOC in `src/`，1129 个测试全部通过
 - `v2.0` audit 原始状态为 `gaps_found`，Phase 49 接线修复后所有 4 个 critical blockers 已解决
 - 渐进债务：12+ 命令仍需 contract schema 定义；benchmark 命令需迁移到共享输出基础设施
-- 当前 active milestone：`v2.3 graph-capability`
-- 本轮聚焦 graph-native SQLite schema、edge confidence、incremental update、impact traversal 与 community detection；agent-provisioning / `verify_contract` 继续后移到 `v3.0+`
+- 当前 active milestone：`v2.4 parser-multilang-depth`
+- 本轮聚焦 Python Tree-sitter grammar 集成、多语言 parser 切换、PythonTypeEnhancer、Python call-graph/complexity；Rust/Java/C++ grammar 继续后移到 `v3.0+`
 - `scripts/validate-docs.js` 与 `node dist/cli/index.js ci check-docs-sync` 继续作为 docs governance enforcement surface
 
 ## Constraints
@@ -261,14 +283,16 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 - **Version Binding**: milestone `vX.Y` 映射为 npm `X.Y.0`，major 跳跃必须在确认门中特别提示
 - **Reuse Existing Guardrails**: 新的治理检测优先接入 `docs:check` 与 `ci check-docs-sync`，不要再造平行治理入口
 - **Archive Identity**: archive 文档只能作为 historical snapshot / index，不得重新声明 current truth
-- **Baseline Preservation**: `v2.3` 不能为 graph capability 重新打开 `v2.2` 已收敛的 parser/storage/MCP 范围，除非出现明确 blocker
-- **Graph Truth First**: 先交付可计算的 graph schema / traversal / clustering truth，再考虑更高层的 agent UX 包装
+- **Baseline Preservation**: `v2.4` 不能重新打开 `v2.2` parser/storage/MCP 或 `v2.3` graph schema，除非出现明确 blocker
+- **Python Depth First**: 聚焦 Python Tree-sitter 集成和分析质量，再考虑 Rust/Java/C++ grammar 扩展
+- **Fallback Safety**: regex-based PythonParser 在 Tree-sitter WASM 不可用时必须保留为回退路径
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| 启动 `v2.3 graph-capability` | 用户要求直接基于现有 deferred items 启动 `v2.3`，不另做 research 分流 | Active 2026-05-07 |
+| 启动 `v2.4 parser-multilang-depth` | 用户确认 Python 深度解析无 phase 覆盖，创建独立 milestone 覆盖 Tree-sitter Python、多语言切换、PythonTypeEnhancer、call-graph/complexity | Active 2026-05-09 |
+| 启动 `v2.3 graph-capability` | 用户要求直接基于现有 deferred items 启动 `v2.3`，不另做 research 分流 | Shipped 2026-05-09 |
 | `v2.3` 直接消费现有 graph-related deferred items | `.planning/STATE.md` 已有明确候选：schema redesign、edge confidence、incremental update、impact CTE、community detection | ✓ Good |
 | `v2.3` 跳过额外 research | 当前是 brownfield capability 收敛，仓库 planning truth 已足够定义范围 | ✓ Good |
 | roadmap 延续 `Phase 63+` | 本次未使用 `--reset-phase-numbers`，`v2.2` 已在 `Phase 62` 收尾 | ✓ Good |
@@ -324,22 +348,22 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 
 ## Current State
 
-- **Completed milestones / follow-ups:** `v1.0`→`v1.11`、`v2.0 agent-native-foundation`、`v2.1 ux-onboarding-enhancement`
+- **Completed milestones / follow-ups:** `v1.0`→`v1.11`、`v2.0 agent-native-foundation`、`v2.1 ux-onboarding-enhancement`、`v2.2 architecture-foundation`、`v2.3 graph-capability`
 - **Historical closed branch:** `v1.5 Isolated ArcadeDB Server-backed Prototype`（22-24 不再继续）
-- **Active milestone:** `v2.2 architecture-foundation`
-- **Current planning status:** 正在定义 requirements；默认将从 Phase 59 开始，Phase 50 和 52 继续保持独立 follow-up
+- **Active milestone:** `v2.4 parser-multilang-depth`
+- **Current planning status:** Phase 67 ready for context gathering
 - **Known remaining debt:** `INI-01`（`mycodemap init --json` 机器可读 receipt）仍保留为 cleanup gap；`F-1` 旧 receipt wording 仍是 cosmetic follow-up；actual `/release v1.9` execution 仍保留在 deferred backlog；渐进债务（12+ 命令 contract 迁移、benchmark 输出基础设施迁移）
-- **Codebase:** 74,544 TypeScript LOC, 1129 tests all passing
+- **Codebase:** 74,544 TypeScript LOC, tests passing
 
 ## Next Milestone Goals (Candidates)
 
-1. **v2.3 schema-redesign-graph-capability** — SQLite graph redesign, edge confidence, incremental update, impact CTE, community detection
-2. **v3.0 architecture-intelligence** — Auto-Generate design.md, Architecture Remediation Patches, Self-Healing Design Contract, plugin system, deeper language support
-3. **v3.0+ agent follow-ups** — Auto-Provisioned Agent Skills, MCP `verify_contract`, deeper language support
+1. **v2.5 deep-analysis-hooks** — hub/bridge detection, hook mechanism, node dedup
+2. **v2.6 polish-and-stabilize** — complexity calculation unify, MCP blank-line filter, edge ID normalization, Interface Contract 1.0.0
+3. **v3.0 architecture-intelligence** — Auto-Generate design.md, Architecture Remediation Patches, Self-Healing Design Contract, plugin system, Rust/Java/C++ parser extension
 
 ## Next Execution Step
 
-- 完成 `v2.3 graph-capability` 的 requirements / roadmap 初始化，然后进入 `Phase 63`
+- Gather context for `Phase 67: Tree-sitter Python Grammar Integration` via `/gsd-discuss-phase 67`
 
 ## Evolution
 
@@ -359,4 +383,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. 更新 Current State / Context / Key Decisions
 
 ---
-*Last updated: 2026-05-07 after starting Milestone v2.3 graph-capability*
+*Last updated: 2026-05-09 after starting Milestone v2.4 parser-multilang-depth*

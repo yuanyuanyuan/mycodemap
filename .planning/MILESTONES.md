@@ -3,7 +3,38 @@
 > **Current active planning truth** lives in `.planning/PROJECT.md`, `.planning/ROADMAP.md`, and `.planning/STATE.md`. During an active milestone, `.planning/REQUIREMENTS.md` joins that set; between milestones it may be absent by design.
 > The shipped entries below are **historical snapshots**. Their `What's next` text records closeout-time context and must not override the current active planning surface.
 
-**Current status:** No active milestone. The latest shipped milestone is `v2.2 architecture-foundation` (2026-05-07). Start the next milestone when ready.
+**Current status:** Active milestone is `v2.4 parser-multilang-depth` (planning started 2026-05-09). Latest shipped milestone is `v2.3 graph-capability` (2026-05-09).
+
+## v2.3 graph-capability (Shipped: 2026-05-09)
+
+**Goal:** 在 `v2.2` 已收敛的 parser / SQLite / MCP 基线上，补齐 CodeMap 的 graph-native 数据模型与核心图分析能力，让后续 agent graph experience 建立在可计算、可增量、可解释的 graph truth 上。
+
+**Phases completed:** 63-66 (5 plans total)
+
+**Delivered:**
+
+- Graph-optimized SQLite schema 替换了旧 governance-oriented 持久化结构，支持 node/edge traversal
+- Edge confidence 语义（`EXTRACTED` / `INFERRED` / `AMBIGUOUS`）已持久化到 graph 中
+- Incremental graph refresh 支持基于 `git diff` 或 changed-file set 的 scoped recompute
+- Recursive impact traversal 提供 direct vs transitive 分层 downstream reachability 结果
+- Community detection baseline 通过 Louvain 算法暴露模块聚类到 MCP surface
+
+**Key accomplishments:**
+
+- `Phase 63` 收口 graph-optimized schema、confidence contract、transactional storage 和 CLI/MCP compatibility lock
+- `Phase 64` 收口 changed-file detection、invalidation rules、scoped recompute engine 和 observability
+- `Phase 65` 收口 recursive traversal query、layered impact summary 和 CLI/MCP-readable result shaping
+- `Phase 66` 收口 MCP-first community detection、weighted projection、interpretable output 和 sparse-graph degradation proof
+
+**Stats:**
+
+- `9/9` milestone requirements satisfied
+- `5/5` plans complete across `4` phases
+- Timeline: `2026-05-07 → 2026-05-09`
+
+**What's next:** Start `v2.4 parser-multilang-depth` to upgrade Python parsing from regex-based MVP to Tree-sitter AST-based deep analysis.
+
+---
 
 ## v2.2 architecture-foundation (Shipped: 2026-05-07)
 
