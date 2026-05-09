@@ -1,19 +1,20 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.4
-milestone_name: milestone
+milestone_name: parser-multilang-depth
 current_phase: 68
 current_phase_name: multi-language-parser-switching
 current_plan: none
-status: planning
-last_updated: "2026-05-09T11:55:50.430Z"
+status: ready_to_plan
+stopped_at: "Phase 68 context gathered"
+last_updated: "2026-05-09T19:54:37+08:00"
 last_activity: 2026-05-09
 progress:
   total_phases: 5
-  completed_phases: 0
-  total_plans: 3
+  completed_phases: 1
+  total_plans: 1
   completed_plans: 1
-  percent: 33
+  percent: 20
 ---
 
 # Session State
@@ -33,22 +34,23 @@ See: `.planning/PROJECT.md` (updated 2026-05-09)
 **Current Plan:** none
 **Total Phases:** 5 scoped (67-71)
 **Total Plans in Milestone:** 1 completed
-**Status:** Phase 67 complete, ready to plan Phase 68
+**Status:** Phase 68 context gathered, ready to plan
 **Progress:** [##--------] Phase 67 complete (1/5)
 **Last Activity:** 2026-05-09
-**Last Activity Description:** Phase 67 completed — tree-sitter-python@0.23.4 installed, PythonTreeSitterParser created with AST-based analysis, wired as default python handler
+**Last Activity Description:** Phase 68 context gathered — locked shared Tree-sitter cutover decisions for multi-language parser switching
 
 ## Current Position
 
-Phase: 67 complete → 68 ready for planning
+Phase: 68 context gathered → ready for planning
 Plan: -
-Status: Ready for /gsd-discuss-phase 68 or /gsd-plan-phase 68
-Last activity: 2026-05-09 — Phase 67 fully executed (6 commits, 20 tests passing, AST > regex verified)
+Status: Ready for /gsd-plan-phase 68
+Last activity: 2026-05-09 — Phase 68 context captured for multi-language parser switching
 
 ## Decisions Made
 
 | Date | Summary | Rationale |
 |------|---------|-----------|
+| 2026-05-09 | Phase 68 context gathered | Locked capability-first scope, extension-only switching, strict Python no-fallback behavior, and TS/JS main-path Tree-sitter cutover |
 | 2026-05-09 | Phase 67 context gathered | Discussed WASM grammar, parser architecture, fallback strategy, AST features; captured 20 decisions in CONTEXT.md |
 | 2026-05-09 | Phase 67 complete | tree-sitter-python@0.23.4 installed, PythonTreeSitterParser created, wired as default handler; 20 tests pass; WASM path used (native ABI incompatible) |
 | 2026-05-09 | v2.4 parser-multilang-depth initialized | User confirmed Python deep parsing has no phase coverage; created dedicated milestone at v2.4 position |
