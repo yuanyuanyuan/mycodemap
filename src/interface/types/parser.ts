@@ -77,6 +77,8 @@ export interface ParseResult {
   parseTime: number;
   /** 错误信息 */
   errors?: ParseError[];
+  /** 使用的解析器名称 (e.g., 'PythonTreeSitterParser' or 'PythonParser') */
+  parserUsed?: string;
 }
 
 // ============================================
