@@ -43,7 +43,11 @@
 **Goal:** Build a `PythonTypeEnhancer` (following the `TypeScriptTypeEnhancer` pattern) that infers type information from Python docstrings, type annotations, and common patterns, enriching the graph truth with type metadata for Python symbols.
 **Depends on:** Phase 67
 **Requirements:** PY-05, PY-06
-**Plans:** TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] `69-01-PLAN.md` — Build `PythonTypeEnhancer` with annotation-first merge, bounded Google/NumPy/Sphinx docstring parsing, and fail-soft fixture coverage
+- [ ] `69-02-PLAN.md` — Wire Python type metadata through parser/analyzer seams and prove `module.typeInfo` persistence end-to-end
 
 **Success Criteria:**
 1. `PythonTypeEnhancer` extracts type information from Python docstrings (Google, NumPy, Sphinx styles) and PEP 484 type annotations.
