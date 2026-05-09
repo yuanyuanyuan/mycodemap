@@ -8,6 +8,7 @@ import { ParserRegistry } from './registry/ParserRegistry.js';
 import { TypeScriptParser } from './implementations/TypeScriptParser.js';
 import { GoParser } from './implementations/GoParser.js';
 import { PythonParser } from './implementations/PythonParser.js';
+import { PythonTreeSitterParser } from './implementations/PythonTreeSitterParser.js';
 
 // 基类和接口
 export { ParserBase, ParseError } from './interfaces/ParserBase.js';
@@ -19,6 +20,7 @@ export { ParserRegistry, parserRegistry, ParserNotFoundError } from './registry/
 export { TypeScriptParser } from './implementations/TypeScriptParser.js';
 export { GoParser } from './implementations/GoParser.js';
 export { PythonParser } from './implementations/PythonParser.js';
+export { PythonTreeSitterParser } from './implementations/PythonTreeSitterParser.js';
 
 // 重新导出 Interface Layer 的类型
 export type {
@@ -45,8 +47,9 @@ export function createDefaultParserRegistry(): ParserRegistry {
   // 注册 Go 解析器
   registry.register(new GoParser());
   
-  // 注册 Python 解析器
-  registry.register(new PythonParser());
+  // AST-first: PythonTreeSitterParser replaces regex PythonParser (D-08, D-11)
+  // If tree-sitter-python is unavailable, parseFile() throws with actionable error (D-10)
+  registry.register(new PythonTreeSitterParser());
   
   return registry;
 }
