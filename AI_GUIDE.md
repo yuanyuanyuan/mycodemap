@@ -51,6 +51,7 @@ cat .mycodemap/AI_MAP.md
 | "项目结构是什么" | `generate` → 读 `AI_MAP.md` |
 | "XXX 在哪里定义" | `query -s "XXX"` |
 | "修改 XXX 会影响什么" | `impact -f "XXX" -t -j` |
+| "这个仓库当前有哪些模块社区/边界" | `codemap_communities`（MCP 原生 tool，返回可解释社区摘要） |
 | "XXX 模块依赖什么" | `deps -m "XXX" -j` |
 | "代码质量如何" | `complexity -f "src/file.ts" -j` |
 | "查找与 XXX 相关的代码" | `query -S "XXX" -j` |
@@ -152,6 +153,7 @@ node dist/cli/index.js mcp start
 ```
 
 - 所有 schema 定义的 CLI 命令（20+）都可通过 MCP 调用，不再局限于 `codemap_query` / `codemap_impact`
+- Phase 66 额外提供原生 graph tool `codemap_communities`：它直接复用 persisted graph truth，返回 `status/confidence/graph_status/warnings/remediation` + `summary/communities[]`，用于识别模块社区边界与低信号降级状态
 - 原生 `codemap_context` 提供轻量路由门：固定支持 `review` / `debug` / `default` 三类任务，`minimal` 只返回摘要/计数/风险/建议，`standard` 额外暴露 warnings、rationale 与 focus areas
 - `codemap_context.allowedTools` 是严格过滤器：它可以收窄建议集合，但如果会隐藏当前路由自身必须推荐的工具，调用会返回结构化 `FILTER_CONFLICT`
 - 动态 tool 注册：MCP server 从 `codemap --schema` 输出的 contract schema 动态构建 tool 定义

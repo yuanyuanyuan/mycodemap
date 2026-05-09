@@ -67,6 +67,7 @@ describe('Generate CLI', () => {
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let processExitSpy: ReturnType<typeof vi.spyOn>;
+  let processCwdSpy: ReturnType<typeof vi.spyOn>;
   let mockExitCode: number | undefined;
   let originalEnv: NodeJS.ProcessEnv;
   const tempDirs: string[] = [];
@@ -87,6 +88,74 @@ describe('Generate CLI', () => {
     },
     modules: [],
     dependencies: { nodes: [], edges: [] },
+  });
+
+  const createIncrementalModules = (rootDir: string) => ([
+    {
+      id: 'mod-a',
+      path: path.join(rootDir, 'src/a.ts'),
+      absolutePath: path.join(rootDir, 'src/a.ts'),
+      type: 'source' as const,
+      stats: { lines: 4, codeLines: 3, commentLines: 0, blankLines: 1 },
+      exports: [],
+      imports: [],
+      symbols: [],
+      dependencies: [path.join(rootDir, 'src/b.ts')],
+      dependents: [],
+    },
+    {
+      id: 'mod-b',
+      path: path.join(rootDir, 'src/b.ts'),
+      absolutePath: path.join(rootDir, 'src/b.ts'),
+      type: 'source' as const,
+      stats: { lines: 4, codeLines: 3, commentLines: 0, blankLines: 1 },
+      exports: [],
+      imports: [],
+      symbols: [],
+      dependencies: [],
+      dependents: [path.join(rootDir, 'src/a.ts')],
+    },
+  ]);
+
+  const createStoredGraph = (rootDir: string) => ({
+    project: {
+      id: 'proj-1',
+      name: 'test-project',
+      rootPath: rootDir,
+      createdAt: new Date('2026-05-08T00:00:00.000Z'),
+      updatedAt: new Date('2026-05-08T00:00:00.000Z'),
+    },
+    modules: [
+      {
+        id: 'graph-mod-a',
+        projectId: 'proj-1',
+        path: path.join(rootDir, 'src/a.ts'),
+        language: 'typescript',
+        stats: { lines: 4, codeLines: 3, commentLines: 0, blankLines: 1 },
+      },
+      {
+        id: 'graph-mod-b',
+        projectId: 'proj-1',
+        path: path.join(rootDir, 'src/b.ts'),
+        language: 'typescript',
+        stats: { lines: 4, codeLines: 3, commentLines: 0, blankLines: 1 },
+      },
+    ],
+    symbols: [],
+    dependencies: [
+      {
+        id: 'dep-1',
+        sourceId: 'graph-mod-a',
+        sourceEntityType: 'module',
+        targetId: 'graph-mod-b',
+        targetEntityType: 'module',
+        type: 'import',
+        confidence: 'EXTRACTED' as const,
+      },
+    ],
+    graphStatus: 'complete' as const,
+    failedFileCount: 0,
+    parseFailureFiles: [],
   });
 
   const createMockConfig = () => ({
@@ -115,6 +184,7 @@ describe('Generate CLI', () => {
       throw new Error(`Process exit with code: ${code}`);
     });
     originalEnv = { ...process.env };
+    processCwdSpy = vi.spyOn(process, 'cwd').mockReturnValue('/project');
     
     // Reset all mocks
     vi.clearAllMocks();
@@ -145,6 +215,7 @@ describe('Generate CLI', () => {
     consoleLogSpy.mockRestore();
     consoleErrorSpy.mockRestore();
     processExitSpy.mockRestore();
+    processCwdSpy.mockRestore();
     process.env = originalEnv;
     return Promise.all(tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
   });
@@ -238,6 +309,96 @@ describe('Generate CLI', () => {
         databasePath: '.mycodemap/governance.sqlite',
       });
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('治理图存储 (sqlite)'));
+    }, 30000);
+
+    it('should persist EXTRACTED confidence for parser-backed module and symbol dependencies', async () => {
+      mockAnalyze.mockResolvedValue({
+        ...createMockCodeMap(),
+        project: {
+          name: 'test-project',
+          rootDir: process.cwd(),
+          packageManager: 'npm',
+        },
+        modules: [
+          {
+            id: 'src/a.ts',
+            path: 'src/a.ts',
+            absolutePath: path.join(process.cwd(), 'src/a.ts'),
+            type: 'source',
+            stats: {
+              lines: 10,
+              codeLines: 8,
+              commentLines: 1,
+              blankLines: 1,
+            },
+            exports: [],
+            imports: [],
+            dependencies: ['src/b.ts'],
+            dependents: [],
+            symbols: [{
+              id: 'sym-a',
+              name: 'callA',
+              kind: 'function',
+              location: { file: 'src/a.ts', line: 1, column: 1 },
+              visibility: 'public',
+              relatedSymbols: [],
+              signature: {
+                parameters: [],
+                returnType: 'void',
+                async: false,
+                calls: [{ callee: 'callB', line: 2 }],
+              },
+            }],
+            callGraph: {
+              crossFileCalls: [{
+                caller: 'callA',
+                callee: 'callB',
+                resolved: true,
+                calleeLocation: { file: 'src/b.ts', line: 1, column: 1 },
+              }],
+            },
+          },
+          {
+            id: 'src/b.ts',
+            path: 'src/b.ts',
+            absolutePath: path.join(process.cwd(), 'src/b.ts'),
+            type: 'source',
+            stats: {
+              lines: 10,
+              codeLines: 8,
+              commentLines: 1,
+              blankLines: 1,
+            },
+            exports: [],
+            imports: [],
+            dependencies: [],
+            dependents: [],
+            symbols: [{
+              id: 'sym-b',
+              name: 'callB',
+              kind: 'function',
+              location: { file: 'src/b.ts', line: 1, column: 1 },
+              visibility: 'public',
+              relatedSymbols: [],
+              signature: {
+                parameters: [],
+                returnType: 'void',
+                async: false,
+              },
+            }],
+          },
+        ],
+      });
+
+      await generateCommand({ symbolLevel: true });
+
+      const savedGraph = mockStorageSaveCodeGraph.mock.calls[0]?.[0] as {
+        dependencies: Array<{ type: string; confidence?: string }>;
+      };
+      expect(savedGraph.dependencies).toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: 'import', confidence: 'EXTRACTED' }),
+        expect.objectContaining({ type: 'call', confidence: 'EXTRACTED' }),
+      ]));
     }, 30000);
 
     it('should handle analysis error', async () => {
@@ -381,6 +542,107 @@ describe('Generate CLI', () => {
     it('should announce the single parser main path', async () => {
       await generateCommand({});
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('默认 parser 主路径'));
+    }, 30000);
+
+    it('should run incremental refresh, keep changed-files precedence, and persist refresh metadata', async () => {
+      const rootDir = await fs.mkdtemp(path.join(tmpdir(), 'codemap-incremental-generate-'));
+      tempDirs.push(rootDir);
+      processCwdSpy.mockReturnValue(rootDir);
+      await fs.mkdir(path.join(rootDir, '.mycodemap'), { recursive: true });
+      await fs.writeFile(
+        path.join(rootDir, '.mycodemap', 'codemap.json'),
+        JSON.stringify({
+          ...createMockCodeMap(),
+          project: {
+            name: 'test-project',
+            rootDir,
+            packageManager: 'npm',
+          },
+          modules: createIncrementalModules(rootDir),
+        }),
+        'utf8'
+      );
+      mockAnalyze.mockResolvedValue({
+        ...createMockCodeMap(),
+        project: {
+          name: 'test-project',
+          rootDir,
+          packageManager: 'npm',
+        },
+        modules: createIncrementalModules(rootDir),
+      });
+      mockCreateForProject.mockResolvedValue({
+        type: 'sqlite',
+        loadCodeGraph: vi.fn().mockResolvedValue(createStoredGraph(rootDir)),
+        saveCodeGraph: mockStorageSaveCodeGraph,
+        close: mockStorageClose,
+      });
+
+      const result = await generateCommand({
+        incremental: true,
+        changedFiles: ['src/a.ts'],
+        base: 'main',
+        against: 'HEAD',
+        json: true,
+        structured: true,
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        status: 'success',
+        mode: 'incremental',
+      }));
+      expect(result.refresh?.diagnostics).toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: 'INCREMENTAL_CHANGED_FILES_OVERRIDE' }),
+        expect.objectContaining({ code: 'INCREMENTAL_SNAPSHOT_REPLACED' }),
+      ]));
+      expect(mockStorageSaveCodeGraph).toHaveBeenCalledWith(expect.objectContaining({
+        lastRefresh: expect.objectContaining({
+          status: 'success',
+        }),
+      }));
+      expect(mockGenerateJSON).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lastRefresh: expect.objectContaining({
+            status: 'success',
+          }),
+        }),
+        expect.any(String)
+      );
+    }, 30000);
+
+    it('should fail closed when incremental changed file is outside persisted graph truth', async () => {
+      const rootDir = await fs.mkdtemp(path.join(tmpdir(), 'codemap-incremental-fail-'));
+      tempDirs.push(rootDir);
+      processCwdSpy.mockReturnValue(rootDir);
+      await fs.mkdir(path.join(rootDir, '.mycodemap'), { recursive: true });
+      await fs.writeFile(
+        path.join(rootDir, '.mycodemap', 'codemap.json'),
+        JSON.stringify({
+          ...createMockCodeMap(),
+          project: {
+            name: 'test-project',
+            rootDir,
+            packageManager: 'npm',
+          },
+          modules: createIncrementalModules(rootDir),
+        }),
+        'utf8'
+      );
+      mockCreateForProject.mockResolvedValue({
+        type: 'sqlite',
+        loadCodeGraph: vi.fn().mockResolvedValue(createStoredGraph(rootDir)),
+        saveCodeGraph: mockStorageSaveCodeGraph,
+        close: mockStorageClose,
+      });
+
+      await expect(generateCommand({
+        incremental: true,
+        changedFiles: ['src/missing.ts'],
+        json: true,
+        structured: true,
+      })).rejects.toThrow('Process exit');
+      expect(mockExitCode).toBe(1);
+      expect(mockStorageSaveCodeGraph).not.toHaveBeenCalled();
     }, 30000);
   });
 });

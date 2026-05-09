@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CodeGraph } from '../../../interface/types/index.js';
 import {
+  analyzeImpactInGraph,
   calculateImpactInGraph,
   createEmptyCodeGraph,
   deserializeCodeGraphSnapshot,
@@ -113,10 +114,26 @@ describe('graph-helpers', () => {
   it('calculates impact and statistics from the same graph contract', () => {
     const graph = createGraphFixture();
 
-    expect(calculateImpactInGraph(graph, 'mod-c', 2).affectedModules.map(module => module.id)).toEqual([
-      'mod-b',
-      'mod-a',
-    ]);
+    expect(calculateImpactInGraph(graph, 'mod-c', 2)).toEqual(expect.objectContaining({
+      status: 'ok',
+      summary: expect.objectContaining({
+        directCount: 1,
+        transitiveCount: 1,
+      }),
+      direct: [
+        expect.objectContaining({ id: 'mod-b', depth: 1, path: ['mod-c', 'mod-b'] }),
+      ],
+      transitiveLayers: [
+        expect.objectContaining({
+          depth: 2,
+          nodes: [expect.objectContaining({ id: 'mod-a', depth: 2, path: ['mod-c', 'mod-b', 'mod-a'] })],
+        }),
+      ],
+      affectedModules: [
+        expect.objectContaining({ id: 'mod-b' }),
+        expect.objectContaining({ id: 'mod-a' }),
+      ],
+    }));
     expect(getProjectStatisticsFromGraph(graph)).toEqual({
       totalModules: 3,
       totalSymbols: 2,
@@ -134,5 +151,71 @@ describe('graph-helpers', () => {
     expect(roundTrip.project.updatedAt).toBeInstanceOf(Date);
     expect(roundTrip.project.rootPath).toBe('/fixture');
     expect(roundTrip.modules).toHaveLength(3);
+  });
+
+  it('returns explicit not_found and ambiguous impact states instead of empty success', () => {
+    const graph = createGraphFixture();
+    graph.symbols.push({
+      id: 'sym-a-duplicate',
+      moduleId: 'mod-b',
+      name: 'callA',
+      kind: 'function',
+      location: { file: 'src/b.ts', line: 4, column: 1 },
+      visibility: 'public',
+    });
+
+    expect(analyzeImpactInGraph(graph, {
+      kind: 'file',
+      filePath: 'src/missing.ts',
+      depth: 2,
+    })).toEqual(expect.objectContaining({
+      status: 'not_found',
+      error: expect.objectContaining({ code: 'FILE_NOT_FOUND' }),
+    }));
+
+    expect(analyzeImpactInGraph(graph, {
+      kind: 'symbol',
+      symbol: 'callA',
+      depth: 2,
+      limit: 10,
+    })).toEqual(expect.objectContaining({
+      status: 'ambiguous',
+      error: expect.objectContaining({ code: 'AMBIGUOUS_ENTRYPOINT' }),
+      entrypoint: expect.objectContaining({
+        candidates: expect.arrayContaining([
+          expect.objectContaining({ id: 'sym-a' }),
+          expect.objectContaining({ id: 'sym-a-duplicate' }),
+        ]),
+      }),
+    }));
+  });
+
+  it('degrades confidence for partial truth and marks traversal truncation explicitly', () => {
+    const graph = createGraphFixture();
+    graph.graphStatus = 'partial';
+    graph.failedFileCount = 1;
+    graph.parseFailureFiles = ['src/stale.ts'];
+
+    const truncated = analyzeImpactInGraph(graph, {
+      kind: 'file',
+      filePath: 'src/a.ts',
+      depth: 3,
+      limit: 1,
+    });
+
+    expect(truncated).toEqual(expect.objectContaining({
+      status: 'ok',
+      confidence: 'reduced',
+      truncated: true,
+      warnings: expect.arrayContaining([
+        expect.objectContaining({ code: 'GRAPH_PARTIAL' }),
+        expect.objectContaining({ code: 'TRAVERSAL_TRUNCATED' }),
+      ]),
+      summary: expect.objectContaining({
+        directCount: 1,
+        transitiveCount: 0,
+        truncated: true,
+      }),
+    }));
   });
 });

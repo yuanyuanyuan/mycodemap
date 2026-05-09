@@ -8,6 +8,7 @@ import type {
 import type {
   CodeGraph,
   Dependency,
+  DependencyConfidence,
   Module,
 } from '../../../interface/types/index.js';
 import {
@@ -37,6 +38,11 @@ export interface GovernanceGraphDatabaseLike {
 const GRAPH_STATUS_METADATA_KEY = 'graph_status';
 const FAILED_FILE_COUNT_METADATA_KEY = 'failed_file_count';
 const PARSE_FAILURE_FILES_METADATA_KEY = 'parse_failure_files_json';
+const VALID_DEPENDENCY_CONFIDENCE = new Set<DependencyConfidence>([
+  'EXTRACTED',
+  'INFERRED',
+  'AMBIGUOUS',
+]);
 
 function toStringValue(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
@@ -71,6 +77,17 @@ function parseStringArrayValue(value: unknown): string[] {
   } catch {
     return [];
   }
+}
+
+function normalizeDependencyConfidence(value: unknown): DependencyConfidence {
+  const confidence = toStringValue(value);
+  if (VALID_DEPENDENCY_CONFIDENCE.has(confidence as DependencyConfidence)) {
+    return confidence as DependencyConfidence;
+  }
+
+  throw new Error(
+    `Invalid dependency confidence "${confidence || '<empty>'}". Run \`mycodemap generate\` to rebuild the SQLite graph.`
+  );
 }
 
 function readGraphIntegrityMetadata(
@@ -142,13 +159,13 @@ export function readGovernanceGraphFromSQLite(
     }));
   const dependencies = database
     .prepare(`
-      SELECT id, source_id, source_entity_type, target_id, target_entity_type, dependency_type, file_path, line, confidence
-      FROM dependencies
-      ORDER BY id
+      SELECT dependency_id, source_id, source_entity_type, target_id, target_entity_type, dependency_type, file_path, line, confidence
+      FROM graph_edges
+      ORDER BY dependency_id
     `)
     .all()
     .map((row): Dependency => ({
-      id: toStringValue(row.id),
+      id: toStringValue(row.dependency_id),
       sourceId: toStringValue(row.source_id),
       sourceEntityType: toStringValue(row.source_entity_type, 'module') as Dependency['sourceEntityType'],
       targetId: toStringValue(row.target_id),
@@ -156,7 +173,7 @@ export function readGovernanceGraphFromSQLite(
       type: toStringValue(row.dependency_type) as Dependency['type'],
       filePath: toStringValue(row.file_path) || undefined,
       line: row.line === null || row.line === undefined ? undefined : toNumberValue(row.line),
-      confidence: toStringValue(row.confidence) === '' ? undefined : toStringValue(row.confidence) as Dependency['confidence'],
+      confidence: normalizeDependencyConfidence(row.confidence),
     }));
   const graphIntegrity = readGraphIntegrityMetadata(database);
 

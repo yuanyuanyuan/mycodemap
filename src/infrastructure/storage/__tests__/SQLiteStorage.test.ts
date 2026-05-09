@@ -96,9 +96,31 @@ function createGraphFixture(): CodeGraph {
         targetId: 'sym-b',
         targetEntityType: 'symbol',
         type: 'call',
-        confidence: 'high',
+        confidence: 'EXTRACTED',
         filePath: 'src/a.ts',
         line: 1,
+      },
+      {
+        id: 'dep-4',
+        sourceId: 'mod-a',
+        sourceEntityType: 'module',
+        targetId: 'sym-b',
+        targetEntityType: 'symbol',
+        type: 'type-ref',
+        confidence: 'INFERRED',
+        filePath: 'src/a.ts',
+        line: 4,
+      },
+      {
+        id: 'dep-5',
+        sourceId: 'mod-b',
+        sourceEntityType: 'module',
+        targetId: 'sym-a',
+        targetEntityType: 'symbol',
+        type: 'type-ref',
+        confidence: 'AMBIGUOUS',
+        filePath: 'src/b.ts',
+        line: 8,
       },
     ],
     graphStatus: 'partial',
@@ -119,7 +141,7 @@ describe('SQLiteStorage', () => {
     }
   });
 
-  it('persists normalized governance rows and internal history snapshots', async () => {
+  it('persists normalized governance rows, graph projection parity, and internal history snapshots', async () => {
     const rootDir = createTempRoot();
     tempRoots.push(rootDir);
     const storage = new SQLiteStorage({ type: 'sqlite', databasePath: '.codemap/governance.sqlite' });
@@ -136,14 +158,19 @@ describe('SQLiteStorage', () => {
 
     const inspector = await createSQLiteInspector(rootDir);
     expect(inspector.prepare('SELECT value FROM metadata WHERE key = ?').get('schema_version')?.value)
-      .toBe('governance-v3');
+      .toBe('graph-v1');
     expect(inspector.prepare('SELECT COUNT(*) AS count FROM modules').get()?.count).toBe(2);
     expect(inspector.prepare('SELECT COUNT(*) AS count FROM symbols').get()?.count).toBe(2);
-    expect(inspector.prepare('SELECT COUNT(*) AS count FROM dependencies').get()?.count).toBe(3);
+    expect(inspector.prepare('SELECT COUNT(*) AS count FROM dependencies').get()?.count).toBe(5);
+    expect(inspector.prepare('SELECT COUNT(*) AS count FROM graph_edges').get()?.count).toBe(5);
     expect(inspector.prepare('SELECT signature FROM symbols WHERE id = ?').get('sym-a')?.signature)
       .toBe('callA() => void');
     expect(inspector.prepare('SELECT confidence FROM dependencies WHERE id = ?').get('dep-3')?.confidence)
-      .toBe('high');
+      .toBe('EXTRACTED');
+    expect(inspector.prepare('SELECT confidence FROM graph_edges WHERE dependency_id = ?').get('dep-4')?.confidence)
+      .toBe('INFERRED');
+    expect(inspector.prepare('SELECT confidence FROM graph_edges WHERE dependency_id = ?').get('dep-5')?.confidence)
+      .toBe('AMBIGUOUS');
     expect(inspector.prepare('SELECT value FROM metadata WHERE key = ?').get('graph_status')?.value)
       .toBe('partial');
     expect(inspector.prepare('SELECT value FROM metadata WHERE key = ?').get('failed_file_count')?.value)
@@ -152,7 +179,7 @@ describe('SQLiteStorage', () => {
       .toBe('["src/missing.ts"]');
     expect(inspector.prepare('SELECT snapshot_source FROM history_snapshots LIMIT 1').get()?.snapshot_source)
       .toBe('save-code-graph');
-    expect(inspector.prepare('SELECT COUNT(*) AS count FROM history_relations').get()?.count).toBe(7);
+    expect(inspector.prepare('SELECT COUNT(*) AS count FROM history_relations').get()?.count).toBe(9);
     inspector.close();
 
     await storage.close();
@@ -167,14 +194,14 @@ describe('SQLiteStorage', () => {
     await storage.saveCodeGraph(createGraphFixture());
 
     expect(await storage.findModuleById('mod-a')).toEqual(expect.objectContaining({ id: 'mod-a' }));
-    expect((await storage.findDependencies('mod-a')).map((dependency) => dependency.id)).toEqual(['dep-1']);
+    expect((await storage.findDependencies('mod-a')).map((dependency) => dependency.id)).toEqual(['dep-1', 'dep-4']);
     expect(await storage.findSymbolById('sym-a')).toEqual(expect.objectContaining({ signature: 'callA() => void' }));
     expect(await storage.findDependencies('sym-a')).toEqual([
       expect.objectContaining({
         id: 'dep-3',
         sourceEntityType: 'symbol',
         targetEntityType: 'symbol',
-        confidence: 'high',
+        confidence: 'EXTRACTED',
         filePath: 'src/a.ts',
         line: 1,
       }),
@@ -186,7 +213,17 @@ describe('SQLiteStorage', () => {
         length: 2,
       },
     ]);
-    expect((await storage.calculateImpact('mod-a', 2)).affectedModules.map((module) => module.id)).toEqual(['mod-b']);
+    expect(await storage.calculateImpact('mod-a', 2)).toEqual(expect.objectContaining({
+      status: 'ok',
+      summary: expect.objectContaining({
+        directCount: 1,
+        transitiveCount: 0,
+      }),
+      direct: [
+        expect.objectContaining({ id: 'mod-b', depth: 1, path: ['mod-a', 'mod-b'] }),
+      ],
+      affectedModules: [expect.objectContaining({ id: 'mod-b' })],
+    }));
     expect(await storage.loadGraphMetadata()).toEqual(expect.objectContaining({
       generatedAt: expect.any(String),
       graphStatus: 'partial',
@@ -195,17 +232,28 @@ describe('SQLiteStorage', () => {
       moduleCount: 2,
       symbolCount: 2,
     }));
-    expect(await storage.calculateSymbolImpact('sym-b', 2, 10)).toEqual({
+    expect(await storage.calculateSymbolImpact('sym-b', 2, 10)).toEqual(expect.objectContaining({
+      status: 'ok',
+      confidence: 'reduced',
       rootSymbol: expect.objectContaining({ id: 'sym-b' }),
-      affectedSymbols: [{
-        symbol: expect.objectContaining({ id: 'sym-a' }),
-        depth: 1,
-        path: ['sym-b', 'sym-a'],
-      }],
+      direct: [
+        expect.objectContaining({ id: 'sym-a', depth: 1, path: ['sym-b', 'sym-a'] }),
+      ],
+      transitiveLayers: [],
+      warnings: expect.arrayContaining([
+        expect.objectContaining({ code: 'GRAPH_PARTIAL' }),
+      ]),
+      affectedSymbols: [
+        expect.objectContaining({
+          symbol: expect.objectContaining({ id: 'sym-a' }),
+          depth: 1,
+          path: ['sym-b', 'sym-a'],
+        }),
+      ],
       depth: 2,
       limit: 10,
       truncated: false,
-    });
+    }));
 
     await storage.updateModule({
       id: 'mod-c',
@@ -277,6 +325,122 @@ describe('SQLiteStorage', () => {
     inspector.close();
 
     await storage.close();
+  });
+
+  it('round-trips EXTRACTED, INFERRED, and AMBIGUOUS dependency confidence values', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+    const storage = new SQLiteStorage({ type: 'sqlite', databasePath: '.codemap/governance.sqlite' });
+
+    await storage.initialize(rootDir);
+    await storage.saveCodeGraph(createGraphFixture());
+
+    const loadedGraph = await storage.loadCodeGraph();
+    expect(loadedGraph.dependencies.map((dependency) => dependency.confidence)).toEqual([
+      undefined,
+      undefined,
+      'EXTRACTED',
+      'INFERRED',
+      'AMBIGUOUS',
+    ]);
+
+    await storage.close();
+  });
+
+  it('fails closed when a materialized governance-v3 database is reopened without rebuilding', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+    const databasePath = '.codemap/governance.sqlite';
+    const staleDatabase = await createSQLiteInspector(rootDir, databasePath);
+
+    staleDatabase.exec(`
+      CREATE TABLE IF NOT EXISTS metadata (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        root_path TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS dependencies (
+        id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL,
+        source_entity_type TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        target_entity_type TEXT NOT NULL,
+        dependency_type TEXT NOT NULL,
+        file_path TEXT,
+        line INTEGER,
+        confidence TEXT
+      );
+    `);
+    staleDatabase.prepare(`
+      INSERT INTO metadata (key, value)
+      VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run('schema_version', 'governance-v3');
+    staleDatabase.prepare(`
+      INSERT INTO projects (id, name, root_path, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run('proj-1', 'fixture', '/fixture', '2026-04-15T00:00:00.000Z', '2026-04-15T00:00:00.000Z');
+    staleDatabase.prepare(`
+      INSERT INTO dependencies (
+        id, source_id, source_entity_type, target_id, target_entity_type, dependency_type, file_path, line, confidence
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('dep-stale', 'mod-a', 'module', 'mod-b', 'module', 'import', 'src/a.ts', 1, 'EXTRACTED');
+    staleDatabase.close();
+
+    const storage = new SQLiteStorage({ type: 'sqlite', databasePath });
+    await expect(storage.initialize(rootDir)).rejects.toMatchObject({
+      code: 'SQLITE_INIT_FAILED',
+      cause: expect.objectContaining({
+        code: 'GRAPH_SCHEMA_REBUILD_REQUIRED',
+      }),
+    });
+  });
+
+  it('rejects projection drift and invalid confidence rows diagnostically', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+    const databasePath = '.codemap/governance.sqlite';
+    const storage = new SQLiteStorage({ type: 'sqlite', databasePath });
+
+    await storage.initialize(rootDir);
+    await storage.saveCodeGraph(createGraphFixture());
+    await storage.close();
+
+    const driftInspector = await createSQLiteInspector(rootDir, databasePath);
+    driftInspector.prepare('DELETE FROM graph_edges WHERE dependency_id = ?').run('dep-5');
+    driftInspector.close();
+
+    const driftStorage = new SQLiteStorage({ type: 'sqlite', databasePath });
+    await expect(driftStorage.initialize(rootDir)).rejects.toMatchObject({
+      code: 'SQLITE_INIT_FAILED',
+      cause: expect.objectContaining({
+        code: 'GRAPH_SCHEMA_REBUILD_REQUIRED',
+      }),
+    });
+
+    const rootDirInvalid = createTempRoot();
+    tempRoots.push(rootDirInvalid);
+    const invalidStorage = new SQLiteStorage({ type: 'sqlite', databasePath });
+    await invalidStorage.initialize(rootDirInvalid);
+    await invalidStorage.saveCodeGraph(createGraphFixture());
+    await invalidStorage.close();
+
+    const invalidInspector = await createSQLiteInspector(rootDirInvalid, databasePath);
+    invalidInspector.prepare('UPDATE dependencies SET confidence = ? WHERE id = ?').run('HIGH', 'dep-3');
+    invalidInspector.close();
+
+    const invalidReadStorage = new SQLiteStorage({ type: 'sqlite', databasePath });
+    await invalidReadStorage.initialize(rootDirInvalid);
+    await expect(invalidReadStorage.loadCodeGraph()).rejects.toMatchObject({
+      code: 'GRAPH_INVALID_DEPENDENCY_CONFIDENCE',
+    });
   });
 
   it('reopens an existing SQLite database after close', async () => {

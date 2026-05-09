@@ -73,6 +73,10 @@ For the Phase 61 family (`codemap_query`, `codemap_deps`, `codemap_analyze`), MC
 
 Phase 62 adds one native routing tool on top of that execution surface: `codemap_context`. It lives in `src/server/mcp/context-tool.ts`, supports `review` / `debug` / `default`, and exposes `detailLevel=minimal|standard` plus a strict `allowedTools` filter. The filter is fail-closed: if it would hide a tool the route itself needs to recommend, MCP returns a structured `FILTER_CONFLICT` error instead of silently emitting inconsistent guidance.
 
+Phase 65 moves `impact` onto one shared graph-native traversal truth. `src/infrastructure/storage/graph-helpers.ts` now owns entrypoint resolution plus layered downstream reachability (`summary + direct[] + transitiveLayers[]`), while the CLI `impact` command and MCP `codemap_impact` tool stay as thin adapters over the same persisted graph result. Missing entrypoints, missing graph truth, partial graph warnings, and traversal truncation are surfaced explicitly instead of being flattened into empty success payloads.
+
+Phase 66 adds graph-native community detection on the same persisted truth. `src/infrastructure/storage/community-helpers.ts` folds mixed module/symbol dependencies into a weighted module-level projection, runs a Louvain baseline, and emits interpretable `summary + communities[]` results with explicit low-signal warnings. The first public surface is MCP-only via `codemap_communities`; `src/server/mcp/service.ts` remains a thin snake_case adapter and does not reimplement partition logic.
+
 ## CLI Contract
 
 The top-level CLI registers these primary commands in `src/cli/index.ts`:

@@ -7,7 +7,14 @@ import type { GraphMetadata } from '../../interface/types/storage.js';
 export type McpToolStatus = 'ok' | 'not_found' | 'ambiguous' | 'unavailable' | 'invalid_input';
 export type McpToolConfidence = 'high' | 'reduced' | 'ambiguous' | 'unavailable';
 export type McpGraphStatus = GraphMetadata['graphStatus'] | 'missing';
-export type McpErrorCode = 'GRAPH_NOT_FOUND' | 'SYMBOL_NOT_FOUND' | 'AMBIGUOUS_EDGE' | 'INVALID_TASK' | 'FILTER_CONFLICT';
+export type McpErrorCode =
+  | 'GRAPH_NOT_FOUND'
+  | 'FILE_NOT_FOUND'
+  | 'SYMBOL_NOT_FOUND'
+  | 'AMBIGUOUS_ENTRYPOINT'
+  | 'AMBIGUOUS_EDGE'
+  | 'INVALID_TASK'
+  | 'FILTER_CONFLICT';
 
 export interface McpToolError {
   code: McpErrorCode;
@@ -42,9 +49,48 @@ export interface McpQueryResult {
 }
 
 export interface McpImpactNode {
-  symbol: McpSymbolRef;
+  id: string;
+  kind: 'module' | 'symbol';
+  name: string;
+  file_path: string;
   depth: number;
   path: string[];
+}
+
+export interface McpImpactEntrypointCandidate {
+  id: string;
+  kind: 'module' | 'symbol';
+  name: string;
+  file_path: string;
+  line?: number;
+}
+
+export interface McpImpactEntrypoint {
+  kind: 'file' | 'symbol';
+  id?: string;
+  name: string;
+  file_path?: string;
+  line?: number;
+  candidates?: McpImpactEntrypointCandidate[];
+}
+
+export interface McpImpactLayer {
+  depth: number;
+  nodes: McpImpactNode[];
+}
+
+export interface McpImpactWarning {
+  code: 'GRAPH_PARTIAL' | 'TRAVERSAL_TRUNCATED';
+  message: string;
+}
+
+export interface McpImpactSummary {
+  requested_depth: number;
+  direct_count: number;
+  transitive_count: number;
+  total_count: number;
+  max_depth: number;
+  truncated: boolean;
 }
 
 export interface McpImpactResult {
@@ -55,11 +101,58 @@ export interface McpImpactResult {
   generated_at: string | null;
   failed_file_count: number;
   parse_failure_files: string[];
-  root_symbol?: McpSymbolRef;
-  affected_symbols: McpImpactNode[];
-  depth: number;
-  limit: number;
+  entrypoint: McpImpactEntrypoint;
+  summary: McpImpactSummary;
+  direct: McpImpactNode[];
+  transitive_layers: McpImpactLayer[];
+  warnings: McpImpactWarning[];
   truncated: boolean;
+  remediation?: string;
+  error?: McpToolError;
+}
+
+export interface McpCommunityWarning {
+  code:
+    | 'GRAPH_PARTIAL'
+    | 'LOW_SIGNAL_SPARSE_GRAPH'
+    | 'LOW_SIGNAL_DOMINANT_SINGLE_CLUSTER'
+    | 'LOW_SIGNAL_SINGLETON_HEAVY';
+  message: string;
+}
+
+export interface McpCommunitySummary {
+  total_modules: number;
+  total_edges: number;
+  community_count: number;
+  singleton_count: number;
+  modularity: number;
+  largest_community_size: number;
+  largest_community_ratio: number;
+}
+
+export interface McpCommunityCluster {
+  id: string;
+  label: string;
+  module_ids: string[];
+  module_paths: string[];
+  size: number;
+  top_paths: string[];
+  dominant_edge_kinds: Array<'import' | 'inherit' | 'implement' | 'call' | 'type-ref'>;
+  cohesion: number;
+}
+
+export interface McpCommunityResult {
+  [key: string]: unknown;
+  status: McpToolStatus;
+  confidence: McpToolConfidence;
+  graph_status: McpGraphStatus;
+  generated_at: string | null;
+  failed_file_count: number;
+  parse_failure_files: string[];
+  summary: McpCommunitySummary;
+  communities: McpCommunityCluster[];
+  warnings: McpCommunityWarning[];
+  remediation?: string;
   error?: McpToolError;
 }
 

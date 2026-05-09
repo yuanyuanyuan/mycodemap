@@ -10,6 +10,7 @@ import type {
   StorageConfig,
   Cycle,
   GraphMetadata,
+  IncrementalRefreshSummary,
   ImpactResult,
   ProjectStatistics,
   SymbolImpactResult,
@@ -19,6 +20,7 @@ import type {
   Module,
   Symbol,
   Dependency,
+  DependencyConfidence,
 } from '../../../interface/types/index.js';
 import type {
   FileHistorySignal,
@@ -32,6 +34,7 @@ import type {
 import { StorageBase, StorageError } from '../interfaces/StorageBase.js';
 import {
   calculateImpactInGraph,
+  calculateSymbolImpactInGraph,
   cloneCodeGraph,
   createEmptyCodeGraph,
   deserializeCodeGraphSnapshot,
@@ -92,6 +95,13 @@ const GRAPH_STATUS_METADATA_KEY = 'graph_status';
 const FAILED_FILE_COUNT_METADATA_KEY = 'failed_file_count';
 const PARSE_FAILURE_FILES_METADATA_KEY = 'parse_failure_files_json';
 const LAST_GRAPH_SYNC_AT_METADATA_KEY = 'last_graph_sync_at';
+const LAST_REFRESH_METADATA_KEY = 'last_refresh_summary_json';
+const VALID_DEPENDENCY_CONFIDENCE = new Set<DependencyConfidence>([
+  'EXTRACTED',
+  'INFERRED',
+  'AMBIGUOUS',
+]);
+const SQLITE_REBUILD_REQUIRED_MESSAGE = 'Graph schema is outdated. Run `mycodemap generate` to rebuild the SQLite graph.';
 
 export interface SQLiteStorageRuntimeOptions {
   readonly governanceGraphThresholds?: GovernanceGraphPerfThresholds;
@@ -194,13 +204,14 @@ function readGraphMetadata(database: SQLiteDatabaseLike): GraphMetadata {
     .prepare(`
       SELECT key, value
       FROM metadata
-      WHERE key IN (?, ?, ?, ?)
+      WHERE key IN (?, ?, ?, ?, ?)
     `)
     .all(
       GRAPH_STATUS_METADATA_KEY,
       FAILED_FILE_COUNT_METADATA_KEY,
       PARSE_FAILURE_FILES_METADATA_KEY,
-      LAST_GRAPH_SYNC_AT_METADATA_KEY
+      LAST_GRAPH_SYNC_AT_METADATA_KEY,
+      LAST_REFRESH_METADATA_KEY
     );
   const metadataMap = new Map(
     metadataRows.map(row => [toStringValue(row.key), row.value])
@@ -224,7 +235,21 @@ function readGraphMetadata(database: SQLiteDatabaseLike): GraphMetadata {
     parseFailureFiles,
     moduleCount,
     symbolCount,
+    lastRefresh: parseRefreshSummary(metadataMap.get(LAST_REFRESH_METADATA_KEY)),
   };
+}
+
+function parseRefreshSummary(value: unknown): IncrementalRefreshSummary | undefined {
+  const raw = toStringValue(value);
+  if (!raw) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(raw) as IncrementalRefreshSummary;
+  } catch {
+    return undefined;
+  }
 }
 
 function createHistorySnapshotId(recordedAt: string): string {
@@ -248,6 +273,19 @@ function resolveEntityType(
 function hasColumn(database: SQLiteDatabaseLike, tableName: string, columnName: string): boolean {
   const rows = database.prepare(`PRAGMA table_info(${tableName})`).all();
   return rows.some((row) => toStringValue(row.name) === columnName);
+}
+
+function hasTable(database: SQLiteDatabaseLike, tableName: string): boolean {
+  const row = database
+    .prepare(`
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table' AND name = ?
+      LIMIT 1
+    `)
+    .get(tableName);
+
+  return Boolean(row?.name);
 }
 
 function addColumnIfMissing(
@@ -274,6 +312,29 @@ function createUnavailableHistoryDiagnostics(reason: string): HistorySignalDiagn
     analyzedFiles: 0,
     requiresPrecompute: false,
   };
+}
+
+function createGraphRebuildRequiredError(reason: string): StorageError {
+  return new StorageError(
+    `${reason} ${SQLITE_REBUILD_REQUIRED_MESSAGE}`,
+    'GRAPH_SCHEMA_REBUILD_REQUIRED'
+  );
+}
+
+function normalizeDependencyConfidence(value: unknown): DependencyConfidence | undefined {
+  if (value === null || value === undefined || toStringValue(value) === '') {
+    return undefined;
+  }
+
+  const confidence = toStringValue(value);
+  if (VALID_DEPENDENCY_CONFIDENCE.has(confidence as DependencyConfidence)) {
+    return confidence as DependencyConfidence;
+  }
+
+  throw new StorageError(
+    `Invalid dependency confidence "${confidence}". Run \`mycodemap generate\` to rebuild the SQLite graph.`,
+    'GRAPH_INVALID_DEPENDENCY_CONFIDENCE'
+  );
 }
 
 function createUnavailableSymbolHistoryResult(query: string, reason: string): SymbolHistoryResult {
@@ -352,8 +413,10 @@ export class SQLiteStorage extends StorageBase {
       this.database = new Database(databasePath);
       this.database.pragma?.('journal_mode = WAL');
       this.database.pragma?.('foreign_keys = ON');
+      this.assertSchemaCompatibility(this.database);
       this.database.exec(SQLITE_GOVERNANCE_SCHEMA_SQL);
       this.ensureSchemaColumns(this.database);
+      this.assertProjectionParity(this.database);
       this.database
         .prepare(SQLITE_SCHEMA_VERSION_UPSERT_SQL)
         .run('schema_version', CURRENT_SQLITE_SCHEMA_VERSION);
@@ -559,82 +622,12 @@ export class SQLiteStorage extends StorageBase {
     depth: number,
     limit: number
   ): Promise<SymbolImpactResult> {
-    const database = this.getDatabase();
-    const rootSymbol = await this.findSymbolById(symbolId);
-    if (!rootSymbol) {
-      throw new StorageError(
-        `Symbol ${symbolId} not found`,
-        'SYMBOL_NOT_FOUND'
-      );
-    }
-
-    const selectCallers = database.prepare(`
-      SELECT s.id, s.module_id, s.name, s.kind, s.signature, s.file_path, s.line, s.column_number, s.end_line, s.end_column, s.visibility
-      FROM dependencies d
-      INNER JOIN symbols s ON s.id = d.source_id
-      WHERE d.target_id = ?
-        AND d.dependency_type = 'call'
-      ORDER BY d.id, s.id
-    `);
-
-    const affectedSymbols: SymbolImpactResult['affectedSymbols'] = [];
-    const visited = new Set<string>([symbolId]);
-    const queue: Array<{ id: string; level: number; path: string[] }> = [{
-      id: symbolId,
-      level: 0,
-      path: [symbolId],
-    }];
-    let truncated = false;
-
-    while (queue.length > 0) {
-      const current = queue.shift();
-      if (!current) {
-        continue;
-      }
-
-      if (current.level >= depth) {
-        continue;
-      }
-
-      const callerRows = selectCallers.all(current.id);
-      for (const row of callerRows) {
-        if (affectedSymbols.length >= limit) {
-          truncated = true;
-          queue.length = 0;
-          break;
-        }
-
-        const callerId = toStringValue(row.id);
-        if (visited.has(callerId)) {
-          continue;
-        }
-
-        visited.add(callerId);
-        const callerSymbol = this.mapSymbolRow(row);
-        const nextLevel = current.level + 1;
-        const nextPath = [...current.path, callerId];
-
-        affectedSymbols.push({
-          symbol: callerSymbol,
-          depth: nextLevel,
-          path: nextPath,
-        });
-
-        queue.push({
-          id: callerId,
-          level: nextLevel,
-          path: nextPath,
-        });
-      }
-    }
-
-    return {
-      rootSymbol,
-      affectedSymbols,
+    return calculateSymbolImpactInGraph(
+      await this.loadCodeGraph(),
+      symbolId,
       depth,
-      limit,
-      truncated,
-    };
+      limit
+    );
   }
 
   async getStatistics(): Promise<ProjectStatistics> {
@@ -917,6 +910,69 @@ export class SQLiteStorage extends StorageBase {
     addColumnIfMissing(database, 'dependencies', 'confidence', 'confidence TEXT');
   }
 
+  private assertSchemaCompatibility(database: SQLiteDatabaseLike): void {
+    if (!hasTable(database, 'metadata')) {
+      return;
+    }
+
+    const schemaVersion = toStringValue(
+      database.prepare('SELECT value FROM metadata WHERE key = ? LIMIT 1').get('schema_version')?.value
+    );
+    const projectCount = hasTable(database, 'projects')
+      ? toNumberValue(database.prepare('SELECT COUNT(*) AS count FROM projects').get()?.count)
+      : 0;
+    const dependencyCount = hasTable(database, 'dependencies')
+      ? toNumberValue(database.prepare('SELECT COUNT(*) AS count FROM dependencies').get()?.count)
+      : 0;
+    const snapshotCount = hasTable(database, 'snapshots')
+      ? toNumberValue(database.prepare('SELECT COUNT(*) AS count FROM snapshots').get()?.count)
+      : 0;
+    const hasMaterializedGraph = projectCount > 0 || dependencyCount > 0;
+
+    if (!hasMaterializedGraph && (schemaVersion === '' || schemaVersion === 'bootstrap-v1') && snapshotCount > 0) {
+      return;
+    }
+
+    if (schemaVersion === '' && !hasMaterializedGraph) {
+      return;
+    }
+
+    if (schemaVersion !== CURRENT_SQLITE_SCHEMA_VERSION) {
+      throw createGraphRebuildRequiredError(
+        `Found SQLite schema version "${schemaVersion || 'unknown'}" but expected "${CURRENT_SQLITE_SCHEMA_VERSION}".`
+      );
+    }
+
+    if (dependencyCount > 0 && !hasTable(database, 'graph_edges')) {
+      throw createGraphRebuildRequiredError(
+        'Traversal projection table "graph_edges" is missing.'
+      );
+    }
+  }
+
+  private assertProjectionParity(database: SQLiteDatabaseLike): void {
+    if (!hasTable(database, 'dependencies') || !hasTable(database, 'graph_edges')) {
+      return;
+    }
+
+    const dependencyCount = toNumberValue(
+      database.prepare('SELECT COUNT(*) AS count FROM dependencies').get()?.count
+    );
+    const projectionCount = toNumberValue(
+      database.prepare('SELECT COUNT(*) AS count FROM graph_edges').get()?.count
+    );
+
+    if (dependencyCount === 0 && projectionCount === 0) {
+      return;
+    }
+
+    if (dependencyCount !== projectionCount) {
+      throw createGraphRebuildRequiredError(
+        `Traversal projection drift detected (${projectionCount}/${dependencyCount} rows).`
+      );
+    }
+  }
+
   private backfillLegacySnapshotIfNeeded(database: SQLiteDatabaseLike): void {
     const hasCurrentProject = toNumberValue(
       database.prepare('SELECT COUNT(*) AS count FROM projects').get()?.count
@@ -979,6 +1035,12 @@ export class SQLiteStorage extends StorageBase {
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
+    const insertGraphEdge = database.prepare(`
+      INSERT INTO graph_edges (
+        dependency_id, source_id, source_entity_type, target_id, target_entity_type, dependency_type, confidence, file_path, line
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
     const insertSnapshotMirror = database.prepare(`
       INSERT INTO snapshots (id, project_id, graph_json, updated_at)
       VALUES (?, ?, ?, ?)
@@ -999,6 +1061,7 @@ export class SQLiteStorage extends StorageBase {
 
     this.runInTransaction(database, () => {
       database.prepare('DELETE FROM dependencies').run();
+      database.prepare('DELETE FROM graph_edges').run();
       database.prepare('DELETE FROM symbols').run();
       database.prepare('DELETE FROM modules').run();
       database.prepare('DELETE FROM projects').run();
@@ -1044,6 +1107,7 @@ export class SQLiteStorage extends StorageBase {
       for (const dependency of normalizedGraph.dependencies) {
         const sourceEntityType = resolveEntityType(dependency.sourceEntityType, dependency.sourceId, symbolIds);
         const targetEntityType = resolveEntityType(dependency.targetEntityType, dependency.targetId, symbolIds);
+        const confidence = normalizeDependencyConfidence(dependency.confidence);
         insertDependency.run(
           dependency.id,
           dependency.sourceId,
@@ -1053,7 +1117,18 @@ export class SQLiteStorage extends StorageBase {
           dependency.type,
           dependency.filePath ?? null,
           dependency.line ?? null,
-          dependency.confidence ?? null
+          confidence ?? null
+        );
+        insertGraphEdge.run(
+          dependency.id,
+          dependency.sourceId,
+          sourceEntityType,
+          dependency.targetId,
+          targetEntityType,
+          dependency.type,
+          confidence ?? 'EXTRACTED',
+          dependency.filePath ?? null,
+          dependency.line ?? null
         );
       }
 
@@ -1112,6 +1187,7 @@ export class SQLiteStorage extends StorageBase {
       for (const dependency of normalizedGraph.dependencies) {
         const sourceEntityType = resolveEntityType(dependency.sourceEntityType, dependency.sourceId, symbolIds);
         const targetEntityType = resolveEntityType(dependency.targetEntityType, dependency.targetId, symbolIds);
+        const confidence = normalizeDependencyConfidence(dependency.confidence);
         insertHistoryRelation.run(
           `${snapshotId}:dependency:${dependency.id}`,
           snapshotId,
@@ -1124,7 +1200,7 @@ export class SQLiteStorage extends StorageBase {
           JSON.stringify({
             dependencyId: dependency.id,
             dependencyType: dependency.type,
-            confidence: dependency.confidence ?? null,
+            confidence: confidence ?? null,
             filePath: dependency.filePath ?? null,
             line: dependency.line ?? null,
           })
@@ -1141,8 +1217,14 @@ export class SQLiteStorage extends StorageBase {
         JSON.stringify(normalizedGraph.parseFailureFiles ?? [])
       );
       upsertMetadata.run(LAST_GRAPH_SYNC_AT_METADATA_KEY, recordedAt);
+      upsertMetadata.run('schema_version', CURRENT_SQLITE_SCHEMA_VERSION);
+      upsertMetadata.run(
+        LAST_REFRESH_METADATA_KEY,
+        normalizedGraph.lastRefresh ? JSON.stringify(normalizedGraph.lastRefresh) : ''
+      );
     });
 
+    this.assertProjectionParity(database);
     this.refreshGovernanceGraphCache(database);
   }
 
@@ -1164,14 +1246,21 @@ export class SQLiteStorage extends StorageBase {
         ...symbol,
         location: { ...symbol.location },
       })),
-      dependencies: graph.dependencies.map(dependency => ({ ...dependency })),
+      dependencies: graph.dependencies.map(dependency => ({
+        ...dependency,
+        confidence: normalizeDependencyConfidence(dependency.confidence),
+      })),
       graphStatus: graph.graphStatus ?? 'complete',
       failedFileCount: graph.failedFileCount ?? 0,
       parseFailureFiles: [...(graph.parseFailureFiles ?? [])],
+      lastRefresh: graph.lastRefresh,
     };
   }
 
   private readCodeGraph(database: SQLiteDatabaseLike): CodeGraph {
+    this.assertSchemaCompatibility(database);
+    this.assertProjectionParity(database);
+
     const projectRow = database
       .prepare(`
         SELECT id, name, root_path, created_at, updated_at
@@ -1224,6 +1313,7 @@ export class SQLiteStorage extends StorageBase {
       graphStatus: graphIntegrity.graphStatus,
       failedFileCount: graphIntegrity.failedFileCount,
       parseFailureFiles: graphIntegrity.parseFailureFiles,
+      lastRefresh: readGraphMetadata(database).lastRefresh,
     };
   }
 
@@ -1270,7 +1360,7 @@ export class SQLiteStorage extends StorageBase {
       type: toStringValue(row.dependency_type) as Dependency['type'],
       filePath: toStringValue(row.file_path) || undefined,
       line: toOptionalNumberValue(row.line),
-      confidence: toStringValue(row.confidence) === '' ? undefined : toStringValue(row.confidence) as Dependency['confidence'],
+      confidence: normalizeDependencyConfidence(row.confidence),
     };
   }
 
@@ -1300,10 +1390,14 @@ export class SQLiteStorage extends StorageBase {
   }
 
   private readGovernanceGraphForAnalysis(database: SQLiteDatabaseLike): CodeGraph {
+    this.assertSchemaCompatibility(database);
+    this.assertProjectionParity(database);
     return readGovernanceGraphFromSQLite(database, this.projectPath ?? '');
   }
 
   private refreshGovernanceGraphCache(database: SQLiteDatabaseLike): void {
+    this.assertSchemaCompatibility(database);
+    this.assertProjectionParity(database);
     const cache = new GovernanceGraphCache(
       database,
       this.projectPath ?? '',

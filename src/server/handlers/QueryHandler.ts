@@ -177,7 +177,7 @@ export class QueryHandler {
     }
 
     return {
-      rootModule: result.rootModule,
+      rootModule: result.rootModule ?? request.moduleId,
       affectedModules: affectedWithDepth,
       totalAffected: affectedWithDepth.length,
       maxDepth: Math.max(...affectedWithDepth.map(m => m.depth), 0),

@@ -140,7 +140,14 @@ program
   .option('-m, --mode <mode>', 'Parser 兼容输入；默认使用单一路径 parser，fast/smart/hybrid 将返回废弃错误', 'tree-sitter')
   .option('-o, --output <dir>', '输出目录', '.mycodemap')
   .option('--symbol-level', '额外 materialize symbol-level 调用依赖到代码图存储', false)
+  .option('--incremental', '基于 persisted graph truth 执行 scoped incremental refresh', false)
+  .option('--changed-files <paths...>', '显式指定 changed files，启用 incremental refresh')
+  .option('--base <rev>', '增量刷新时用于 git diff 的 base revision')
+  .option('--against <rev>', '增量刷新时用于 git diff 的 against revision')
   .option('--ai-context', '为每个文件生成 AI 描述（需要 AI Provider）', false)
+  .option('-j, --json', 'JSON 格式输出')
+  .option('--human', '强制人类可读输出')
+  .option('--structured', '输出完全结构化的 JSON（不包含自然语言字符串，需要配合 --json 使用）')
   .action(await createActionHandler('generate', async (options: unknown, command: Command) => {
     await generateCommand({
       ...(options as Record<string, unknown>),

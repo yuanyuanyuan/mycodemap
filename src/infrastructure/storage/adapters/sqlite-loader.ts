@@ -5,6 +5,7 @@
 import { createActionableError } from '../../../cli/output/errors.js';
 import { ErrorCodes } from '../../../cli/output/error-codes.js';
 import type { WasmFallbackResult } from '../../../cli/output/wasm-fallback.js';
+import { createRequire } from 'node:module';
 
 interface SQLiteStatementLike {
   run: (...params: unknown[]) => unknown;
@@ -45,6 +46,7 @@ interface SQLiteLoadOptions {
 }
 
 let lastSQLiteLoadDiagnostics: SQLiteLoadDiagnostics | null = null;
+const moduleRequire = createRequire(import.meta.url);
 
 export function getLastSQLiteLoadDiagnostics(): SQLiteLoadDiagnostics | null {
   return lastSQLiteLoadDiagnostics;
@@ -133,7 +135,7 @@ export async function loadSQLiteWithDiagnostics(options: SQLiteLoadOptions = {})
 
 function loadNativeSQLite(): SQLiteConstructor {
   try {
-    const betterSqlite3 = require('better-sqlite3');
+    const betterSqlite3 = moduleRequire('better-sqlite3');
     return betterSqlite3.default || betterSqlite3;
   } catch (error) {
     throw new Error(
@@ -166,7 +168,7 @@ async function loadWASMSQLite(options: SQLiteLoadOptions = {}): Promise<{
 
 function loadNodeSqlite(): SQLiteConstructor {
   try {
-    const { DatabaseSync } = require('node:sqlite');
+    const { DatabaseSync } = moduleRequire('node:sqlite');
 
     // Wrap DatabaseSync to match SQLiteDatabaseLike interface
     return class NodeSqliteWrapper implements SQLiteDatabaseLike {
@@ -235,7 +237,7 @@ async function loadSqlJs(): Promise<SQLiteConstructor> {
         if (filename === ':memory:') {
           this.db = new sqlJsModule.Database();
         } else {
-          const fs = require('node:fs');
+          const fs = moduleRequire('node:fs');
           const data = fs.existsSync(filename) ? fs.readFileSync(filename) : null;
           this.db = new sqlJsModule.Database(data);
         }

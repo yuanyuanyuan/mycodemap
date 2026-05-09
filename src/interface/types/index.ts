@@ -364,6 +364,7 @@ export interface CodeMap {
   failedFileCount?: number;
   parseFailureFiles?: string[];
   pluginReport?: PluginExecutionReport;
+  lastRefresh?: import('./storage.js').IncrementalRefreshSummary;
 }
 
 // ============================================
@@ -621,6 +622,8 @@ export interface Symbol {
 }
 
 // 领域实体: 依赖
+export type DependencyConfidence = 'EXTRACTED' | 'INFERRED' | 'AMBIGUOUS';
+
 export interface Dependency {
   id: string;
   sourceId: string;  // 模块ID
@@ -628,7 +631,7 @@ export interface Dependency {
   sourceEntityType?: 'module' | 'symbol';
   targetEntityType?: 'module' | 'symbol';
   type: 'import' | 'inherit' | 'implement' | 'call' | 'type-ref';
-  confidence?: 'high' | 'ambiguous';
+  confidence?: DependencyConfidence;
   filePath?: string;
   line?: number;
 }
@@ -642,6 +645,7 @@ export interface CodeGraph {
   graphStatus?: GraphStatus;
   failedFileCount?: number;
   parseFailureFiles?: string[];
+  lastRefresh?: import('./storage.js').IncrementalRefreshSummary;
 }
 
 // ============================================
@@ -667,6 +671,13 @@ export type {
   Cycle,
   ImpactResult,
   GraphMetadata,
+  IncrementalRefreshAffected,
+  IncrementalRefreshCounts,
+  IncrementalRefreshDiagnostic,
+  IncrementalRefreshDiagnosticCode,
+  IncrementalRefreshReason,
+  IncrementalRefreshStatus,
+  IncrementalRefreshSummary,
   SymbolImpactNode,
   SymbolImpactResult,
   ProjectStatistics,

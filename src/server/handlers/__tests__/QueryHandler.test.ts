@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { CodeGraph } from '../../../interface/types/index.js';
@@ -8,6 +8,19 @@ import { QueryHandler } from '../QueryHandler.js';
 
 function createTempRoot(): string {
   return mkdtempSync(path.join(tmpdir(), 'codemap-query-handler-'));
+}
+
+async function createSQLiteInspector(rootDir: string, databasePath = '.codemap/governance.sqlite') {
+  const sqliteModule = await import('better-sqlite3');
+  mkdirSync(path.dirname(path.join(rootDir, databasePath)), { recursive: true });
+  return new sqliteModule.default(path.join(rootDir, databasePath)) as {
+    exec: (sql: string) => unknown;
+    close: () => void;
+    prepare: (sql: string) => {
+      run: (...params: unknown[]) => unknown;
+      get: (...params: unknown[]) => Record<string, unknown> | undefined;
+    };
+  };
 }
 
 function createImpactFixture(): CodeGraph {
@@ -110,5 +123,85 @@ describe('QueryHandler', () => {
 
     await eagerStorage.close();
     await directStorage.close();
+  });
+
+  it('keeps searchModules and getModuleDetail success fields stable on the new persisted truth', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+    const storage = new SQLiteStorage({
+      type: 'sqlite',
+      databasePath: '.codemap/governance.sqlite',
+    });
+
+    await storage.initialize(rootDir);
+    await storage.saveCodeGraph(createImpactFixture());
+
+    const handler = new QueryHandler(storage);
+    const search = await handler.searchModules({ query: 'src/', limit: 10 });
+    const detail = await handler.getModuleDetail('mid');
+
+    expect(search).toEqual({
+      items: [
+        expect.objectContaining({
+          id: 'leaf',
+          path: 'src/leaf.ts',
+          language: 'ts',
+        }),
+        expect.objectContaining({
+          id: 'mid',
+          path: 'src/mid.ts',
+          language: 'ts',
+        }),
+        expect.objectContaining({
+          id: 'root',
+          path: 'src/root.ts',
+          language: 'ts',
+        }),
+      ],
+      total: 3,
+    });
+    expect(detail).toEqual(expect.objectContaining({
+      id: 'mid',
+      path: 'src/mid.ts',
+      dependencies: [
+        expect.objectContaining({
+          id: 'dep-1',
+          targetPath: 'src/leaf.ts',
+          type: 'import',
+        }),
+      ],
+      dependents: [
+        expect.objectContaining({
+          id: 'dep-2',
+          sourcePath: 'src/root.ts',
+          type: 'import',
+        }),
+      ],
+    }));
+
+    await storage.close();
+  });
+
+  it('rejects stale schema reads with rebuild guidance instead of returning empty success', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+    const databasePath = '.codemap/governance.sqlite';
+    const storage = new SQLiteStorage({ type: 'sqlite', databasePath });
+
+    await storage.initialize(rootDir);
+    await storage.saveCodeGraph(createImpactFixture());
+    await storage.close();
+
+    const inspector = await createSQLiteInspector(rootDir, databasePath);
+    inspector.prepare('DELETE FROM graph_edges WHERE dependency_id = ?').run('dep-2');
+    inspector.close();
+
+    const staleStorage = new SQLiteStorage({ type: 'sqlite', databasePath });
+    await expect(staleStorage.initialize(rootDir)).rejects.toMatchObject({
+      code: 'SQLITE_INIT_FAILED',
+      cause: expect.objectContaining({
+        code: 'GRAPH_SCHEMA_REBUILD_REQUIRED',
+      }),
+    });
   });
 });

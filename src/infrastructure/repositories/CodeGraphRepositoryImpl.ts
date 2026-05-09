@@ -8,6 +8,7 @@ import type { IStorage } from '../storage/index.js';
 import { CodeGraph } from '../../domain/entities/CodeGraph.js';
 import type { CodeGraphRepository } from '../../domain/repositories/CodeGraphRepository.js';
 import { RepositoryError, EntityNotFoundError } from '../../domain/repositories/CodeGraphRepository.js';
+import type { IncrementalRefreshSummary } from '../../interface/types/storage.js';
 
 /**
  * CodeGraphRepository 实现
@@ -33,6 +34,11 @@ export class CodeGraphRepositoryImpl implements CodeGraphRepository {
         error
       );
     }
+  }
+
+  async saveWithRefreshSummary(graph: CodeGraph, refresh: IncrementalRefreshSummary): Promise<void> {
+    graph.lastRefresh = refresh;
+    await this.save(graph);
   }
 
   /**

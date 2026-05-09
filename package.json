@@ -68,6 +68,8 @@
     "commander": "^11.1.0",
     "dependency-cruiser": "^17.3.10",
     "globby": "^14.0.0",
+    "graphology": "^0.26.0",
+    "graphology-communities-louvain": "^2.0.2",
     "hono": "^4.12.8",
     "ora": "^8.0.1",
     "smol-toml": "^1.6.1",

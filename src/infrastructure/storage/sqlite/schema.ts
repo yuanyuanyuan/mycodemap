@@ -4,7 +4,7 @@
 // SQLite 治理存储 schema 定义与版本管理
 // ============================================
 
-export const CURRENT_SQLITE_SCHEMA_VERSION = 'governance-v3';
+export const CURRENT_SQLITE_SCHEMA_VERSION = 'graph-v1';
 
 export const SQLITE_SCHEMA_VERSION_UPSERT_SQL = `
   INSERT INTO metadata (key, value)
@@ -63,6 +63,18 @@ export const SQLITE_GOVERNANCE_SCHEMA_SQL = `
     confidence TEXT
   );
 
+  CREATE TABLE IF NOT EXISTS graph_edges (
+    dependency_id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL,
+    source_entity_type TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    target_entity_type TEXT NOT NULL,
+    dependency_type TEXT NOT NULL,
+    confidence TEXT NOT NULL,
+    file_path TEXT,
+    line INTEGER
+  );
+
   CREATE TABLE IF NOT EXISTS history_snapshots (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL,
@@ -104,6 +116,14 @@ export const SQLITE_GOVERNANCE_SCHEMA_SQL = `
     ON dependencies (source_id, dependency_type);
   CREATE INDEX IF NOT EXISTS idx_dependencies_target
     ON dependencies (target_id, dependency_type);
+  CREATE INDEX IF NOT EXISTS idx_graph_edges_source
+    ON graph_edges (source_id, source_entity_type);
+  CREATE INDEX IF NOT EXISTS idx_graph_edges_target
+    ON graph_edges (target_id, target_entity_type);
+  CREATE INDEX IF NOT EXISTS idx_graph_edges_confidence
+    ON graph_edges (confidence);
+  CREATE INDEX IF NOT EXISTS idx_graph_edges_dependency_type
+    ON graph_edges (dependency_type);
   CREATE INDEX IF NOT EXISTS idx_history_snapshots_project
     ON history_snapshots (project_id, recorded_at DESC);
   CREATE INDEX IF NOT EXISTS idx_history_relations_snapshot

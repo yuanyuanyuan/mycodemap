@@ -5,6 +5,7 @@
 // ============================================
 
 import type { CodeGraph as CodeGraphInterface } from '../../interface/types/index.js';
+import type { IncrementalRefreshSummary } from '../../interface/types/storage.js';
 import { Project } from './Project.js';
 import { Module } from './Module.js';
 import { Symbol } from './Symbol.js';
@@ -27,6 +28,7 @@ export class CodeGraph implements CodeGraphInterface {
   graphStatus?: CodeGraphInterface['graphStatus'];
   failedFileCount?: number;
   parseFailureFiles?: string[];
+  lastRefresh?: IncrementalRefreshSummary;
 
   constructor(
     project: Project,
@@ -50,7 +52,7 @@ export class CodeGraph implements CodeGraphInterface {
    * 从接口数据创建代码图实体
    */
   static fromInterface(data: CodeGraphInterface): CodeGraph {
-    return new CodeGraph(
+    const graph = new CodeGraph(
       Project.fromInterface(data.project),
       data.modules.map(m => Module.fromInterface(m)),
       data.symbols.map(s => Symbol.fromInterface(s)),
@@ -59,6 +61,8 @@ export class CodeGraph implements CodeGraphInterface {
       data.failedFileCount ?? 0,
       data.parseFailureFiles ?? []
     );
+    graph.lastRefresh = data.lastRefresh;
+    return graph;
   }
 
   /**
@@ -73,6 +77,7 @@ export class CodeGraph implements CodeGraphInterface {
       graphStatus: this.graphStatus ?? 'complete',
       failedFileCount: this.failedFileCount ?? 0,
       parseFailureFiles: [...(this.parseFailureFiles ?? [])],
+      lastRefresh: this.lastRefresh,
     };
   }
 

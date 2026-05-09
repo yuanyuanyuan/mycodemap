@@ -4,16 +4,53 @@
 import type {
   Cycle,
   GraphMetadata,
+  ImpactAnalysisRequest,
+  ImpactEntrypoint,
+  ImpactEntrypointCandidate,
+  ImpactNode,
+  SharedImpactResult,
   ImpactResult,
   ProjectStatistics,
   SymbolImpactResult,
+  SymbolImpactNode,
 } from '../../interface/types/storage.js';
 import type {
   CodeGraph,
+  DependencyConfidence,
   Module,
   Symbol,
   Dependency,
 } from '../../interface/types/index.js';
+import type { IncrementalRefreshReason } from '../../interface/types/storage.js';
+
+export interface IncrementalNeighborhood {
+  invalidatedModuleIds: string[];
+  invalidatedModulePaths: string[];
+  reasons: IncrementalRefreshReason[];
+}
+
+interface TraversalState {
+  id: string;
+  depth: number;
+  path: string[];
+}
+
+interface ImpactTraversalOutput {
+  direct: ImpactNode[];
+  transitiveLayers: SharedImpactResult['transitiveLayers'];
+  truncated: boolean;
+}
+
+type ResolvedImpactEntrypoint =
+  | {
+    ok: true;
+    entrypoint: ImpactEntrypoint;
+    rootId: string;
+  }
+  | {
+    ok: false;
+    result: SharedImpactResult;
+  };
 
 export function cloneCodeGraph(graph: CodeGraph): CodeGraph {
   return globalThis.structuredClone(graph);
@@ -45,6 +82,7 @@ export function deserializeCodeGraphSnapshot(
     graphStatus: parsedGraph.graphStatus ?? 'complete',
     failedFileCount: parsedGraph.failedFileCount ?? 0,
     parseFailureFiles: parsedGraph.parseFailureFiles ?? [],
+    lastRefresh: parsedGraph.lastRefresh,
   };
 }
 
@@ -65,6 +103,7 @@ export function createEmptyCodeGraph(projectPath: string = ''): CodeGraph {
     graphStatus: 'complete',
     failedFileCount: 0,
     parseFailureFiles: [],
+    lastRefresh: undefined,
   };
 }
 
@@ -83,6 +122,7 @@ export function getGraphMetadataFromGraph(
     parseFailureFiles: [...(graph.parseFailureFiles ?? [])],
     moduleCount: graph.modules.length,
     symbolCount: graph.symbols.length,
+    lastRefresh: graph.lastRefresh,
   };
 }
 
@@ -109,6 +149,537 @@ export function deleteModuleFromGraph(graph: CodeGraph, moduleId: string): CodeG
   );
 
   return nextGraph;
+}
+
+function normalizePath(filePath: string): string {
+  return filePath.replace(/\\/gu, '/');
+}
+
+function matchesRequestedPath(candidatePath: string, requestedPath: string): boolean {
+  const normalizedCandidate = normalizePath(candidatePath);
+  const normalizedRequested = normalizePath(requestedPath);
+
+  return normalizedCandidate === normalizedRequested
+    || normalizedCandidate.endsWith(`/${normalizedRequested}`)
+    || normalizedRequested.endsWith(`/${normalizedCandidate}`);
+}
+
+function isConservativeConfidence(confidence: DependencyConfidence | undefined): boolean {
+  return confidence === 'INFERRED' || confidence === 'AMBIGUOUS';
+}
+
+function createEmptyImpactResult(
+  request: ImpactAnalysisRequest,
+  graphStatus: SharedImpactResult['graphStatus'],
+  overrides: Pick<SharedImpactResult, 'status' | 'confidence'> & {
+    error?: SharedImpactResult['error'];
+    warnings?: SharedImpactResult['warnings'];
+    remediation?: string;
+    entrypoint?: Partial<ImpactEntrypoint>;
+  }
+): SharedImpactResult {
+  return {
+    status: overrides.status,
+    confidence: overrides.confidence,
+    graphStatus,
+    entrypoint: {
+      kind: request.kind,
+      name: request.kind === 'file' ? request.filePath : request.symbol,
+      filePath: request.filePath,
+      ...overrides.entrypoint,
+    },
+    summary: {
+      requestedDepth: request.depth,
+      directCount: 0,
+      transitiveCount: 0,
+      totalCount: 0,
+      maxDepth: 0,
+      truncated: false,
+    },
+    direct: [],
+    transitiveLayers: [],
+    warnings: overrides.warnings ?? [],
+    truncated: false,
+    remediation: overrides.remediation,
+    error: overrides.error,
+  };
+}
+
+function toImpactCandidate(moduleOrSymbol: Module | Symbol): ImpactEntrypointCandidate {
+  if ('moduleId' in moduleOrSymbol) {
+    return {
+      id: moduleOrSymbol.id,
+      kind: 'symbol',
+      name: moduleOrSymbol.name,
+      filePath: moduleOrSymbol.location.file,
+      line: moduleOrSymbol.location.line,
+    };
+  }
+
+  return {
+    id: moduleOrSymbol.id,
+    kind: 'module',
+    name: moduleOrSymbol.path,
+    filePath: moduleOrSymbol.path,
+  };
+}
+
+function resolveImpactEntrypointInGraph(
+  graph: CodeGraph,
+  request: ImpactAnalysisRequest
+): ResolvedImpactEntrypoint {
+  const graphStatus = graph.modules.length > 0 || graph.symbols.length > 0
+    ? (graph.graphStatus ?? 'complete')
+    : 'missing';
+
+  if (graphStatus === 'missing') {
+    return {
+      ok: false,
+      result: createEmptyImpactResult(request, 'missing', {
+        status: 'unavailable',
+        confidence: 'unavailable',
+        error: {
+          code: 'GRAPH_NOT_FOUND',
+          message: 'Code graph not found. Run `mycodemap generate --symbol-level` first.',
+        },
+        remediation: 'Run `mycodemap generate --symbol-level` to rebuild graph truth before querying impact.',
+      }),
+    };
+  }
+
+  if (request.kind === 'file') {
+    const matches = graph.modules.filter((module) => matchesRequestedPath(module.path, request.filePath));
+    if (matches.length === 1) {
+      return {
+        ok: true,
+        rootId: matches[0].id,
+        entrypoint: {
+          kind: 'file',
+          id: matches[0].id,
+          name: matches[0].path,
+          filePath: matches[0].path,
+        },
+      };
+    }
+
+    if (matches.length > 1) {
+      return {
+        ok: false,
+        result: createEmptyImpactResult(request, graphStatus, {
+          status: 'ambiguous',
+          confidence: 'ambiguous',
+          error: {
+            code: 'AMBIGUOUS_ENTRYPOINT',
+            message: `File "${request.filePath}" resolves to multiple modules.`,
+            details: {
+              candidates: matches.map(toImpactCandidate),
+            },
+          },
+          entrypoint: {
+            candidates: matches.map(toImpactCandidate),
+          },
+        }),
+      };
+    }
+
+    return {
+      ok: false,
+      result: createEmptyImpactResult(request, graphStatus, {
+        status: 'not_found',
+        confidence: 'unavailable',
+        error: {
+          code: 'FILE_NOT_FOUND',
+          message: `File "${request.filePath}" not found in the persisted graph.`,
+        },
+        remediation: 'Use a repo-relative path and regenerate graph truth if the file is newly added.',
+      }),
+    };
+  }
+
+  const matches = graph.symbols
+    .filter((symbol) => symbol.name === request.symbol)
+    .filter((symbol) => request.filePath ? matchesRequestedPath(symbol.location.file, request.filePath) : true);
+
+  if (matches.length === 1) {
+    return {
+      ok: true,
+      rootId: matches[0].id,
+      entrypoint: {
+        kind: 'symbol',
+        id: matches[0].id,
+        name: matches[0].name,
+        filePath: matches[0].location.file,
+        line: matches[0].location.line,
+      },
+    };
+  }
+
+  if (matches.length > 1) {
+    return {
+      ok: false,
+      result: createEmptyImpactResult(request, graphStatus, {
+        status: 'ambiguous',
+        confidence: 'ambiguous',
+        error: {
+          code: 'AMBIGUOUS_ENTRYPOINT',
+          message: `Symbol "${request.symbol}" resolves to multiple candidates.`,
+          details: {
+            candidates: matches.map(toImpactCandidate),
+          },
+        },
+        entrypoint: {
+          candidates: matches.map(toImpactCandidate),
+        },
+      }),
+    };
+  }
+
+  return {
+    ok: false,
+    result: createEmptyImpactResult(request, graphStatus, {
+      status: 'not_found',
+      confidence: 'unavailable',
+      error: {
+        code: 'SYMBOL_NOT_FOUND',
+        message: request.filePath
+          ? `Symbol "${request.symbol}" not found in "${request.filePath}".`
+          : `Symbol "${request.symbol}" not found.`,
+      },
+      remediation: 'Use an exact symbol name and optionally pass filePath to disambiguate.',
+    }),
+  };
+}
+
+function buildModuleReverseAdjacency(graph: CodeGraph): Map<string, string[]> {
+  const adjacency = new Map<string, Set<string>>();
+  const symbolToModuleId = new Map(graph.symbols.map((symbol) => [symbol.id, symbol.moduleId] as const));
+
+  for (const dependency of graph.dependencies) {
+    const sourceModuleId = dependency.sourceEntityType === 'symbol'
+      ? symbolToModuleId.get(dependency.sourceId)
+      : dependency.sourceId;
+    const targetModuleId = dependency.targetEntityType === 'symbol'
+      ? symbolToModuleId.get(dependency.targetId)
+      : dependency.targetId;
+
+    if (!sourceModuleId || !targetModuleId || sourceModuleId === targetModuleId) {
+      continue;
+    }
+
+    if (!adjacency.has(targetModuleId)) {
+      adjacency.set(targetModuleId, new Set());
+    }
+    adjacency.get(targetModuleId)?.add(sourceModuleId);
+  }
+
+  return new Map(
+    Array.from(adjacency.entries()).map(([key, values]) => [key, Array.from(values)])
+  );
+}
+
+function buildSymbolReverseAdjacency(graph: CodeGraph): Map<string, string[]> {
+  const adjacency = new Map<string, Set<string>>();
+
+  for (const dependency of graph.dependencies) {
+    if (
+      dependency.type !== 'call'
+      || dependency.sourceEntityType !== 'symbol'
+      || dependency.targetEntityType !== 'symbol'
+    ) {
+      continue;
+    }
+
+    if (!adjacency.has(dependency.targetId)) {
+      adjacency.set(dependency.targetId, new Set());
+    }
+    adjacency.get(dependency.targetId)?.add(dependency.sourceId);
+  }
+
+  return new Map(
+    Array.from(adjacency.entries()).map(([key, values]) => [key, Array.from(values)])
+  );
+}
+
+function collectImpactTraversal(
+  rootId: string,
+  depth: number,
+  limit: number,
+  adjacency: Map<string, string[]>,
+  resolveNode: (id: string, hop: number, path: string[]) => ImpactNode | null
+): ImpactTraversalOutput {
+  const direct: ImpactNode[] = [];
+  const transitiveLayerMap = new Map<number, ImpactNode[]>();
+  const visited = new Set<string>([rootId]);
+  const queue: TraversalState[] = [{ id: rootId, depth: 0, path: [rootId] }];
+  let impactedCount = 0;
+  let truncated = false;
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || current.depth >= depth) {
+      continue;
+    }
+
+    const neighbors = adjacency.get(current.id) ?? [];
+    for (const neighborId of neighbors) {
+      if (visited.has(neighborId)) {
+        continue;
+      }
+
+      if (impactedCount >= limit) {
+        truncated = true;
+        queue.length = 0;
+        break;
+      }
+
+      const nextDepth = current.depth + 1;
+      const nextPath = [...current.path, neighborId];
+      const node = resolveNode(neighborId, nextDepth, nextPath);
+      if (!node) {
+        continue;
+      }
+
+      visited.add(neighborId);
+      impactedCount += 1;
+
+      if (nextDepth === 1) {
+        direct.push(node);
+      } else {
+        const layer = transitiveLayerMap.get(nextDepth) ?? [];
+        layer.push(node);
+        transitiveLayerMap.set(nextDepth, layer);
+      }
+
+      queue.push({
+        id: neighborId,
+        depth: nextDepth,
+        path: nextPath,
+      });
+    }
+  }
+
+  return {
+    direct,
+    transitiveLayers: Array.from(transitiveLayerMap.entries())
+      .sort((left, right) => left[0] - right[0])
+      .map(([layerDepth, nodes]) => ({
+        depth: layerDepth,
+        nodes,
+      })),
+    truncated,
+  };
+}
+
+function buildSharedImpactResult(
+  graph: CodeGraph,
+  request: ImpactAnalysisRequest,
+  resolved: Extract<ResolvedImpactEntrypoint, { ok: true }>,
+  traversal: ImpactTraversalOutput
+): SharedImpactResult {
+  const graphStatus = graph.graphStatus ?? 'complete';
+  const warnings: SharedImpactResult['warnings'] = [];
+  let confidence: SharedImpactResult['confidence'] = 'high';
+
+  if (graphStatus === 'partial') {
+    warnings.push({
+      code: 'GRAPH_PARTIAL',
+      message: 'Graph truth is partial; parse failures may hide affected files or symbols.',
+    });
+    confidence = 'reduced';
+  }
+
+  if (traversal.truncated) {
+    warnings.push({
+      code: 'TRAVERSAL_TRUNCATED',
+      message: 'Impact traversal hit the configured depth/limit boundary before exhaustion.',
+    });
+    confidence = 'reduced';
+  }
+
+  const transitiveCount = traversal.transitiveLayers.reduce(
+    (sum, layer) => sum + layer.nodes.length,
+    0
+  );
+
+  return {
+    status: 'ok',
+    confidence,
+    graphStatus,
+    entrypoint: resolved.entrypoint,
+    summary: {
+      requestedDepth: request.depth,
+      directCount: traversal.direct.length,
+      transitiveCount,
+      totalCount: traversal.direct.length + transitiveCount,
+      maxDepth: traversal.transitiveLayers.at(-1)?.depth ?? (traversal.direct.length > 0 ? 1 : 0),
+      truncated: traversal.truncated,
+    },
+    direct: traversal.direct,
+    transitiveLayers: traversal.transitiveLayers,
+    warnings,
+    truncated: traversal.truncated,
+  };
+}
+
+function toModuleImpactNode(module: Module, depth: number, path: string[]): ImpactNode {
+  return {
+    id: module.id,
+    kind: 'module',
+    name: module.path,
+    filePath: module.path,
+    depth,
+    path,
+  };
+}
+
+function toSymbolImpactNode(symbol: Symbol, depth: number, path: string[]): SymbolImpactNode {
+  return {
+    id: symbol.id,
+    kind: 'symbol',
+    name: symbol.name,
+    filePath: symbol.location.file,
+    depth,
+    path,
+    symbol: { ...symbol },
+  };
+}
+
+export function analyzeImpactInGraph(
+  graph: CodeGraph,
+  request: ImpactAnalysisRequest
+): SharedImpactResult {
+  const resolved = resolveImpactEntrypointInGraph(graph, request);
+  if (!resolved.ok) {
+    return resolved.result;
+  }
+
+  if (request.kind === 'file') {
+    const moduleMap = new Map(graph.modules.map((module) => [module.id, module] as const));
+    const traversal = collectImpactTraversal(
+      resolved.rootId,
+      request.depth,
+      request.limit ?? Number.MAX_SAFE_INTEGER,
+      buildModuleReverseAdjacency(graph),
+      (id, hop, traversalPath) => {
+        const module = moduleMap.get(id);
+        return module ? toModuleImpactNode(module, hop, traversalPath) : null;
+      }
+    );
+
+    return buildSharedImpactResult(graph, request, resolved, traversal);
+  }
+
+  const symbolMap = new Map(graph.symbols.map((symbol) => [symbol.id, symbol] as const));
+  const traversal = collectImpactTraversal(
+    resolved.rootId,
+    request.depth,
+    request.limit,
+    buildSymbolReverseAdjacency(graph),
+    (id, hop, traversalPath) => {
+      const symbol = symbolMap.get(id);
+      return symbol ? toSymbolImpactNode(symbol, hop, traversalPath) : null;
+    }
+  );
+
+  return buildSharedImpactResult(graph, request, resolved, traversal);
+}
+
+export function collectIncrementalNeighborhood(
+  graph: CodeGraph,
+  changedModulePaths: readonly string[],
+): IncrementalNeighborhood {
+  const normalizedChangedPaths = changedModulePaths.map(normalizePath);
+  const moduleById = new Map(graph.modules.map((module) => [module.id, module] as const));
+  const moduleIdByPath = new Map(
+    graph.modules.map((module) => [normalizePath(module.path), module.id] as const)
+  );
+  const symbolToModuleId = new Map(
+    graph.symbols.map((symbol) => [symbol.id, symbol.moduleId] as const)
+  );
+  const adjacency = new Map<string, Set<string>>();
+  const reasonMap = new Map<string, string>();
+
+  const addEdge = (fromId: string, toId: string, reason: string): void => {
+    if (!adjacency.has(fromId)) {
+      adjacency.set(fromId, new Set());
+    }
+    adjacency.get(fromId)?.add(toId);
+    if (!reasonMap.has(`${fromId}->${toId}`)) {
+      reasonMap.set(`${fromId}->${toId}`, reason);
+    }
+  };
+
+  for (const dependency of graph.dependencies) {
+    const sourceModuleId = dependency.sourceEntityType === 'symbol'
+      ? symbolToModuleId.get(dependency.sourceId)
+      : dependency.sourceId;
+    const targetModuleId = dependency.targetEntityType === 'symbol'
+      ? symbolToModuleId.get(dependency.targetId)
+      : dependency.targetId;
+
+    if (!sourceModuleId || !targetModuleId || sourceModuleId === targetModuleId) {
+      continue;
+    }
+
+    const conservativeSuffix = isConservativeConfidence(dependency.confidence)
+      ? '（保守扩张）'
+      : '';
+    const reason = `${dependency.type} ${sourceModuleId} -> ${targetModuleId}${conservativeSuffix}`;
+    addEdge(sourceModuleId, targetModuleId, reason);
+    addEdge(targetModuleId, sourceModuleId, reason);
+  }
+
+  const queue: Array<{ moduleId: string; depth: number }> = [];
+  const visited = new Set<string>();
+  const reasons: IncrementalRefreshReason[] = [];
+
+  for (const changedPath of normalizedChangedPaths) {
+    const changedModuleId = moduleIdByPath.get(changedPath);
+    if (!changedModuleId) {
+      continue;
+    }
+    queue.push({ moduleId: changedModuleId, depth: 0 });
+    reasons.push({
+      path: changedPath,
+      reason: 'changed file seed',
+    });
+  }
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || visited.has(current.moduleId) || current.depth > 2) {
+      continue;
+    }
+
+    visited.add(current.moduleId);
+    const neighbors = adjacency.get(current.moduleId) ?? new Set<string>();
+    for (const neighborId of neighbors) {
+      if (visited.has(neighborId)) {
+        continue;
+      }
+      const neighbor = moduleById.get(neighborId);
+      if (!neighbor) {
+        continue;
+      }
+      reasons.push({
+        path: normalizePath(neighbor.path),
+        reason: `2-hop invalidation: ${reasonMap.get(`${current.moduleId}->${neighborId}`) ?? 'dependency edge'}`,
+      });
+      queue.push({ moduleId: neighborId, depth: current.depth + 1 });
+    }
+  }
+
+  const invalidatedModuleIds = Array.from(visited);
+  const invalidatedModulePaths = invalidatedModuleIds
+    .map((moduleId) => moduleById.get(moduleId)?.path)
+    .filter((value): value is string => Boolean(value))
+    .map(normalizePath);
+
+  return {
+    invalidatedModuleIds,
+    invalidatedModulePaths,
+    reasons,
+  };
 }
 
 export function findCallersInGraph(graph: CodeGraph, functionId: string): Symbol[] {
@@ -197,41 +768,29 @@ export function calculateImpactInGraph(
   moduleId: string,
   depth: number
 ): ImpactResult {
-  const affectedModules: Module[] = [];
-  const visited = new Set<string>();
-  const queue: Array<{ id: string; level: number }> = [{ id: moduleId, level: 0 }];
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current) {
-      continue;
-    }
-
-    const { id, level } = current;
-
-    if (visited.has(id) || level > depth) {
-      continue;
-    }
-
-    visited.add(id);
-
-    if (level > 0) {
-      const module = graph.modules.find(candidate => candidate.id === id);
-      if (module) {
-        affectedModules.push({ ...module });
+  const module = graph.modules.find((candidate) => candidate.id === moduleId);
+  const shared = module
+    ? analyzeImpactInGraph(graph, { kind: 'file', filePath: module.path, depth })
+    : createEmptyImpactResult(
+      { kind: 'file', filePath: moduleId, depth },
+      graph.graphStatus ?? 'complete',
+      {
+        status: 'not_found',
+        confidence: 'unavailable',
+        error: {
+          code: 'FILE_NOT_FOUND',
+          message: `Module "${moduleId}" not found in the persisted graph.`,
+        },
       }
-    }
-
-    for (const dependency of graph.dependencies) {
-      if (dependency.targetId === id && !visited.has(dependency.sourceId)) {
-        queue.push({ id: dependency.sourceId, level: level + 1 });
-      }
-    }
-  }
+    );
 
   return {
+    ...shared,
     rootModule: moduleId,
-    affectedModules,
+    affectedModules: [...shared.direct, ...shared.transitiveLayers.flatMap((layer) => layer.nodes)]
+      .map((node) => graph.modules.find((candidate) => candidate.id === node.id))
+      .filter((candidate): candidate is Module => Boolean(candidate))
+      .map((candidate) => ({ ...candidate })),
     depth,
   };
 }
@@ -246,87 +805,31 @@ export function calculateSymbolImpactInGraph(
   if (!rootSymbol) {
     throw new Error(`Symbol ${symbolId} not found`);
   }
-
-  const symbolMap = new Map(
-    graph.symbols.map(symbol => [symbol.id, symbol] as const)
-  );
-  const callerMap = new Map<string, Dependency[]>();
-
-  for (const dependency of graph.dependencies) {
-    if (
-      dependency.type !== 'call'
-      || dependency.sourceEntityType !== 'symbol'
-      || dependency.targetEntityType !== 'symbol'
-    ) {
-      continue;
-    }
-
-    const existing = callerMap.get(dependency.targetId) ?? [];
-    existing.push(dependency);
-    callerMap.set(dependency.targetId, existing);
-  }
-
-  const affectedSymbols: SymbolImpactResult['affectedSymbols'] = [];
-  const visited = new Set<string>([symbolId]);
-  const queue: Array<{ id: string; level: number; path: string[] }> = [{
-    id: symbolId,
-    level: 0,
-    path: [symbolId],
-  }];
-  let truncated = false;
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current) {
-      continue;
-    }
-
-    if (current.level >= depth) {
-      continue;
-    }
-
-    const callers = callerMap.get(current.id) ?? [];
-    for (const dependency of callers) {
-      if (affectedSymbols.length >= limit) {
-        truncated = true;
-        queue.length = 0;
-        break;
-      }
-
-      const callerId = dependency.sourceId;
-      if (visited.has(callerId)) {
-        continue;
-      }
-
-      const callerSymbol = symbolMap.get(callerId);
-      if (!callerSymbol) {
-        continue;
-      }
-
-      visited.add(callerId);
-      const nextPath = [...current.path, callerId];
-      const nextLevel = current.level + 1;
-
-      affectedSymbols.push({
-        symbol: { ...callerSymbol },
-        depth: nextLevel,
-        path: nextPath,
-      });
-
-      queue.push({
-        id: callerId,
-        level: nextLevel,
-        path: nextPath,
-      });
-    }
-  }
-
-  return {
-    rootSymbol: { ...rootSymbol },
-    affectedSymbols,
+  const shared = analyzeImpactInGraph(graph, {
+    kind: 'symbol',
+    symbol: rootSymbol.name,
+    filePath: rootSymbol.location.file,
     depth,
     limit,
-    truncated,
+  });
+  const flattenedNodes = [
+    ...shared.direct,
+    ...shared.transitiveLayers.flatMap((layer) => layer.nodes),
+  ];
+
+  return {
+    ...shared,
+    rootSymbol: { ...rootSymbol },
+    affectedSymbols: flattenedNodes
+      .map((node) => graph.symbols.find((candidate) => candidate.id === node.id))
+      .filter((candidate): candidate is Symbol => Boolean(candidate))
+      .map((candidate, index) => {
+        const flattenedNode = flattenedNodes[index];
+        return toSymbolImpactNode(candidate, flattenedNode.depth, flattenedNode.path);
+      }),
+    depth,
+    limit,
+    truncated: shared.truncated,
   };
 }
 

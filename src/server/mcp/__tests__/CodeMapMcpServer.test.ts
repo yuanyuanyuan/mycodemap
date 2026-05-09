@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { PassThrough } from 'node:stream';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { CodeGraph } from '../../../interface/types/index.js';
 import { MemoryStorage } from '../../../infrastructure/storage/adapters/MemoryStorage.js';
+import { SQLiteStorage } from '../../../infrastructure/storage/adapters/SQLiteStorage.js';
 import { createCodeMapMcpServer } from '../server.js';
 
 function createGraphFixture(options: {
@@ -11,8 +15,10 @@ function createGraphFixture(options: {
   graphStatus?: 'complete' | 'partial';
   failedFileCount?: number;
   parseFailureFiles?: string[];
+  communityShape?: 'default' | 'sparse';
 } = {}): CodeGraph {
   const updatedAt = options.updatedAt ?? new Date();
+  const communityShape = options.communityShape ?? 'default';
 
   return {
     project: {
@@ -106,30 +112,44 @@ function createGraphFixture(options: {
         visibility: 'public',
       },
     ],
-    dependencies: [
-      {
-        id: 'dep-call-1',
-        sourceId: 'sym-caller',
-        sourceEntityType: 'symbol',
-        targetId: 'sym-target',
-        targetEntityType: 'symbol',
-        type: 'call',
-        confidence: 'high',
-        filePath: 'src/caller.ts',
-        line: 2,
-      },
-      {
-        id: 'dep-call-2',
-        sourceId: 'sym-transitive',
-        sourceEntityType: 'symbol',
-        targetId: 'sym-caller',
-        targetEntityType: 'symbol',
-        type: 'call',
-        confidence: 'high',
-        filePath: 'src/transitive.ts',
-        line: 2,
-      },
-    ],
+    dependencies: communityShape === 'sparse'
+      ? [
+        {
+          id: 'dep-call-1',
+          sourceId: 'sym-caller',
+          sourceEntityType: 'symbol',
+          targetId: 'sym-target',
+          targetEntityType: 'symbol',
+          type: 'call',
+          confidence: 'EXTRACTED',
+          filePath: 'src/caller.ts',
+          line: 2,
+        },
+      ]
+      : [
+        {
+          id: 'dep-call-1',
+          sourceId: 'sym-caller',
+          sourceEntityType: 'symbol',
+          targetId: 'sym-target',
+          targetEntityType: 'symbol',
+          type: 'call',
+          confidence: 'EXTRACTED',
+          filePath: 'src/caller.ts',
+          line: 2,
+        },
+        {
+          id: 'dep-call-2',
+          sourceId: 'sym-transitive',
+          sourceEntityType: 'symbol',
+          targetId: 'sym-caller',
+          targetEntityType: 'symbol',
+          type: 'call',
+          confidence: 'EXTRACTED',
+          filePath: 'src/transitive.ts',
+          line: 2,
+        },
+      ],
     graphStatus: options.graphStatus ?? 'complete',
     failedFileCount: options.failedFileCount ?? 0,
     parseFailureFiles: options.parseFailureFiles ?? [],
@@ -142,6 +162,7 @@ async function createConnectedClient(options: {
   graphStatus?: 'complete' | 'partial';
   failedFileCount?: number;
   parseFailureFiles?: string[];
+  communityShape?: 'default' | 'sparse';
 } = {}) {
   const storage = new MemoryStorage();
   await storage.initialize('/fixture');
@@ -173,13 +194,32 @@ async function createConnectedClient(options: {
   };
 }
 
+async function createSQLiteInspector(rootDir: string, databasePath = '.codemap/governance.sqlite') {
+  const sqliteModule = await import('better-sqlite3');
+  mkdirSync(path.dirname(path.join(rootDir, databasePath)), { recursive: true });
+  return new sqliteModule.default(path.join(rootDir, databasePath)) as {
+    close: () => void;
+    prepare: (sql: string) => {
+      run: (...params: unknown[]) => unknown;
+    };
+  };
+}
+
 const openResources: Array<{
   client: Client;
   server: ReturnType<typeof createCodeMapMcpServer>;
-  storage: MemoryStorage;
+  storage: MemoryStorage | SQLiteStorage;
 }> = [];
+const tempRoots: string[] = [];
 
 afterEach(async () => {
+  while (tempRoots.length > 0) {
+    const root = tempRoots.pop();
+    if (root) {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
   while (openResources.length > 0) {
     const resource = openResources.pop();
     if (!resource) {
@@ -203,6 +243,7 @@ describe('CodeMap experimental MCP server', () => {
       'codemap_query',
       'codemap_env_contract',
       'codemap_impact',
+      'codemap_communities',
       'codemap_context',
       'codemap_analyze',
       'codemap_deps',
@@ -247,7 +288,7 @@ describe('CodeMap experimental MCP server', () => {
     expect(items.length).toBeGreaterThan(0);
   });
 
-  it('returns symbol-level caller impact without a second tool-layer graph walk', async () => {
+  it('returns layered shared impact truth without a second tool-layer graph walk', async () => {
     const connection = await createConnectedClient();
     openResources.push(connection);
 
@@ -256,22 +297,72 @@ describe('CodeMap experimental MCP server', () => {
       arguments: { symbol: 'target', depth: 4, limit: 10 },
     });
     const structured = result.structuredContent as Record<string, unknown>;
-    const affectedSymbols = structured.affected_symbols as Array<Record<string, unknown>>;
+    const direct = structured.direct as Array<Record<string, unknown>>;
+    const transitiveLayers = structured.transitive_layers as Array<Record<string, unknown>>;
 
     expect(structured.status).toBe('ok');
-    expect(structured.root_symbol).toEqual(expect.objectContaining({ id: 'sym-target' }));
-    expect(affectedSymbols).toEqual([
+    expect(structured.entrypoint).toEqual(expect.objectContaining({
+      kind: 'symbol',
+      id: 'sym-target',
+      file_path: 'src/target.ts',
+    }));
+    expect(structured.summary).toEqual(expect.objectContaining({
+      requested_depth: 4,
+      direct_count: 1,
+      transitive_count: 1,
+      total_count: 2,
+    }));
+    expect(direct).toEqual([
       expect.objectContaining({
+        id: 'sym-caller',
+        kind: 'symbol',
+        name: 'caller',
+        file_path: 'src/caller.ts',
         depth: 1,
-        symbol: expect.objectContaining({ id: 'sym-caller' }),
         path: ['sym-target', 'sym-caller'],
       }),
+    ]);
+    expect(transitiveLayers).toEqual([
       expect.objectContaining({
         depth: 2,
-        symbol: expect.objectContaining({ id: 'sym-transitive' }),
-        path: ['sym-target', 'sym-caller', 'sym-transitive'],
+        nodes: [expect.objectContaining({
+          id: 'sym-transitive',
+          depth: 2,
+          path: ['sym-target', 'sym-caller', 'sym-transitive'],
+        })],
       }),
     ]);
+    expect(structured.graph_status).toBe('complete');
+  });
+
+  it('returns interpretable community summaries through the native MCP tool', async () => {
+    const connection = await createConnectedClient();
+    openResources.push(connection);
+
+    const result = await connection.client.callTool({
+      name: 'codemap_communities',
+      arguments: {},
+    });
+    const structured = result.structuredContent as Record<string, unknown>;
+    const communities = structured.communities as Array<Record<string, unknown>>;
+
+    expect(result.isError).toBe(false);
+    expect(structured.status).toBe('ok');
+    expect(structured.summary).toEqual(expect.objectContaining({
+      total_modules: 5,
+      community_count: 3,
+    }));
+    expect(communities[0]).toEqual(expect.objectContaining({
+      label: 'community-1',
+      top_paths: ['src/caller.ts', 'src/target.ts', 'src/transitive.ts'],
+      dominant_edge_kinds: ['call'],
+    }));
+    expect(communities).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        label: 'src',
+        dominant_edge_kinds: [],
+      }),
+    ]));
   });
 
   it('returns GRAPH_NOT_FOUND when the symbol graph has not been generated', async () => {
@@ -292,7 +383,7 @@ describe('CodeMap experimental MCP server', () => {
     }));
   });
 
-  it('returns SYMBOL_NOT_FOUND and AMBIGUOUS_EDGE explicitly', async () => {
+  it('returns SYMBOL_NOT_FOUND and AMBIGUOUS_ENTRYPOINT explicitly', async () => {
     const connection = await createConnectedClient();
     openResources.push(connection);
 
@@ -308,7 +399,7 @@ describe('CodeMap experimental MCP server', () => {
     expect((notFoundResult.structuredContent as Record<string, unknown>).error)
       .toEqual(expect.objectContaining({ code: 'SYMBOL_NOT_FOUND' }));
     expect((ambiguousResult.structuredContent as Record<string, unknown>).error)
-      .toEqual(expect.objectContaining({ code: 'AMBIGUOUS_EDGE' }));
+      .toEqual(expect.objectContaining({ code: 'AMBIGUOUS_ENTRYPOINT' }));
   });
 
   it('returns structured direct-execution failures for the Phase 61 family', async () => {
@@ -428,5 +519,98 @@ describe('CodeMap experimental MCP server', () => {
       status: 'invalid_input',
       error: expect.objectContaining({ code: 'FILTER_CONFLICT' }),
     }));
+  });
+
+  it('keeps codemap_query stable and degrades codemap_impact explicitly on partial graph truth', async () => {
+    const connection = await createConnectedClient({
+      graphStatus: 'partial',
+      failedFileCount: 1,
+      parseFailureFiles: ['src/stale.ts'],
+    });
+    openResources.push(connection);
+
+    const queryResult = await connection.client.callTool({
+      name: 'codemap_query',
+      arguments: { search: 'target', limit: 5 },
+    });
+    const impactResult = await connection.client.callTool({
+      name: 'codemap_impact',
+      arguments: { symbol: 'target', depth: 3, limit: 10 },
+    });
+
+    expect(queryResult.structuredContent).toEqual(expect.objectContaining({
+      status: 'ok',
+      diagnostics: expect.objectContaining({ tool: 'query' }),
+      result: expect.objectContaining({
+        type: 'search',
+        query: 'target',
+      }),
+    }));
+    expect(impactResult.structuredContent).toEqual(expect.objectContaining({
+      status: 'ok',
+      confidence: 'reduced',
+      graph_status: 'partial',
+      failed_file_count: 1,
+      parse_failure_files: ['src/stale.ts'],
+      entrypoint: expect.objectContaining({ id: 'sym-target' }),
+      direct: expect.arrayContaining([
+        expect.objectContaining({
+          id: 'sym-caller',
+        }),
+      ]),
+      warnings: expect.arrayContaining([
+        expect.objectContaining({ code: 'GRAPH_PARTIAL' }),
+      ]),
+    }));
+  });
+
+  it('keeps degraded low-signal warnings visible on codemap_communities', async () => {
+    const connection = await createConnectedClient({
+      graphStatus: 'partial',
+      failedFileCount: 1,
+      parseFailureFiles: ['src/stale.ts'],
+      communityShape: 'sparse',
+    });
+    openResources.push(connection);
+
+    const result = await connection.client.callTool({
+      name: 'codemap_communities',
+      arguments: {},
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.structuredContent).toEqual(expect.objectContaining({
+      status: 'ok',
+      confidence: 'reduced',
+      graph_status: 'partial',
+      warnings: expect.arrayContaining([
+        expect.objectContaining({ code: 'GRAPH_PARTIAL' }),
+        expect.objectContaining({ code: 'LOW_SIGNAL_SPARSE_GRAPH' }),
+        expect.objectContaining({ code: 'LOW_SIGNAL_SINGLETON_HEAVY' }),
+      ]),
+    }));
+  });
+
+  it('does not return a false success envelope when persisted SQLite truth is stale', async () => {
+    const rootDir = mkdtempSync(path.join(tmpdir(), 'codemap-mcp-phase63-'));
+    tempRoots.push(rootDir);
+    const databasePath = '.codemap/governance.sqlite';
+    const storage = new SQLiteStorage({ type: 'sqlite', databasePath });
+
+    await storage.initialize(rootDir);
+    await storage.saveCodeGraph(createGraphFixture());
+    await storage.close();
+
+    const inspector = await createSQLiteInspector(rootDir, databasePath);
+    inspector.prepare('DELETE FROM graph_edges WHERE dependency_id = ?').run('dep-call-2');
+    inspector.close();
+
+    const staleStorage = new SQLiteStorage({ type: 'sqlite', databasePath });
+    await expect(staleStorage.initialize(rootDir)).rejects.toMatchObject({
+      code: 'SQLITE_INIT_FAILED',
+      cause: expect.objectContaining({
+        code: 'GRAPH_SCHEMA_REBUILD_REQUIRED',
+      }),
+    });
   });
 });

@@ -5,6 +5,7 @@
 // ============================================
 
 import type { CodeGraph } from '../entities/CodeGraph.js';
+import type { IncrementalRefreshSummary } from '../../interface/types/storage.js';
 
 /**
  * 代码图仓库接口
@@ -21,6 +22,11 @@ export interface CodeGraphRepository {
    * 保存代码图
    */
   save(graph: CodeGraph): Promise<void>;
+
+  /**
+   * 保存代码图并持久化最近一次增量刷新摘要
+   */
+  saveWithRefreshSummary(graph: CodeGraph, refresh: IncrementalRefreshSummary): Promise<void>;
 
   /**
    * 根据项目 ID 加载代码图

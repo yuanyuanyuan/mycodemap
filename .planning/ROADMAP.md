@@ -1,7 +1,7 @@
 # Milestone v2.4: parser-multilang-depth
 
 **Status:** IN PROGRESS
-**Phases:** 67-70
+**Phases:** 67-71
 **Total Plans:** TBD
 
 ## Overview
@@ -62,6 +62,21 @@
 3. Cross-file analysis for Python resolves import references to actual symbol definitions in the same project.
 4. At least one test proves that a Python project with cross-file imports produces a connected dependency graph, not isolated per-file fragments.
 
+### Phase 71: Parser Legacy Cleanup
+
+**Goal:** Close parser architecture debt left after Phase 59 (parser cutover) and Phase 68 (multi-language parser switching). Unify `ILanguageParser` as the single canonical interface, remove adapter shims (`convertRegistryResultToLegacyResult`, `toLegacyParseResult`), relocate `TreeSitterParser` into Infrastructure layer and register it in `ParserRegistry`, decouple Core layer from direct Infrastructure imports, and relocate `TypeScriptTypeEnhancer` out of the legacy layer.
+**Depends on:** Phase 59, Phase 68
+**Requirements:** PAR-09, PAR-10, PAR-11
+**Plans:** 3 planned (71-01 type unification, 71-02 TreeSitterParser relocation, 71-03 layer decoupling)
+
+**Success Criteria:**
+1. `ILanguageParser` is the single internal parser interface; Legacy `IParser` is marked `@deprecated` and unused internally.
+2. No adapter functions (`convertRegistryResultToLegacyResult`, `toLegacyParseResult`) exist in active runtime code.
+3. `TreeSitterParser` lives in `src/infrastructure/parser/implementations/`, extends `ParserBase`, and is registered in `ParserRegistry`.
+4. `src/core/analyzer.ts` does not directly import `createDefaultParserRegistry` from Infrastructure layer.
+5. `TypeScriptTypeEnhancer` lives in `src/infrastructure/parser/enhancers/` and is imported from there by all consumers.
+6. All existing tests pass; no regression in `mycodemap generate` for TS/Python/Go projects.
+
 ## Milestone Summary
 
 **Key Objectives:**
@@ -74,8 +89,8 @@
 
 **Coverage:**
 
-- `4` phases
-- Phase numbering continues from `66` to `67-70`
+- `5` phases
+- Phase numbering continues from `66` to `67-71`
 
 **Deferred Beyond v2.4:**
 

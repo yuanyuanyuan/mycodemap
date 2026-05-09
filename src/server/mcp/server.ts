@@ -92,7 +92,7 @@ function registerNativeTools(server: McpServer, service: CodeMapMcpService, stor
 
   server.registerTool('codemap_impact', {
     title: 'CodeMap Impact',
-    description: 'Experimental: query symbol-level caller impact from the local CodeMap graph.',
+    description: 'Experimental: query layered graph-native impact from a symbol entrypoint using the shared persisted graph truth.',
     inputSchema: {
       symbol: z.string().min(1).describe('Exact symbol name to resolve'),
       filePath: z.string().min(1).optional().describe('Optional file path to disambiguate same-name symbols'),
@@ -106,6 +106,23 @@ function registerNativeTools(server: McpServer, service: CodeMapMcpService, stor
       depth,
       limit,
     });
+
+    return {
+      content: [{
+        type: 'text',
+        text: renderStructuredContent(structuredContent),
+      }],
+      structuredContent,
+      isError: structuredContent.status !== 'ok',
+    };
+  });
+
+  server.registerTool('codemap_communities', {
+    title: 'CodeMap Communities',
+    description: 'Experimental: query module-level community structure from the shared persisted graph truth.',
+    inputSchema: {},
+  }, async () => {
+    const structuredContent = await service.communities();
 
     return {
       content: [{
@@ -190,7 +207,12 @@ export function createCodeMapMcpServer(storage: IStorage, rootDir: string = cwd(
   });
   const service = new CodeMapMcpService(storage);
 
-  const reservedNames = new Set<string>(['codemap_impact', 'codemap_env_contract', 'codemap_context']);
+  const reservedNames = new Set<string>([
+    'codemap_impact',
+    'codemap_communities',
+    'codemap_env_contract',
+    'codemap_context',
+  ]);
 
   registerNativeTools(server, service, storage);
   registerContractTools(server, getFullContract(), reservedNames, rootDir);

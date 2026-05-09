@@ -11,7 +11,7 @@ import type { Dependency as DependencyInterface } from '../../interface/types/in
  */
 export type DependencyType = 'import' | 'inherit' | 'implement' | 'call' | 'type-ref';
 export type DependencyEntityType = 'module' | 'symbol';
-export type DependencyConfidence = 'high' | 'ambiguous';
+export type DependencyConfidence = 'EXTRACTED' | 'INFERRED' | 'AMBIGUOUS';
 
 /**
  * 依赖领域实体
@@ -112,6 +112,12 @@ export class Dependency implements DependencyInterface {
     }
     if (this.sourceId === this.targetId) {
       throw new Error('Source and target cannot be the same');
+    }
+    if (
+      this.confidence !== undefined
+      && !['EXTRACTED', 'INFERRED', 'AMBIGUOUS'].includes(this.confidence)
+    ) {
+      throw new Error(`Invalid dependency confidence: ${this.confidence}`);
     }
   }
 
