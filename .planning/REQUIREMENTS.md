@@ -63,24 +63,24 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TOKEN-01 | TBD | Pending |
-| TOKEN-02 | TBD | Pending |
-| TOKEN-03 | TBD | Pending |
-| TOKEN-04 | TBD | Pending |
-| TOKEN-05 | TBD | Pending |
-| RPT-01 | TBD | Pending |
-| RPT-02 | TBD | Pending |
-| RPT-03 | TBD | Pending |
-| CI-01 | TBD | Pending |
-| CI-02 | TBD | Pending |
-| CI-03 | TBD | Pending |
-| CMD-01 | TBD | Pending |
-| CMD-02 | TBD | Pending |
+| TOKEN-01 | Phase 75 | Pending |
+| TOKEN-02 | Phase 75 | Pending |
+| TOKEN-03 | Phase 78 | Pending |
+| TOKEN-04 | Phase 78 | Pending |
+| TOKEN-05 | Phase 78 | Pending |
+| RPT-01 | Phase 76 | Pending |
+| RPT-02 | Phase 76 | Pending |
+| RPT-03 | Phase 76 | Pending |
+| CI-01 | Phase 77 | Pending |
+| CI-02 | Phase 77 | Pending |
+| CI-03 | Phase 77 | Pending |
+| CMD-01 | Phase 75 | Pending |
+| CMD-02 | Phase 75 | Pending |
 
 **Coverage:**
 - v2.7 requirements: 13 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 13
+- Mapped to phases: 13 (roadmap created)
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-10*
