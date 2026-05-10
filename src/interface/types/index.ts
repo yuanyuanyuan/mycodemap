@@ -5,6 +5,8 @@
 // CodeMap 核心类型定义 - Interface Layer
 // ============================================
 
+import type { IParserRegistry, ITypeEnhancer } from './parser.js';
+
 // ============================================
 // Section 1: 基础类型定义
 // ============================================
@@ -283,6 +285,15 @@ export interface ModuleInfo {
     }>;
     unionTypes: string[];
     intersectionTypes: string[];
+    typeAliases: Array<{
+      name: string;
+      type: string;
+      genericParams?: Array<{
+        name: string;
+        extends?: string;
+        default?: string;
+      }>;
+    }>;
   };
 }
 
@@ -384,6 +395,8 @@ export interface AnalysisOptions {
   output?: string;
   watch?: boolean;
   enhanceTypes?: boolean;
+  parserRegistry?: IParserRegistry;
+  typeEnhancers?: ITypeEnhancer[];
 }
 
 // 文件变更
@@ -661,6 +674,7 @@ export type {
   LanguageFeature,
   ILanguageParser,
   IParserRegistry,
+  ITypeEnhancer,
 } from './parser.js';
 
 export type {

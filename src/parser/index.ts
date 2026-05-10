@@ -10,15 +10,23 @@ import path from 'path';
 import type { ModuleInfo, ImportInfo, ExportInfo, ModuleSymbol, SymbolKind, DecoratorInfo } from '../types/index.js';
 import type { ParseResult as RegistryParseResult } from '../interface/types/parser.js';
 import { createDefaultParserRegistry } from '../infrastructure/parser/index.js';
+import { TypeScriptTypeEnhancer } from '../infrastructure/parser/enhancers/TypeScriptTypeEnhancer.js';
 import { ErrorCodes } from '../cli/output/error-codes.js';
-import type { IParser, ParserOptions, ParserMode, DeprecatedParserMode } from './interfaces/IParser.js';
-import { TypeScriptTypeEnhancer } from './enhancers/TypeScriptTypeEnhancer.js';
+import type { IParser, ParserOptions, ParserMode, DeprecatedParserMode, ParseResult as LegacyParseResult } from './interfaces/IParser.js';
+import { PythonTypeEnhancer } from './enhancers/PythonTypeEnhancer.js';
 import { SmartParser } from './implementations/smart-parser.js';
 import { FastParser } from './implementations/fast-parser.js';
 
+type RegistryCompatParseResult = RegistryParseResult & {
+  path: string;
+  type: ModuleInfo['type'];
+  stats: ModuleInfo['stats'];
+};
+
 // 导出接口
 export type { IParser, ParserOptions, ParserMode, DeprecatedParserMode, ParserModeInput } from './interfaces/IParser.js';
-export type { ParseResult, TypeInfo, CallGraph, ComplexityMetrics } from './interfaces/IParser.js';
+export type { ParseResult } from '../interface/types/parser.js';
+export type { TypeInfo, CallGraph, ComplexityMetrics } from './interfaces/IParser.js';
 
 // 导出实现
 export { SmartParser, FastParser };
@@ -50,19 +58,27 @@ class RegistryBackedParser implements IParser {
   readonly name = 'registry-backed-parser';
   readonly mode = 'tree-sitter';
   private readonly registry = createDefaultParserRegistry();
-  private readonly enhancer: TypeScriptTypeEnhancer;
+  private readonly tsEnhancer: TypeScriptTypeEnhancer;
+  private readonly pythonEnhancer: PythonTypeEnhancer;
+  private readonly initializedParsers = new Set<string>();
 
   constructor(private readonly options: ParserOptions) {
-    this.enhancer = new TypeScriptTypeEnhancer(
+    this.tsEnhancer = new TypeScriptTypeEnhancer(
       options.rootDir,
       options.enhanceTypes !== false
     );
+    this.pythonEnhancer = new PythonTypeEnhancer(options.enhanceTypes !== false);
   }
 
-  async parseFile(filePath: string) {
+  async parseFile(filePath: string): Promise<LegacyParseResult> {
     const parser = this.registry.getParserByFile(filePath);
     if (!parser) {
       throw new Error(`No parser registered for ${filePath}`);
+    }
+
+    if (!this.initializedParsers.has(parser.languageId)) {
+      await parser.initialize();
+      this.initializedParsers.add(parser.languageId);
     }
 
     const content = await readFileContent(filePath);
@@ -72,41 +88,32 @@ class RegistryBackedParser implements IParser {
       includeTypeInfo: true,
     });
 
-    const [enhanced] = await this.enhancer.enhance([toLegacyParseResult(parsed)]);
+    const [enhanced] = await this.enhanceResults([this.addLegacyCompatFields(parsed)]);
     return enhanced;
   }
 
-  async parseFiles(filePaths: string[]) {
-    const results = await Promise.all(filePaths.map((filePath) => this.parseFile(filePath)));
-    return this.enhancer.enhance(results);
+  async parseFiles(filePaths: string[]): Promise<LegacyParseResult[]> {
+    return Promise.all(filePaths.map((filePath) => this.parseFile(filePath)));
   }
 
   dispose(): void {
-    this.enhancer.dispose();
+    this.tsEnhancer.dispose();
+    this.pythonEnhancer.dispose();
   }
-}
 
-function toLegacyParseResult(result: RegistryParseResult): import('./interfaces/IParser.js').ParseResult {
-  return {
-    path: result.filePath,
-    exports: result.exports,
-    imports: result.imports,
-    symbols: result.symbols,
-    dependencies: result.imports.map((entry) => resolveImportPath(result.filePath, entry.source)),
-    type: getModuleType(result.filePath),
-    stats: result.module.stats,
-    callGraph: result.callGraph
-      ? {
-          calls: result.callGraph.calls,
-          recursive: result.callGraph.recursive,
-          callCounts: result.callGraph.calls.reduce<Record<string, number>>((counts, call) => {
-            counts[call.callee] = (counts[call.callee] ?? 0) + 1;
-            return counts;
-          }, {}),
-        }
-      : undefined,
-    complexity: result.complexity,
-  };
+  private async enhanceResults(results: RegistryCompatParseResult[]): Promise<RegistryCompatParseResult[]> {
+    const tsEnhanced = await this.tsEnhancer.enhance(results);
+    return this.pythonEnhancer.enhance(tsEnhanced) as Promise<RegistryCompatParseResult[]>;
+  }
+
+  private addLegacyCompatFields(result: RegistryParseResult): RegistryCompatParseResult {
+    return {
+      ...result,
+      path: result.filePath,
+      type: getModuleType(result.filePath),
+      stats: result.module.stats,
+    };
+  }
 }
 
 function createDeprecatedParserModeError(mode: DeprecatedParserMode): Error & { code: string } {

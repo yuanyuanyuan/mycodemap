@@ -2,11 +2,9 @@
 // [WHY] Core analysis engine that orchestrates parsing, dependency analysis, and code map generation
 import path from 'path';
 import fs from 'fs/promises';
-import { createDefaultParserRegistry } from '../infrastructure/parser/index.js';
 import type { CodeMap, AnalysisOptions, ModuleInfo, DependencyGraph, ProjectInfo, ProjectSummary } from '../types/index.js';
-import type { ParseResult } from '../parser/interfaces/IParser.js';
+import type { ParseResult } from '../interface/types/parser.js';
 import { isDeprecatedParserMode } from '../parser/index.js';
-import { TypeScriptTypeEnhancer } from '../parser/enhancers/TypeScriptTypeEnhancer.js';
 import { createGlobalIndex } from './global-index.js';
 import { discoverProjectFiles, DEFAULT_DISCOVERY_EXCLUDES } from './file-discovery.js';
 import { ErrorCodes } from '../cli/output/error-codes.js';
@@ -21,6 +19,8 @@ export async function analyze(options: AnalysisOptions): Promise<CodeMap> {
     exclude = DEFAULT_DISCOVERY_EXCLUDES,
     mode = 'tree-sitter',
     enhanceTypes = true,
+    parserRegistry,
+    typeEnhancers = [],
   } = options;
 
   if (isDeprecatedParserMode(mode)) {
@@ -38,15 +38,16 @@ export async function analyze(options: AnalysisOptions): Promise<CodeMap> {
     exclude
   });
 
-  // 2. Registry 主路径解析文件
-  const registry = createDefaultParserRegistry();
-  const tsEnhancer = new TypeScriptTypeEnhancer(rootDir, enhanceTypes);
+  if (!parserRegistry) {
+    throw new Error('AnalysisOptions.parserRegistry is required. Use the composition root to build analysis context.');
+  }
+
   const initializedParsers = new Set<string>();
   let parseResults: ParseResult[] = [];
 
   for (const file of files) {
     try {
-      const parser = registry.getParserByFile(file);
+      const parser = parserRegistry.getParserByFile(file);
       if (!parser) {
         console.warn(`Warning: No parser registered for ${file}`);
         continue;
@@ -64,18 +65,24 @@ export async function analyze(options: AnalysisOptions): Promise<CodeMap> {
         includeTypeInfo: true,
       });
 
-      parseResults.push(convertRegistryResultToLegacyResult(parsed));
+      parseResults.push(parsed);
     } catch (error) {
       console.warn(`Warning: Failed to parse ${file}: ${error}`);
     }
   }
 
-  parseResults = await tsEnhancer.enhance(parseResults);
+  if (enhanceTypes) {
+    for (const enhancer of typeEnhancers) {
+      parseResults = await enhancer.enhance(parseResults);
+    }
+  }
   const modules = parseResults.map((result) => convertToModuleInfo(result));
-  tsEnhancer.dispose();
+  for (const enhancer of typeEnhancers) {
+    enhancer.dispose();
+  }
   await Promise.all(
-    registry.getSupportedLanguages().map(async (language) => {
-      const parser = registry.getParser(language);
+    parserRegistry.getSupportedLanguages().map(async (language) => {
+      const parser = parserRegistry.getParser(language);
       if (parser) {
         await parser.dispose();
       }
@@ -135,34 +142,17 @@ export async function analyze(options: AnalysisOptions): Promise<CodeMap> {
 // 转换 ParseResult 到 ModuleInfo
 function convertToModuleInfo(result: ParseResult): ModuleInfo {
   return {
-    id: createModuleId(result.path),
-    path: result.path,
-    absolutePath: result.path,
-    type: result.type,
-    stats: result.stats,
-    exports: result.exports,
-    imports: result.imports,
-    symbols: result.symbols,
-    dependencies: Array.from(new Set(result.dependencies)),
-    dependents: [],
-    // Smart 模式额外信息
-    complexity: result.complexity,
-    callGraph: result.callGraph,
-    typeInfo: result.typeInfo
-  };
-}
-
-function convertRegistryResultToLegacyResult(
-  result: import('../interface/types/parser.js').ParseResult
-): ParseResult {
-  return {
+    id: createModuleId(result.filePath),
     path: result.filePath,
-    exports: result.exports,
-    imports: result.imports,
-    symbols: result.symbols,
-    dependencies: result.imports.map((entry) => resolveDependencyPath(result.filePath, entry.source)),
+    absolutePath: result.filePath,
     type: categorizeParsedFile(result.filePath),
     stats: result.module.stats,
+    exports: result.exports,
+    imports: result.imports,
+    symbols: result.symbols,
+    dependencies: Array.from(new Set(result.imports.map((entry) => resolveDependencyPath(result.filePath, entry.source)))),
+    dependents: [],
+    complexity: result.complexity,
     callGraph: result.callGraph
       ? {
           calls: result.callGraph.calls,
@@ -173,7 +163,7 @@ function convertRegistryResultToLegacyResult(
           }, {}),
         }
       : undefined,
-    complexity: result.complexity,
+    typeInfo: result.typeInfo
   };
 }
 

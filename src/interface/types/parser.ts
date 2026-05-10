@@ -53,6 +53,75 @@ export interface ParseError {
   severity: 'error' | 'warning';
 }
 
+/** 完整类型信息 */
+export interface TypeInfo {
+  typeDefinitions: Array<{
+    name: string;
+    kind: 'interface' | 'type' | 'enum' | 'class' | 'alias';
+    members: Array<{
+      name: string;
+      type: string;
+      optional: boolean;
+      visibility?: 'public' | 'private' | 'protected' | 'internal';
+      isReadonly?: boolean;
+    }>;
+    extends?: string[];
+    implements?: string[];
+    genericParams?: Array<{
+      name: string;
+      extends?: string;
+      default?: string;
+    }>;
+  }>;
+  genericParams: Array<{
+    name: string;
+    extends?: string;
+    default?: string;
+    constraint?: string;
+  }>;
+  crossFileRefs: Array<{
+    symbol: string;
+    file: string;
+    line: number;
+    column?: number;
+    exportName?: string;
+  }>;
+  unionTypes: string[];
+  intersectionTypes: string[];
+  typeAliases: Array<{
+    name: string;
+    type: string;
+    genericParams?: Array<{
+      name: string;
+      extends?: string;
+      default?: string;
+    }>;
+  }>;
+  conditionalTypes?: Array<{
+    checkType: string;
+    extendsType: string;
+    trueType: string;
+    falseType: string;
+  }>;
+  mappedTypes?: Array<{
+    typeParameter: string;
+    constraint: string;
+    valueType: string;
+    asType?: string;
+    readonly?: 'add' | 'remove';
+    optional?: 'add' | 'remove';
+  }>;
+  templateLiteralTypes?: Array<{
+    head: string;
+    spans: Array<{
+      type: string;
+      literal: string;
+    }>;
+  }>;
+  indexedAccessTypes?: string[];
+  inferredTypes?: string[];
+}
+
 /** 解析结果 */
 export interface ParseResult {
   /** 文件路径 */
@@ -73,6 +142,8 @@ export interface ParseResult {
   callGraph?: CallGraphInfo;
   /** 复杂度指标 */
   complexity?: ComplexityMetrics;
+  /** 兼容 legacy enhancer 的完整类型信息 */
+  typeInfo?: TypeInfo;
   /** 解析耗时 (ms) */
   parseTime: number;
   /** 错误信息 */
@@ -144,8 +215,13 @@ export interface ILanguageParser {
 }
 
 // ============================================
-// Section 6: 解析器注册表接口
+// Section 6: 增强器与注册表接口
 // ============================================
+
+export interface ITypeEnhancer {
+  enhance(results: ParseResult[]): Promise<ParseResult[]>;
+  dispose(): void;
+}
 
 /** 解析器注册表 */
 export interface IParserRegistry {
