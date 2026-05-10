@@ -43,7 +43,7 @@
 **Goal:** 让 Python complexity metrics 进入 shared symbol/module truth，并被 downstream surfaces 复用。
 **Depends on:** Phase 70 or equivalent stable Python deep-analysis seam
 **Requirements:** `PY-08`
-**Plans:** 0 planned
+**Plans:** 1 planned
 
 **Success Criteria:**
 1. Python complexity metrics are computed from the active AST-based path, not the deprecated regex path.
@@ -55,7 +55,7 @@
 **Goal:** 在现有 graph/community baseline 上交付 hub / bridge detection，并用三层 dedup 策略保护 topology truth。
 **Depends on:** Phase 70 for richer graph edges
 **Requirements:** `HOOK-01`, `HOOK-03`
-**Plans:** 0 planned
+**Plans:** 1 planned
 
 **Success Criteria:**
 1. Hub / bridge output uses persisted graph truth and remains interpretable to users/agents.
@@ -67,7 +67,7 @@
 **Goal:** 实现 first-remind-then-silent 的 hook 行为，并把提醒统一路由到 Phase 58 `env-contract` retrieval surface。
 **Depends on:** Shipped Phase 58 env-contract baseline
 **Requirements:** `HOOK-02`
-**Plans:** 0 planned
+**Plans:** 1 planned
 
 **Success Criteria:**
 1. The first matching session event triggers a reminder to query `env-contract`.
@@ -154,7 +154,7 @@
 | 71. Parser Legacy Cleanup | v2.4 | 3/3 | Complete | 2026-05-10 |
 | 72. Python Complexity Truth | v2.5 | 0/0 | Planned | - |
 | 73. Graph Topology Signals and Dedup | v2.5 | 0/0 | Planned | - |
-| 74. Env-contract Reminder Hook | v2.5 | 0/0 | Planned | - |
+| 74. Env-contract Reminder Hook | v2.5 | 1/1 | Complete | 2026-05-10 |
 | 75. Core Infrastructure and Basic Token Analysis | v2.7 | 0/TBD | Not started | - |
 | 76. Estimation and Reporting | v2.7 | 0/TBD | Not started | - |
 | 77. CI Gate and Threshold Enforcement | v2.7 | 0/TBD | Not started | - |
