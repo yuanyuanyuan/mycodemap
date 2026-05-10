@@ -2,11 +2,12 @@
 // [WHY] PythonTreeSitterParser unit tests — AST-based Python parser
 // ============================================
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PythonTreeSitterParser } from '../implementations/PythonTreeSitterParser.js';
 import { PythonParser } from '../implementations/PythonParser.js';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { TreeSitterParser } from '../implementations/TreeSitterParser.js';
 
 const FIXTURE_DIR = resolve(import.meta.dirname, '../../../../tests/fixtures/python');
 
@@ -31,6 +32,18 @@ describe('PythonTreeSitterParser', () => {
     it('should set parserUsed metadata to PythonTreeSitterParser', async () => {
       const result = await parser.parseFile('/tmp/test.py', 'x = 1\n');
       expect(result.parserUsed).toBe('PythonTreeSitterParser');
+    });
+
+    it('fails closed when tree-sitter grammar is unavailable', async () => {
+      const initializeSpy = vi
+        .spyOn(TreeSitterParser.prototype, 'initialize')
+        .mockRejectedValueOnce(new Error('grammar unavailable'));
+
+      const strictParser = new PythonTreeSitterParser();
+
+      await expect(strictParser.initialize()).rejects.toThrow(/No silent fallback to regex parser/);
+
+      initializeSpy.mockRestore();
     });
   });
 

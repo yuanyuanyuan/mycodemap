@@ -5,9 +5,13 @@
 import { createActionableError } from '../../cli/output/errors.js';
 import { ErrorCodes } from '../../cli/output/error-codes.js';
 
+let wasmTreeSitterPromise: Promise<TreeSitterLoaderResult> | null = null;
+let hasWarnedNativeFallback = false;
+
 export interface TreeSitterLoaderResult {
   Parser: any;
-  TypeScript: { typescript: any };
+  TypeScript: { typescript: any; tsx?: any };
+  Python: any;
 }
 
 /**
@@ -33,11 +37,14 @@ export async function loadTreeSitter(): Promise<TreeSitterLoaderResult> {
     // Native failed — try WASM fallback automatically
     try {
       const wasm = await loadWASMTreeSitter();
-      // eslint-disable-next-line no-console
-      console.warn(
-        '⚠️  Native tree-sitter unavailable, using WASM fallback. ' +
-        'Add --native to force native (requires build tools).'
-      );
+      if (!hasWarnedNativeFallback) {
+        hasWarnedNativeFallback = true;
+        // eslint-disable-next-line no-console
+        console.warn(
+          '⚠️  Native tree-sitter unavailable, using WASM fallback. ' +
+          'Add --native to force native (requires build tools).'
+        );
+      }
       return wasm;
     } catch (wasmError) {
       throw createTreeSitterLoaderError(nativeError as Error, wasmError as Error);
@@ -48,14 +55,33 @@ export async function loadTreeSitter(): Promise<TreeSitterLoaderResult> {
 async function loadNativeTreeSitter(): Promise<TreeSitterLoaderResult> {
   const treeSitterModule = await import('tree-sitter');
   const typescriptModule = await import('tree-sitter-typescript');
+  const pythonModule = await import('tree-sitter-python');
+  const Parser = treeSitterModule.default;
+  const pythonLanguage = (pythonModule as any).default?.language ?? (pythonModule as any).language;
+  const validationParser = new Parser();
+
+  validationParser.setLanguage(typescriptModule.typescript);
+  void validationParser.parse('export const ok = 1').rootNode.type;
+
+  validationParser.setLanguage(pythonLanguage);
+  void validationParser.parse('x = 1').rootNode.type;
 
   return {
-    Parser: treeSitterModule.default,
+    Parser,
     TypeScript: typescriptModule,
+    Python: pythonLanguage,
   };
 }
 
 async function loadWASMTreeSitter(): Promise<TreeSitterLoaderResult> {
+  if (!wasmTreeSitterPromise) {
+    wasmTreeSitterPromise = loadWASMTreeSitterUncached();
+  }
+
+  return wasmTreeSitterPromise;
+}
+
+async function loadWASMTreeSitterUncached(): Promise<TreeSitterLoaderResult> {
   try {
     const Parser = await import('web-tree-sitter');
     const wasmParser = Parser.default || Parser;
@@ -68,36 +94,47 @@ async function loadWASMTreeSitter(): Promise<TreeSitterLoaderResult> {
     // Load TypeScript language WASM
     // web-tree-sitter languages are loaded via .wasm files
     let typescriptLanguage: any;
+    let tsxLanguage: any;
+    let pythonLanguage: any;
     try {
-      // Try to load from tree-sitter-typescript's wasm file if available
       const { createRequire } = await import('node:module');
       const require = createRequire(import.meta.url);
+      // Try to load from tree-sitter-typescript's wasm file if available
       const tsWasmPath = require.resolve('tree-sitter-typescript/typescript.wasm');
+      const tsxWasmPath = require.resolve('tree-sitter-typescript/tsx.wasm');
+      const pyWasmPath = require.resolve('tree-sitter-python/tree-sitter-python.wasm');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const Lang = (wasmParser as any).Language;
       typescriptLanguage = await Lang.load(tsWasmPath);
+      tsxLanguage = await Lang.load(tsxWasmPath);
+      pythonLanguage = await Lang.load(pyWasmPath);
     } catch {
       // Fallback: try to find any .wasm in tree-sitter-typescript package
       try {
-        const { fileURLToPath } = await import('node:url');
         const { dirname, join } = await import('node:path');
-        const tsPkgPath = await import.meta.resolve('tree-sitter-typescript');
-        const tsDir = dirname(fileURLToPath(tsPkgPath));
-        const wasmPath = join(tsDir, 'tree-sitter-typescript.wasm');
+        const { createRequire } = await import('node:module');
+        const require = createRequire(import.meta.url);
+        const tsPkgDir = dirname(require.resolve('tree-sitter-typescript/package.json'));
+        const typescriptWasmPath = join(tsPkgDir, 'tree-sitter-typescript.wasm');
+        const tsxWasmPath = join(tsPkgDir, 'tree-sitter-tsx.wasm');
+        const pyWasmPath = require.resolve('tree-sitter-python/tree-sitter-python.wasm');
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const Lang = (wasmParser as any).Language;
-        typescriptLanguage = await Lang.load(wasmPath);
+        typescriptLanguage = await Lang.load(typescriptWasmPath);
+        tsxLanguage = await Lang.load(tsxWasmPath);
+        pythonLanguage = await Lang.load(pyWasmPath);
       } catch {
         throw new Error(
-          'web-tree-sitter loaded but tree-sitter-typescript WASM not found. ' +
-          'Install: npm install web-tree-sitter tree-sitter-typescript'
+          'web-tree-sitter loaded but TypeScript/Python WASM grammars not found. ' +
+          'Install: npm install web-tree-sitter tree-sitter-typescript tree-sitter-python'
         );
       }
     }
 
     return {
       Parser: wasmParser,
-      TypeScript: { typescript: typescriptLanguage },
+      TypeScript: { typescript: typescriptLanguage, tsx: tsxLanguage },
+      Python: pythonLanguage,
     };
   } catch (error) {
     throw new Error(
@@ -115,8 +152,8 @@ function createTreeSitterLoaderError(nativeError: Error, wasmError: Error): Erro
     {
       rootCause: nativeError.message,
       remediationPlan: [
-        'Install build tools (python, make, gcc) and run: npm rebuild tree-sitter tree-sitter-typescript',
-        'Or use WASM fallback: npm install web-tree-sitter',
+        'Install build tools (python, make, gcc) and run: npm rebuild tree-sitter tree-sitter-typescript tree-sitter-python',
+        'Or use WASM fallback: npm install web-tree-sitter tree-sitter-typescript tree-sitter-python',
         'Or use --wasm-fallback flag to auto-activate WASM on first run',
       ].join('; '),
       confidence: 0.9,

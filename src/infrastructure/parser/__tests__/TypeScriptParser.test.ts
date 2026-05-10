@@ -25,6 +25,7 @@ describe('TypeScriptParser', () => {
       
       expect(result.filePath).toBe('/test.ts');
       expect(result.language).toBe('typescript');
+      expect(result.parserUsed).toBe('TreeSitterParser');
       expect(result.symbols.length).toBeGreaterThan(0);
     });
 

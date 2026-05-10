@@ -5,6 +5,7 @@
 // ============================================
 
 import { ParserRegistry } from './registry/ParserRegistry.js';
+import { TreeSitterParser } from './implementations/TreeSitterParser.js';
 import { TypeScriptParser } from './implementations/TypeScriptParser.js';
 import { GoParser } from './implementations/GoParser.js';
 import { PythonParser } from './implementations/PythonParser.js';
@@ -17,6 +18,7 @@ export { ParserBase, ParseError } from './interfaces/ParserBase.js';
 export { ParserRegistry, parserRegistry, ParserNotFoundError } from './registry/ParserRegistry.js';
 
 // 具体解析器实现
+export { TreeSitterParser } from './implementations/TreeSitterParser.js';
 export { TypeScriptParser } from './implementations/TypeScriptParser.js';
 export { GoParser } from './implementations/GoParser.js';
 export { PythonParser } from './implementations/PythonParser.js';
@@ -41,8 +43,8 @@ export type {
 export function createDefaultParserRegistry(): ParserRegistry {
   const registry = new ParserRegistry();
   
-  // 注册 TypeScript/JavaScript 解析器
-  registry.register(new TypeScriptParser());
+  // Tree-sitter is the active TS/JS parser; the regex TypeScriptParser remains as a compatibility wrapper only.
+  registry.register(new TreeSitterParser());
   
   // 注册 Go 解析器
   registry.register(new GoParser());

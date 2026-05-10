@@ -20,9 +20,7 @@ import type {
   SymbolKind,
 } from '../../../interface/types/index.js';
 import { ParserBase, ParseError } from '../interfaces/ParserBase.js';
-
-// 模块级缓存：web-tree-sitter 是单例，init() 只能安全调用一次
-let _wasmParserCtor: any = null;
+import { TreeSitterParser } from './TreeSitterParser.js';
 
 /**
  * Python Tree-sitter 解析器
@@ -46,80 +44,31 @@ export class PythonTreeSitterParser extends ParserBase {
     'complexity-metrics',
   ] as const);
 
-  private parser: any = null;
-  private pythonLanguage: any = null;
-  private grammarLoaded = false;
+  private sharedParser = new TreeSitterParser({
+    rootDir: process.cwd(),
+    mode: 'tree-sitter',
+  });
 
   // ============================================
   // 生命周期
   // ============================================
 
   protected async doInitialize(): Promise<void> {
-    await this.loadGrammar();
+    try {
+      await this.sharedParser.initialize();
+      await this.sharedParser.parseSyntaxTree('/virtual.py', 'x = 1\n');
+    } catch {
+      throw new ParseError(
+        'tree-sitter-python grammar not available. ' +
+        'Install native: npm install tree-sitter tree-sitter-python. ' +
+        'Or WASM: npm install web-tree-sitter tree-sitter-python. ' +
+        'No silent fallback to regex parser.'
+      );
+    }
   }
 
   protected async doDispose(): Promise<void> {
-    this.parser = null;
-    this.pythonLanguage = null;
-    this.grammarLoaded = false;
-  }
-
-  // ============================================
-  // Grammar 加载（双路径：native → WASM）
-  // ============================================
-
-  private async loadGrammar(): Promise<void> {
-    // 尝试 native 加载
-    try {
-      const treeSitterModule = await import('tree-sitter');
-      const pythonModule = await import('tree-sitter-python');
-      this.parser = new (treeSitterModule.default as any)();
-      this.pythonLanguage = (pythonModule as any).language;
-      this.parser.setLanguage(this.pythonLanguage);
-      // 验证 parse + node 访问正常（ABI 不兼容时 setLanguage 成功但 node 访问失败）
-      const testTree = this.parser.parse('x = 1');
-      void testTree.rootNode.type;
-      this.grammarLoaded = true;
-      return;
-    } catch {
-      // native 失败（ABI 不兼容或模块缺失），尝试 WASM
-    }
-
-    // 尝试 WASM 加载（web-tree-sitter 是单例，使用模块级缓存）
-    try {
-      if (!_wasmParserCtor) {
-        const wasmParserModule = await import('web-tree-sitter');
-        _wasmParserCtor = (wasmParserModule as any).default || wasmParserModule;
-        if (typeof _wasmParserCtor.init === 'function') {
-          await _wasmParserCtor.init();
-        }
-      }
-
-      const Lang = (_wasmParserCtor as any).Language;
-      if (!Lang) {
-        throw new Error('web-tree-sitter Language not available after init()');
-      }
-
-      const { createRequire } = await import('node:module');
-      const require = createRequire(import.meta.url);
-      const pyWasmPath = require.resolve('tree-sitter-python/tree-sitter-python.wasm');
-      this.pythonLanguage = await Lang.load(pyWasmPath);
-
-      this.parser = new _wasmParserCtor();
-      this.parser.setLanguage(this.pythonLanguage);
-      this.grammarLoaded = true;
-      return;
-    } catch {
-      // WASM 也失败
-    }
-
-    // 两种方式都失败，抛出明确错误（D-10）
-    throw new ParseError(
-      'tree-sitter-python grammar not available. ' +
-      'Install native: npm install tree-sitter tree-sitter-python. ' +
-      'Or WASM: npm install web-tree-sitter tree-sitter-python. ' +
-      'No silent fallback to regex parser.'
-    );
+    this.sharedParser.dispose();
   }
 
   // ============================================
@@ -133,18 +82,11 @@ export class PythonTreeSitterParser extends ParserBase {
   ): Promise<ParseResult> {
     this.ensureInitialized();
 
-    if (!this.grammarLoaded) {
-      throw new ParseError(
-        'tree-sitter-python grammar not available. Cannot parse Python files.',
-        filePath
-      );
-    }
-
     const startTime = Date.now();
 
     try {
-      const tree = this.parser.parse(content);
-      const root = tree.rootNode;
+      const syntaxTree = await this.sharedParser.parseSyntaxTree(filePath, content);
+      const root = syntaxTree.rootNode;
 
       // 并行提取各种信息
       const [imports, exports, symbols] = await Promise.all([
@@ -197,29 +139,20 @@ export class PythonTreeSitterParser extends ParserBase {
 
   async extractImports(content: string): Promise<ImportInfo[]> {
     this.ensureInitialized();
-    if (!this.grammarLoaded) {
-      throw new ParseError('tree-sitter-python grammar not available.');
-    }
-    const tree = this.parser.parse(content);
-    return this.extractImportsFromAST(tree.rootNode);
+    const syntaxTree = await this.sharedParser.parseSyntaxTree('/virtual.py', content);
+    return this.extractImportsFromAST(syntaxTree.rootNode);
   }
 
   async extractExports(content: string): Promise<ExportInfo[]> {
     this.ensureInitialized();
-    if (!this.grammarLoaded) {
-      throw new ParseError('tree-sitter-python grammar not available.');
-    }
-    const tree = this.parser.parse(content);
-    return this.extractExportsFromAST(tree.rootNode);
+    const syntaxTree = await this.sharedParser.parseSyntaxTree('/virtual.py', content);
+    return this.extractExportsFromAST(syntaxTree.rootNode);
   }
 
   async extractSymbols(content: string): Promise<ModuleSymbol[]> {
     this.ensureInitialized();
-    if (!this.grammarLoaded) {
-      throw new ParseError('tree-sitter-python grammar not available.');
-    }
-    const tree = this.parser.parse(content);
-    return this.extractSymbolsFromAST(tree.rootNode);
+    const syntaxTree = await this.sharedParser.parseSyntaxTree('/virtual.py', content);
+    return this.extractSymbolsFromAST(syntaxTree.rootNode);
   }
 
   // ============================================

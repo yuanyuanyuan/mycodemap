@@ -3,9 +3,12 @@
 // ============================================
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ParserRegistry, ParserNotFoundError } from '../registry/ParserRegistry.js';
+import { ParserRegistry } from '../registry/ParserRegistry.js';
+import { TreeSitterParser } from '../implementations/TreeSitterParser.js';
 import { TypeScriptParser } from '../implementations/TypeScriptParser.js';
 import { GoParser } from '../implementations/GoParser.js';
+import { PythonTreeSitterParser } from '../implementations/PythonTreeSitterParser.js';
+import { createDefaultParserRegistry } from '../index.js';
 
 describe('ParserRegistry', () => {
   let registry: ParserRegistry;
@@ -46,6 +49,27 @@ describe('ParserRegistry', () => {
       
       const parser = registry.getParserByFile('/path/to/file.py');
       expect(parser).toBeUndefined();
+    });
+
+    it('routes ts and py files through tree-sitter-backed parsers on the active path', async () => {
+      const defaultRegistry = createDefaultParserRegistry();
+      const tsParser = defaultRegistry.getParserByFile('/tmp/example.ts');
+      const pyParser = defaultRegistry.getParserByFile('/tmp/example.py');
+
+      expect(tsParser).toBeInstanceOf(TreeSitterParser);
+      expect(pyParser).toBeInstanceOf(PythonTreeSitterParser);
+
+      await tsParser!.initialize();
+      await pyParser!.initialize();
+
+      const tsResult = await tsParser!.parseFile('/tmp/example.ts', 'export function run() {}');
+      const pyResult = await pyParser!.parseFile('/tmp/example.py', 'def run():\n    pass\n');
+
+      expect(tsResult.parserUsed).toBe('TreeSitterParser');
+      expect(pyResult.parserUsed).toBe('PythonTreeSitterParser');
+
+      await tsParser!.dispose();
+      await pyParser!.dispose();
     });
   });
 

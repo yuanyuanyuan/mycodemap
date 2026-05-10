@@ -2,6 +2,9 @@
 phase: 67-tree-sitter-python-grammar
 plan: TREE-SITTER-PYTHON
 status: complete
+requirements-completed:
+  - PY-01
+  - PY-02
 completed: 2026-05-09
 commits:
   - 91e7d19
