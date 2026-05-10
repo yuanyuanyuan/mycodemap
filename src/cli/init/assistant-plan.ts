@@ -58,7 +58,11 @@ mycodemap preview     # Preview without config
 
 ## Subagent Retrieval
 
-Before delegated work, query the Project Environment Contract:
+For delegated-start reminders, enable the runtime hook adapter:
+
+    mycodemap env-contract --run-reminder-hook claude
+
+When you need the Project Environment Contract directly, query:
 
     mycodemap env-contract --for default --json
 
@@ -90,7 +94,11 @@ mycodemap preview     # Preview without config
 
 ## Subagent Retrieval
 
-Before delegated work, query the Project Environment Contract:
+For delegated-start reminders, enable the runtime hook adapter:
+
+    mycodemap env-contract --run-reminder-hook codex
+
+When you need the Project Environment Contract directly, query:
 
     mycodemap env-contract --for default --json
 
@@ -112,8 +120,7 @@ function generateClaudeHookExample(): string {
             hooks: [
               {
                 type: 'command',
-                command:
-                  'echo \'{"hookSpecificOutput":{"hookEventName":"SubagentStart","additionalContext":"Before starting delegated work, run: mycodemap env-contract --for default --json"}}\'',
+                command: 'mycodemap env-contract --run-reminder-hook claude',
               },
             ],
           },
@@ -133,7 +140,10 @@ function generateCodexAgentExample(): string {
 description = "Retrieve project environment contract for delegated agents"
 
 developer_instructions = """
-Before starting work, retrieve the project environment contract:
+Enable the delegated-start reminder hook:
+- mycodemap env-contract --run-reminder-hook codex
+
+When you need the project environment contract:
 - CLI: mycodemap env-contract --for worker --json
 - MCP: codemap_env_contract(agentType="worker")
 """

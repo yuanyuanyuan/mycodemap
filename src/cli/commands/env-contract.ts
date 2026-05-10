@@ -12,6 +12,10 @@ import {
   type ProjectEnvironmentContract,
   type ContractCategory,
 } from '../env-contract/index.js';
+import {
+  buildReminderHookCommand,
+  runReminderHookFromStdin,
+} from '../env-contract/reminder-hook-runner.js';
 import { resolveOutputMode, formatError } from '../output/index.js';
 
 interface EnvContractCommandOptions {
@@ -23,6 +27,7 @@ interface EnvContractCommandOptions {
   update?: boolean;
   asHookConfig?: boolean;
   asCodexAgent?: boolean;
+  runReminderHook?: string;
 }
 
 const CONTRACT_FILE = '.mycodemap/env-contract.json';
@@ -59,7 +64,7 @@ function buildHookConfigOutput(agentType: string): string {
           hooks: [
             {
               type: 'command',
-              command: `echo '{"hookSpecificOutput":{"hookEventName":"SubagentStart","additionalContext":"Before starting work, run: mycodemap env-contract --for ${agentType} --json"}}'`,
+              command: buildReminderHookCommand('claude'),
             },
           ],
         },
@@ -78,7 +83,10 @@ description = "Execution-focused agent for implementation and fixes"
 developer_instructions = """
 You are a ${agentType} agent responsible for implementing and fixing code.
 
-Before starting any task, query the project environment contract:
+Enable the delegated-start reminder hook with:
+- ${buildReminderHookCommand('codex')}
+
+When you need the project environment contract:
 - Run: mycodemap env-contract --for ${agentType} --json
 - Or use the MCP tool: codemap_env_contract(agentType="${agentType}")
 
@@ -131,6 +139,19 @@ async function envContractAction(options: EnvContractCommandOptions): Promise<vo
     if (options.asHookConfig) {
       const output = buildHookConfigOutput(agentType);
       process.stdout.write(output + '\n');
+      return;
+    }
+
+    // --run-reminder-hook mode
+    if (options.runReminderHook) {
+      const runtime = options.runReminderHook === 'claude' ? 'claude' : options.runReminderHook === 'codex' ? 'codex' : undefined;
+      if (!runtime) {
+        throw new Error(`Unsupported reminder hook runtime: ${options.runReminderHook}`);
+      }
+      const output = await runReminderHookFromStdin(runtime);
+      if (output.length > 0) {
+        process.stdout.write(output + '\n');
+      }
       return;
     }
 
@@ -229,4 +250,5 @@ export const envContractCommand = new Command('env-contract')
   .option('--update', 'Regenerate .mycodemap/env-contract.json')
   .option('--as-hook-config', 'Print Claude Code SubagentStart hook example')
   .option('--as-codex-agent', 'Print Codex agent developer_instructions example')
+  .option('--run-reminder-hook <runtime>', 'Run the delegated-start reminder hook for claude or codex')
   .action(envContractAction);

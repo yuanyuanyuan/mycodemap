@@ -1,7 +1,12 @@
 // [META] since:2026-05-10 | owner:cli-team | stable:false
 // [WHY] Normalizes Claude/Codex delegated-start hook payloads and renders non-blocking reminder output.
 
+import { execFile } from 'node:child_process';
+import { stdin } from 'node:process';
+import { promisify } from 'node:util';
 import type { AgentType } from './types.js';
+import { decideReminder, type ReminderRetrievalStatus } from './reminder-engine.js';
+import { FileReminderLedger, type ReminderLedger } from './reminder-ledger.js';
 
 const KNOWN_ROLES: readonly AgentType[] = [
   'explore',
@@ -16,6 +21,8 @@ const KNOWN_ROLES: readonly AgentType[] = [
 const CODEX_SEAM_EVENTS = ['SessionStart', 'UserPromptSubmit'] as const;
 
 type CodexSeamEventName = (typeof CODEX_SEAM_EVENTS)[number];
+const execFileAsync = promisify(execFile);
+const DEFAULT_CODEX_WARNING_EVENT: CodexSeamEventName = 'UserPromptSubmit';
 
 export interface NormalizedReminderEvent {
   runtime: 'claude' | 'codex';
@@ -40,6 +47,11 @@ export type ReminderAction =
   | { kind: 'silent' }
   | { kind: 'remind'; message: string }
   | { kind: 'warn'; message: string };
+
+export interface ReminderHookDependencies {
+  ledger?: ReminderLedger;
+  checkRetrieval?: (role: AgentType) => Promise<ReminderRetrievalStatus> | ReminderRetrievalStatus;
+}
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -224,4 +236,132 @@ export function renderCodexHookOutput(
     payload.systemMessage = action.message;
   }
   return JSON.stringify(payload, null, 2);
+}
+
+function toReminderAction(action: Awaited<ReturnType<typeof decideReminder>>): ReminderAction {
+  if (action.kind === 'silent') {
+    return { kind: 'silent' };
+  }
+  if (action.kind === 'warn') {
+    return { kind: 'warn', message: action.message };
+  }
+  return { kind: 'remind', message: action.message };
+}
+
+export function buildReminderHookCommand(runtime: 'claude' | 'codex'): string {
+  return `mycodemap env-contract --run-reminder-hook ${runtime}`;
+}
+
+async function defaultCheckRetrieval(role: AgentType): Promise<ReminderRetrievalStatus> {
+  try {
+    await execFileAsync(
+      'mycodemap',
+      ['env-contract', '--for', role, '--json'],
+      {
+        timeout: 15000,
+        maxBuffer: 1024 * 1024,
+      },
+    );
+    return { available: true };
+  } catch (error) {
+    const execError = error as NodeJS.ErrnoException & {
+      stdout?: string;
+      stderr?: string;
+      code?: string | number;
+    };
+    const detail =
+      execError.stderr?.trim() ||
+      execError.stdout?.trim() ||
+      execError.message ||
+      String(execError.code ?? 'unknown error');
+    return {
+      available: false,
+      detail,
+    };
+  }
+}
+
+function resolveDependencies(dependencies?: ReminderHookDependencies): Required<ReminderHookDependencies> {
+  return {
+    ledger: dependencies?.ledger ?? new FileReminderLedger(),
+    checkRetrieval: dependencies?.checkRetrieval ?? defaultCheckRetrieval,
+  };
+}
+
+function buildPayloadWarning(reason: string): ReminderAction {
+  return {
+    kind: 'warn',
+    message: [
+      'Delegated-start reminder hook could not normalize the runtime payload.',
+      reason,
+      'No hidden fallback guidance was injected; delegated work may continue.',
+    ].join('\n'),
+  };
+}
+
+export async function runClaudeReminderHook(
+  input: unknown,
+  dependencies?: ReminderHookDependencies,
+): Promise<string> {
+  const event = normalizeClaudeDelegatedStart(input);
+  if (!event) {
+    return renderClaudeHookOutput(
+      buildPayloadWarning('Expected a Claude SubagentStart payload with session_id and agent_type.'),
+    );
+  }
+
+  const resolved = resolveDependencies(dependencies);
+  const action = await decideReminder(event, {
+    ledger: resolved.ledger,
+    checkRetrieval: resolved.checkRetrieval,
+  });
+  return renderClaudeHookOutput(toReminderAction(action));
+}
+
+export async function runCodexReminderHook(
+  input: unknown,
+  dependencies?: ReminderHookDependencies,
+): Promise<string> {
+  const probe = probeCodexDelegatedStart(input);
+  if (!probe.usable || !probe.normalizedEvent) {
+    return renderCodexHookOutput(
+      probe.hookEventName ?? DEFAULT_CODEX_WARNING_EVENT,
+      buildPayloadWarning(probe.reason ?? 'Expected a supported Codex delegated-start payload.'),
+    );
+  }
+
+  const resolved = resolveDependencies(dependencies);
+  const hookEventName = probe.hookEventName ?? DEFAULT_CODEX_WARNING_EVENT;
+  const action = await decideReminder(probe.normalizedEvent, {
+    ledger: resolved.ledger,
+    checkRetrieval: resolved.checkRetrieval,
+  });
+  return renderCodexHookOutput(hookEventName, toReminderAction(action));
+}
+
+async function readStdinText(): Promise<string> {
+  if (stdin.readableEnded) {
+    return '';
+  }
+
+  return new Promise((resolve, reject) => {
+    let buffer = '';
+    stdin.setEncoding('utf8');
+    stdin.on('data', (chunk) => {
+      buffer += chunk;
+    });
+    stdin.on('end', () => resolve(buffer));
+    stdin.on('error', reject);
+  });
+}
+
+export async function runReminderHookFromStdin(
+  runtime: 'claude' | 'codex',
+  dependencies?: ReminderHookDependencies,
+): Promise<string> {
+  const rawInput = await readStdinText();
+  const payload = rawInput.trim().length > 0 ? JSON.parse(rawInput) : {};
+  return runtime === 'claude'
+    ? runClaudeReminderHook(payload, dependencies)
+    : runCodexReminderHook(payload, dependencies);
 }

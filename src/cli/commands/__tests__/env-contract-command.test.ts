@@ -142,7 +142,7 @@ VALID_TAGS="FEAT FIX DOCS"
     const { stdout, exitCode } = runCli(['env-contract', '--for', 'worker', '--as-hook-config'], tmpDir);
     expect(exitCode).toBe(0);
     expect(stdout).toContain('SubagentStart');
-    expect(stdout).toContain('mycodemap env-contract --for worker --json');
+    expect(stdout).toContain('mycodemap env-contract --run-reminder-hook claude');
     // Should be valid JSON
     const parsed = JSON.parse(stdout);
     expect(parsed.hooks.SubagentStart).toBeDefined();
@@ -152,6 +152,7 @@ VALID_TAGS="FEAT FIX DOCS"
     const { stdout, exitCode } = runCli(['env-contract', '--for', 'worker', '--as-codex-agent'], tmpDir);
     expect(exitCode).toBe(0);
     expect(stdout).toContain('developer_instructions');
+    expect(stdout).toContain('mycodemap env-contract --run-reminder-hook codex');
     expect(stdout).toContain('codemap_env_contract');
     expect(stdout).toContain('mycodemap env-contract --for worker --json');
   });

@@ -129,8 +129,7 @@ describe('createAssistantPlan', () => {
     expect(parsed.hooks.SubagentStart).toBeDefined();
     expect(Array.isArray(parsed.hooks.SubagentStart)).toBe(true);
     expect(parsed.hooks.SubagentStart[0].hooks[0].type).toBe('command');
-    expect(parsed.hooks.SubagentStart[0].hooks[0].command).toContain('mycodemap env-contract --for');
-    expect(parsed.hooks.SubagentStart[0].hooks[0].command).toContain('additionalContext');
+    expect(parsed.hooks.SubagentStart[0].hooks[0].command).toContain('mycodemap env-contract --run-reminder-hook claude');
   });
 
   it('generates codex-agent-example.toml with developer_instructions', () => {
@@ -144,6 +143,7 @@ describe('createAssistantPlan', () => {
     expect(write!.content).toContain('[developer_instructions]');
     expect(write!.content).toContain('developer_instructions = """');
     expect(write!.content).toContain('codemap_env_contract(agentType="worker")');
+    expect(write!.content).toContain('mycodemap env-contract --run-reminder-hook codex');
     expect(write!.content).toContain('mycodemap env-contract --for worker --json');
   });
 
@@ -228,6 +228,8 @@ describe('createAssistantPlan', () => {
 
     expect(claudeWrite).toBeDefined();
     expect(agentsWrite).toBeDefined();
+    expect(claudeWrite!.content).toContain('mycodemap env-contract --run-reminder-hook claude');
+    expect(agentsWrite!.content).toContain('mycodemap env-contract --run-reminder-hook codex');
     expect(claudeWrite!.content).toContain('mycodemap env-contract --for default --json');
     expect(agentsWrite!.content).toContain('mycodemap env-contract --for default --json');
     expect(claudeWrite!.content).toContain('--for explore, --for plan, --for worker, or --for verify');

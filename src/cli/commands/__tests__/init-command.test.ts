@@ -189,7 +189,8 @@ describe('initCommand', () => {
     // All files should use retrieval guidance
     expect(claudeContext).toContain('mycodemap env-contract --for default --json');
     expect(agentsContext).toContain('mycodemap env-contract --for default --json');
-    expect(hookExample).toContain('mycodemap env-contract --for');
+    expect(hookExample).toContain('mycodemap env-contract --run-reminder-hook claude');
+    expect(codexExample).toContain('mycodemap env-contract --run-reminder-hook codex');
     expect(codexExample).toContain('mycodemap env-contract --for worker --json');
 
     // No file should contain the old raw file-reading pattern
