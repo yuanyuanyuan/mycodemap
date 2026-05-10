@@ -3,7 +3,39 @@
 > **Current active planning truth** lives in `.planning/PROJECT.md`, `.planning/ROADMAP.md`, and `.planning/STATE.md`. During an active milestone, `.planning/REQUIREMENTS.md` joins that set; between milestones it may be absent by design.
 > The shipped entries below are **historical snapshots**. Their `What's next` text records closeout-time context and must not override the current active planning surface.
 
-**Current status:** Active milestone is `v2.4 parser-multilang-depth` (planning started 2026-05-09). Latest shipped milestone is `v2.3 graph-capability` (2026-05-09).
+**Current status:** No active milestone selected. Latest shipped milestone is `v2.4 parser-multilang-depth` (2026-05-10).
+
+## v2.4 parser-multilang-depth (Shipped: 2026-05-10)
+
+**Goal:** 在 `v2.2` 已收敛的 parser / storage / MCP 基线和 `v2.3` 已建立的 graph-native schema 之上，把 Python 解析从 regex-based MVP 升级为 Tree-sitter AST-based 深度解析，并完成多语言 parser 切换与 parser contract cleanup。
+
+**Phases completed:** 67-69, 71 (8 plans total)
+
+**Delivered:**
+
+- Python 主路径已从 regex parser 升级为 Tree-sitter AST parser，能稳定提取 imports、symbols、classes、functions、decorators 与 async 结构
+- TS/JS/Python 现在共享 extension-aware Tree-sitter parser capability；Python grammar 不可用时显式失败，而不是静默回退
+- `PythonTypeEnhancer` 已把 Google / NumPy / Sphinx docstring 与 PEP 484 注解提升到共享 `typeInfo` output surface
+- Parser runtime 已统一到 interface-layer `ParseResult`，Core 通过 composition root 注入 registry / enhancers，不再直接构造 Infrastructure parser 依赖
+
+**Key accomplishments:**
+
+- `Phase 67` 收口 `tree-sitter-python` WASM grammar、`PythonTreeSitterParser` 和 AST-vs-regex superiority proof
+- `Phase 68` 收口 shared Tree-sitter loader、TS/JS/Python extension switching、strict no-fallback behavior 与 regression coverage
+- `Phase 69` 收口 `PythonTypeEnhancer`、bounded docstring parsing、shared `typeInfo` propagation 与 analyzer proof
+- `Phase 71` 收口 parser contract unification、`TreeSitterParser` 基础设施迁移、legacy shim removal 与 Core→Infrastructure decoupling
+
+**Stats:**
+
+- `9/9` milestone requirements satisfied
+- `8/8` plans complete across `4` shipped phases
+- Timeline: `2026-05-09 → 2026-05-10`
+- Change slice in current closeout workspace: `25` files changed, `587` insertions, `1412` deletions
+- Git range was not captured as a clean isolated slice because milestone work finished on a dirty workspace with mixed in-flight changes
+
+**What's next:** Start `v2.5 deep-analysis-hooks` when ready, carrying forward `PY-07` / `PY-08` plus hook/deep-analysis follow-ups.
+
+---
 
 ## v2.3 graph-capability (Shipped: 2026-05-09)
 
