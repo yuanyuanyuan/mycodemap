@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { GlobalSymbolIndexBuilder } from '../global-index.js';
-import type { ParseResult } from '../../parser/interfaces/IParser.js';
+import type { ParseResult } from '../../interface/types/parser.js';
 
 describe('GlobalSymbolIndexBuilder', () => {
   const tempRoots: string[] = [];
@@ -37,9 +37,20 @@ describe('GlobalSymbolIndexBuilder', () => {
     const appPath = path.join(root, 'src/app.ts');
     const results: ParseResult[] = [
       {
-        path: utilPath,
-        type: 'source',
-        stats: { lines: 1, codeLines: 1, commentLines: 0, blankLines: 0 },
+        filePath: utilPath,
+        language: 'typescript',
+        module: {
+          id: 'module-util',
+          path: utilPath,
+          absolutePath: utilPath,
+          type: 'source',
+          stats: { lines: 1, codeLines: 1, commentLines: 0, blankLines: 0 },
+          exports: [],
+          imports: [],
+          symbols: [],
+          dependencies: [],
+          dependents: [],
+        },
         dependencies: [],
         imports: [],
         exports: [{
@@ -56,11 +67,23 @@ describe('GlobalSymbolIndexBuilder', () => {
           visibility: 'public',
           relatedSymbols: [],
         }],
+        parseTime: 1,
       },
       {
-        path: appPath,
-        type: 'source',
-        stats: { lines: 1, codeLines: 1, commentLines: 0, blankLines: 0 },
+        filePath: appPath,
+        language: 'typescript',
+        module: {
+          id: 'module-app',
+          path: appPath,
+          absolutePath: appPath,
+          type: 'source',
+          stats: { lines: 1, codeLines: 1, commentLines: 0, blankLines: 0 },
+          exports: [],
+          imports: [],
+          symbols: [],
+          dependencies: [],
+          dependents: [],
+        },
         dependencies: [],
         imports: [{
           source: '@lib/util',
@@ -84,8 +107,8 @@ describe('GlobalSymbolIndexBuilder', () => {
         callGraph: {
           calls: [{ caller: 'run', callee: 'aliasedHelper', line: 1 }],
           recursive: [],
-          callCounts: {},
         },
+        parseTime: 1,
       },
     ];
 

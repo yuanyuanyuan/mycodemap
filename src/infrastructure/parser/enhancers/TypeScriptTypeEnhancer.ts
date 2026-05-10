@@ -1,8 +1,9 @@
 // [META] since:2026-05 | owner:parser-team | stable:false
-// [WHY] TS-only post-parse enhancement seam preserves SmartParser insights without keeping it as the main parser selector
+// [WHY] Infrastructure-owned TS post-parse enhancement seam preserves SmartParser insights without keeping it as the main parser selector
 
-import { SmartParser } from '../implementations/smart-parser.js';
-import type { ParseResult, ParserOptions } from '../interfaces/IParser.js';
+import { SmartParser } from '../../../parser/implementations/smart-parser.js';
+import type { ParseResult } from '../../../interface/types/parser.js';
+import type { ParserOptions } from '../../../parser/interfaces/IParser.js';
 
 const TYPESCRIPT_EXTENSIONS = new Set(['.ts', '.tsx']);
 
@@ -35,15 +36,20 @@ export class TypeScriptTypeEnhancer {
   }
 
   private async enhanceResult(result: ParseResult): Promise<ParseResult> {
-    if (!this.isTypeScriptFile(result.path)) {
+    if (!this.isTypeScriptFile(result.filePath)) {
       return result;
     }
 
-    const enhanced = await this.smartParser.parseFile(result.path);
+    const enhanced = await this.smartParser.parseFile(result.filePath);
     return {
       ...result,
       typeInfo: enhanced.typeInfo ?? result.typeInfo,
-      callGraph: enhanced.callGraph ?? result.callGraph,
+      callGraph: enhanced.callGraph
+        ? {
+            calls: enhanced.callGraph.calls,
+            recursive: enhanced.callGraph.recursive,
+          }
+        : result.callGraph,
       complexity: enhanced.complexity ?? result.complexity,
     };
   }

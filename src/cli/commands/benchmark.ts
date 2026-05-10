@@ -2,10 +2,11 @@
 // [WHY] Compare WASM vs Native performance to verify <1s startup penalty on 10K-file repos
 
 import { performance } from 'node:perf_hooks';
+import { readFile } from 'node:fs/promises';
 import { globby } from 'globby';
 import path from 'node:path';
 import { loadTreeSitter } from '../../parser/implementations/tree-sitter-loader.js';
-import { TreeSitterParser } from '../../parser/implementations/tree-sitter-parser.js';
+import { TreeSitterParser } from '../../infrastructure/parser/implementations/TreeSitterParser.js';
 import { loadSQLite } from '../../infrastructure/storage/adapters/sqlite-loader.js';
 
 export interface BenchmarkOptions {
@@ -59,6 +60,7 @@ async function runSingleBenchmark(
     // Parser init
     const parseInitStart = performance.now();
     const parser = new TreeSitterParser({ rootDir: target, mode: 'fast' });
+    await parser.initialize();
     const parseInitMs = performance.now() - parseInitStart;
 
     // Storage init
@@ -77,7 +79,8 @@ async function runSingleBenchmark(
 
     const firstFileParseStart = performance.now();
     if (files.length > 0) {
-      await parser.parseFile(files[0]);
+      const content = await readFile(files[0]!, 'utf-8');
+      await parser.parseFile(files[0]!, content);
     }
     const firstFileParseMs = performance.now() - firstFileParseStart;
 

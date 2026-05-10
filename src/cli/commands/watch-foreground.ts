@@ -4,6 +4,7 @@
 import chalk from 'chalk';
 import chokidar from 'chokidar';
 import { analyze } from '../../core/analyzer.js';
+import { buildAnalysisContext } from '../../composition/parser-composition.js';
 import { generateAIMap, generateJSON, generateContext } from '../../generator/index.js';
 import { resolveOutputDir } from '../paths.js';
 import type { AnalysisOptions } from '../../types/index.js';
@@ -79,7 +80,10 @@ async function runAnalysis(rootDir: string, mode: string, outputDir: string) {
     output: outputDir
   };
 
-  const codeMap = await analyze(analysisOptions);
+  const codeMap = await analyze({
+    ...analysisOptions,
+    ...buildAnalysisContext(rootDir, true),
+  });
   await generateAIMap(codeMap, outputDir);
   await generateJSON(codeMap, outputDir);
   await generateContext(codeMap, outputDir);

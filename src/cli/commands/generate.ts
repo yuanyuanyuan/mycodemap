@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import chalk from 'chalk';
 import ora from 'ora';
 import { analyze } from '../../core/analyzer.js';
+import { buildAnalysisContext } from '../../composition/parser-composition.js';
 import { generateAIMap, generateJSON, generateContext, generateMermaidGraph } from '../../generator/index.js';
 import { resolveDataPath, resolveOutputDir } from '../paths.js';
 import { storageFactory } from '../../infrastructure/storage/StorageFactory.js';
@@ -554,7 +555,10 @@ export async function generateCommand(options: GenerateCommandOptions) {
         ));
       }
     } else {
-      const codeMap = await analyze(analysisOptions);
+      const codeMap = await analyze({
+        ...analysisOptions,
+        ...buildAnalysisContext(analysisOptions.rootDir, analysisOptions.enhanceTypes ?? true),
+      });
       let pluginReport: PluginExecutionReport | undefined;
 
       if (loadedConfig.hasExplicitPluginConfig) {
@@ -911,6 +915,7 @@ async function runIncrementalGenerate(input: {
     const incrementalCodeMap = await analyze({
       ...analysisOptions,
       include: invalidatedPaths.map((filePath) => toRelativePattern(rootDir, filePath)),
+      ...buildAnalysisContext(rootDir, analysisOptions.enhanceTypes ?? true),
     });
 
     const recomputedPaths = Array.from(new Set(

@@ -1,7 +1,8 @@
 // [META] since:2026-05 | owner:parser-team | stable:false
 // [WHY] Central parser interface contract shared by legacy implementations and the new registry-backed path
 
-import type { ExportInfo, ImportInfo, ModuleSymbol } from '../../types/index.js';
+import type { Dependency, ExportInfo, ImportInfo, Module, ModuleSymbol } from '../../types/index.js';
+import type { LanguageId } from '../../interface/types/parser.js';
 
 /**
  * 解析器模式
@@ -13,6 +14,7 @@ export type ParserModeInput = ParserMode | DeprecatedParserMode;
 /**
  * 解析器选项
  */
+/** @deprecated Active runtime uses `src/interface/types/parser.ts` contracts directly. */
 export interface ParserOptions {
   /** 解析模式 */
   mode?: ParserModeInput;
@@ -29,7 +31,13 @@ export interface ParserOptions {
 /**
  * 解析结果
  */
+/** @deprecated Active runtime uses `src/interface/types/parser.ts` ParseResult directly. */
 export interface ParseResult {
+  /** Registry parse result compatibility */
+  filePath?: string;
+  language?: LanguageId;
+  module?: Module;
+  parseTime?: number;
   /** 文件路径 */
   path: string;
   /** 导出信息 */
@@ -39,7 +47,7 @@ export interface ParseResult {
   /** 符号信息 */
   symbols: ModuleSymbol[];
   /** 依赖列表 */
-  dependencies: string[];
+  dependencies: string[] | Dependency[];
   /** 模块类型 */
   type: 'source' | 'test' | 'config' | 'type';
   /** 代码统计 */
@@ -152,7 +160,7 @@ export interface CallGraph {
   /** 递归函数 */
   recursive: string[];
   /** 被调用次数 */
-  callCounts: Record<string, number>;
+  callCounts?: Record<string, number>;
 }
 
 /**
@@ -179,6 +187,7 @@ export interface ComplexityMetrics {
 /**
  * 解析器接口
  */
+/** @deprecated Internal runtime uses `ILanguageParser`; keep `IParser` only for compatibility. */
 export interface IParser {
   /** 解析器名称 */
   readonly name: string;

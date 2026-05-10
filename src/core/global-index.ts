@@ -20,7 +20,7 @@ import type {
   CallChain,
   CallChainEntry
 } from '../types/index.js';
-import type { ParseResult } from '../parser/interfaces/IParser.js';
+import type { ParseResult } from '../interface/types/parser.js';
 
 /**
  * 全局符号索引构建器
@@ -68,7 +68,7 @@ export class GlobalSymbolIndexBuilder {
    * 为单个文件建立符号索引
    */
   private buildFileIndex(result: ParseResult): void {
-    const filePath = result.path;
+    const filePath = result.filePath;
     const relativePath = path.relative(this.rootDir, filePath);
 
     const fileIndex: FileSymbolIndex = {
@@ -128,7 +128,7 @@ export class GlobalSymbolIndexBuilder {
    * 解析跨文件调用
    */
   private resolveCrossFileCalls(result: ParseResult): void {
-    const filePath = result.path;
+    const filePath = result.filePath;
     const relativePath = path.relative(this.rootDir, filePath);
     const fileIndex = this.index.files.get(relativePath);
 
