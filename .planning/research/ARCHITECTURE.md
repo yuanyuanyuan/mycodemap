@@ -1,146 +1,305 @@
-# Architecture Research
+# Architecture Research: agent-metrics Integration
 
-**Domain:** AI-native code analysis CLI architecture foundation
-**Researched:** 2026-05-06
+**Domain:** CodeMap v2.7 agent-effectiveness-validation
+**Researched:** 2026-05-10
 **Confidence:** HIGH
 
-## Standard Architecture
+## Summary
 
-### System Overview
+`agent-metrics` integrates into CodeMap through six existing architectural seams: CLI command registration, interface contract schema, output infrastructure, SQLite storage, git history parsing, and the execution layer. The command should follow the `history` command pattern (thin CLI wrapper over a dedicated service) rather than the `benchmark` command pattern (self-contained with custom output).
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                    Entry Surfaces                           │
-├─────────────────────────────────────────────────────────────┤
-│ CLI commands        MCP native tools     MCP contract tools │
-│ (`src/cli/...`)     (`codemap_query`)    (`codemap_*`)      │
-└──────────────┬───────────────────────┬──────────────────────┘
-               │                       │
-               ▼                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│                Execution / Service Seams                    │
-├─────────────────────────────────────────────────────────────┤
-│ parser orchestration │ storage runtime │ query/impact svc   │
-└──────────────┬───────────────────────┬──────────────────────┘
-               │                       │
-               ▼                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 Infrastructure Truth Layer                  │
-├─────────────────────────────────────────────────────────────┤
-│ parser factory/registry │ SQLite runtime │ graph storage    │
-└─────────────────────────────────────────────────────────────┘
+## Key Findings
+
+### 1. CLI Command Registration: Use Subcommand Pattern
+
+**Current state:** `src/cli/index.ts` registers commands via Commander.js. Two patterns exist:
+
+| Pattern | Example | When Used |
+|---------|---------|-----------|
+| Direct registration | `benchmark`, `query`, `deps` | Single-purpose commands |
+| Subcommand via `.addCommand()` | `ci`, `check`, `history`, `design` | Command families with multiple subcommands |
+
+**Recommendation:** Use `.addCommand()` pattern for `agent-metrics` because it has two subcommands (`token`, `report`). This matches `ci`, `check`, and `design` command families.
+
+**Integration point:** `src/cli/index.ts` line ~229-244. Add `program.addCommand(agentMetricsCommand)` alongside existing command families.
+
+### 2. Interface Contract Schema: New Contract File Required
+
+**Current state:** `src/cli/interface-contract/commands/` contains contracts for 8 commands. Each contract is a `CommandContract` object with `name`, `description`, `args`, `flags`, `outputShape`, `errorCodes`, and `examples`.
+
+**Recommendation:** Create `src/cli/interface-contract/commands/agent-metrics.ts` with two subcontracts:
+- `agentMetricsTokenContract` for `codemap agent-metrics token`
+- `agentMetricsReportContract` for `codemap agent-metrics report`
+
+**Integration point:** `src/cli/interface-contract/commands/index.ts` must add the new contracts to `commandContracts` array.
+
+### 3. Output Infrastructure: Reuse Shared Layer
+
+**Current state:** `src/cli/output/` provides:
+- `resolveOutputMode()` — TTY/flag detection for `--json` / `--human`
+- `renderOutput()` — mode-aware stdout writer
+- `formatError()` — structured error formatting
+- `createProgressEmitter()` — progress updates
+
+**Problem:** `benchmark` command does NOT use this infrastructure. It has custom `console.log` output and manual `JSON.stringify`. This is technical debt (noted in PROJECT.md as `AGENT-11: benchmark 命令迁移到共享输出基础设施`).
+
+**Recommendation:** `agent-metrics` MUST use the shared output infrastructure from day one. This avoids adding to the migration debt and ensures consistent JSON/human output behavior.
+
+**Pattern to follow:** `src/cli/commands/query.ts` lines 29-53:
+```typescript
+const mode = resolveOutputMode({ json: options.json, human: options.human });
+const progress = createProgressEmitter(mode, 'Analyzing tokens...');
+// ... execute logic ...
+renderOutput(result, formatAgentMetricsHuman, mode);
 ```
 
-### Component Responsibilities
+### 4. SQLite Storage: New Table for Metrics Persistence
 
-| Component | Responsibility | Typical Implementation |
-|-----------|----------------|------------------------|
-| parser entrypoint | 决定主流程解析器与 mode contract | `src/parser/index.ts` + `src/core/analyzer.ts` |
-| parser registry | 抽象多语言解析器注册与 extension lookup | `src/infrastructure/parser/*` |
-| storage runtime/factory | 决定 backend、fallback、错误语义 | `src/cli/storage-runtime.ts` + `src/infrastructure/storage/StorageFactory.ts` |
-| MCP native tools | 返回真实 structured result | `src/server/mcp/server.ts` + `service.ts` |
-| MCP contract tools | 当前只做 CLI contract 暴露，需在 v2.2 收敛到真实执行 | `src/server/mcp/schema-adapter.ts` |
+**Current state:** `src/infrastructure/storage/sqlite/schema.ts` defines the governance schema with tables for `metadata`, `projects`, `modules`, `symbols`, `dependencies`, `graph_edges`, `history_snapshots`, `history_relations`, and `snapshots`.
 
-## Recommended Project Structure
+**Recommendation:** Add a new `agent_metrics` table to persist token cost analysis results:
 
-```text
-src/
-├── cli/commands/                 # CLI wrappers; long-term should be thin
-├── server/mcp/                   # MCP transport, native tools, contract adapters
-├── parser/                       # legacy parser entrypoint and parser implementations
-├── infrastructure/parser/        # language parser registry and multi-language infra
-├── infrastructure/storage/       # storage factory, adapters, sqlite runtime
-└── core/                         # orchestration and graph construction
+```sql
+CREATE TABLE IF NOT EXISTS agent_metrics (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  recorded_at TEXT NOT NULL,
+  query_type TEXT NOT NULL,
+  command TEXT NOT NULL,
+  json_response_size_bytes INTEGER NOT NULL,
+  estimated_input_tokens INTEGER NOT NULL,
+  estimated_output_tokens INTEGER NOT NULL,
+  estimated_total_tokens INTEGER NOT NULL,
+  execution_time_ms INTEGER,
+  git_commit_hash TEXT,
+  git_commit_message TEXT,
+  metadata_json TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_metrics_project
+  ON agent_metrics (project_id, recorded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_metrics_query_type
+  ON agent_metrics (query_type);
 ```
 
-### Structure Rationale
+**Integration points:**
+- `src/infrastructure/storage/sqlite/schema.ts` — add table definition
+- `src/infrastructure/storage/adapters/SQLiteStorage.ts` — add methods for metrics CRUD
+- `src/interface/types/storage.ts` — add `IStorage` method signatures for metrics
 
-- **`parser/` vs `infrastructure/parser/`:** 当前存在 legacy entrypoint 与新 registry 基础设施双轨，v2.2 的关键不是再加第三层，而是决定谁成为唯一 truth。
-- **`server/mcp/`:** 已经有 native vs contract 双路径，是 direct execution 切换的天然边界。
-- **`infrastructure/storage/`:** 现有 storage factory 与 adapter 已分层，适合把 breaking change 限制在 factory/config/runtime seam，而不是散改命令层。
+### 5. Git History Parsing: Reuse GitAnalyzer
 
-## Architectural Patterns
+**Current state:** `src/orchestrator/git-analyzer.ts` provides:
+- `GitAnalyzer` class with `findRelatedCommits()`, `calculateRiskScore()`
+- `CommitInfo` interface with `hash`, `message`, `date`, `author`, `files`, `tag`
+- `CommitTag` with `type` (BUGFIX/FEATURE/REFACTOR/etc), `scope`, `subject`
 
-### Pattern 1: Single Truth Entry for Parser Selection
+**Recommendation:** Create `src/orchestrator/agent-metrics-service.ts` that:
+1. Uses `GitAnalyzer.findRelatedCommits()` to get recent commits
+2. Maps commit patterns to query types (e.g., refactor commits → impact analysis, feature commits → dependency tracing)
+3. Runs representative queries for each type and measures token costs
 
-**What:** 让 parser 选择逻辑只存在一个入口，而不是 `createParser()`、`analyze()`、registry 各自维护一份 truth。  
-**When to use:** parser 主路径切换、废弃旧 mode、扩语言支持。  
-**Trade-offs:** upfront refactor 成本高，但能明显降低 docs/config/test drift。
+**Query type mapping from git history:**
 
-### Pattern 2: Actionable Failure Boundaries
+| Commit Pattern | Extracted Query Type | Rationale |
+|----------------|---------------------|-----------|
+| `REFACTOR` + files in same module | `impact` analysis | Refactoring requires understanding impact |
+| `FEATURE` + new dependencies | `deps` query | Adding features often requires dependency analysis |
+| `BUGFIX` + specific symbol | `query --symbol` | Bug fixes target specific symbols |
+| `DELETE` + module removal | `cycles` detection | Removing modules may break cycles |
+| Multiple files changed | `analyze find` | Broad changes need comprehensive analysis |
 
-**What:** backend 不可用时返回结构化错误和修复建议，而不是 silent fallback。  
-**When to use:** storage convergence、native dependency 缺失、config breaking change。  
-**Trade-offs:** 需要同步 CLI/MCP/error-code/docs，但能避免“看似成功、实际降级”的假象。
+### 6. Execution Layer: Optional MCP Integration
 
-### Pattern 3: Shared Command Service for CLI + MCP
+**Current state:** `src/execution/contract-tools/` provides shared transport-free execution for `query`, `deps`, `analyze`. Both CLI and MCP call this layer.
 
-**What:** 先抽 pure function/service，再让 CLI 和 MCP 只是不同 adapter。  
-**When to use:** 当前任何仍由 MCP 返回 `cli_redirect` 的 contract tool。  
-**Trade-offs:** 需要先拆命令文件，但这是缩短 `src/cli/commands/*.ts` 的唯一可持续路径。
+**Recommendation:** For MVP, `agent-metrics` is CLI-only (as stated in requirements). However, the service layer should be designed to be callable from MCP later:
+
+```
+CLI: src/cli/commands/agent-metrics.ts
+  ↓
+Service: src/orchestrator/agent-metrics-service.ts
+  ↓
+Execution: queries existing contract-tools (query, deps, impact, etc.)
+  ↓
+Storage: IStorage (SQLite) for metrics persistence
+```
+
+This ensures future MCP gateway integration (v2) can reuse the service layer without duplication.
+
+## Component Boundaries
+
+| Component | Responsibility | Communicates With |
+|-----------|---------------|-------------------|
+| `src/cli/commands/agent-metrics.ts` | CLI entry point, flag parsing, output formatting | `agent-metrics-service.ts`, `output/` |
+| `src/orchestrator/agent-metrics-service.ts` | Core logic: git history parsing, query execution, token estimation | `git-analyzer.ts`, `contract-tools/`, `IStorage` |
+| `src/cli/interface-contract/commands/agent-metrics.ts` | Schema definition for `--schema` output | `interface-contract/index.ts` |
+| `src/infrastructure/storage/sqlite/schema.ts` | Table definition | `SQLiteStorage.ts` |
+| `src/infrastructure/storage/adapters/SQLiteStorage.ts` | Metrics CRUD operations | `IStorage` interface |
 
 ## Data Flow
 
-### Request Flow
+```
+1. User runs: codemap agent-metrics report --max-tokens-per-query 5000
 
-```text
-CLI/MCP request
-    ↓
-command wrapper / MCP adapter
-    ↓
-shared service seam
-    ↓
-parser or storage runtime
-    ↓
-structured result / actionable error
+2. CLI layer (src/cli/commands/agent-metrics.ts):
+   - Parse flags via Commander
+   - Resolve output mode (--json / --human / TTY)
+   - Call agent-metrics-service
+
+3. Service layer (src/orchestrator/agent-metrics-service.ts):
+   a. Git history extraction:
+      - GitAnalyzer.findRelatedCommits() → recent commits
+      - Map commit patterns → query types
+   b. Query execution:
+      - For each query type, run representative query via contract-tools
+      - Capture JSON response size
+   c. Token estimation:
+      - JSON size → token count (heuristic: ~4 chars/token)
+      - Aggregate by query type
+   d. Threshold check:
+      - If --max-tokens-per-query set, compare against threshold
+      - Return pass/fail status
+
+4. Storage layer (IStorage):
+   - Persist metrics to agent_metrics table
+   - Load historical metrics for trend analysis
+
+5. Output layer (src/cli/output/):
+   - renderOutput() with human renderer or JSON
+   - Exit code 1 if threshold exceeded
 ```
 
-### Key Data Flows
+## Suggested Build Order
 
-1. **Parser flow:** config mode → parser selection → parse results → graph build  
-2. **Storage flow:** storage config → runtime selection → graph persistence/query → metadata/error envelope  
-3. **MCP flow:** tool input schema → service execution → structuredContent → agent consumption
+### Phase 75: agent-metrics Core Infrastructure
 
-## Anti-Patterns
+**Goal:** Create the command skeleton, service layer, and SQLite schema.
 
-### Anti-Pattern 1: Dual Entry Truth
+**Components:**
+1. `src/cli/commands/agent-metrics.ts` — CLI entry with `token` and `report` subcommands
+2. `src/orchestrator/agent-metrics-service.ts` — Service with git history parsing and query execution
+3. `src/infrastructure/storage/sqlite/schema.ts` — Add `agent_metrics` table
+4. `src/infrastructure/storage/adapters/SQLiteStorage.ts` — Add metrics CRUD methods
+5. `src/interface/types/storage.ts` — Add `IStorage` method signatures
 
-**What people do:** 一边保留 legacy parser entrypoint，一边新增 registry，却不明确谁是主流程。  
-**Why it's wrong:** 每个调用点都可能单独判断 mode/backend，最后出现“代码支持 A，文档说 B，测试验证 C”。  
-**Do this instead:** 先选唯一 orchestrator seam，再让其他层变成 compatibility wrapper 或删除。
+**Why first:** Foundation for all subsequent work. Without storage and service, no analysis can run.
 
-### Anti-Pattern 2: Discovery-Only MCP
+### Phase 76: Token Estimation and Reporting
 
-**What people do:** 把 MCP tool 当成 CLI 帮助系统，只返回命令字符串。  
-**Why it's wrong:** agent 仍需二次解释和执行，失去 machine-actionable contract 的意义。  
-**Do this instead:** 原生命令结果走 structured output，CLI 只是其中一个 adapter。
+**Goal:** Implement token heuristics, per-query-type aggregation, and report output.
 
-### Anti-Pattern 3: Silent Storage Fallback
+**Components:**
+1. Token estimation logic in service layer
+2. Per-query-type statistics (avg, min, max, p95)
+3. Human-readable table renderer
+4. JSON output mode
 
-**What people do:** backend 不可用时静默回退到另一个 backend。  
-**Why it's wrong:** 用户以为 graph truth 保持一致，实际 runtime/性能/可见性都变了。  
-**Do this instead:** fallback 只能在同一 truth family 内发生（SQLite native/WASM/built-in），跨 backend 切换必须显式失败。
+**Why second:** Depends on Phase 75 infrastructure. Reporting is the primary user value.
 
-## Integration Points
+### Phase 77: CI Gate and Threshold Enforcement
 
-### Internal Boundaries
+**Goal:** Implement `--max-tokens-per-query` threshold and non-zero exit code.
 
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| `core/analyzer` ↔ `parser/index` | direct API | 当前是 parser 主路径最脆弱的 coupling 点。 |
-| `cli/config-loader` ↔ `StorageFactory` | typed config | v2.2 breaking change 会先经过这里暴露。 |
-| `server/mcp/server` ↔ `schema-adapter` | tool registration | 当前 native tools 返回真结果，contract tools 返回 `cli_redirect`。 |
-| `server/mcp/server` ↔ `service` | direct service call | 这是 direct execution 的可复用模式，应扩展到更多 tools。 |
+**Components:**
+1. Threshold comparison logic
+2. Pass/fail summary output
+3. Exit code handling
+4. CI-friendly output format
+
+**Why third:** Depends on Phase 76 reporting. CI gate is the secondary user value.
+
+### Phase 78: Interface Contract and Schema
+
+**Goal:** Define interface contract for `agent-metrics` commands.
+
+**Components:**
+1. `src/cli/interface-contract/commands/agent-metrics.ts`
+2. Update `src/cli/interface-contract/commands/index.ts`
+3. Update `src/cli/interface-contract/index.ts` exports
+
+**Why last:** Contract can be defined after command behavior is stable. Early contract definition risks churn.
+
+## Relationship with Existing Benchmark Command
+
+**Current state:** `benchmark` command compares WASM vs Native performance. It has:
+- Custom output formatting (not using shared infrastructure)
+- No interface contract
+- No storage persistence
+- No git history integration
+
+**Recommendation:** Keep `agent-metrics` separate from `benchmark` as stated in requirements. However, note that `AGENT-11` (benchmark migration to shared output infrastructure) should be done in `v2.6` to reduce technical debt.
+
+**Future consideration:** If `benchmark` migrates to shared infrastructure, both commands could share:
+- Output formatting patterns
+- Progress emitter usage
+- Error handling patterns
+
+## Anti-Patterns to Avoid
+
+### Anti-Pattern 1: Custom Output Like Benchmark
+
+**What:** Writing `console.log` with manual table formatting instead of using `renderOutput()`.
+
+**Why bad:** Creates migration debt. `AGENT-11` already exists to fix this for benchmark.
+
+**Instead:** Use `resolveOutputMode()`, `renderOutput()`, and `formatError()` from `src/cli/output/`.
+
+### Anti-Pattern 2: Inline Git Parsing
+
+**What:** Duplicating git command execution logic in the command file.
+
+**Why bad:** `GitAnalyzer` already handles git operations with proper error handling.
+
+**Instead:** Create a service that uses `GitAnalyzer` as a dependency.
+
+### Anti-Pattern 3: Ephemeral-Only Metrics
+
+**What:** Running analysis without persisting results to SQLite.
+
+**Why bad:** No trend tracking, no historical comparison, no CI regression detection.
+
+**Instead:** Always persist to `agent_metrics` table, even if user only wants current report.
+
+### Anti-Pattern 4: Tight Coupling to Contract-Tools
+
+**What:** Directly importing and calling `executeQueryTool()` in the command file.
+
+**Why bad:** Bypasses service layer, makes MCP integration harder.
+
+**Instead:** Service layer calls contract-tools; command file calls service.
+
+## Open Questions
+
+1. **Token estimation calibration:** The heuristic of ~4 chars/token needs validation against actual LLM tokenizers. Should we add a calibration mode that runs against known token counts?
+
+2. **Query scenario coverage:** How many representative queries per type? Running all possible queries could be expensive. Suggest starting with 3-5 per type.
+
+3. **Historical trend window:** How far back should trend analysis go? Suggest 30 days by default with `--since` flag.
+
+4. **Metrics retention policy:** Should old metrics be pruned? Suggest keeping last 90 days by default.
+
+5. **Git history depth:** How many commits to analyze for query extraction? Suggest 50-100 recent commits.
 
 ## Sources
 
-- [parser/index.ts:25](/data/codemap/src/parser/index.ts:25)
-- [analyzer.ts:15](/data/codemap/src/core/analyzer.ts:15)
-- [infrastructure/parser/index.ts:39](/data/codemap/src/infrastructure/parser/index.ts:39)
-- [StorageFactory.ts:48](/data/codemap/src/infrastructure/storage/StorageFactory.ts:48)
-- [server.ts:36](/data/codemap/src/server/mcp/server.ts:36)
-- [schema-adapter.ts:286](/data/codemap/src/server/mcp/schema-adapter.ts:286)
+- [src/cli/index.ts](/data/codemap/src/cli/index.ts) — CLI command registration
+- [src/cli/commands/benchmark.ts](/data/codemap/src/cli/commands/benchmark.ts) — existing benchmark command (anti-pattern reference)
+- [src/cli/commands/query.ts](/data/codemap/src/cli/commands/query.ts) — good pattern for shared output usage
+- [src/cli/commands/history.ts](/data/codemap/src/cli/commands/history.ts) — good pattern for service-backed command
+- [src/cli/interface-contract/commands/benchmark.ts](/data/codemap/src/cli/interface-contract/commands/benchmark.ts) — interface contract example
+- [src/cli/interface-contract/commands/index.ts](/data/codemap/src/cli/interface-contract/commands/index.ts) — contract registry
+- [src/cli/output/index.ts](/data/codemap/src/cli/output/index.ts) — shared output infrastructure
+- [src/cli/output/types.ts](/data/codemap/src/cli/output/types.ts) — output types
+- [src/infrastructure/storage/sqlite/schema.ts](/data/codemap/src/infrastructure/storage/sqlite/schema.ts) — SQLite schema
+- [src/infrastructure/storage/adapters/SQLiteStorage.ts](/data/codemap/src/infrastructure/storage/adapters/SQLiteStorage.ts) — storage adapter
+- [src/interface/types/storage.ts](/data/codemap/src/interface/types/storage.ts) — storage interface
+- [src/orchestrator/git-analyzer.ts](/data/codemap/src/orchestrator/git-analyzer.ts) — git history parsing
+- [src/orchestrator/history-risk-service.ts](/data/codemap/src/orchestrator/history-risk-service.ts) — service pattern reference
+- [src/cli/storage-runtime.ts](/data/codemap/src/cli/storage-runtime.ts) — storage initialization
+- [src/execution/contract-tools/](/data/codemap/src/execution/contract-tools/) — shared execution layer
+- [docs/brainstorms/2026-05-10-agent-effectiveness-validation-requirements.md](/data/codemap/docs/brainstorms/2026-05-10-agent-effectiveness-validation-requirements.md) — requirements
 
 ---
-*Architecture research for: v2.2 architecture-foundation*
-*Researched: 2026-05-06*
+*Architecture research for: v2.7 agent-effectiveness-validation*
+*Researched: 2026-05-10*
