@@ -14,11 +14,21 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 
 ## Planning Horizon
 
-当前没有新的 active milestone 被正式启动。最近已完成的是 `v2.4 parser-multilang-depth`；下一轮规划候选是 `v2.5 deep-analysis-hooks`，优先承接 Python call-graph / complexity 与 hook-related deep-analysis follow-ups。
+当前 active milestone 已切换到 `v2.7 agent-effectiveness-validation`。它为 CodeMap 补齐 agent 有效性度量基础设施——`codemap agent-metrics` 命令提供 token 成本分析，消除"工具对 agent 划不划算"的盲区。`v2.5 deep-analysis-hooks` 仍保留为 active（Phase 70 ready to plan），可在 v2.7 完成后继续或并行推进。下一轮候选保留为 `v2.6 polish-and-stabilize` 和 `v3.0 architecture-intelligence`。
+
+## Current Milestone: v2.7 agent-effectiveness-validation
+
+**Goal:** 新建 `codemap agent-metrics` 命令，提供 token 成本分析维度的 agent 有效性指标。MVP 为 CLI 离线报告，后续演进到 MCP gateway 持续采集 + CI 门禁 + agent 行为分类。目标是消除"CodeMap 对 agent 划不划算"这个当前完全盲区。
+
+**Target features:**
+- Token 成本分析：per-query-type token estimation、响应大小统计、成本趋势追踪
+- 报告输出：human-readable 表格 + JSON 模式（`--json`），支持 CI 管道消费
+- CI 门禁：`--max-tokens-per-query` 阈值参数，超阈值返回非零退出码
+- 命令结构：`codemap agent-metrics token` + `codemap agent-metrics report`
 
 ## Current State
 
-**Status:** No active milestone is currently selected. Latest shipped milestone is `v2.4 parser-multilang-depth` on `2026-05-10`.
+**Status:** Active milestone is `v2.7 agent-effectiveness-validation`. `v2.5 deep-analysis-hooks` remains active (Phase 70 ready to plan). Latest shipped milestone remains `v2.4 parser-multilang-depth` on `2026-05-10`.
 
 **What shipped in v2.4:**
 - Python 主路径已升级为 Tree-sitter AST parser，替代 regex-based MVP ✅
@@ -27,8 +37,8 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 - Parser runtime 已统一到 interface-layer `ParseResult`，Core 通过 composition root 注入 parser registry / enhancers ✅
 
 **What remains next:**
-- Python call-graph 与 complexity metrics 仍未交付，已显式递延到 `v2.5+`
-- hook / hub-bridge / dedup follow-ups 仍在 `v2.5` 候选池
+- `v2.7` agent-metrics 命令是当前执行焦点
+- `PY-07` / `PY-08` / `HOOK-01~03` 仍在 `v2.5` scope，待 v2.7 完成后继续
 - complexity unify、MCP blank-line filter、edge ID normalization、Interface Contract 1.0.0 仍在 `v2.6` 候选池
 
 ## Milestone Focus
@@ -36,6 +46,7 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 - Preserve the converged `v2.2` parser/storage/MCP baseline and `v2.3` graph schema
 - Carry Python deep-analysis forward from AST/type depth into call-graph and complexity
 - Reuse the shared parser/type surfaces shipped in `v2.4` rather than adding Python-only side channels
+- Keep hook guidance retrieval-led through Phase 58 `env-contract`, not prompt-snippet reinjection
 - Continue reducing architecture drift by extending existing seams instead of reopening settled baselines
 
 ## Latest Completed Milestone: v2.4 parser-multilang-depth
@@ -97,10 +108,6 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 - [ ] **HOOK-01**: hub / bridge detection
 - [ ] **HOOK-02**: hook mechanism (first-remind-then-silent, Phase 58 integration)
 - [ ] **HOOK-03**: node dedup (3-layer)
-- [ ] **POL-01**: Complexity calculation unify
-- [ ] **POL-02**: MCP blank-line filter
-- [ ] **POL-03**: Edge ID normalization
-- [ ] **POL-04**: Interface Contract 1.0.0
 
 ### Future Milestones
 
@@ -127,9 +134,8 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 - `docs/rules/validation.md` 与 `docs/rules/engineering-with-codex-openai.md` 已承担验证顺序、工程执行与交付要求
 - `AI_GUIDE.md` 与 `docs/rules/README.md` 已分别承担产品/CLI discoverability 与 rules 路由
 - 当前 `src/` 约 `88,496` 行 TypeScript
-- 渐进债务：12+ 命令仍需 contract schema 定义；benchmark 命令仍需迁移到共享输出基础设施
+- 当前 planning focus：Python call-graph / complexity、hook surfaces；Rust/Java/C++ grammar 继续后移到 `v3.0+`
 - 最新 shipped milestone：`v2.4 parser-multilang-depth`
-- 下一轮 planning focus 候选：Python call-graph / complexity、hook surfaces；Rust/Java/C++ grammar 继续后移到 `v3.0+`
 - `scripts/validate-docs.js` 与 `node dist/cli/index.js ci check-docs-sync` 继续作为 docs governance enforcement surface
 
 ## Constraints
@@ -144,6 +150,7 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 - **Baseline Preservation**: 不重新打开 `v2.2` parser/storage/MCP 或 `v2.3` graph schema，除非出现明确 blocker
 - **Python Depth First**: 先沿着 Python AST / type / call-graph / complexity 主线继续推进，再考虑更广 grammar 扩展
 - **Explicit Failure Over Silent Fallback**: Python grammar 不可用时必须给出可操作错误，而不是静默回退到 regex main path
+- **Retrieval-Led Hooks**: hook 相关能力必须复用 Phase 58 `env-contract` 检索面，而不是重新引入 prompt snippet / hidden rule cache
 
 ## Key Decisions
 
@@ -153,6 +160,8 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 | `PY-04` 锁定为 strict no-fallback | Python grammar 可用时必须走 AST parser，不可用时显式失败，而不是静默回退 regex | Completed 2026-05-10 |
 | `PY-06` 通过共享顶层 `typeInfo` surface 闭合 | Python 类型增强复用现有 graph/module truth 输出契约，不引入 Python-only side channel | Completed 2026-05-10 |
 | `Phase 70` 递延到 `v2.5+` | Python call-graph / complexity 仍重要，但不再作为 `v2.4` closeout blocker | Deferred 2026-05-10 |
+| 启动 `v2.5 deep-analysis-hooks` | 用户确认本 milestone 覆盖 `PY-07` / `PY-08` 与 `HOOK-01~03`，并要求先 research 再进 requirements | Active 2026-05-10 |
+| 继续使用保留的 `Phase 70` 编号 | `Phase 70` 已在 `v2.4` closeout 中明确递延到 `v2.5+`，不应重写历史编号 | Active 2026-05-10 |
 | `v2.3` 不重新打开 parser/storage/MCP baseline | graph capability 建立在稳定执行基础上，而不是回到底座收敛 | Shipped 2026-05-09 |
 | `v2.2` 聚焦 parser / storage / MCP 基线收敛 | 先清理架构根基，再进入图能力与 agent/intelligence 扩展 | Shipped 2026-05-07 |
 
@@ -160,19 +169,19 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 
 - **Completed milestones / follow-ups:** `v1.0`→`v1.11`、`v2.0`、`v2.1`、`v2.2`、`v2.3`、`v2.4`
 - **Historical closed branch:** `v1.5 Isolated ArcadeDB Server-backed Prototype`
-- **Active milestone:** none selected
-- **Current planning status:** `v2.4` 已归档；下一轮等待 `v2.5` 或其他里程碑正式定 scope
-- **Known remaining debt:** `PY-07` / `PY-08`、hook follow-ups、contract migration 渐进债务、benchmark 输出基础设施迁移
+- **Active milestone:** `v2.5 deep-analysis-hooks`
+- **Current planning status:** research complete; requirements / roadmap now define Phase `70`, `72`, `73`, `74`
+- **Known remaining debt:** `v2.6` polish items、contract migration 渐进债务、benchmark 输出基础设施迁移
 
 ## Next Milestone Goals (Candidates)
 
-1. **v2.5 deep-analysis-hooks** — `PY-07` / `PY-08` + hub/bridge detection, hook mechanism, node dedup
+1. **v2.5 deep-analysis-hooks** — Python call-graph / complexity, hub-bridge / hook / dedup (active, Phase 70 ready to plan)
 2. **v2.6 polish-and-stabilize** — complexity calculation unify, MCP blank-line filter, edge ID normalization, Interface Contract 1.0.0
 3. **v3.0 architecture-intelligence** — Auto-Generate design.md, Architecture Remediation Patches, Self-Healing Design Contract, parser extension
 
 ## Next Execution Step
 
-Choose and scope the next milestone before reintroducing `.planning/REQUIREMENTS.md`.
+Define v2.7 requirements and create roadmap via `/gsd-plan-phase`.
 
 ## Evolution
 
@@ -192,4 +201,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. 更新 Current State / Context / Key Decisions
 
 ---
-*Last updated: 2026-05-10 after shipping Milestone v2.4 parser-multilang-depth*
+*Last updated: 2026-05-10 after starting Milestone v2.7 agent-effectiveness-validation*

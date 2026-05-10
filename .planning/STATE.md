@@ -1,19 +1,19 @@
 ---
 gsd_state_version: 1.0
-milestone: none
-milestone_name: none
-current_phase: none
-current_phase_name: milestone-closeout
-current_plan: none
-status: shipped
-last_updated: "2026-05-10T10:30:00.000Z"
+milestone: v2.7
+milestone_name: agent-effectiveness-validation
+current_phase: null
+current_phase_name: null
+current_plan: null
+status: defining_requirements
+last_updated: "2026-05-10T14:00:00.000Z"
 last_activity: 2026-05-10
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Session State
@@ -23,58 +23,61 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-10)
 
 **Core Value:** 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
-**Current Focus:** `v2.4 parser-multilang-depth` shipped; next milestone not yet selected
+**Current Focus:** `v2.7 agent-effectiveness-validation` — `codemap agent-metrics` 命令
 
 ## Position
 
-**Milestone:** none active
-**Current Phase:** milestone closeout complete
-**Current Phase Name:** shipped milestone waiting for next scope
-**Current Plan:** none
-**Total Phases:** 4 shipped in-scope (`67`, `68`, `69`, `71`)
-**Total Plans in Milestone:** 8 completed
-**Status:** Milestone shipped
-**Progress:** [##########] Delivered phases complete (4/4)
+**Milestone:** `v2.7 agent-effectiveness-validation`
+**Current Phase:** Not started (defining requirements)
+**Current Plan:** —
+**Total Phases:** TBD (pending roadmap)
+**Total Plans in Milestone:** 0
+**Status:** Defining requirements
+**Progress:** [----------] 0/? phases complete
 **Last Activity:** 2026-05-10
-**Last Activity Description:** `v2.4` roadmap/requirements/audit archived; planning truth reset to between-milestones state
+**Last Activity Description:** Milestone v2.7 started from agent-effectiveness-validation requirements doc
 
 ## Current Position
 
-Phase: no active phase
-Plan: -
-Status: Shipped / awaiting next milestone
-Last activity: 2026-05-10 -- milestone archived and active truth reset
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-10 — Milestone v2.7 started
 
 ## Decisions Made
 
 | Date | Summary | Rationale |
 |------|---------|-----------|
-| 2026-05-09 | Phase 67 context gathered | Locked WASM grammar, parser architecture, explicit failure semantics, and AST feature goals |
-| 2026-05-09 | Phase 67 complete | `tree-sitter-python@0.23.4` installed, `PythonTreeSitterParser` created, wired as default handler; WASM path chosen |
-| 2026-05-10 | Phase 68 complete | Shared multi-language Tree-sitter capability, TS/JS cutover, and strict Python no-fallback verification shipped |
-| 2026-05-10 | Phase 69 complete | PythonTypeEnhancer delivered docstring/annotation enrichment and analyzer-facing `typeInfo` propagation |
-| 2026-05-10 | Phase 70 deferred | Python call-graph and complexity moved out of `v2.4` into `v2.5+` follow-up scope |
-| 2026-05-10 | Phase 71 complete | Parser legacy cleanup closed type unification, TreeSitterParser relocation, and Core→Infrastructure decoupling |
-| 2026-05-10 | v2.4 shipped | Milestone archived with `9/9` requirements closed; `Phase 70` remains explicitly deferred to `v2.5+` |
+| 2026-05-10 | Start `v2.5 deep-analysis-hooks` | User confirmed scope covers `PY-07` / `PY-08` and `HOOK-01~03` |
+| 2026-05-10 | Research-first before requirements | User explicitly chose to run research before scoping requirements |
+| 2026-05-10 | Keep reserved `Phase 70` numbering | `Phase 70` was already deferred out of `v2.4`; preserving it avoids rewriting milestone history |
+| 2026-05-10 | Split `v2.5` into 4 phases | Separate Python call-graph, Python complexity, topology+dedup, and hook reminder for clearer verification boundaries |
+| 2026-05-10 | Lock Phase 70 to high-confidence symbol-level call graph | Standard-scope static calls only; dynamic calls unresolved; no inferred edges or file-level dual writeback |
+| 2026-05-10 | Start `v2.7 agent-effectiveness-validation` | User confirmed agent-metrics as independent milestone; v2.6 polish deferred |
+| 2026-05-10 | New command `codemap agent-metrics` not extending `benchmark` | benchmark focuses on parser/storage performance; agent-metrics focuses on agent effectiveness; separate concerns |
 
-## Closeout Notes
+## Active Milestone Scope
 
-- **Latest shipped milestone:** `v2.4 parser-multilang-depth` archived on 2026-05-10. Archived roadmap/requirements/audit now live in `.planning/milestones/v2.4-ROADMAP.md`, `.planning/milestones/v2.4-REQUIREMENTS.md`, and `.planning/milestones/v2.4-MILESTONE-AUDIT.md`.
-- **Current planning truth:** between milestones, active truth lives in `.planning/PROJECT.md`, `.planning/ROADMAP.md`, and `.planning/STATE.md`; `.planning/REQUIREMENTS.md` is intentionally absent until the next milestone is scoped.
+| Requirement | Summary | Planned Phase |
+|-------------|---------|---------------|
+| (TBD) | Token 成本分析 per-query-type | — |
+| (TBD) | 报告输出 human-readable + JSON | — |
+| (TBD) | CI 门禁 max-tokens-per-query 阈值 | — |
+| (TBD) | 命令结构 agent-metrics token / report | — |
 
 ## Deferred Items
 
 | Category | Item | Target Milestone |
 |----------|------|------------------|
-| parser | PY-07: Python call-graph extraction | v2.5 deep-analysis-hooks |
-| parser | PY-08: Python complexity metrics | v2.5 deep-analysis-hooks |
-| graph | HOOK-01: hub / bridge detection | v2.5 deep-analysis-hooks |
-| graph | HOOK-02: hook mechanism (first-remind-then-silent, Phase 58 integration) | v2.5 deep-analysis-hooks |
-| graph | HOOK-03: node dedup (3-layer) | v2.5 deep-analysis-hooks |
 | polish | POL-01: Complexity calculation unify | v2.6 polish-and-stabilize |
 | polish | POL-02: MCP blank-line filter | v2.6 polish-and-stabilize |
 | polish | POL-03: Edge ID normalization | v2.6 polish-and-stabilize |
 | polish | POL-04: Interface Contract 1.0.0 | v2.6 polish-and-stabilize |
+| deep-analysis | PY-07: Python call-graph extraction | v2.5 deep-analysis-hooks |
+| deep-analysis | PY-08: Python complexity truth | v2.5 deep-analysis-hooks |
+| deep-analysis | HOOK-01: hub/bridge detection | v2.5 deep-analysis-hooks |
+| deep-analysis | HOOK-02: hook mechanism | v2.5 deep-analysis-hooks |
+| deep-analysis | HOOK-03: node dedup | v2.5 deep-analysis-hooks |
 | agent-integration | Auto-Provisioned Agent Skills | v3.0+ |
 | agent-integration | MCP `verify_contract` Tool | v3.0+ |
 | parser | Parser extension Rust/Java/C++ (Tree-sitter grammar) | v3.0+ |
@@ -82,9 +85,10 @@ Last activity: 2026-05-10 -- milestone archived and active truth reset
 
 ## Risks To Watch
 
-- Python call-graph and complexity remain deferred follow-up work for `v2.5+`
-- Next milestone must not silently reintroduce `Phase 70` into `v2.4` historical closeout
-- Do not let future Python depth work sprawl into Rust/Java/C++ grammar scope
+- token 估算的启发式公式需要基于实际数据校准，不能凭空设定
+- 默认阈值需要先跑一次 token report 看数据分布，否则可能过松或过紧
+- 查询场景从 git history 提取的策略需要确认——不是所有 commit 都有清晰的 ground truth
+- agent-metrics 不应与现有 benchmark 命令产生职责重叠
 
 ---
-*State initialized for v2.4 on 2026-05-09; reset to between-milestones state on 2026-05-10*
+*State initialized for v2.7 on 2026-05-10*
