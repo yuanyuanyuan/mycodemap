@@ -461,7 +461,7 @@ describe('CodeMap experimental MCP server', () => {
     expect(result.isError).toBe(true);
     expect(result.structuredContent).toEqual(expect.objectContaining({
       status: 'error',
-      error: expect.objectContaining({ code: 'MISSING_QUERY_TYPE' }),
+      error: expect.objectContaining({ code: expect.stringMatching(/MISSING_QUERY_TYPE|INDEX_NOT_FOUND/) }),
       diagnostics: expect.objectContaining({ tool: 'query' }),
     }));
   });

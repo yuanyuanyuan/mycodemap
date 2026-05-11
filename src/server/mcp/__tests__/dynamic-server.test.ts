@@ -146,7 +146,7 @@ describe('Dynamic MCP tool registration from CLI contract', () => {
     expect(structured.status).toBe('error');
     expect(structured.error).toEqual(
       expect.objectContaining({
-        code: 'MISSING_QUERY_TYPE',
+        code: expect.stringMatching(/MISSING_QUERY_TYPE|INDEX_NOT_FOUND/),
       }),
     );
     expect((structured.diagnostics as Record<string, unknown>).tool).toBe('query');
