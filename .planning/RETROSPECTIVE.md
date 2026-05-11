@@ -5,6 +5,50 @@
 > Archive identity note: milestone sections below are retrospective snapshots of shipped work.
 > They are a lessons archive, **not** the current active planning surface; current truth lives in `.planning/PROJECT.md`, `.planning/ROADMAP.md`, `.planning/REQUIREMENTS.md`, and `.planning/STATE.md`.
 
+## Milestone: v2.5 — deep-analysis-hooks
+
+**Shipped:** 2026-05-10
+**Phases:** 4 | **Plans:** 4 | **Sessions:** multiple
+
+### What Was Built
+
+- Conservative Python call-graph extraction that persists both symbol-level edges and explicit non-edge issues through the shared analyzer/global-index path.
+- Python complexity persistence on shared module/symbol truth, with downstream CLI reads preferring persisted truth over silent recompute.
+- Module-level hub / bridge topology insight and three-layer duplicate suppression across graph materialization, SQLite writeback, and projection reads.
+- First-remind-then-silent env-contract reminder hooks for Codex/Claude delegated-start flows, using a shared reminder engine and session-role ledger.
+
+### What Worked
+
+- Extending existing parser/analyzer/storage/community seams kept the milestone narrow and avoided reopening already-settled baselines.
+- Conservative explicit-failure handling remained consistent across Python dynamic calls, topology degradation, and env-contract retrieval failures.
+- Shared persisted truth paid off: complexity, topology, and hook behavior all reused established surfaces instead of adding special-case channels.
+
+### What Was Inefficient
+
+- Milestone execution finished before formal closeout, and live planning advanced to `v2.7` first, so `v2.5` archival had to be reconstructed instead of snapshotted directly from live `REQUIREMENTS.md`.
+- The workspace stayed dirty across multiple phases, which made milestone-level git range and LOC accounting unreliable.
+- `gsd-sdk` lifecycle query surfaces remain unavailable in this runtime, so audit/closeout still required manual evidence gathering.
+
+### Patterns Established
+
+- Deep-analysis follow-ups should extend shared truth seams first, and only add new surfaces if reuse is impossible.
+- Duplicate suppression belongs at multiple layers when downstream analytics depend on persisted edge counts.
+- Hook/runtime adapters should normalize host-specific events first, then defer policy to a shared engine.
+
+### Key Lessons
+
+1. If a milestone starts to drift into the next active planning state, closeout should preserve the newer live truth and reconstruct the historical archive instead of overwriting current files.
+2. Persisted truth should be the default read path for downstream tools; recompute belongs as an explicit fallback, not the silent baseline.
+3. Dirty-workspace execution is tolerable for implementation, but milestone closeout should expect weaker git-based telemetry and rely more on phase summary evidence.
+
+### Cost Observations
+
+- Model mix: not captured in durable telemetry for this milestone.
+- Sessions: multiple discuss/plan/execute/closeout steps in one day.
+- Notable: most complexity came from preserving archive identity and shared-truth consistency, not from adding brand-new product surfaces.
+
+---
+
 ## Milestone: v1.11 — release-followup-hardening
 
 **Shipped:** 2026-04-29

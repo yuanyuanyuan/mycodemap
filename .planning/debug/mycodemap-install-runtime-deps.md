@@ -1,5 +1,5 @@
 ---
-status: awaiting_human_verify
+status: resolved
 trigger: |-
   根据下面的内容，做一个fix： # mycodemap v0.5.1 安装问题报告
 
@@ -12,15 +12,15 @@ trigger: |-
   问题 2: devDependencies 被生产代码引用 — glob
   问题 3: ESM default import 兼容性 — glob 版本不匹配
 created: 2026-04-19T16:20:08.097Z
-updated: 2026-04-19T16:24:10.480Z
+updated: 2026-05-11T03:15:00Z
 ---
 
 ## Current Focus
 
-hypothesis: 根因已确认并完成修复，剩余只需等待人工确认发布侧行为
-test: 运行聚焦测试、全量测试、dist CLI help，以及 tarball 安装后的 `check --help` / `analyze --help`
-expecting: 所有验证通过，且打包安装环境不再出现缺包或 `glob` ESM default export 错误
-next_action: 等待用户确认是否需要补充发布前防回归检查
+hypothesis: 根因已确认、修复已落地、发布包路径已完成验证，本 debug session 关闭
+test: 已完成聚焦测试、全量测试、dist CLI help，以及 tarball 安装后的 `check --help` / `analyze --help`
+expecting: 已验证通过；不再需要额外人工发布侧确认才能结束该 debug session
+next_action: none
 reasoning_checkpoint: null
 tdd_checkpoint: null
 
