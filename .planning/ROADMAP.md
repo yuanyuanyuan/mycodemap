@@ -9,6 +9,10 @@
 
 - 📋 **v3.0 architecture-intelligence** — agent integration, architecture intelligence, broader parser coverage (planned)
 
+## Special Follow-up Phases
+
+- ✅ **Phase 84 agent-hook-control-protocol** — between-milestones hardening to upgrade installable git hooks into AI-agent-executable control protocols (completed `2026-05-12`; not a new milestone)
+
 ## Phases
 
 <details>
@@ -61,3 +65,4 @@
 | 81. Edge ID Normalization | v2.6 | 1/1 | Complete | 2026-05-11 |
 | 82. Interface Contract 1.0.0 | v2.6 | 1/1 | Complete | 2026-05-11 |
 | 83. Query Path Performance Optimization | v2.6 | 1/1 | Complete | 2026-05-11 |
+| 84. AI Agent Hook Control Protocol | between-milestones | 1/1 | Complete | 2026-05-12 |

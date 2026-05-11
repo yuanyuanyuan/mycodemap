@@ -2,6 +2,10 @@
 # Pre-commit hook: 运行测试和文件头检查
 
 HOOK_SOURCE=".mycodemap/hooks/pre-commit"
+RULE_CONFIG_PATH=".claude/rule-system.config.json"
+RULE_REPORT_ONLY_TIMEOUT_SECONDS="${RULE_REPORT_ONLY_TIMEOUT_SECONDS:-20}"
+RULE_HARD_GATE_MODE="report-only"
+CHECK_RESULTS_FILE=""
 TEST_OUTPUT_FILE=""
 FILTERED_TEST_OUTPUT_FILE=""
 SUPPRESSED_TEST_WARNING_COUNT=0
@@ -22,18 +26,44 @@ TEST_SCRIPT=""
 VITEST_ARGS=""
 JEST_ARGS=""
 VITEST_ENTRY=""
+ATTEMPT_ID=""
+ATTEMPT_LOG_RELATIVE_PATH=""
+ATTEMPT_LOG_ABSOLUTE_PATH=""
+AGENT_CONTEXT_RAW="${CODEMAP_AGENT_CONTEXT:-}"
+PARENT_COMMIT=""
+STAGED_FILES=""
+STAGED_FILE_COUNT=0
+NON_DOT_FILES=""
+ONLY_DOT_DIRS=true
+IS_INITIAL_COMMIT=false
+CONTAINS_DOC_FILES=false
+DOC_FILES=""
+CURRENT_LIMIT=0
+STAGED_TS_FILES=""
+MISSING_HEADERS=0
+MISSING_HEADER_FILES=""
+DOC_GUARDRAIL_FILES=""
+STAGED_TEST_FILES=""
+MISSING_REAL_PATTERN=0
+MISSING_REAL_PATTERN_FILES=""
+STAGED=""
+STAGED_COUNT=0
+PROTOCOL_JSON=""
+VALIDATE_EXIT=0
+MAX_FILES_PER_COMMIT=10
+MAX_FILES_WITH_DOCS=20
 
-print_blocked_rule() {
-    rule_id="$1"
-    reason="$2"
-
-    echo "ERROR: Commit precheck blocked the commit."
-    echo "RULE_ID: $rule_id"
-    echo "HOOK_SOURCE: $HOOK_SOURCE"
-    echo "WHY: $reason"
+now_ms() {
+    python3 - <<'PY'
+import time
+print(int(time.time() * 1000))
+PY
 }
 
-cleanup_related_test_artifacts() {
+cleanup_temp_artifacts() {
+    if [ -n "$CHECK_RESULTS_FILE" ] && [ -f "$CHECK_RESULTS_FILE" ]; then
+        rm -f "$CHECK_RESULTS_FILE"
+    fi
     if [ -n "$TEST_OUTPUT_FILE" ] && [ -f "$TEST_OUTPUT_FILE" ]; then
         rm -f "$TEST_OUTPUT_FILE"
     fi
@@ -42,8 +72,445 @@ cleanup_related_test_artifacts() {
     fi
 }
 
+trap cleanup_temp_artifacts EXIT
+
+count_non_empty_lines() {
+    INPUT_TEXT="$1" python3 - <<'PY'
+import os
+text = os.environ.get('INPUT_TEXT', '')
+print(sum(1 for line in text.splitlines() if line.strip()))
+PY
+}
+
+json_array_from_lines() {
+    INPUT_TEXT="$1" python3 - <<'PY'
+import json
+import os
+lines = [line for line in os.environ.get('INPUT_TEXT', '').splitlines() if line.strip()]
+print(json.dumps(lines, separators=(',', ':')))
+PY
+}
+
+json_to_base64() {
+    INPUT_TEXT="$1" python3 - <<'PY'
+import base64
+import os
+
+print(base64.b64encode(os.environ.get('INPUT_TEXT', '{}').encode('utf-8')).decode('ascii'))
+PY
+}
+
+append_check_result() {
+    check_name="$1"
+    check_status="$2"
+    check_duration_ms="$3"
+    check_details_json="${4:-{}}"
+    check_message="${5:-}"
+    check_rule_id="${6:-}"
+    check_skip_reason="${7:-}"
+    check_blocking_override="${8:-}"
+    check_details_b64=$(json_to_base64 "$check_details_json")
+
+    CHECK_NAME="$check_name" \
+    CHECK_STATUS="$check_status" \
+    CHECK_DURATION_MS="$check_duration_ms" \
+    CHECK_DETAILS_B64="$check_details_b64" \
+    CHECK_MESSAGE="$check_message" \
+    CHECK_RULE_ID="$check_rule_id" \
+    CHECK_SKIP_REASON="$check_skip_reason" \
+    CHECK_BLOCKING_OVERRIDE="$check_blocking_override" \
+    python3 - "$CHECK_RESULTS_FILE" <<'PY'
+import base64
+import json
+import os
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+raw_details_b64 = os.environ.get('CHECK_DETAILS_B64', '') or 'e30='
+try:
+    raw_details = base64.b64decode(raw_details_b64).decode('utf-8')
+except Exception:
+    raw_details = '{}'
+
+def load_jsonish(raw: str):
+    candidates = [raw]
+    trimmed = raw.strip()
+    if trimmed != raw:
+        candidates.append(trimmed)
+    if trimmed.startswith("'") and trimmed.endswith("'") and len(trimmed) >= 2:
+        candidates.append(trimmed[1:-1])
+    while trimmed.count('{') < trimmed.count('}') and trimmed.endswith('}'):
+        trimmed = trimmed[:-1]
+        candidates.append(trimmed)
+
+    seen = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        try:
+            details = json.loads(candidate)
+            while isinstance(details, str):
+                details = json.loads(details)
+            return details
+        except Exception:
+            continue
+    raise ValueError(raw)
+
+try:
+    details = load_jsonish(raw_details)
+except Exception:
+    details = {'raw': raw_details}
+
+payload = {
+    'name': os.environ.get('CHECK_NAME', ''),
+    'status': os.environ.get('CHECK_STATUS', ''),
+    'duration_ms': int(os.environ.get('CHECK_DURATION_MS', '0') or '0'),
+    'details': details,
+}
+
+message = os.environ.get('CHECK_MESSAGE', '')
+rule_id = os.environ.get('CHECK_RULE_ID', '')
+skip_reason = os.environ.get('CHECK_SKIP_REASON', '')
+blocking_override = os.environ.get('CHECK_BLOCKING_OVERRIDE', '')
+if message:
+    payload['message'] = message
+if rule_id:
+    payload['rule_id'] = rule_id
+if skip_reason:
+    payload['skip_reason'] = skip_reason
+if blocking_override:
+    payload['blocking_override'] = blocking_override.lower() == 'true'
+
+with path.open('a', encoding='utf-8') as handle:
+    handle.write(json.dumps(payload, separators=(',', ':')))
+    handle.write('\n')
+PY
+}
+
+load_rule_hard_gate_mode() {
+    if [ -f "$RULE_CONFIG_PATH" ]; then
+        RULE_HARD_GATE_MODE=$(python3 - <<'PY'
+import json
+from pathlib import Path
+
+config_path = Path('.claude/rule-system.config.json')
+
+try:
+    config = json.loads(config_path.read_text(encoding='utf-8'))
+except Exception:
+    print('report-only')
+else:
+    print(config.get('hard_gate', {}).get('mode', 'report-only'))
+PY
+)
+    fi
+}
+
+prepare_attempt_context() {
+    CHECK_RESULTS_FILE=$(mktemp "${TMPDIR:-/tmp}/codemap-precheck-results-XXXXXX")
+    ATTEMPT_TIMESTAMP=$(python3 - <<'PY'
+from datetime import datetime, timezone
+print(datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
+PY
+)
+    ATTEMPT_ID="${CODEMAP_ATTEMPT_ID:-precommit-${ATTEMPT_TIMESTAMP}-$$}"
+    ATTEMPT_LOG_RELATIVE_PATH=".mycodemap/logs/pre-commit/${ATTEMPT_ID}.json"
+    ATTEMPT_LOG_ABSOLUTE_PATH="$(pwd)/$ATTEMPT_LOG_RELATIVE_PATH"
+    mkdir -p "$(dirname "$ATTEMPT_LOG_ABSOLUTE_PATH")" 2>/dev/null || true
+    PARENT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || true)
+}
+
+resolve_rule_definition_line() {
+    marker="$1"
+    if [ ! -f "$HOOK_SOURCE" ]; then
+        echo ""
+        return 0
+    fi
+
+    grep -nF "$marker" "$HOOK_SOURCE" | head -n 1 | cut -d: -f1
+}
+
+build_rule_metadata_json() {
+    rule_id="$1"
+    definition_marker=""
+    doc_ref=""
+    override_process=""
+
+    case "$rule_id" in
+        staged-file-limit)
+            definition_marker='MAX_FILES_PER_COMMIT=10'
+            override_process='文件数限制不可覆盖；dot-directory-only commits 豁免；若认为必须保持单一原子提交，请请求人工审查。'
+            ;;
+        source-file-headers)
+            definition_marker='Checking file headers...'
+            override_process='为缺失文件补齐 [META]/[WHY] 头注释后重试。'
+            ;;
+        docs-guardrail)
+            definition_marker='DOC_GUARDRAIL_FILES='
+            override_process='先修复 docs:check 报告的问题；该规则不支持跳过。'
+            ;;
+        related-tests)
+            definition_marker='build_test_precheck_plan() {'
+            doc_ref='docs/rules/testing.md#测试框架'
+            override_process='修复代码或测试，并使用 VERIFY 命令重跑；不要通过忽略 hook 绕过。'
+            ;;
+        repo-local-rule-validation|repo-local-rule-validation-unavailable|repo-local-rule-validation-unexpected)
+            definition_marker='RULE_CONFIG_PATH=".claude/rule-system.config.json"'
+            override_process='按配置决定 enforce/report-only；若为 enforce，必须修复阻断问题后重试。'
+            ;;
+        *)
+            definition_marker='print_blocked_rule() {'
+            override_process='按照该规则提示修复后重试。'
+            ;;
+    esac
+
+    RULE_ID_FOR_JSON="$rule_id" \
+    RULE_LINE_FOR_JSON="$(resolve_rule_definition_line "$definition_marker")" \
+    RULE_DOC_REF_FOR_JSON="$doc_ref" \
+    RULE_OVERRIDE_FOR_JSON="$override_process" \
+    python3 - <<'PY'
+import json
+import os
+
+rule_id = os.environ.get('RULE_ID_FOR_JSON', '')
+line = os.environ.get('RULE_LINE_FOR_JSON', '').strip()
+doc_ref = os.environ.get('RULE_DOC_REF_FOR_JSON', '').strip()
+override_process = os.environ.get('RULE_OVERRIDE_FOR_JSON', '').strip()
+
+definition = '.mycodemap/hooks/pre-commit'
+if line:
+    definition = f'{definition}:{line}'
+
+payload = {
+    'id': rule_id,
+    'defined_at': definition,
+    'doc_ref': doc_ref or None,
+    'override_process': override_process or None,
+}
+print(json.dumps(payload, separators=(',', ':')))
+PY
+}
+
+render_protocol_json() {
+    final_status="$1"
+    next_action="$2"
+    blocked_rule="$3"
+    blocked_reason="$4"
+    resolution_json="${5:-null}"
+    rule_metadata_json="${6:-null}"
+
+    FINAL_STATUS="$final_status" \
+    NEXT_ACTION="$next_action" \
+    BLOCKED_RULE="$blocked_rule" \
+    BLOCKED_REASON="$blocked_reason" \
+    BLOCK_RESOLUTION_JSON="$resolution_json" \
+    RULE_METADATA_JSON="$rule_metadata_json" \
+    RULE_HARD_GATE_MODE="$RULE_HARD_GATE_MODE" \
+    HOOK_SOURCE="$HOOK_SOURCE" \
+    ATTEMPT_ID="$ATTEMPT_ID" \
+    ATTEMPT_LOG_RELATIVE_PATH="$ATTEMPT_LOG_RELATIVE_PATH" \
+    AGENT_CONTEXT_RAW="$AGENT_CONTEXT_RAW" \
+    PARENT_COMMIT="$PARENT_COMMIT" \
+    STAGED_FILES_RAW="$STAGED_FILES" \
+    STAGED_FILE_COUNT_VALUE="$STAGED_FILE_COUNT" \
+    NON_DOT_FILES_RAW="$NON_DOT_FILES" \
+    DOC_FILES_RAW="$DOC_FILES" \
+    CURRENT_LIMIT_VALUE="$CURRENT_LIMIT" \
+    ONLY_DOT_DIRS_VALUE="$ONLY_DOT_DIRS" \
+    IS_INITIAL_COMMIT_VALUE="$IS_INITIAL_COMMIT" \
+    CONTAINS_DOC_FILES_VALUE="$CONTAINS_DOC_FILES" \
+    python3 - "$CHECK_RESULTS_FILE" <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+check_file = Path(sys.argv[1])
+
+def load_jsonish(raw: str):
+    candidates = [raw]
+    trimmed = raw.strip()
+    if trimmed != raw:
+        candidates.append(trimmed)
+    if trimmed.startswith("'") and trimmed.endswith("'") and len(trimmed) >= 2:
+        candidates.append(trimmed[1:-1])
+    while trimmed.count('{') < trimmed.count('}') and trimmed.endswith('}'):
+        trimmed = trimmed[:-1]
+        candidates.append(trimmed)
+
+    seen = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        try:
+            value = json.loads(candidate)
+            while isinstance(value, str):
+                value = json.loads(value)
+            return value
+        except Exception:
+            continue
+    raise ValueError(raw)
+
+records = []
+if check_file.exists():
+    for line in check_file.read_text(encoding='utf-8').splitlines():
+        line = line.strip()
+        if line:
+            record = json.loads(line)
+            details = record.get('details')
+            if isinstance(details, dict) and 'raw' in details:
+                try:
+                    normalized = load_jsonish(details['raw'])
+                    record['details'] = normalized
+                except Exception:
+                    pass
+            records.append(record)
+
+rule_mode = os.environ.get('RULE_HARD_GATE_MODE', 'report-only')
+catalog = [
+    {'name': 'staged-file-limit', 'order': 0, 'complexity': 'O(1)', 'blocking': True},
+    {'name': 'source-file-headers', 'order': 1, 'complexity': 'O(staged TypeScript files)', 'blocking': True},
+    {'name': 'docs-guardrail', 'order': 2, 'complexity': 'O(1)+docs:check', 'blocking': True},
+    {'name': 'related-tests', 'order': 3, 'complexity': 'O(changed source files + selected tests)', 'blocking': True},
+    {'name': 'repo-local-rule-validation', 'order': 4, 'complexity': 'O(rule validation)', 'blocking': rule_mode == 'enforce'},
+    {'name': 'real-world-test-patterns', 'order': 5, 'complexity': 'O(staged test files)', 'blocking': False},
+    {'name': 'ai-feed-generation', 'order': 6, 'complexity': 'O(1)+background', 'blocking': False},
+]
+record_map = {record['name']: record for record in records}
+blocked_rule = os.environ.get('BLOCKED_RULE', '').strip()
+blocked_order = None
+for item in catalog:
+    if item['name'] == blocked_rule or (blocked_rule.startswith('repo-local-rule-validation') and item['name'] == 'repo-local-rule-validation'):
+        blocked_order = item['order']
+        break
+if blocked_order is not None:
+    for item in catalog:
+        if item['name'] not in record_map and item['order'] > blocked_order:
+            record_map[item['name']] = {
+                'name': item['name'],
+                'status': 'skipped',
+                'duration_ms': 0,
+                'details': {},
+                'skip_reason': f'blocked-by-{blocked_rule}',
+            }
+
+checks = []
+for item in catalog:
+    record = record_map.get(item['name'])
+    if record is None:
+        record = {
+            'name': item['name'],
+            'status': 'skipped',
+            'duration_ms': 0,
+            'details': {},
+            'skip_reason': 'not-run',
+        }
+    merged = dict(item)
+    merged.update(record)
+    if 'blocking_override' in merged:
+        merged['blocking'] = merged.pop('blocking_override')
+    details = merged.get('details')
+    if isinstance(details, dict) and 'raw' in details:
+        try:
+            normalized = load_jsonish(details['raw'])
+            merged['details'] = normalized
+        except Exception:
+            pass
+    checks.append(merged)
+
+agent_context_raw = os.environ.get('AGENT_CONTEXT_RAW', '').strip()
+agent_context = None
+agent_context_error = None
+if agent_context_raw:
+    try:
+        agent_context = json.loads(agent_context_raw)
+    except Exception as exc:
+        agent_context_error = str(exc)
+        agent_context = {'raw': agent_context_raw}
+
+resolution_raw = os.environ.get('BLOCK_RESOLUTION_JSON', 'null')
+rule_metadata_raw = os.environ.get('RULE_METADATA_JSON', 'null')
+try:
+    resolution = json.loads(resolution_raw)
+except Exception:
+    resolution = {'raw': resolution_raw}
+try:
+    rule_metadata = json.loads(rule_metadata_raw)
+except Exception:
+    rule_metadata = {'raw': rule_metadata_raw}
+
+staged_files = [line for line in os.environ.get('STAGED_FILES_RAW', '').splitlines() if line.strip()]
+non_dot_files = [line for line in os.environ.get('NON_DOT_FILES_RAW', '').splitlines() if line.strip()]
+doc_files = [line for line in os.environ.get('DOC_FILES_RAW', '').splitlines() if line.strip()]
+
+payload = {
+    'schema': 'codemap.precommit.v1',
+    'hook_source': os.environ.get('HOOK_SOURCE', '.mycodemap/hooks/pre-commit'),
+    'attempt': {
+        'attempt_id': os.environ.get('ATTEMPT_ID', ''),
+        'log_path': os.environ.get('ATTEMPT_LOG_RELATIVE_PATH', ''),
+        'context_env': 'CODEMAP_AGENT_CONTEXT',
+        'input_context': agent_context,
+        'input_context_parse_error': agent_context_error,
+        'parent_commit': os.environ.get('PARENT_COMMIT', '') or None,
+    },
+    'commit_allowed': os.environ.get('FINAL_STATUS', 'allowed') == 'allowed',
+    'next_action': os.environ.get('NEXT_ACTION', 'commit'),
+    'repo': {
+        'staged_files': staged_files,
+        'staged_count': int(os.environ.get('STAGED_FILE_COUNT_VALUE', '0') or '0'),
+        'non_dot_files': non_dot_files,
+        'doc_files': doc_files,
+        'current_limit': int(os.environ.get('CURRENT_LIMIT_VALUE', '0') or '0'),
+        'only_dot_dirs': os.environ.get('ONLY_DOT_DIRS_VALUE', 'false') == 'true',
+        'is_initial_commit': os.environ.get('IS_INITIAL_COMMIT_VALUE', 'false') == 'true',
+        'contains_doc_files': os.environ.get('CONTAINS_DOC_FILES_VALUE', 'false') == 'true',
+    },
+    'checks': checks,
+}
+
+if blocked_rule:
+    payload['block'] = {
+        'rule_id': blocked_rule,
+        'why': os.environ.get('BLOCKED_REASON', ''),
+        'rule': rule_metadata,
+        'resolution': resolution,
+    }
+
+print(json.dumps(payload, separators=(',', ':')))
+PY
+}
+
+emit_protocol_line() {
+    final_status="$1"
+    next_action="$2"
+    blocked_rule="$3"
+    blocked_reason="$4"
+    resolution_json="${5:-null}"
+    rule_metadata_json="${6:-null}"
+
+    PROTOCOL_JSON=$(render_protocol_json "$final_status" "$next_action" "$blocked_rule" "$blocked_reason" "$resolution_json" "$rule_metadata_json")
+    if [ -n "$ATTEMPT_LOG_ABSOLUTE_PATH" ]; then
+        printf '%s\n' "$PROTOCOL_JSON" >"$ATTEMPT_LOG_ABSOLUTE_PATH" 2>/dev/null || true
+    fi
+    printf 'CODEMAP_PRECHECK_PROTOCOL:%s\n' "$PROTOCOL_JSON"
+}
+
+print_blocked_rule() {
+    rule_id="$1"
+    reason="$2"
+
+    echo 'ERROR: Commit precheck blocked the commit.'
+    echo "RULE_ID: $rule_id"
+    echo "HOOK_SOURCE: $HOOK_SOURCE"
+    echo "WHY: $reason"
+}
+
 read_package_json_metadata() {
-    if [ ! -f "package.json" ]; then
+    if [ ! -f 'package.json' ]; then
         return 1
     fi
 
@@ -52,13 +519,13 @@ import json
 from pathlib import Path
 
 try:
-    pkg = json.loads(Path("package.json").read_text(encoding="utf-8"))
+    pkg = json.loads(Path('package.json').read_text(encoding='utf-8'))
 except Exception:
     raise SystemExit(1)
 
-scripts = pkg.get("scripts") or {}
-package_manager = str(pkg.get("packageManager") or "").strip()
-test_script = str(scripts.get("test") or "").strip()
+scripts = pkg.get('scripts') or {}
+package_manager = str(pkg.get('packageManager') or '').strip()
+test_script = str(scripts.get('test') or '').strip()
 
 print(package_manager)
 print(test_script)
@@ -71,36 +538,36 @@ PY
 }
 
 resolve_package_manager() {
-    PACKAGE_MANAGER=""
-    PACKAGE_MANAGER_HINT=""
-    TEST_SCRIPT=""
+    PACKAGE_MANAGER=''
+    PACKAGE_MANAGER_HINT=''
+    TEST_SCRIPT=''
 
     read_package_json_metadata || true
 
     case "$PACKAGE_MANAGER_HINT" in
         pnpm@*|pnpm)
-            PACKAGE_MANAGER="pnpm"
+            PACKAGE_MANAGER='pnpm'
             ;;
         yarn@*|yarn)
-            PACKAGE_MANAGER="yarn"
+            PACKAGE_MANAGER='yarn'
             ;;
         bun@*|bun)
-            PACKAGE_MANAGER="bun"
+            PACKAGE_MANAGER='bun'
             ;;
         npm@*|npm)
-            PACKAGE_MANAGER="npm"
+            PACKAGE_MANAGER='npm'
             ;;
     esac
 
     if [ -z "$PACKAGE_MANAGER" ]; then
-        if [ -f "pnpm-lock.yaml" ]; then
-            PACKAGE_MANAGER="pnpm"
-        elif [ -f "yarn.lock" ]; then
-            PACKAGE_MANAGER="yarn"
-        elif [ -f "bun.lockb" ] || [ -f "bun.lock" ]; then
-            PACKAGE_MANAGER="bun"
-        elif [ -f "package-lock.json" ] || [ -f "package.json" ]; then
-            PACKAGE_MANAGER="npm"
+        if [ -f 'pnpm-lock.yaml' ]; then
+            PACKAGE_MANAGER='pnpm'
+        elif [ -f 'yarn.lock' ]; then
+            PACKAGE_MANAGER='yarn'
+        elif [ -f 'bun.lockb' ] || [ -f 'bun.lock' ]; then
+            PACKAGE_MANAGER='bun'
+        elif [ -f 'package-lock.json' ] || [ -f 'package.json' ]; then
+            PACKAGE_MANAGER='npm'
         fi
     fi
 }
@@ -108,41 +575,41 @@ resolve_package_manager() {
 build_package_test_command() {
     case "$PACKAGE_MANAGER" in
         pnpm)
-            PACKAGE_TEST_COMMAND="pnpm test"
+            PACKAGE_TEST_COMMAND='pnpm test'
             ;;
         yarn)
-            PACKAGE_TEST_COMMAND="yarn test"
+            PACKAGE_TEST_COMMAND='yarn test'
             ;;
         bun)
-            PACKAGE_TEST_COMMAND="bun test"
+            PACKAGE_TEST_COMMAND='bun test'
             ;;
         npm|*)
-            PACKAGE_TEST_COMMAND="npm test"
+            PACKAGE_TEST_COMMAND='npm test'
             ;;
     esac
 }
 
 ensure_vitest_entry() {
-    VITEST_ENTRY=""
+    VITEST_ENTRY=''
 
-    if [ -f "node_modules/vitest/vitest.mjs" ]; then
-        VITEST_ENTRY="node_modules/vitest/vitest.mjs"
+    if [ -f 'node_modules/vitest/vitest.mjs' ]; then
+        VITEST_ENTRY='node_modules/vitest/vitest.mjs'
         return 0
     fi
 
-    if [ -d "node_modules" ] && [ ! -e "node_modules/vitest" ]; then
+    if [ -d 'node_modules' ] && [ ! -e 'node_modules/vitest' ]; then
         VITEST_PACKAGE_DIR=$(find node_modules -type d -path '*/.pnpm/*/node_modules/vitest' | head -n 1)
         if [ -n "$VITEST_PACKAGE_DIR" ]; then
             ln -sfn "${VITEST_PACKAGE_DIR#node_modules/}" node_modules/vitest
         fi
     fi
 
-    if [ -f "node_modules/vitest/vitest.mjs" ]; then
-        VITEST_ENTRY="node_modules/vitest/vitest.mjs"
+    if [ -f 'node_modules/vitest/vitest.mjs' ]; then
+        VITEST_ENTRY='node_modules/vitest/vitest.mjs'
         return 0
     fi
 
-    if [ -d "node_modules" ]; then
+    if [ -d 'node_modules' ]; then
         VITEST_ENTRY=$(find node_modules -type f -path '*/.pnpm/*/node_modules/vitest/vitest.mjs' | head -n 1)
         if [ -z "$VITEST_ENTRY" ]; then
             VITEST_ENTRY=$(find node_modules -type f -path '*/.vitest-*/vitest.mjs' | head -n 1)
@@ -157,7 +624,7 @@ ensure_vitest_entry() {
 }
 
 build_vitest_related_command() {
-    GENERAL_VERIFY_COMMAND="npx vitest related"
+    GENERAL_VERIFY_COMMAND='npx vitest related'
     for staged_file in $STAGED; do
         GENERAL_VERIFY_COMMAND="$GENERAL_VERIFY_COMMAND $staged_file"
     done
@@ -170,7 +637,7 @@ build_vitest_related_command() {
 }
 
 build_jest_related_command() {
-    GENERAL_VERIFY_COMMAND="npx jest --findRelatedTests"
+    GENERAL_VERIFY_COMMAND='npx jest --findRelatedTests'
     for staged_file in $STAGED; do
         GENERAL_VERIFY_COMMAND="$GENERAL_VERIFY_COMMAND $staged_file"
     done
@@ -183,82 +650,82 @@ build_jest_related_command() {
 }
 
 build_test_precheck_plan() {
-    TEST_COMMAND=""
-    TEST_STRATEGY=""
-    TEST_FAILURE_REASON=""
-    TEST_TARGET_KIND=""
-    SOURCE_FILE_PATTERN=""
-    GENERAL_VERIFY_COMMAND=""
-    FAILED_TEST_VERIFY_COMMAND=""
-    PACKAGE_TEST_COMMAND=""
+    TEST_COMMAND=''
+    TEST_STRATEGY=''
+    TEST_FAILURE_REASON=''
+    TEST_TARGET_KIND=''
+    SOURCE_FILE_PATTERN=''
+    GENERAL_VERIFY_COMMAND=''
+    FAILED_TEST_VERIFY_COMMAND=''
+    PACKAGE_TEST_COMMAND=''
 
     resolve_package_manager
 
     SOURCE_FILE_PATTERN='\.[cm]?[jt]sx?$'
-    TEST_TARGET_KIND="JS/TS source"
+    TEST_TARGET_KIND='JS/TS source'
 
-    if [ -f "package.json" ]; then
+    if [ -f 'package.json' ]; then
         if echo "$TEST_SCRIPT" | grep -Eq '^vitest([[:space:]].*)?$'; then
-            TEST_STRATEGY="vitest-related"
-            TEST_FAILURE_REASON="Related Vitest checks for the staged source files failed."
+            TEST_STRATEGY='vitest-related'
+            TEST_FAILURE_REASON='Related Vitest checks for the staged source files failed.'
             return 0
         fi
 
         if echo "$TEST_SCRIPT" | grep -Eq '^jest([[:space:]].*)?$'; then
-            TEST_STRATEGY="jest-related"
-            TEST_FAILURE_REASON="Related Jest checks for the staged source files failed."
+            TEST_STRATEGY='jest-related'
+            TEST_FAILURE_REASON='Related Jest checks for the staged source files failed.'
             return 0
         fi
 
         if [ -z "$TEST_SCRIPT" ] && ensure_vitest_entry; then
-            TEST_STRATEGY="vitest-related"
-            TEST_FAILURE_REASON="Related Vitest checks for the staged source files failed."
+            TEST_STRATEGY='vitest-related'
+            TEST_FAILURE_REASON='Related Vitest checks for the staged source files failed.'
             return 0
         fi
 
         if [ -n "$TEST_SCRIPT" ]; then
             build_package_test_command
-            TEST_STRATEGY="package-test"
+            TEST_STRATEGY='package-test'
             TEST_COMMAND="$PACKAGE_TEST_COMMAND"
             GENERAL_VERIFY_COMMAND="$PACKAGE_TEST_COMMAND"
-            TEST_FAILURE_REASON="The project test command for the staged source files failed."
+            TEST_FAILURE_REASON='The project test command for the staged source files failed.'
             return 0
         fi
     fi
 
     if ensure_vitest_entry; then
-        TEST_STRATEGY="vitest-related"
-        TEST_FAILURE_REASON="Related Vitest checks for the staged source files failed."
+        TEST_STRATEGY='vitest-related'
+        TEST_FAILURE_REASON='Related Vitest checks for the staged source files failed.'
         return 0
     fi
 
-    if [ -f "pyproject.toml" ]; then
-        TEST_STRATEGY="pytest"
-        TEST_TARGET_KIND="Python source"
+    if [ -f 'pyproject.toml' ]; then
+        TEST_STRATEGY='pytest'
+        TEST_TARGET_KIND='Python source'
         SOURCE_FILE_PATTERN='\.py$'
-        TEST_COMMAND="pytest"
-        GENERAL_VERIFY_COMMAND="pytest"
-        TEST_FAILURE_REASON="Pytest failed for the staged source files."
+        TEST_COMMAND='pytest'
+        GENERAL_VERIFY_COMMAND='pytest'
+        TEST_FAILURE_REASON='Pytest failed for the staged source files.'
         return 0
     fi
 
-    if [ -f "go.mod" ]; then
-        TEST_STRATEGY="go-test"
-        TEST_TARGET_KIND="Go source"
+    if [ -f 'go.mod' ]; then
+        TEST_STRATEGY='go-test'
+        TEST_TARGET_KIND='Go source'
         SOURCE_FILE_PATTERN='\.go$'
-        TEST_COMMAND="go test ./..."
-        GENERAL_VERIFY_COMMAND="go test ./..."
-        TEST_FAILURE_REASON="Go tests failed for the staged source files."
+        TEST_COMMAND='go test ./...'
+        GENERAL_VERIFY_COMMAND='go test ./...'
+        TEST_FAILURE_REASON='Go tests failed for the staged source files.'
         return 0
     fi
 
-    if [ -f "Cargo.toml" ]; then
-        TEST_STRATEGY="cargo-test"
-        TEST_TARGET_KIND="Rust source"
+    if [ -f 'Cargo.toml' ]; then
+        TEST_STRATEGY='cargo-test'
+        TEST_TARGET_KIND='Rust source'
         SOURCE_FILE_PATTERN='\.rs$'
-        TEST_COMMAND="cargo test"
-        GENERAL_VERIFY_COMMAND="cargo test"
-        TEST_FAILURE_REASON="Cargo tests failed for the staged source files."
+        TEST_COMMAND='cargo test'
+        GENERAL_VERIFY_COMMAND='cargo test'
+        TEST_FAILURE_REASON='Cargo tests failed for the staged source files.'
         return 0
     fi
 
@@ -266,7 +733,7 @@ build_test_precheck_plan() {
 }
 
 extract_failed_test_file() {
-    FAILED_TEST_FILE=""
+    FAILED_TEST_FILE=''
 
     case "$TEST_STRATEGY" in
         pytest)
@@ -276,7 +743,7 @@ extract_failed_test_file() {
             FAILED_TEST_FILE=$(grep -Eo '[A-Za-z0-9_./-]+_test\.go' "$FILTERED_TEST_OUTPUT_FILE" | head -n 1)
             ;;
         cargo-test)
-            FAILED_TEST_FILE=""
+            FAILED_TEST_FILE=''
             ;;
         *)
             FAILED_TEST_FILE=$(grep -Eo '[A-Za-z0-9_./-]+\.(test|spec)\.[cm]?[jt]sx?' "$FILTERED_TEST_OUTPUT_FILE" | head -n 1)
@@ -285,7 +752,7 @@ extract_failed_test_file() {
 }
 
 build_failed_test_verify_command() {
-    FAILED_TEST_VERIFY_COMMAND=""
+    FAILED_TEST_VERIFY_COMMAND=''
 
     if [ -z "$FAILED_TEST_FILE" ]; then
         return 0
@@ -378,20 +845,20 @@ failing_test_matches_staged_module() {
 build_related_test_failure_hint() {
     if grep -Eq 'AssertionError|expected .* to (be|equal|deeply equal|match|contain)' "$FILTERED_TEST_OUTPUT_FILE"; then
         if failing_test_matches_staged_module; then
-            FAILED_TEST_HINT="This looks like a behavior change near the modified module. Check whether the affected test expectations need updating."
+            FAILED_TEST_HINT='This looks like a behavior change near the modified module. Check whether the affected test expectations need updating.'
         else
-            FAILED_TEST_HINT="This looks like an assertion mismatch. Check whether the implementation changed or the test expectation drifted."
+            FAILED_TEST_HINT='This looks like an assertion mismatch. Check whether the implementation changed or the test expectation drifted.'
         fi
     elif grep -Eq 'ReferenceError|TypeError|SyntaxError|Cannot find module|is not defined|Unhandled' "$FILTERED_TEST_OUTPUT_FILE"; then
-        FAILED_TEST_HINT="This looks like a code regression or broken test setup. Check the implementation and stack trace."
+        FAILED_TEST_HINT='This looks like a code regression or broken test setup. Check the implementation and stack trace.'
     else
-        FAILED_TEST_HINT="Inspect the first failing test and stack trace below."
+        FAILED_TEST_HINT='Inspect the first failing test and stack trace below.'
     fi
 }
 
 print_related_test_summary() {
-    echo "========================================"
-    echo "TEST_FAILURE_SUMMARY"
+    echo '========================================'
+    echo 'TEST_FAILURE_SUMMARY'
     if [ -n "$TEST_STRATEGY" ]; then
         echo "TEST_STRATEGY: $TEST_STRATEGY"
     fi
@@ -414,7 +881,7 @@ print_related_test_summary() {
     if [ -n "$GENERAL_VERIFY_COMMAND" ] && [ "$GENERAL_VERIFY_COMMAND" != "$FAILED_TEST_VERIFY_COMMAND" ]; then
         echo "VERIFY: $GENERAL_VERIFY_COMMAND"
     fi
-    echo "========================================"
+    echo '========================================'
 }
 
 run_related_tests() {
@@ -439,23 +906,512 @@ run_related_tests() {
         print_related_test_summary
     fi
 
-    cleanup_related_test_artifacts
     return "$RELATED_TEST_EXIT"
 }
 
-echo "Running pre-commit checks..."
+build_staged_file_limit_resolution_json() {
+    STAGED_FILES_RAW="$STAGED_FILES" \
+    CURRENT_LIMIT_VALUE="$CURRENT_LIMIT" \
+    ATTEMPT_ID_VALUE="$ATTEMPT_ID" \
+    python3 - <<'PY'
+import json
+import os
+import re
+import shlex
+from collections import Counter, defaultdict
 
-# 1. 运行 staged source files 对应的测试预检（失败即阻断）
-# 优先使用 runner-specific related tests；否则回退到项目级 test command
-echo "Running tests for staged files..."
+files = [line for line in os.environ.get('STAGED_FILES_RAW', '').splitlines() if line.strip()]
+limit = int(os.environ.get('CURRENT_LIMIT_VALUE', '10') or '10')
+attempt_id = os.environ.get('ATTEMPT_ID_VALUE', '')
+ignore = {
+    'src', 'scripts', 'tests', 'test', '__tests__', 'cli', 'dist', 'data', 'home', 'tmp', 'codemap',
+    'json', 'ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs', 'py', 'md', 'yml', 'yaml', 'sh', 'config'
+}
 
+
+def doc_file(path: str) -> bool:
+    return path.endswith('.md') or path.startswith('docs/') or path.startswith('README') or path.startswith('CHANGELOG') or path.startswith('LICENSE')
+
+
+def tokens(path: str):
+    raw = re.findall(r'[A-Za-z0-9]+', path.lower())
+    return {token for token in raw if token not in ignore and not token.isdigit()}
+
+
+def anchor(path: str):
+    lower = path.lower()
+    token_set = tokens(path)
+    if lower.startswith(('scripts/hooks/', '.githooks/', '.mycodemap/hooks/')) or 'hook' in token_set or 'hooks' in token_set:
+        return 'hooks'
+    if 'env' in token_set and 'contract' in token_set:
+        return 'env-contract'
+    if 'manifest' in token_set or 'package' in token_set:
+        return 'manifest'
+    if 'doctor' in token_set:
+        return 'doctor'
+    if doc_file(path):
+        return 'docs'
+    if token_set:
+        return sorted(token_set)[0]
+    return 'misc'
+
+indexed = list(enumerate(files))
+buckets = defaultdict(list)
+for index, file_path in indexed:
+    buckets[anchor(file_path)].append((index, file_path))
+
+ordered_buckets = sorted(
+    buckets.items(),
+    key=lambda item: (-len(item[1]), min(index for index, _ in item[1])),
+)
+
+chunks = []
+for bucket_name, items in ordered_buckets:
+    paths = [path for _, path in sorted(items)]
+    while paths:
+        chunks.append({'anchor': bucket_name, 'files': paths[:limit]})
+        paths = paths[limit:]
+
+
+def scope_and_tag(chunk_anchor, paths):
+    bucket_tokens = Counter()
+    for path in paths:
+        bucket_tokens.update(tokens(path))
+    token_set = set(bucket_tokens)
+    if 'env' in token_set and 'contract' in token_set:
+        return 'env-contract', 'FEATURE', 'multi-language test command discovery'
+    if 'hook' in token_set or 'hooks' in token_set or chunk_anchor == 'hooks':
+        return 'hooks', 'REFACTOR', 'structured pre-commit protocol changes'
+    if 'manifest' in token_set or 'package' in token_set or chunk_anchor == 'manifest':
+        return 'manifest', 'FEATURE', 'test command detection changes'
+    if all(doc_file(path) for path in paths):
+        return 'docs', 'DOCS', 'documentation updates'
+    if 'doctor' in token_set or chunk_anchor == 'doctor':
+        return 'doctor', 'REFACTOR', 'doctor contract alignment'
+    scope = chunk_anchor if chunk_anchor and chunk_anchor != 'misc' else 'changes'
+    return scope, 'REFACTOR', 'split commit group'
+
+suggested_groups = []
+total_groups = len(chunks)
+for index, chunk in enumerate(chunks, start=1):
+    scope, tag, summary = scope_and_tag(chunk['anchor'], chunk['files'])
+    if total_groups > 1:
+        message = f'[{tag}] {scope}: {summary} ({index}/{total_groups})'
+    else:
+        message = f'[{tag}] {scope}: {summary}'
+    agent_context = {
+        'attempt_id': attempt_id,
+        'plan_id': f'{attempt_id}-split-commit',
+        'group_index': index,
+        'group_count': total_groups,
+        'resolution': 'split_commit',
+    }
+    suggested_groups.append({
+        'group_index': index,
+        'files': chunk['files'],
+        'message': message,
+        'commands': {
+            'reset': 'git reset HEAD',
+            'stage': 'git add ' + ' '.join(shlex.quote(path) for path in chunk['files']),
+            'commit': 'git commit -m ' + shlex.quote(message),
+            'commit_with_context': 'CODEMAP_AGENT_CONTEXT=' + shlex.quote(json.dumps(agent_context, separators=(",", ":"))) + ' git commit -m ' + shlex.quote(message),
+        },
+        'agent_context': agent_context,
+    })
+
+payload = {
+    'type': 'split_commit',
+    'current': len(files),
+    'limit': limit,
+    'reset_command': 'git reset HEAD',
+    'suggested_groups': suggested_groups,
+}
+print(json.dumps(payload, separators=(',', ':')))
+PY
+}
+
+build_header_resolution_json() {
+    MISSING_HEADER_FILES_RAW="$MISSING_HEADER_FILES" python3 - <<'PY'
+import json
+import os
+files = [line for line in os.environ.get('MISSING_HEADER_FILES_RAW', '').splitlines() if line.strip()]
+payload = {
+    'type': 'edit_headers',
+    'files': files,
+    'header_template': [
+        '// [META] since:YYYY-MM | owner:team | stable:false',
+        '// [WHY] Explain why this file exists',
+    ],
+}
+print(json.dumps(payload, separators=(',', ':')))
+PY
+}
+
+build_docs_guardrail_resolution_json() {
+    DOC_GUARDRAIL_FILES_RAW="$DOC_GUARDRAIL_FILES" python3 - <<'PY'
+import json
+import os
+files = [line for line in os.environ.get('DOC_GUARDRAIL_FILES_RAW', '').splitlines() if line.strip()]
+payload = {
+    'type': 'rerun_docs_check',
+    'command': 'npm run docs:check',
+    'triggered_by': files,
+}
+print(json.dumps(payload, separators=(',', ':')))
+PY
+}
+
+build_related_tests_resolution_json() {
+    failed_test_json=$(json_array_from_lines "$FAILED_TEST_FILE")
+    staged_files_json=$(json_array_from_lines "$STAGED")
+    verify_commands_raw=$(printf '%s\n%s\n' "$FAILED_TEST_VERIFY_COMMAND" "$GENERAL_VERIFY_COMMAND")
+    verify_commands_json=$(VERIFY_COMMANDS_RAW="$verify_commands_raw" python3 - <<'PY'
+import json
+import os
+commands = []
+for line in os.environ.get('VERIFY_COMMANDS_RAW', '').splitlines():
+    line = line.strip()
+    if line and line not in commands:
+        commands.append(line)
+print(json.dumps(commands, separators=(',', ':')))
+PY
+)
+
+    FAILED_TEST_HINT_VALUE="$FAILED_TEST_HINT" \
+    TEST_STRATEGY_VALUE="$TEST_STRATEGY" \
+    FAILED_TEST_FILE_JSON="$failed_test_json" \
+    STAGED_FILES_JSON="$staged_files_json" \
+    VERIFY_COMMANDS_JSON="$verify_commands_json" \
+    python3 - <<'PY'
+import json
+import os
+failed_test_files = json.loads(os.environ.get('FAILED_TEST_FILE_JSON', '[]'))
+staged_files = json.loads(os.environ.get('STAGED_FILES_JSON', '[]'))
+verify_commands = json.loads(os.environ.get('VERIFY_COMMANDS_JSON', '[]'))
+payload = {
+    'type': 'rerun_verify_commands',
+    'test_strategy': os.environ.get('TEST_STRATEGY_VALUE', ''),
+    'failed_test_file': failed_test_files[0] if failed_test_files else None,
+    'verify_commands': verify_commands,
+    'staged_source_files': staged_files,
+    'likely_cause': os.environ.get('FAILED_TEST_HINT_VALUE', ''),
+}
+print(json.dumps(payload, separators=(',', ':')))
+PY
+}
+
+build_rule_validation_resolution_json() {
+    RULE_HARD_GATE_MODE_VALUE="$RULE_HARD_GATE_MODE" python3 - <<'PY'
+import json
+import os
+payload = {
+    'type': 'run_rule_validation',
+    'mode': os.environ.get('RULE_HARD_GATE_MODE_VALUE', 'report-only'),
+    'command': 'python3 scripts/validate-rules.py code',
+}
+print(json.dumps(payload, separators=(',', ':')))
+PY
+}
+
+record_staged_file_limit_check() {
+    check_status="$1"
+    duration_ms="$2"
+    details_json=$(STAGED_FILES_RAW="$STAGED_FILES" STAGED_FILE_COUNT_VALUE="$STAGED_FILE_COUNT" CURRENT_LIMIT_VALUE="$CURRENT_LIMIT" ONLY_DOT_DIRS_VALUE="$ONLY_DOT_DIRS" IS_INITIAL_COMMIT_VALUE="$IS_INITIAL_COMMIT" CONTAINS_DOC_FILES_VALUE="$CONTAINS_DOC_FILES" python3 - <<'PY'
+import json
+import os
+staged_files = [line for line in os.environ.get('STAGED_FILES_RAW', '').splitlines() if line.strip()]
+details = {
+    'staged_count': int(os.environ.get('STAGED_FILE_COUNT_VALUE', '0') or '0'),
+    'current_limit': int(os.environ.get('CURRENT_LIMIT_VALUE', '0') or '0'),
+    'only_dot_dirs': os.environ.get('ONLY_DOT_DIRS_VALUE', 'false') == 'true',
+    'is_initial_commit': os.environ.get('IS_INITIAL_COMMIT_VALUE', 'false') == 'true',
+    'contains_doc_files': os.environ.get('CONTAINS_DOC_FILES_VALUE', 'false') == 'true',
+    'staged_files': staged_files,
+}
+print(json.dumps(details, separators=(',', ':')))
+PY
+)
+    append_check_result 'staged-file-limit' "$check_status" "$duration_ms" "$details_json" '' 'staged-file-limit'
+}
+
+record_source_headers_check() {
+    check_status="$1"
+    duration_ms="$2"
+    details_json=$(STAGED_TS_FILES_RAW="$STAGED_TS_FILES" MISSING_HEADER_FILES_RAW="$MISSING_HEADER_FILES" python3 - <<'PY'
+import json
+import os
+missing_files = [line for line in os.environ.get('MISSING_HEADER_FILES_RAW', '').splitlines() if line.strip()]
+checked_files = [line for line in os.environ.get('STAGED_TS_FILES_RAW', '').splitlines() if line.strip()]
+payload = {
+    'checked_files': checked_files,
+    'missing_header_files': missing_files,
+}
+print(json.dumps(payload, separators=(',', ':')))
+PY
+)
+    append_check_result 'source-file-headers' "$check_status" "$duration_ms" "$details_json" '' 'source-file-headers'
+}
+
+record_docs_guardrail_check() {
+    check_status="$1"
+    duration_ms="$2"
+    skip_reason="${3:-}"
+    details_json=$(DOC_GUARDRAIL_FILES_RAW="$DOC_GUARDRAIL_FILES" python3 - <<'PY'
+import json
+import os
+triggered = [line for line in os.environ.get('DOC_GUARDRAIL_FILES_RAW', '').splitlines() if line.strip()]
+payload = {
+    'triggered_by': triggered,
+    'command': 'npm run docs:check',
+}
+print(json.dumps(payload, separators=(',', ':')))
+PY
+)
+    append_check_result 'docs-guardrail' "$check_status" "$duration_ms" "$details_json" '' 'docs-guardrail' "$skip_reason"
+}
+
+record_related_tests_check() {
+    check_status="$1"
+    duration_ms="$2"
+    skip_reason="${3:-}"
+    details_json=$(TEST_STAGED_FILES_RAW="$STAGED" TEST_STRATEGY_VALUE="$TEST_STRATEGY" TEST_COMMAND_VALUE="$TEST_COMMAND" FAILED_TEST_FILE_VALUE="$FAILED_TEST_FILE" FAILED_TEST_VERIFY_COMMAND_VALUE="$FAILED_TEST_VERIFY_COMMAND" GENERAL_VERIFY_COMMAND_VALUE="$GENERAL_VERIFY_COMMAND" python3 - <<'PY'
+import json
+import os
+staged_files = [line for line in os.environ.get('TEST_STAGED_FILES_RAW', '').splitlines() if line.strip()]
+payload = {
+    'test_strategy': os.environ.get('TEST_STRATEGY_VALUE', ''),
+    'test_command': os.environ.get('TEST_COMMAND_VALUE', ''),
+    'failed_test_file': os.environ.get('FAILED_TEST_FILE_VALUE', '') or None,
+    'verify_commands': [command for command in [os.environ.get('FAILED_TEST_VERIFY_COMMAND_VALUE', ''), os.environ.get('GENERAL_VERIFY_COMMAND_VALUE', '')] if command],
+    'triggered_source_files': staged_files,
+}
+print(json.dumps(payload, separators=(',', ':')))
+PY
+)
+    append_check_result 'related-tests' "$check_status" "$duration_ms" "$details_json" '' 'related-tests' "$skip_reason"
+}
+
+record_rule_validation_check() {
+    check_status="$1"
+    duration_ms="$2"
+    details_json=$(RULE_HARD_GATE_MODE_VALUE="$RULE_HARD_GATE_MODE" RULE_REPORT_ONLY_TIMEOUT_SECONDS_VALUE="$RULE_REPORT_ONLY_TIMEOUT_SECONDS" RULE_VALIDATE_EXIT_VALUE="$VALIDATE_EXIT" python3 - <<'PY'
+import json
+import os
+payload = {
+    'mode': os.environ.get('RULE_HARD_GATE_MODE_VALUE', 'report-only'),
+    'timeout_seconds': int(os.environ.get('RULE_REPORT_ONLY_TIMEOUT_SECONDS_VALUE', '20') or '20'),
+    'exit_code': int(os.environ.get('RULE_VALIDATE_EXIT_VALUE', '0') or '0'),
+}
+print(json.dumps(payload, separators=(',', ':')))
+PY
+)
+    blocking_override='true'
+    if [ "$RULE_HARD_GATE_MODE" = 'report-only' ]; then
+        blocking_override='false'
+    fi
+    append_check_result 'repo-local-rule-validation' "$check_status" "$duration_ms" "$details_json" '' 'repo-local-rule-validation' '' "$blocking_override"
+}
+
+record_real_world_test_patterns_check() {
+    check_status="$1"
+    duration_ms="$2"
+    skip_reason="${3:-}"
+    details_json=$(STAGED_TEST_FILES_RAW="$STAGED_TEST_FILES" MISSING_REAL_PATTERN_FILES_RAW="$MISSING_REAL_PATTERN_FILES" python3 - <<'PY'
+import json
+import os
+payload = {
+    'checked_files': [line for line in os.environ.get('STAGED_TEST_FILES_RAW', '').splitlines() if line.strip()],
+    'warning_files': [line for line in os.environ.get('MISSING_REAL_PATTERN_FILES_RAW', '').splitlines() if line.strip()],
+}
+print(json.dumps(payload, separators=(',', ':')))
+PY
+)
+    append_check_result 'real-world-test-patterns' "$check_status" "$duration_ms" "$details_json" '' '' "$skip_reason"
+}
+
+record_ai_feed_check() {
+    check_status="$1"
+    duration_ms="$2"
+    details_json='{"command":"npx mycodemap generate --quiet","mode":"background"}'
+    append_check_result 'ai-feed-generation' "$check_status" "$duration_ms" "$details_json"
+}
+
+run_rule_validation_report_only() {
+    python3 - <<'PY'
+import os
+import subprocess
+import sys
+
+timeout_value = os.environ.get('RULE_REPORT_ONLY_TIMEOUT_SECONDS', '20')
+try:
+    timeout_seconds = int(timeout_value)
+except ValueError:
+    timeout_seconds = 20
+
+try:
+    completed = subprocess.run(
+        ['python3', 'scripts/validate-rules.py', 'code', '--report-only'],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        timeout=timeout_seconds,
+    )
+except subprocess.TimeoutExpired:
+    sys.exit(124)
+
+sys.exit(completed.returncode)
+PY
+}
+
+prepare_attempt_context
+load_rule_hard_gate_mode
+
+echo 'Running pre-commit checks...'
+
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+STAGED_FILE_COUNT=$(count_non_empty_lines "$STAGED_FILES")
+NON_DOT_FILES=$(printf '%s\n' "$STAGED_FILES" | grep -v '^\.' || true)
+if [ -n "$NON_DOT_FILES" ]; then
+    ONLY_DOT_DIRS=false
+fi
+if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
+    IS_INITIAL_COMMIT=true
+fi
+DOC_FILES=$(printf '%s\n' "$STAGED_FILES" | grep -E '(\.md$|^docs/|^README|^CHANGELOG|^LICENSE)' || true)
+if [ -n "$DOC_FILES" ]; then
+    CONTAINS_DOC_FILES=true
+fi
+if [ "$CONTAINS_DOC_FILES" = 'true' ]; then
+    CURRENT_LIMIT=$MAX_FILES_WITH_DOCS
+else
+    CURRENT_LIMIT=$MAX_FILES_PER_COMMIT
+fi
+
+# 1. staged-file-limit: O(1) 失败前置
+limit_start_ms=$(now_ms)
+if [ "$ONLY_DOT_DIRS" = 'true' ]; then
+    echo 'Note: Only dot-directory files staged, skipping count limit check'
+    limit_end_ms=$(now_ms)
+    record_staged_file_limit_check 'skipped' "$((limit_end_ms - limit_start_ms))"
+elif [ "$STAGED_FILE_COUNT" -gt "$CURRENT_LIMIT" ] && [ "$IS_INITIAL_COMMIT" = 'false' ]; then
+    limit_end_ms=$(now_ms)
+    record_staged_file_limit_check 'failed' "$((limit_end_ms - limit_start_ms))"
+    print_blocked_rule 'staged-file-limit' "This non-initial commit stages $STAGED_FILE_COUNT files, which exceeds the allowed limit of $CURRENT_LIMIT."
+    if [ "$CONTAINS_DOC_FILES" = 'true' ]; then
+        echo "FIX: This commit includes documentation files, so the higher limit is $MAX_FILES_WITH_DOCS files."
+    else
+        echo "FIX: Non-dot commits without documentation files must stay at or below $MAX_FILES_PER_COMMIT files."
+    fi
+    echo 'FIX: Dot-directory-only commits are exempt from this rule.'
+    echo 'FIX: Split the staged changes into smaller commits, then retry.'
+    echo 'STAGED_FILES:'
+    printf '%s\n' "$STAGED_FILES"
+    resolution_json=$(build_staged_file_limit_resolution_json)
+    rule_metadata_json=$(build_rule_metadata_json 'staged-file-limit')
+    emit_protocol_line 'blocked' 'split_commit' 'staged-file-limit' "This non-initial commit stages $STAGED_FILE_COUNT files, which exceeds the allowed limit of $CURRENT_LIMIT." "$resolution_json" "$rule_metadata_json"
+    exit 1
+else
+    limit_end_ms=$(now_ms)
+    record_staged_file_limit_check 'passed' "$((limit_end_ms - limit_start_ms))"
+fi
+
+# 2. source-file-headers: 便宜阻断前置
+header_start_ms=$(now_ms)
+echo 'Checking file headers...'
+if [ "$ONLY_DOT_DIRS" = 'true' ]; then
+    echo 'Note: Only dot-directory files staged, skipping header check'
+    STAGED_TS_FILES=''
+    header_end_ms=$(now_ms)
+    record_source_headers_check 'skipped' "$((header_end_ms - header_start_ms))"
+else
+    STAGED_TS_FILES=$(printf '%s\n' "$STAGED_FILES" | grep '\.ts$' | grep -v '\.test\.ts$' | grep -v '\.d\.ts$' || true)
+    if [ -z "$STAGED_TS_FILES" ]; then
+        echo 'No TypeScript source files staged, skipping header check'
+        header_end_ms=$(now_ms)
+        record_source_headers_check 'skipped' "$((header_end_ms - header_start_ms))"
+    else
+        MISSING_HEADERS=0
+        MISSING_HEADER_FILES=''
+        for file in $STAGED_TS_FILES; do
+            if [ ! -f "$file" ]; then
+                continue
+            fi
+
+            HEAD_CONTENT=$(head -10 "$file")
+            missing_for_file=false
+            if ! echo "$HEAD_CONTENT" | grep -q '\[META\]'; then
+                echo "ERROR: $file missing [META] comment"
+                MISSING_HEADERS=$((MISSING_HEADERS + 1))
+                missing_for_file=true
+            fi
+            if ! echo "$HEAD_CONTENT" | grep -q '\[WHY\]'; then
+                echo "ERROR: $file missing [WHY] comment"
+                MISSING_HEADERS=$((MISSING_HEADERS + 1))
+                missing_for_file=true
+            fi
+            if [ "$missing_for_file" = 'true' ]; then
+                MISSING_HEADER_FILES=$(printf '%s\n%s' "$MISSING_HEADER_FILES" "$file" | sed '/^[[:space:]]*$/d')
+            fi
+        done
+
+        if [ "$MISSING_HEADERS" -gt 0 ]; then
+            header_end_ms=$(now_ms)
+            record_source_headers_check 'failed' "$((header_end_ms - header_start_ms))"
+            print_blocked_rule 'source-file-headers' 'Non-test, non-.d.ts TypeScript source files staged outside dot-directories must include [META] and [WHY] in the first 10 lines.'
+            echo 'FIX: Add these header lines at the top of each listed file:'
+            echo 'FIX: // [META] since:YYYY-MM | owner:team | stable:false'
+            echo 'FIX: // [WHY] Explain why this file exists'
+            resolution_json=$(build_header_resolution_json)
+            rule_metadata_json=$(build_rule_metadata_json 'source-file-headers')
+            emit_protocol_line 'blocked' 'edit_headers' 'source-file-headers' 'Non-test, non-.d.ts TypeScript source files staged outside dot-directories must include [META] and [WHY] in the first 10 lines.' "$resolution_json" "$rule_metadata_json"
+            exit 1
+        fi
+
+        echo 'File headers passed'
+        header_end_ms=$(now_ms)
+        record_source_headers_check 'passed' "$((header_end_ms - header_start_ms))"
+    fi
+fi
+
+# 3. docs-guardrail: 在测试前先挡住文档漂移
+DOC_GUARDRAIL_FILES=$(printf '%s\n' "$STAGED_FILES" | grep -E '^(README\.md|package\.json|docs/|src/cli/index\.ts|vitest\.config\.ts|vitest\.benchmark\.config\.ts|\.github/workflows/ci-gateway\.yml)$' || true)
+docs_start_ms=$(now_ms)
+if [ -n "$DOC_GUARDRAIL_FILES" ]; then
+    echo 'Checking documentation guardrails...'
+    npm run docs:check
+    if [ $? -ne 0 ]; then
+        docs_end_ms=$(now_ms)
+        record_docs_guardrail_check 'failed' "$((docs_end_ms - docs_start_ms))"
+        print_blocked_rule 'docs-guardrail' 'Documentation guardrails run whenever staged files touch README/package metadata, docs, CLI entrypoints, vitest config, or the CI gateway workflow.'
+        echo 'TRIGGERED_BY:'
+        printf '%s\n' "$DOC_GUARDRAIL_FILES"
+        echo 'FIX: Run npm run docs:check and resolve the reported documentation drift.'
+        echo 'FIX: Retry the commit after docs:check passes.'
+        resolution_json=$(build_docs_guardrail_resolution_json)
+        rule_metadata_json=$(build_rule_metadata_json 'docs-guardrail')
+        emit_protocol_line 'blocked' 'rerun_docs_check' 'docs-guardrail' 'Documentation guardrails run whenever staged files touch README/package metadata, docs, CLI entrypoints, vitest config, or the CI gateway workflow.' "$resolution_json" "$rule_metadata_json"
+        exit 1
+    fi
+    echo 'Documentation guardrails passed'
+    docs_end_ms=$(now_ms)
+    record_docs_guardrail_check 'passed' "$((docs_end_ms - docs_start_ms))"
+else
+    echo 'Documentation guardrails skipped'
+    docs_end_ms=$(now_ms)
+    record_docs_guardrail_check 'skipped' "$((docs_end_ms - docs_start_ms))" 'no-doc-guardrail-triggers'
+fi
+
+# 4. related-tests / package test fallback
+related_start_ms=$(now_ms)
+echo 'Running tests for staged files...'
 if build_test_precheck_plan; then
-    STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E "$SOURCE_FILE_PATTERN" || true)
+    STAGED=$(printf '%s\n' "$STAGED_FILES" | grep -E "$SOURCE_FILE_PATTERN" || true)
     if [ -z "$STAGED" ]; then
         echo "No $TEST_TARGET_KIND files staged, skipping tests"
+        related_end_ms=$(now_ms)
+        record_related_tests_check 'skipped' "$((related_end_ms - related_start_ms))" 'no-matching-staged-source-files'
     else
-        STAGED_COUNT=$(printf '%s\n' "$STAGED" | wc -l | tr -d ' ')
-
+        STAGED_COUNT=$(count_non_empty_lines "$STAGED")
         case "$TEST_STRATEGY" in
             vitest-related)
                 if [ "$STAGED_COUNT" -le 3 ]; then
@@ -483,9 +1439,9 @@ if build_test_precheck_plan; then
 
         run_related_tests
         if [ $? -ne 0 ]; then
-            print_blocked_rule \
-                "related-tests" \
-                "$TEST_FAILURE_REASON"
+            related_end_ms=$(now_ms)
+            record_related_tests_check 'failed' "$((related_end_ms - related_start_ms))"
+            print_blocked_rule 'related-tests' "$TEST_FAILURE_REASON"
             if [ -n "$TEST_STRATEGY" ]; then
                 echo "TEST_STRATEGY: $TEST_STRATEGY"
             fi
@@ -493,281 +1449,145 @@ if build_test_precheck_plan; then
                 echo "TEST_COMMAND: $TEST_COMMAND"
             fi
             if [ -n "$STAGED" ]; then
-                echo "TRIGGERED_SOURCE_FILES:"
+                echo 'TRIGGERED_SOURCE_FILES:'
                 printf '%s\n' "$STAGED"
             fi
-            echo "FIX: Review the filtered failing test output and summary above."
-            echo "FIX: Repair the code or tests, rerun one of the VERIFY commands, then retry the commit."
+            echo 'FIX: Review the filtered failing test output and summary above.'
+            echo 'FIX: Repair the code or tests, rerun one of the VERIFY commands, then retry the commit.'
+            resolution_json=$(build_related_tests_resolution_json)
+            rule_metadata_json=$(build_rule_metadata_json 'related-tests')
+            emit_protocol_line 'blocked' 'rerun_verify_commands' 'related-tests' "$TEST_FAILURE_REASON" "$resolution_json" "$rule_metadata_json"
             exit 1
         fi
+
+        echo 'Tests passed'
+        related_end_ms=$(now_ms)
+        record_related_tests_check 'passed' "$((related_end_ms - related_start_ms))"
     fi
 else
-    echo "No supported staged-source test strategy detected, skipping tests"
+    echo 'No supported staged-source test strategy detected, skipping tests'
+    related_end_ms=$(now_ms)
+    record_related_tests_check 'skipped' "$((related_end_ms - related_start_ms))" 'no-supported-staged-source-test-strategy'
 fi
 
-echo "Tests passed"
-
-# 2. repo-local 规则校验（按 hard_gate.mode 决定 report-only / enforce）
-RULE_CONFIG_PATH=".claude/rule-system.config.json"
-RULE_HARD_GATE_MODE="report-only"
-RULE_REPORT_ONLY_TIMEOUT_SECONDS="${RULE_REPORT_ONLY_TIMEOUT_SECONDS:-20}"
-
-run_rule_validation_report_only() {
-    python3 - <<'PY'
-import os
-import subprocess
-import sys
-
-timeout_value = os.environ.get("RULE_REPORT_ONLY_TIMEOUT_SECONDS", "20")
-
-try:
-    timeout_seconds = int(timeout_value)
-except ValueError:
-    timeout_seconds = 20
-
-try:
-    completed = subprocess.run(
-        ["python3", "scripts/validate-rules.py", "code", "--report-only"],
-        check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        timeout=timeout_seconds,
-    )
-except subprocess.TimeoutExpired:
-    sys.exit(124)
-
-sys.exit(completed.returncode)
-PY
-}
-
-if [ -f "$RULE_CONFIG_PATH" ]; then
-    RULE_HARD_GATE_MODE=$(python3 - <<'PY'
-import json
-from pathlib import Path
-
-config_path = Path(".claude/rule-system.config.json")
-
-try:
-    config = json.loads(config_path.read_text(encoding="utf-8"))
-except Exception:
-    print("report-only")
-else:
-    print(config.get("hard_gate", {}).get("mode", "report-only"))
-PY
-)
-fi
-
+# 5. repo-local rule validation
+rule_start_ms=$(now_ms)
 echo "Running repo-local rule validation (mode: $RULE_HARD_GATE_MODE)..."
 case "$RULE_HARD_GATE_MODE" in
     enforce)
         python3 scripts/validate-rules.py code
         VALIDATE_EXIT=$?
+        rule_end_ms=$(now_ms)
         case "$VALIDATE_EXIT" in
             0)
-                echo "Rule validation passed"
+                echo 'Rule validation passed'
+                record_rule_validation_check 'passed' "$((rule_end_ms - rule_start_ms))"
                 ;;
             1)
-                print_blocked_rule \
-                    "repo-local-rule-validation" \
-                    "Repo-local rule validation found blocking P0 findings."
-                echo "FIX: Run python3 scripts/validate-rules.py code to inspect the blocking findings."
-                echo "FIX: Resolve the reported P0 issues, then retry the commit."
+                record_rule_validation_check 'failed' "$((rule_end_ms - rule_start_ms))"
+                print_blocked_rule 'repo-local-rule-validation' 'Repo-local rule validation found blocking P0 findings.'
+                echo 'FIX: Run python3 scripts/validate-rules.py code to inspect the blocking findings.'
+                echo 'FIX: Resolve the reported P0 issues, then retry the commit.'
+                resolution_json=$(build_rule_validation_resolution_json)
+                rule_metadata_json=$(build_rule_metadata_json 'repo-local-rule-validation')
+                emit_protocol_line 'blocked' 'run_rule_validation' 'repo-local-rule-validation' 'Repo-local rule validation found blocking P0 findings.' "$resolution_json" "$rule_metadata_json"
                 exit 1
                 ;;
             2)
-                echo "WARNING: Rule validation reported warn-only P1 findings, continuing commit"
+                echo 'WARNING: Rule validation reported warn-only P1 findings, continuing commit'
+                record_rule_validation_check 'warn' "$((rule_end_ms - rule_start_ms))"
                 ;;
             3)
-                echo "WARNING: Rule validation reported notice-only P2 findings, continuing commit"
+                echo 'WARNING: Rule validation reported notice-only P2 findings, continuing commit'
+                record_rule_validation_check 'warn' "$((rule_end_ms - rule_start_ms))"
                 ;;
             4)
-                print_blocked_rule \
-                    "repo-local-rule-validation-unavailable" \
-                    "Repo-local rule validation could not run because required dependencies are unavailable."
-                echo "FIX: Restore the rule validation dependencies, then rerun python3 scripts/validate-rules.py code."
+                record_rule_validation_check 'failed' "$((rule_end_ms - rule_start_ms))"
+                print_blocked_rule 'repo-local-rule-validation-unavailable' 'Repo-local rule validation could not run because required dependencies are unavailable.'
+                echo 'FIX: Restore the rule validation dependencies, then rerun python3 scripts/validate-rules.py code.'
+                resolution_json=$(build_rule_validation_resolution_json)
+                rule_metadata_json=$(build_rule_metadata_json 'repo-local-rule-validation-unavailable')
+                emit_protocol_line 'blocked' 'run_rule_validation' 'repo-local-rule-validation-unavailable' 'Repo-local rule validation could not run because required dependencies are unavailable.' "$resolution_json" "$rule_metadata_json"
                 exit 1
                 ;;
             *)
-                print_blocked_rule \
-                    "repo-local-rule-validation-unexpected" \
-                    "Repo-local rule validation returned an unexpected exit code ($VALIDATE_EXIT)."
-                echo "FIX: Run python3 scripts/validate-rules.py code manually and inspect the failure."
+                record_rule_validation_check 'failed' "$((rule_end_ms - rule_start_ms))"
+                print_blocked_rule 'repo-local-rule-validation-unexpected' "Repo-local rule validation returned an unexpected exit code ($VALIDATE_EXIT)."
+                echo 'FIX: Run python3 scripts/validate-rules.py code manually and inspect the failure.'
+                resolution_json=$(build_rule_validation_resolution_json)
+                rule_metadata_json=$(build_rule_metadata_json 'repo-local-rule-validation-unexpected')
+                emit_protocol_line 'blocked' 'run_rule_validation' 'repo-local-rule-validation-unexpected' "Repo-local rule validation returned an unexpected exit code ($VALIDATE_EXIT)." "$resolution_json" "$rule_metadata_json"
                 exit 1
                 ;;
         esac
         ;;
     report-only|*)
-        if [ "$RULE_HARD_GATE_MODE" != "report-only" ]; then
+        if [ "$RULE_HARD_GATE_MODE" != 'report-only' ]; then
             echo "WARNING: Unknown hard gate mode '$RULE_HARD_GATE_MODE', defaulting to report-only"
         fi
         run_rule_validation_report_only
         VALIDATE_EXIT=$?
+        rule_end_ms=$(now_ms)
         if [ "$VALIDATE_EXIT" -eq 124 ]; then
             echo "INFO: Rule validation report-only timed out after ${RULE_REPORT_ONLY_TIMEOUT_SECONDS}s (non-blocking), continuing commit"
+            record_rule_validation_check 'timeout' "$((rule_end_ms - rule_start_ms))"
         elif [ "$VALIDATE_EXIT" -ne 0 ]; then
             echo "INFO: Rule validation report-only command exited with $VALIDATE_EXIT (non-blocking), continuing commit"
+            record_rule_validation_check 'warn' "$((rule_end_ms - rule_start_ms))"
         else
-            echo "Rule validation report-only completed"
+            echo 'Rule validation report-only completed'
+            record_rule_validation_check 'passed' "$((rule_end_ms - rule_start_ms))"
         fi
         ;;
 esac
 
-# 3. 检查 staged 文件数量（初始化 commit 除外）
-# 规则: 单 commit 文件数量不能超过 10 个
-# 例外: 如果包含文档类型文件，限制放宽到 20 个
-MAX_FILES_PER_COMMIT=10
-MAX_FILES_WITH_DOCS=20
-
-STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
-STAGED_FILE_COUNT=$(echo "$STAGED_FILES" | grep -c '^' || echo 0)
-
-# 检查是否只包含以 . 开头的目录下的文件
-# 如果是，则豁免数量和文件头检查
-ONLY_DOT_DIRS=true
-if [ -n "$STAGED_FILES" ]; then
-    NON_DOT_FILES=$(echo "$STAGED_FILES" | grep -v '^\.' || true)
-    if [ -n "$NON_DOT_FILES" ]; then
-        ONLY_DOT_DIRS=false
-    fi
-fi
-
-# 检查是否是初始化 commit（没有父提交）
-IS_INITIAL_COMMIT=false
-git rev-parse --verify HEAD >/dev/null 2>&1
-if [ $? -ne 0 ]; then
-    IS_INITIAL_COMMIT=true
-fi
-
-# 检查是否包含文档类型文件
-# 文档类型: *.md, docs/* 目录下文件, README*, CHANGELOG*, LICENSE*
-CONTAINS_DOC_FILES=false
-if [ -n "$STAGED_FILES" ]; then
-    DOC_FILES=$(echo "$STAGED_FILES" | grep -E '(\.md$|^docs/|^README|^CHANGELOG|^LICENSE)' || true)
-    if [ -n "$DOC_FILES" ]; then
-        CONTAINS_DOC_FILES=true
-    fi
-fi
-
-# 根据是否包含文档类型文件设置限制
-if [ "$CONTAINS_DOC_FILES" = "true" ]; then
-    CURRENT_LIMIT=$MAX_FILES_WITH_DOCS
-else
-    CURRENT_LIMIT=$MAX_FILES_PER_COMMIT
-fi
-
-if [ "$ONLY_DOT_DIRS" = "true" ]; then
-    echo "Note: Only dot-directory files staged, skipping count limit check"
-elif [ "$STAGED_FILE_COUNT" -gt "$CURRENT_LIMIT" ] && [ "$IS_INITIAL_COMMIT" = "false" ]; then
-    print_blocked_rule \
-        "staged-file-limit" \
-        "This non-initial commit stages $STAGED_FILE_COUNT files, which exceeds the allowed limit of $CURRENT_LIMIT."
-    if [ "$CONTAINS_DOC_FILES" = "true" ]; then
-        echo "FIX: This commit includes documentation files, so the higher limit is $MAX_FILES_WITH_DOCS files."
-    else
-        echo "FIX: Non-dot commits without documentation files must stay at or below $MAX_FILES_PER_COMMIT files."
-    fi
-    echo "FIX: Dot-directory-only commits are exempt from this rule."
-    echo "FIX: Split the staged changes into smaller commits, then retry."
-    echo "STAGED_FILES:"
-    git diff --cached --name-only --diff-filter=ACM
-    exit 1
-fi
-
-# 4. 检查文件头注释（只检查 staged 的 TS 源文件，豁免 . 开头目录）
-echo "Checking file headers..."
-if [ "$ONLY_DOT_DIRS" = "true" ]; then
-    echo "Note: Only dot-directory files staged, skipping header check"
-    STAGED_TS_FILES=""
-else
-    STAGED_TS_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.ts$' | grep -v '\.test\.ts$' | grep -v '\.d\.ts$')
-fi
-
-if [ -n "$STAGED_TS_FILES" ]; then
-    MISSING_HEADERS=0
-
-    for file in $STAGED_TS_FILES; do
-        if [ ! -f "$file" ]; then
-            continue
-        fi
-
-        HEAD_CONTENT=$(head -10 "$file")
-
-        if ! echo "$HEAD_CONTENT" | grep -q '\[META\]'; then
-            echo "ERROR: $file missing [META] comment"
-            MISSING_HEADERS=$((MISSING_HEADERS + 1))
-        fi
-
-        if ! echo "$HEAD_CONTENT" | grep -q '\[WHY\]'; then
-            echo "ERROR: $file missing [WHY] comment"
-            MISSING_HEADERS=$((MISSING_HEADERS + 1))
-        fi
-    done
-
-    if [ $MISSING_HEADERS -gt 0 ]; then
-        print_blocked_rule \
-            "source-file-headers" \
-            "Non-test, non-.d.ts TypeScript source files staged outside dot-directories must include [META] and [WHY] in the first 10 lines."
-        echo "FIX: Add these header lines at the top of each listed file:"
-        echo "FIX: // [META] since:YYYY-MM | owner:team | stable:false"
-        echo "FIX: // [WHY] Explain why this file exists"
-        exit 1
-    fi
-fi
-
-echo "File headers passed"
-
-# 5a. 轻量真实验证检查（warn-only）
-# 如果新增/修改了测试文件，检查是否包含真实调用模式
-echo "Checking for real-world test patterns..."
-STAGED_TEST_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.test\.ts$' || true)
+# 6. 真实场景测试模式（warn-only）
+pattern_start_ms=$(now_ms)
+echo 'Checking for real-world test patterns...'
+STAGED_TEST_FILES=$(printf '%s\n' "$STAGED_FILES" | grep '\.test\.ts$' || true)
 if [ -n "$STAGED_TEST_FILES" ]; then
     MISSING_REAL_PATTERN=0
+    MISSING_REAL_PATTERN_FILES=''
     for file in $STAGED_TEST_FILES; do
         if [ ! -f "$file" ]; then
             continue
         fi
-        # 检查是否包含真实调用模式
-        # 注意：StdioServerTransport + PassThrough 是真实 MCP transport 测试模式
         if ! grep -qE '(spawn|execSync|execFileSync|mktemp|StdioServerTransport|PassThrough|createServer|listen)' "$file"; then
             echo "WARNING: $file does not appear to contain real-world invocation patterns (spawn, execSync, mktemp, StdioServerTransport, PassThrough, etc.)"
             MISSING_REAL_PATTERN=$((MISSING_REAL_PATTERN + 1))
+            MISSING_REAL_PATTERN_FILES=$(printf '%s\n%s' "$MISSING_REAL_PATTERN_FILES" "$file" | sed '/^[[:space:]]*$/d')
         fi
     done
-    if [ $MISSING_REAL_PATTERN -gt 0 ]; then
-        echo ""
-        echo "Consider adding integration/E2E tests with real subprocess/transport calls."
-        echo "See AGENTS.md Section 8.1 for the real-world validation threshold."
-        echo "This is a warning only; commit will proceed."
-        echo ""
+    if [ "$MISSING_REAL_PATTERN" -gt 0 ]; then
+        echo ''
+        echo 'Consider adding integration/E2E tests with real subprocess/transport calls.'
+        echo 'See AGENTS.md Section 8.1 for the real-world validation threshold.'
+        echo 'This is a warning only; commit will proceed.'
+        echo ''
+        pattern_end_ms=$(now_ms)
+        record_real_world_test_patterns_check 'warn' "$((pattern_end_ms - pattern_start_ms))"
+    else
+        pattern_end_ms=$(now_ms)
+        record_real_world_test_patterns_check 'passed' "$((pattern_end_ms - pattern_start_ms))"
     fi
+else
+    pattern_end_ms=$(now_ms)
+    record_real_world_test_patterns_check 'skipped' "$((pattern_end_ms - pattern_start_ms))" 'no-staged-test-files'
 fi
 
-# 5. 检查文档与 CLI 护栏（仅在相关文件变更时阻断）
-DOC_GUARDRAIL_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(README\.md|package\.json|docs/|src/cli/index\.ts|vitest\.config\.ts|vitest\.benchmark\.config\.ts|\.github/workflows/ci-gateway\.yml)$' || true)
-
-if [ -n "$DOC_GUARDRAIL_FILES" ]; then
-    echo "Checking documentation guardrails..."
-    npm run docs:check
-    if [ $? -ne 0 ]; then
-        print_blocked_rule \
-            "docs-guardrail" \
-            "Documentation guardrails run whenever staged files touch README/package metadata, docs, CLI entrypoints, vitest config, or the CI gateway workflow."
-        echo "TRIGGERED_BY:"
-        printf '%s\n' "$DOC_GUARDRAIL_FILES"
-        echo "FIX: Run npm run docs:check and resolve the reported documentation drift."
-        echo "FIX: Retry the commit after docs:check passes."
-        exit 1
-    fi
-fi
-
-echo "Documentation guardrails passed"
-
-# 6. 生成 AI 饲料（警告级，不阻断）
-echo "Generating AI feed..."
+# 7. 生成 AI 饲料（warn-only）
+ai_feed_start_ms=$(now_ms)
+echo 'Generating AI feed...'
 npx mycodemap generate --quiet >/dev/null 2>&1 &
 if [ $? -ne 0 ]; then
-    echo "WARNING: Failed to start AI feed generation"
+    echo 'WARNING: Failed to start AI feed generation'
+    ai_feed_end_ms=$(now_ms)
+    record_ai_feed_check 'warn' "$((ai_feed_end_ms - ai_feed_start_ms))"
+else
+    ai_feed_end_ms=$(now_ms)
+    record_ai_feed_check 'passed' "$((ai_feed_end_ms - ai_feed_start_ms))"
 fi
 
-echo "Pre-commit checks passed"
+echo 'Pre-commit checks passed'
+emit_protocol_line 'allowed' 'commit' '' '' 'null' 'null'
 exit 0

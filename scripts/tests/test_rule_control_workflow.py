@@ -73,6 +73,30 @@ class RuleControlWorkflowTests(unittest.TestCase):
             self.assertIn("go test ./...", content)
             self.assertIn("cargo test", content)
 
+    def test_pre_commit_contains_agent_protocol_contract(self):
+        for hook_path in [
+            ROOT / ".mycodemap" / "hooks" / "pre-commit",
+            ROOT / "scripts" / "hooks" / "templates" / "pre-commit",
+        ]:
+            content = hook_path.read_text(encoding="utf-8")
+            self.assertIn("CODEMAP_PRECHECK_PROTOCOL:", content)
+            self.assertIn("CODEMAP_AGENT_CONTEXT", content)
+            self.assertIn("schema': 'codemap.precommit.v1'", content)
+            self.assertIn("suggested_groups", content)
+            self.assertIn("attempt_id", content)
+
+    def test_commit_msg_contains_agent_protocol_contract(self):
+        for hook_path in [
+            ROOT / ".mycodemap" / "hooks" / "commit-msg",
+            ROOT / "scripts" / "hooks" / "templates" / "commit-msg",
+        ]:
+            content = hook_path.read_text(encoding="utf-8")
+            self.assertIn("CODEMAP_PRECHECK_PROTOCOL:", content)
+            self.assertIn("CODEMAP_AGENT_CONTEXT", content)
+            self.assertIn("schema': 'codemap.commitmsg.v1'", content)
+            self.assertIn("rewrite_commit_message", content)
+            self.assertIn("commit-scope-message", content)
+
 
 if __name__ == "__main__":
     unittest.main()

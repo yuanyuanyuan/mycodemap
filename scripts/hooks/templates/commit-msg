@@ -1,13 +1,364 @@
 #!/bin/sh
-# Commit-msg hook: 仅验证 Commit 消息格式
+# Commit-msg hook: 校验 Commit 消息格式并向 AI Agent 输出结构化协议
 
 HOOK_SOURCE=".mycodemap/hooks/commit-msg"
 MSG_FILE=$1
 MSG=$(head -1 "$MSG_FILE")
-
 VALID_TAGS="BUGFIX FEATURE REFACTOR CONFIG DOCS DELETE"
+COMMIT_FILES=""
+NON_DOT_FILES=""
+ONLY_DOT_DIRS=true
+CHECK_RESULTS_FILE=""
+ATTEMPT_ID=""
+ATTEMPT_LOG_RELATIVE_PATH=""
+ATTEMPT_LOG_ABSOLUTE_PATH=""
+AGENT_CONTEXT_RAW="${CODEMAP_AGENT_CONTEXT:-}"
+PARENT_COMMIT=""
+PROTOCOL_JSON=""
 
-COMMIT_FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
+cleanup_temp_artifacts() {
+    if [ -n "$CHECK_RESULTS_FILE" ] && [ -f "$CHECK_RESULTS_FILE" ]; then
+        rm -f "$CHECK_RESULTS_FILE"
+    fi
+}
+
+trap cleanup_temp_artifacts EXIT
+
+json_array_from_lines() {
+    INPUT_TEXT="$1" python3 - <<'PY'
+import json
+import os
+
+lines = [line for line in os.environ.get('INPUT_TEXT', '').splitlines() if line.strip()]
+print(json.dumps(lines, separators=(',', ':')))
+PY
+}
+
+json_to_base64() {
+    INPUT_TEXT="$1" python3 - <<'PY'
+import base64
+import os
+
+print(base64.b64encode(os.environ.get('INPUT_TEXT', '{}').encode('utf-8')).decode('ascii'))
+PY
+}
+
+append_check_result() {
+    check_name="$1"
+    check_status="$2"
+    check_details_json="${3:-{}}"
+    check_skip_reason="${4:-}"
+    check_rule_id="${5:-}"
+    check_details_b64=$(json_to_base64 "$check_details_json")
+
+    CHECK_NAME="$check_name" \
+    CHECK_STATUS="$check_status" \
+    CHECK_DETAILS_B64="$check_details_b64" \
+    CHECK_SKIP_REASON="$check_skip_reason" \
+    CHECK_RULE_ID="$check_rule_id" \
+    python3 - "$CHECK_RESULTS_FILE" <<'PY'
+import base64
+import json
+import os
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+raw_details_b64 = os.environ.get('CHECK_DETAILS_B64', '') or 'e30='
+try:
+    raw_details = base64.b64decode(raw_details_b64).decode('utf-8')
+except Exception:
+    raw_details = '{}'
+
+def load_jsonish(raw: str):
+    candidates = [raw]
+    trimmed = raw.strip()
+    if trimmed != raw:
+        candidates.append(trimmed)
+    if trimmed.startswith("'") and trimmed.endswith("'") and len(trimmed) >= 2:
+        candidates.append(trimmed[1:-1])
+    while trimmed.count('{') < trimmed.count('}') and trimmed.endswith('}'):
+        trimmed = trimmed[:-1]
+        candidates.append(trimmed)
+
+    seen = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        try:
+            details = json.loads(candidate)
+            while isinstance(details, str):
+                details = json.loads(details)
+            return details
+        except Exception:
+            continue
+    raise ValueError(raw)
+
+try:
+    details = load_jsonish(raw_details)
+except Exception:
+    details = {'raw': raw_details}
+
+payload = {
+    'name': os.environ.get('CHECK_NAME', ''),
+    'status': os.environ.get('CHECK_STATUS', ''),
+    'details': details,
+}
+
+skip_reason = os.environ.get('CHECK_SKIP_REASON', '')
+rule_id = os.environ.get('CHECK_RULE_ID', '')
+if skip_reason:
+    payload['skip_reason'] = skip_reason
+if rule_id:
+    payload['rule_id'] = rule_id
+
+with path.open('a', encoding='utf-8') as handle:
+    handle.write(json.dumps(payload, separators=(',', ':')))
+    handle.write('\n')
+PY
+}
+
+prepare_attempt_context() {
+    CHECK_RESULTS_FILE=$(mktemp "${TMPDIR:-/tmp}/codemap-commit-msg-results-XXXXXX")
+    ATTEMPT_TIMESTAMP=$(python3 - <<'PY'
+from datetime import datetime, timezone
+print(datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
+PY
+)
+    ATTEMPT_ID="${CODEMAP_ATTEMPT_ID:-commitmsg-${ATTEMPT_TIMESTAMP}-$$}"
+    ATTEMPT_LOG_RELATIVE_PATH=".mycodemap/logs/commit-msg/${ATTEMPT_ID}.json"
+    ATTEMPT_LOG_ABSOLUTE_PATH="$(pwd)/$ATTEMPT_LOG_RELATIVE_PATH"
+    mkdir -p "$(dirname "$ATTEMPT_LOG_ABSOLUTE_PATH")" 2>/dev/null || true
+    PARENT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || true)
+}
+
+resolve_rule_definition_line() {
+    marker="$1"
+    if [ ! -f "$HOOK_SOURCE" ]; then
+        echo ""
+        return 0
+    fi
+
+    grep -nF "$marker" "$HOOK_SOURCE" | head -n 1 | cut -d: -f1
+}
+
+build_rule_metadata_json() {
+    rule_id="$1"
+    definition_marker=""
+    override_process=""
+
+    case "$rule_id" in
+        commit-format)
+            definition_marker='# commit-format'
+            override_process='重写首行为 [TAG] scope: message，或仅提交 dot-directory 文件以走豁免分支。'
+            ;;
+        commit-scope-message)
+            definition_marker='# commit-scope-message'
+            override_process='补齐 scope、冒号和 message body，保持格式为 [TAG] scope: message。'
+            ;;
+        *)
+            definition_marker='print_blocked_rule() {'
+            override_process='按提示修复 commit message 后重试。'
+            ;;
+    esac
+
+    RULE_ID_FOR_JSON="$rule_id" \
+    RULE_LINE_FOR_JSON="$(resolve_rule_definition_line "$definition_marker")" \
+    RULE_OVERRIDE_FOR_JSON="$override_process" \
+    python3 - <<'PY'
+import json
+import os
+
+rule_id = os.environ.get('RULE_ID_FOR_JSON', '')
+line = os.environ.get('RULE_LINE_FOR_JSON', '').strip()
+override_process = os.environ.get('RULE_OVERRIDE_FOR_JSON', '').strip()
+
+definition = '.mycodemap/hooks/commit-msg'
+if line:
+    definition = f'{definition}:{line}'
+
+payload = {
+    'id': rule_id,
+    'defined_at': definition,
+    'doc_ref': 'docs/DEVELOPMENT.md',
+    'override_process': override_process or None,
+}
+print(json.dumps(payload, separators=(',', ':')))
+PY
+}
+
+build_commit_message_resolution_json() {
+    rule_id="$1"
+    VALID_TAGS_RAW="$VALID_TAGS" \
+    NON_DOT_FILES_RAW="$NON_DOT_FILES" \
+    RULE_ID_VALUE="$rule_id" \
+    python3 - <<'PY'
+import json
+import os
+
+valid_tags = [tag for tag in os.environ.get('VALID_TAGS_RAW', '').split() if tag]
+triggered = [line for line in os.environ.get('NON_DOT_FILES_RAW', '').splitlines() if line.strip()]
+rule_id = os.environ.get('RULE_ID_VALUE', '')
+
+payload = {
+    'type': 'rewrite_commit_message',
+    'expected_format': '[TAG] scope: message',
+    'valid_tags': valid_tags,
+    'example': '[FEATURE] cli: add new command',
+    'triggered_non_dot_files': triggered,
+}
+
+if rule_id == 'commit-scope-message':
+    payload['missing_parts'] = ['scope', 'colon', 'message']
+
+print(json.dumps(payload, separators=(',', ':')))
+PY
+}
+
+render_protocol_json() {
+    final_status="$1"
+    next_action="$2"
+    blocked_rule="$3"
+    blocked_reason="$4"
+    resolution_json="${5:-null}"
+    rule_metadata_json="${6:-null}"
+
+    FINAL_STATUS="$final_status" \
+    NEXT_ACTION="$next_action" \
+    BLOCKED_RULE="$blocked_rule" \
+    BLOCKED_REASON="$blocked_reason" \
+    BLOCK_RESOLUTION_JSON="$resolution_json" \
+    RULE_METADATA_JSON="$rule_metadata_json" \
+    ATTEMPT_ID="$ATTEMPT_ID" \
+    ATTEMPT_LOG_RELATIVE_PATH="$ATTEMPT_LOG_RELATIVE_PATH" \
+    AGENT_CONTEXT_RAW="$AGENT_CONTEXT_RAW" \
+    PARENT_COMMIT="$PARENT_COMMIT" \
+    COMMIT_FILES_RAW="$COMMIT_FILES" \
+    NON_DOT_FILES_RAW="$NON_DOT_FILES" \
+    ONLY_DOT_DIRS_VALUE="$ONLY_DOT_DIRS" \
+    MESSAGE_PREVIEW="$MSG" \
+    python3 - "$CHECK_RESULTS_FILE" <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+check_file = Path(sys.argv[1])
+records = []
+if check_file.exists():
+    for line in check_file.read_text(encoding='utf-8').splitlines():
+        line = line.strip()
+        if line:
+            records.append(json.loads(line))
+
+catalog = [
+    {'name': 'commit-format', 'order': 0, 'complexity': 'O(1)', 'blocking': True},
+    {'name': 'commit-scope-message', 'order': 1, 'complexity': 'O(1)', 'blocking': True},
+]
+record_map = {record['name']: record for record in records}
+blocked_rule = os.environ.get('BLOCKED_RULE', '').strip()
+blocked_order = None
+for item in catalog:
+    if item['name'] == blocked_rule:
+        blocked_order = item['order']
+        break
+if blocked_order is not None:
+    for item in catalog:
+        if item['name'] not in record_map and item['order'] > blocked_order:
+            record_map[item['name']] = {
+                'name': item['name'],
+                'status': 'skipped',
+                'details': {},
+                'skip_reason': f'blocked-by-{blocked_rule}',
+            }
+
+checks = []
+for item in catalog:
+    record = record_map.get(item['name'])
+    if record is None:
+        record = {
+            'name': item['name'],
+            'status': 'skipped',
+            'details': {},
+            'skip_reason': 'not-run',
+        }
+    merged = dict(item)
+    merged.update(record)
+    checks.append(merged)
+
+agent_context_raw = os.environ.get('AGENT_CONTEXT_RAW', '').strip()
+agent_context = None
+agent_context_error = None
+if agent_context_raw:
+    try:
+        agent_context = json.loads(agent_context_raw)
+    except Exception as exc:
+        agent_context_error = str(exc)
+        agent_context = {'raw': agent_context_raw}
+
+resolution_raw = os.environ.get('BLOCK_RESOLUTION_JSON', 'null')
+rule_metadata_raw = os.environ.get('RULE_METADATA_JSON', 'null')
+try:
+    resolution = json.loads(resolution_raw)
+except Exception:
+    resolution = {'raw': resolution_raw}
+try:
+    rule_metadata = json.loads(rule_metadata_raw)
+except Exception:
+    rule_metadata = {'raw': rule_metadata_raw}
+
+staged_files = [line for line in os.environ.get('COMMIT_FILES_RAW', '').splitlines() if line.strip()]
+non_dot_files = [line for line in os.environ.get('NON_DOT_FILES_RAW', '').splitlines() if line.strip()]
+
+payload = {
+    'schema': 'codemap.commitmsg.v1',
+    'hook_source': '.mycodemap/hooks/commit-msg',
+    'attempt': {
+        'attempt_id': os.environ.get('ATTEMPT_ID', ''),
+        'log_path': os.environ.get('ATTEMPT_LOG_RELATIVE_PATH', ''),
+        'context_env': 'CODEMAP_AGENT_CONTEXT',
+        'input_context': agent_context,
+        'input_context_parse_error': agent_context_error,
+        'parent_commit': os.environ.get('PARENT_COMMIT', '') or None,
+    },
+    'commit_allowed': os.environ.get('FINAL_STATUS', 'allowed') == 'allowed',
+    'next_action': os.environ.get('NEXT_ACTION', 'commit'),
+    'message_preview': os.environ.get('MESSAGE_PREVIEW', ''),
+    'repo': {
+        'staged_files': staged_files,
+        'non_dot_files': non_dot_files,
+        'only_dot_dirs': os.environ.get('ONLY_DOT_DIRS_VALUE', 'false') == 'true',
+    },
+    'checks': checks,
+}
+
+if blocked_rule:
+    payload['block'] = {
+        'rule_id': blocked_rule,
+        'why': os.environ.get('BLOCKED_REASON', ''),
+        'rule': rule_metadata,
+        'resolution': resolution,
+    }
+
+print(json.dumps(payload, separators=(',', ':')))
+PY
+}
+
+emit_protocol_line() {
+    final_status="$1"
+    next_action="$2"
+    blocked_rule="$3"
+    blocked_reason="$4"
+    resolution_json="${5:-null}"
+    rule_metadata_json="${6:-null}"
+
+    PROTOCOL_JSON=$(render_protocol_json "$final_status" "$next_action" "$blocked_rule" "$blocked_reason" "$resolution_json" "$rule_metadata_json")
+    if [ -n "$ATTEMPT_LOG_ABSOLUTE_PATH" ]; then
+        printf '%s\n' "$PROTOCOL_JSON" >"$ATTEMPT_LOG_ABSOLUTE_PATH" 2>/dev/null || true
+    fi
+    printf 'CODEMAP_PRECHECK_PROTOCOL:%s\n' "$PROTOCOL_JSON"
+}
 
 print_blocked_rule() {
     rule_id="$1"
@@ -19,17 +370,22 @@ print_blocked_rule() {
     echo "WHY: $reason"
 }
 
-ONLY_DOT_DIRS=true
+prepare_attempt_context
+
+COMMIT_FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
 if [ -n "$COMMIT_FILES" ]; then
-    NON_DOT_FILES=$(echo "$COMMIT_FILES" | grep -v '^\.' || true)
+    NON_DOT_FILES=$(printf '%s\n' "$COMMIT_FILES" | grep -v '^\.' || true)
     if [ -n "$NON_DOT_FILES" ]; then
         ONLY_DOT_DIRS=false
     fi
 fi
 
+# commit-format
 if [ "$ONLY_DOT_DIRS" = "true" ]; then
     echo "Note: Commit only contains files in dot-directories, skipping message format check"
+    append_check_result 'commit-format' 'skipped' '{"dot_directory_exemption":true}' 'dot-directory-exemption' 'commit-format'
 elif ! echo "$MSG" | grep -qE '^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]'; then
+    append_check_result 'commit-format' 'failed' '{"expected_format":"[TAG] scope: message"}' '' 'commit-format'
     print_blocked_rule \
         "commit-format" \
         "Staged files include at least one non-dot path, so the first commit line must start with an uppercase [TAG]."
@@ -41,12 +397,20 @@ elif ! echo "$MSG" | grep -qE '^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]
     echo "FIX: Valid tags: $VALID_TAGS"
     echo "FIX: Example: [FEATURE] cli: add new command"
     echo "FIX: If you intended the dot-directory exemption, unstage non-dot files and retry."
+    resolution_json=$(build_commit_message_resolution_json 'commit-format')
+    rule_metadata_json=$(build_rule_metadata_json 'commit-format')
+    emit_protocol_line 'blocked' 'rewrite_commit_message' 'commit-format' 'Staged files include at least one non-dot path, so the first commit line must start with an uppercase [TAG].' "$resolution_json" "$rule_metadata_json"
     exit 1
+else
+    append_check_result 'commit-format' 'passed' '{"expected_format":"[TAG] scope: message"}' '' 'commit-format'
 fi
 
+# commit-scope-message
 if [ "$ONLY_DOT_DIRS" = "true" ]; then
     echo "Note: Commit only contains files in dot-directories, skipping scope check"
+    append_check_result 'commit-scope-message' 'skipped' '{"dot_directory_exemption":true}' 'dot-directory-exemption' 'commit-scope-message'
 elif ! echo "$MSG" | grep -qE '^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]\s+[^:]+:\s+.+'; then
+    append_check_result 'commit-scope-message' 'failed' '{"expected_format":"[TAG] scope: message"}' '' 'commit-scope-message'
     print_blocked_rule \
         "commit-scope-message" \
         "The first commit line is missing either the scope, the colon separator, or the message body."
@@ -57,8 +421,14 @@ elif ! echo "$MSG" | grep -qE '^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]
     echo "FIX: Rewrite the first line to match: [TAG] scope: message"
     echo "FIX: Example: [FEATURE] cli: add new command"
     echo "FIX: If you intended the dot-directory exemption, unstage non-dot files and retry."
+    resolution_json=$(build_commit_message_resolution_json 'commit-scope-message')
+    rule_metadata_json=$(build_rule_metadata_json 'commit-scope-message')
+    emit_protocol_line 'blocked' 'rewrite_commit_message' 'commit-scope-message' 'The first commit line is missing either the scope, the colon separator, or the message body.' "$resolution_json" "$rule_metadata_json"
     exit 1
+else
+    append_check_result 'commit-scope-message' 'passed' '{"expected_format":"[TAG] scope: message"}' '' 'commit-scope-message'
 fi
 
 echo "Commit message validated"
+emit_protocol_line 'allowed' 'commit' '' '' 'null' 'null'
 exit 0

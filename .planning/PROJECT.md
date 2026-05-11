@@ -14,11 +14,11 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 
 ## Planning Horizon
 
-当前处于 **between milestones** 状态：`v2.6 polish-and-stabilize` 已完成 closeout，下一轮 active milestone 仍待定义。更远候选保留为 `v3.0 architecture-intelligence` 与后续 contract migration / shared-output 扩展。
+当前处于 **between milestones** 状态：`v2.6 polish-and-stabilize` 已完成 closeout，2026-05-12 又以 special `Phase 84` 完成了一次 hook protocol hardening，但下一轮 active milestone 仍待定义。更远候选保留为 `v3.0 architecture-intelligence` 与后续 contract migration / shared-output 扩展。
 
 ## Current State
 
-**Status:** No active milestone is open. Latest shipped milestone is `v2.6 polish-and-stabilize` (closed 2026-05-11); `v2.7 agent-effectiveness-validation` remains a historical shipped snapshot from earlier the same day.
+**Status:** No active milestone is open. Latest shipped milestone is `v2.6 polish-and-stabilize` (closed 2026-05-11); `v2.7 agent-effectiveness-validation` remains a historical shipped snapshot from earlier the same day. Between milestones, a special `Phase 84` hardening pass completed on 2026-05-12 without opening a new milestone.
 
 **What just shipped in v2.6:**
 - complexity truth 已统一到单一 canonical analyzer seam ✅
@@ -31,6 +31,18 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 - 定义下一轮 active milestone，并重新创建新的 `.planning/REQUIREMENTS.md`
 - 继续 contract migration / shared-output follow-ups（`AGENT-10` / `AGENT-11`）
 - Rust/Java/C++ grammar 扩展与更广 architecture-intelligence 仍在 `v3.0+`
+
+## Latest Special Follow-up: Phase 84 AI Agent Hook Control Protocol
+
+**Goal:** 把 `git commit` hooks 从“对人类可读的阻断提示”升级成“对 AI Agent 可直接执行的 fail-fast 控制协议”，并确保 installable templates 与 managed hook copies 一致。
+
+**Status:** Completed 2026-05-12. This was a between-milestones special follow-up, not a new milestone.
+
+**Delivered:**
+- `pre-commit` 现在会优先处理 cheap blocker，并输出 `codemap.precommit.v1` 协议，带 `checks[]`、`block.rule`、`resolution`、`attempt_id` 与 `CODEMAP_AGENT_CONTEXT`
+- `commit-msg` 现在也输出 `codemap.commitmsg.v1`，`commit-format` 与 `commit-scope-message` 都直接路由到 `rewrite_commit_message`
+- related-tests remediation 保持 framework-aware / generic fallback，而不是假设所有安装目标仓库都用 `vitest`
+- installable template 真源和 managed hook copies 的协议一致性已经被 payload test、workflow unittest 与真实 smoke commit 锁定
 
 ## Latest Completed Milestone: v2.6 polish-and-stabilize
 
@@ -111,6 +123,7 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 - ✓ Python complexity metrics 已持久化到 shared symbol/module truth，downstream CLI 默认读取 persisted truth —— v2.5 / Phase 72
 - ✓ persisted graph/community truth 已暴露 module-level hub / bridge insight，并在 build/writeback/read path 三层抑制 duplicate graph artifacts —— v2.5 / Phase 73
 - ✓ delegated-start hook 已实现 first-remind-then-silent，并统一复用 Phase 58 env-contract retrieval surface —— v2.5 / Phase 74
+- ✓ `git commit` hooks 已升级为 AI-agent-readable control protocol：`pre-commit`/`commit-msg` 都输出 structured blocker resolution、attempt context 与 framework-aware verify guidance —— between-milestones / Phase 84
 - ✓ `codemap agent-metrics` 已作为独立命令家族落地 `token` / `report` 表面 —— v2.7 / Phase 75
 - ✓ no-arg `codemap agent-metrics` 已闭合到最小 report flow —— v2.7 / Phase 75
 - ✓ representative CodeMap 查询已支持 token cost analysis，并持久化 detail-row truth —— v2.7 / Phase 75
@@ -197,12 +210,14 @@ CodeMap 是一个 AI-Native 优先的代码架构治理基础设施。`v2.0` 已
 | Phase 78 intelligence 保持 additive and advisory-only | 趋势/分位数/高成本提示必须扩展既有报告，而不能变成第二套 gate policy | Completed 2026-05-11 |
 | `v2.7` closeout先清 stale open artifacts 再归档 | 用户选择 `Resolve` 路径，closeout 只在 Phase 45/53/58/debug 工件更新并且 `audit-open` 清零后继续 | Completed 2026-05-11 |
 | `v2.6` 继续沿用 backlog 标签 | 用户明确要求沿用既有 `v2.6` 命名启动 polish milestone，而不是把该 scope 重命名为 `v2.8` | Completed 2026-05-11 |
+| 将 hook protocol hardening 记录为 special Phase 84 | 用户要求把本次 AI-agent-friendly hook 优化作为特殊 phase 登记，但当前 planning truth 仍应保持 `between-milestones` | Completed 2026-05-12 |
+| installable hook template 是协议真相源 | 其他项目通过 `mycodemap init` 安装时也要拿到同一套 guardrail，因此不能只修当前仓库本地 hook copy | Completed 2026-05-12 |
 | `v2.3` 不重新打开 parser/storage/MCP baseline | graph capability 建立在稳定执行基础上，而不是回到底座收敛 | Shipped 2026-05-09 |
 | `v2.2` 聚焦 parser / storage / MCP 基线收敛 | 先清理架构根基，再进入图能力与 agent/intelligence 扩展 | Shipped 2026-05-07 |
 
 ## Current State
 
-- **Completed milestones / follow-ups:** `v1.0`→`v1.11`、`v2.0`、`v2.1`、`v2.2`、`v2.3`、`v2.4`、`v2.5`、`v2.6`、`v2.7`
+- **Completed milestones / follow-ups:** `v1.0`→`v1.11`、`v2.0`、`v2.1`、`v2.2`、`v2.3`、`v2.4`、`v2.5`、`v2.6`、`v2.7`、special `Phase 84`
 - **Historical closed branch:** `v1.5 Isolated ArcadeDB Server-backed Prototype`
 - **Active milestone:** none (between milestones)
 - **Current planning status:** closeout complete; next step is define the next milestone and create fresh milestone-scoped requirements

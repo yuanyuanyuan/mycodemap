@@ -4,6 +4,19 @@
 > The shipped entries below are **historical snapshots**. Their `What's next` text records closeout-time context and must not override the current active planning surface.
 
 **Current status:** No active milestone is open. Latest shipped milestone is `v2.6 polish-and-stabilize` (2026-05-11); `v2.7 agent-effectiveness-validation` remains a historical shipped snapshot from earlier the same day.
+**Between-milestones note:** special `Phase 84 agent-hook-control-protocol` completed on 2026-05-12 to harden installable git hooks for AI agents. This did not open a new milestone.
+
+## Between-Milestones Special Follow-up: Phase 84 agent-hook-control-protocol (Completed: 2026-05-12)
+
+**Goal:** 把 installable `pre-commit` / `commit-msg` hooks 从人类可读阻断提示升级为 AI Agent 可直接执行的 fail-fast 控制协议，同时保持 generic test-strategy fallback 和 template truth。
+
+**Delivered:**
+
+- `pre-commit` 输出 `codemap.precommit.v1`，对 staged-file-limit 等 cheap blocker fail fast，并提供结构化 `split_commit` / `verify_commands`
+- `commit-msg` 输出 `codemap.commitmsg.v1`，为 `commit-format` 与 `commit-scope-message` 提供 `rewrite_commit_message` 路由
+- installable templates 与 managed hook copies 的协议一致性已被 payload test、workflow unittest 和真实 smoke commit 验证锁定
+
+**What's next:** 继续保持 `between-milestones` 状态，真正的下一步仍是定义新的 active milestone。
 
 ## v2.6 polish-and-stabilize (Shipped: 2026-05-11)
 

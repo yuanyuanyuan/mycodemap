@@ -55,6 +55,37 @@ assert_log_contains() {
   fi
 }
 
+assert_log_not_contains() {
+  local needle="$1"
+  if grep -F "$needle" "$CASE_LOG" >/dev/null 2>&1; then
+    fail "unexpected output in $(basename "$CASE_LOG"): $needle"
+  fi
+}
+
+assert_protocol_python() {
+  local expression="$1"
+  python3 - "$CASE_LOG" "$expression" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+log_path = Path(sys.argv[1])
+expression = sys.argv[2]
+prefix = "CODEMAP_PRECHECK_PROTOCOL:"
+payload = None
+
+for line in log_path.read_text(encoding="utf-8").splitlines():
+    if line.startswith(prefix):
+        payload = json.loads(line[len(prefix):])
+
+if payload is None:
+    raise SystemExit(f"missing protocol line in {log_path.name}")
+
+if not eval(expression, {"payload": payload}):
+    raise SystemExit(f"protocol assertion failed for {log_path.name}: {expression}")
+PY
+}
+
 run_case() {
   local case_name="$1"
   shift
@@ -109,7 +140,8 @@ cat > package.json <<'EOF'
   "name": "codemap-hook-smoke",
   "version": "1.0.0",
   "scripts": {
-    "docs:check": "node scripts/docs-check.js"
+    "docs:check": "node scripts/docs-check.js",
+    "test": "node scripts/run-tests.js"
   }
 }
 EOF
@@ -123,6 +155,18 @@ if (fs.existsSync('.docs-check-should-fail')) {
 }
 
 console.log('docs:check passed');
+EOF
+
+cat > scripts/run-tests.js <<'EOF'
+const fs = require('node:fs');
+
+if (fs.existsSync('.tests-should-fail')) {
+  console.error('FAILED tests/unit/custom.test.js > fallback runner > reports failure');
+  console.error('AssertionError: expected 1 to be 2');
+  process.exit(1);
+}
+
+console.log('project test passed');
 EOF
 
 cat > scripts/validate-rules.py <<'EOF'
@@ -152,6 +196,10 @@ assert_status 1 commit-format
 assert_log_contains "RULE_ID: commit-format"
 assert_log_contains "HOOK_SOURCE: .mycodemap/hooks/commit-msg"
 assert_log_contains "FIX: Rewrite the first line to match: [TAG] scope: message"
+assert_log_contains "CODEMAP_PRECHECK_PROTOCOL:"
+assert_protocol_python 'payload["hook_source"] == ".mycodemap/hooks/commit-msg"'
+assert_protocol_python 'payload["block"]["rule_id"] == "commit-format"'
+assert_protocol_python 'payload["next_action"] == "rewrite_commit_message"'
 SUMMARY_LINES+=("commit-format: PASS")
 git reset HEAD bad.txt >/dev/null 2>&1
 rm -f bad.txt
@@ -165,6 +213,16 @@ assert_status 1 staged-file-limit
 assert_log_contains "RULE_ID: staged-file-limit"
 assert_log_contains "HOOK_SOURCE: .mycodemap/hooks/pre-commit"
 assert_log_contains "FIX: Split the staged changes into smaller commits, then retry."
+assert_log_contains "CODEMAP_PRECHECK_PROTOCOL:"
+assert_log_not_contains "Running tests for staged files..."
+assert_log_not_contains "Running repo-local rule validation"
+assert_protocol_python 'payload["commit_allowed"] is False'
+assert_protocol_python 'payload["next_action"] == "split_commit"'
+assert_protocol_python 'payload["checks"][0]["name"] == "staged-file-limit" and payload["checks"][0]["status"] == "failed"'
+assert_protocol_python 'payload["checks"][0]["details"]["staged_count"] == 11'
+assert_protocol_python 'payload["block"]["rule_id"] == "staged-file-limit"'
+assert_protocol_python 'payload["block"]["resolution"]["type"] == "split_commit"'
+assert_protocol_python 'len(payload["block"]["resolution"]["suggested_groups"]) >= 2'
 SUMMARY_LINES+=("staged-file-limit: PASS")
 git reset HEAD . >/dev/null 2>&1
 rm -f limit-*.txt
@@ -177,6 +235,9 @@ assert_status 1 docs-guardrail
 assert_log_contains "RULE_ID: docs-guardrail"
 assert_log_contains "TRIGGERED_BY:"
 assert_log_contains "FIX: Run npm run docs:check and resolve the reported documentation drift."
+assert_log_not_contains "Running tests for staged files..."
+assert_protocol_python 'payload["block"]["rule_id"] == "docs-guardrail"'
+assert_protocol_python 'payload["block"]["resolution"]["type"] == "rerun_docs_check"'
 SUMMARY_LINES+=("docs-guardrail: PASS")
 git reset HEAD README.md >/dev/null 2>&1
 rm -f README.md .docs-check-should-fail
@@ -190,9 +251,30 @@ assert_status 1 source-file-headers
 assert_log_contains "RULE_ID: source-file-headers"
 assert_log_contains "FIX: // [META] since:YYYY-MM | owner:team | stable:false"
 assert_log_contains "FIX: // [WHY] Explain why this file exists"
+assert_protocol_python 'payload["block"]["rule_id"] == "source-file-headers"'
+assert_protocol_python 'payload["block"]["resolution"]["type"] == "edit_headers"'
 SUMMARY_LINES+=("source-file-headers: PASS")
 git reset HEAD src/example.ts >/dev/null 2>&1
 rm -f src/example.ts
+
+cat > src/custom.js <<'EOF'
+export const custom = true;
+EOF
+touch .tests-should-fail
+git add src/custom.js .tests-should-fail
+run_case package-test-fallback git commit -m "[FEATURE] hooks: fallback project test command"
+assert_status 1 package-test-fallback
+assert_log_contains "RULE_ID: related-tests"
+assert_log_contains "TEST_STRATEGY: package-test"
+assert_log_contains "TEST_COMMAND: npm test"
+assert_log_contains "VERIFY: npm test"
+assert_protocol_python 'payload["block"]["rule_id"] == "related-tests"'
+assert_protocol_python 'payload["block"]["resolution"]["type"] == "rerun_verify_commands"'
+assert_protocol_python 'payload["block"]["resolution"]["test_strategy"] == "package-test"'
+assert_protocol_python '"npm test" in payload["block"]["resolution"]["verify_commands"]'
+SUMMARY_LINES+=("package-test-fallback: PASS")
+git reset HEAD src/custom.js .tests-should-fail >/dev/null 2>&1
+rm -f src/custom.js .tests-should-fail
 
 echo "good" > good.txt
 git add good.txt
@@ -200,6 +282,8 @@ run_case valid-commit git commit -m "[FEATURE] smoke: allow valid commit"
 assert_status 0 valid-commit
 assert_log_contains "Pre-commit checks passed"
 assert_log_contains "Commit message validated"
+assert_protocol_python 'payload["commit_allowed"] is True'
+assert_protocol_python 'payload["next_action"] == "commit"'
 SUMMARY_LINES+=("valid-commit: PASS")
 
 echo "Hook smoke summary:"

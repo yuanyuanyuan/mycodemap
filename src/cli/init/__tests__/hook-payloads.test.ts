@@ -43,6 +43,31 @@ function runCommit(repoDir: string, message: string): { exitCode: number; output
   }
 }
 
+function extractProtocolPayloads(output: string): Record<string, any>[] {
+  const prefix = 'CODEMAP_PRECHECK_PROTOCOL:';
+  return output
+    .split('\n')
+    .filter((line) => line.startsWith(prefix))
+    .map((line) => JSON.parse(line.slice(prefix.length)));
+}
+
+function extractProtocolPayload(output: string, hookSource?: string): Record<string, any> {
+  const payloads = extractProtocolPayloads(output);
+
+  expect(payloads.length, output).toBeGreaterThan(0);
+  if (!hookSource) {
+    return payloads[payloads.length - 1]!;
+  }
+
+  for (let index = payloads.length - 1; index >= 0; index -= 1) {
+    if (payloads[index]?.hook_source === hookSource) {
+      return payloads[index]!;
+    }
+  }
+
+  throw new Error(`Missing protocol payload for hook source: ${hookSource}`);
+}
+
 describe('managed hook payloads', () => {
   const tempRoots: string[] = [];
 
@@ -64,12 +89,76 @@ describe('managed hook payloads', () => {
     execSync('git add notes/todo.txt', { cwd: repoDir });
 
     const result = runCommit(repoDir, 'docs: bad message');
+    const protocol = extractProtocolPayload(result.output, '.mycodemap/hooks/commit-msg');
 
     expect(result.exitCode).toBe(1);
     expect(result.output).toContain('RULE_ID: commit-format');
     expect(result.output).toContain('TRIGGERED_BY_NON_DOT_FILES:');
     expect(result.output).toContain('notes/todo.txt');
     expect(result.output).toContain('If you intended the dot-directory exemption');
+    expect(protocol).toMatchObject({
+      schema: 'codemap.commitmsg.v1',
+      hook_source: '.mycodemap/hooks/commit-msg',
+      commit_allowed: false,
+      next_action: 'rewrite_commit_message',
+      repo: {
+        non_dot_files: ['notes/todo.txt'],
+        only_dot_dirs: false,
+      },
+      block: {
+        rule_id: 'commit-format',
+        rule: {
+          defined_at: expect.stringContaining('.mycodemap/hooks/commit-msg:'),
+          doc_ref: 'docs/DEVELOPMENT.md',
+        },
+        resolution: {
+          type: 'rewrite_commit_message',
+          expected_format: '[TAG] scope: message',
+          example: '[FEATURE] cli: add new command',
+          triggered_non_dot_files: ['notes/todo.txt'],
+        },
+      },
+    });
+    expect(protocol.checks[0]).toMatchObject({
+      name: 'commit-format',
+      status: 'failed',
+    });
+    expect(protocol.checks[1]).toMatchObject({
+      name: 'commit-scope-message',
+      status: 'skipped',
+      skip_reason: 'blocked-by-commit-format',
+    });
+  });
+
+  it('explains commit scope/message failures with a dedicated rule id and rewrite route', () => {
+    const repoDir = createTempRepo();
+    tempRoots.push(repoDir);
+
+    mkdirSync(path.join(repoDir, 'notes'), { recursive: true });
+    writeFileSync(path.join(repoDir, 'notes', 'todo.txt'), 'todo\n', 'utf8');
+    execSync('git add notes/todo.txt', { cwd: repoDir });
+
+    const result = runCommit(repoDir, '[FEATURE] missing-scope-separator');
+    const protocol = extractProtocolPayload(result.output, '.mycodemap/hooks/commit-msg');
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain('RULE_ID: commit-scope-message');
+    expect(result.output).toContain('Rewrite the first line to match: [TAG] scope: message');
+    expect(protocol.block).toMatchObject({
+      rule_id: 'commit-scope-message',
+      resolution: {
+        type: 'rewrite_commit_message',
+        missing_parts: ['scope', 'colon', 'message'],
+      },
+    });
+    expect(protocol.checks[0]).toMatchObject({
+      name: 'commit-format',
+      status: 'passed',
+    });
+    expect(protocol.checks[1]).toMatchObject({
+      name: 'commit-scope-message',
+      status: 'failed',
+    });
   });
 
   it('explains staged-file-limit failures without suggesting --no-verify', () => {
@@ -87,11 +176,57 @@ describe('managed hook payloads', () => {
     execSync('git add notes', { cwd: repoDir });
 
     const result = runCommit(repoDir, '[DOCS] notes: bulk add');
+    const protocol = extractProtocolPayload(result.output);
 
     expect(result.exitCode).toBe(1);
     expect(result.output).toContain('RULE_ID: staged-file-limit');
     expect(result.output).toContain('STAGED_FILES:');
     expect(result.output).not.toContain('--no-verify');
+    expect(result.output).not.toContain('Running tests for staged files...');
+    expect(result.output).not.toContain('Running repo-local rule validation');
+    expect(protocol).toMatchObject({
+      schema: 'codemap.precommit.v1',
+      commit_allowed: false,
+      next_action: 'split_commit',
+      attempt: {
+        context_env: 'CODEMAP_AGENT_CONTEXT',
+        attempt_id: expect.stringContaining('precommit-'),
+      },
+      repo: {
+        staged_count: 11,
+        current_limit: 10,
+        staged_files: expect.arrayContaining(['notes/file-1.txt', 'notes/file-11.txt']),
+      },
+      block: {
+        rule_id: 'staged-file-limit',
+        rule: {
+          defined_at: expect.stringContaining('.mycodemap/hooks/pre-commit:'),
+        },
+        resolution: {
+          type: 'split_commit',
+          current: 11,
+          limit: 10,
+          reset_command: 'git reset HEAD',
+        },
+      },
+    });
+    expect(protocol.checks[0]).toMatchObject({
+      name: 'staged-file-limit',
+      order: 0,
+      status: 'failed',
+      blocking: true,
+    });
+    expect(protocol.checks[0].details).toMatchObject({
+      staged_count: 11,
+      current_limit: 10,
+    });
+    expect(protocol.checks[0].details).not.toHaveProperty('raw');
+    expect(protocol.checks[1]).toMatchObject({
+      name: 'source-file-headers',
+      status: 'skipped',
+      skip_reason: 'blocked-by-staged-file-limit',
+    });
+    expect(protocol.block.resolution.suggested_groups).toHaveLength(2);
   });
 
   it('explains docs guardrail failures with trigger paths and retry guidance', () => {
@@ -112,6 +247,7 @@ describe('managed hook payloads', () => {
     execSync('git add package.json README.md', { cwd: repoDir });
 
     const result = runCommit(repoDir, '[DOCS] docs: update readme');
+    const protocol = extractProtocolPayload(result.output);
 
     expect(result.exitCode).toBe(1);
     expect(result.output).toContain('RULE_ID: docs-guardrail');
@@ -119,6 +255,24 @@ describe('managed hook payloads', () => {
     expect(result.output).toContain('README.md');
     expect(result.output).toContain('package.json');
     expect(result.output).toContain('Run npm run docs:check');
+    expect(result.output).not.toContain('Running tests for staged files...');
+    expect(protocol.block).toMatchObject({
+      rule_id: 'docs-guardrail',
+      resolution: {
+        type: 'rerun_docs_check',
+        command: 'npm run docs:check',
+        triggered_by: expect.arrayContaining(['README.md', 'package.json']),
+      },
+    });
+    expect(protocol.checks[2]).toMatchObject({
+      name: 'docs-guardrail',
+      status: 'failed',
+    });
+    expect(protocol.checks[3]).toMatchObject({
+      name: 'related-tests',
+      status: 'skipped',
+      skip_reason: 'blocked-by-docs-guardrail',
+    });
   });
 
   it('explains missing header failures with the required header template', () => {
@@ -136,11 +290,27 @@ describe('managed hook payloads', () => {
     execSync('git add src/no-header.ts', { cwd: repoDir });
 
     const result = runCommit(repoDir, '[FEATURE] src: add no header');
+    const protocol = extractProtocolPayload(result.output);
 
     expect(result.exitCode).toBe(1);
     expect(result.output).toContain('RULE_ID: source-file-headers');
     expect(result.output).toContain('// [META] since:YYYY-MM | owner:team | stable:false');
     expect(result.output).toContain('// [WHY] Explain why this file exists');
+    expect(protocol.block).toMatchObject({
+      rule_id: 'source-file-headers',
+      resolution: {
+        type: 'edit_headers',
+        files: ['src/no-header.ts'],
+        header_template: [
+          '// [META] since:YYYY-MM | owner:team | stable:false',
+          '// [WHY] Explain why this file exists',
+        ],
+      },
+    });
+    expect(protocol.checks[1]).toMatchObject({
+      name: 'source-file-headers',
+      status: 'failed',
+    });
   });
 
   it('filters known MCP warning noise and prints a bottom summary for related test failures', () => {
@@ -161,10 +331,19 @@ describe('managed hook payloads', () => {
     );
 
     mkdirSync(path.join(repoDir, 'src', 'cli', 'env-contract'), { recursive: true });
-    writeFileSync(path.join(repoDir, 'src', 'cli', 'env-contract', 'discovery.ts'), 'export const discovery = true;\n', 'utf8');
+    writeFileSync(
+      path.join(repoDir, 'src', 'cli', 'env-contract', 'discovery.ts'),
+      [
+        '// [META] since:2026-05 | owner:cli-team | stable:false',
+        '// [WHY] Exercise related-test failure routing without tripping header guardrails first.',
+        'export const discovery = true;',
+      ].join('\n') + '\n',
+      'utf8',
+    );
     execSync('git add src/cli/env-contract/discovery.ts', { cwd: repoDir });
 
     const result = runCommit(repoDir, '[FEATURE] env-contract: adjust discovery flow');
+    const protocol = extractProtocolPayload(result.output);
 
     expect(result.exitCode).toBe(1);
     expect(result.output).toContain('RULE_ID: related-tests');
@@ -179,6 +358,33 @@ describe('managed hook payloads', () => {
     expect(result.output).toContain('VERIFY: npx vitest related src/cli/env-contract/discovery.ts --watch=false --bail=1');
     expect(result.output).toContain('INFO: Suppressed 2 known MCP contract-tool warning line(s) from test output.');
     expect(result.output).not.toContain('Contract tool "codemap_env_contract"');
+    expect(protocol.block).toMatchObject({
+      rule_id: 'related-tests',
+      rule: {
+        defined_at: expect.stringContaining('.mycodemap/hooks/pre-commit:'),
+        doc_ref: 'docs/rules/testing.md#测试框架',
+      },
+      resolution: {
+        type: 'rerun_verify_commands',
+        test_strategy: 'vitest-related',
+        failed_test_file: 'src/cli/env-contract/__tests__/discovery.test.ts',
+        staged_source_files: ['src/cli/env-contract/discovery.ts'],
+        likely_cause: 'This looks like a behavior change near the modified module. Check whether the affected test expectations need updating.',
+      },
+    });
+    expect(protocol.block.resolution.verify_commands).toEqual(expect.arrayContaining([
+      'npx vitest run src/cli/env-contract/__tests__/discovery.test.ts',
+      'npx vitest related src/cli/env-contract/discovery.ts --watch=false --bail=1',
+    ]));
+    expect(protocol.checks[3]).toMatchObject({
+      name: 'related-tests',
+      status: 'failed',
+    });
+    expect(protocol.checks[4]).toMatchObject({
+      name: 'repo-local-rule-validation',
+      status: 'skipped',
+      skip_reason: 'blocked-by-related-tests',
+    });
   });
 
   it('falls back to the project test command when no safe related-test runner is detected', () => {
@@ -191,6 +397,7 @@ describe('managed hook payloads', () => {
       JSON.stringify({
         name: 'tmp',
         scripts: {
+          'docs:check': 'node -e "process.exit(0)"',
           test: 'node scripts/run-tests.js',
         },
       }, null, 2),
@@ -199,17 +406,26 @@ describe('managed hook payloads', () => {
     writeFileSync(
       path.join(repoDir, 'scripts', 'run-tests.js'),
       [
-        "console.error('FAILED tests/unit/custom.test.js > custom runner > reports failure');",
-        "console.error('AssertionError: expected 1 to be 2');",
-        'process.exit(1);',
+        "const fs = require('node:fs');",
+        "if (fs.existsSync('.tests-should-fail')) {",
+        "  console.error('FAILED tests/unit/custom.test.js > custom runner > reports failure');",
+        "  console.error('AssertionError: expected 1 to be 2');",
+        '  process.exit(1);',
+        '}',
+        "console.log('project test passed');",
       ].join('\n'),
       'utf8',
     );
+    execSync('git add package.json scripts/run-tests.js', { cwd: repoDir });
+    execSync('git commit -m "[CONFIG] hooks: seed fallback runner"', { cwd: repoDir, stdio: 'pipe' });
+
     mkdirSync(path.join(repoDir, 'src'), { recursive: true });
     writeFileSync(path.join(repoDir, 'src', 'custom.js'), 'export const custom = true;\n', 'utf8');
-    execSync('git add package.json scripts/run-tests.js src/custom.js', { cwd: repoDir });
+    writeFileSync(path.join(repoDir, '.tests-should-fail'), '1\n', 'utf8');
+    execSync('git add src/custom.js .tests-should-fail', { cwd: repoDir });
 
     const result = runCommit(repoDir, '[FEATURE] hooks: fallback project test command');
+    const protocol = extractProtocolPayload(result.output);
 
     expect(result.exitCode).toBe(1);
     expect(result.output).toContain('RULE_ID: related-tests');
@@ -221,5 +437,15 @@ describe('managed hook payloads', () => {
     expect(result.output).toContain('TRIGGERED_SOURCE_FILES:');
     expect(result.output).toContain('src/custom.js');
     expect(result.output).not.toContain('npx vitest related');
+    expect(protocol.block).toMatchObject({
+      rule_id: 'related-tests',
+      resolution: {
+        type: 'rerun_verify_commands',
+        test_strategy: 'package-test',
+        failed_test_file: 'tests/unit/custom.test.js',
+        staged_source_files: ['src/custom.js'],
+      },
+    });
+    expect(protocol.block.resolution.verify_commands).toEqual(['npm test']);
   });
 });
