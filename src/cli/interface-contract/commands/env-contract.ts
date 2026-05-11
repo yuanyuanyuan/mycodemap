@@ -7,6 +7,7 @@ export const envContractContract: CommandContract = {
   name: 'env-contract',
   aliases: ['env_contract'],
   description: 'Query the Project Environment Contract for subagent rule retrieval',
+  stable: true,
   args: [],
   flags: [
     {

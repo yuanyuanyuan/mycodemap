@@ -6,6 +6,7 @@ import type { CommandContract } from '../types.js';
 export const doctorContract: CommandContract = {
   name: 'doctor',
   description: '诊断 CodeMap 生态系统健康状况',
+  stable: true,
   args: [],
   flags: [
     {

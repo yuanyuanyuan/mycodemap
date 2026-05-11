@@ -57,6 +57,7 @@ export const errorCodeSchema: z.ZodType<ErrorCode> = z.object({
 export const commandContractSchema: z.ZodType<CommandContract> = z.object({
   name: z.string(),
   description: z.string(),
+  stable: z.boolean(),
   aliases: z.array(z.string()).optional(),
   args: z.array(argDefSchema),
   flags: z.array(flagDefSchema),

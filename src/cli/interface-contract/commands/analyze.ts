@@ -6,6 +6,7 @@ import type { CommandContract } from '../types.js';
 export const analyzeContract: CommandContract = {
   name: 'analyze',
   description: '统一分析入口 - 支持多种分析意图',
+  stable: true,
   args: [],
   flags: [
     {

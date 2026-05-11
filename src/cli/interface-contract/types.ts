@@ -65,6 +65,7 @@ export interface ErrorCode {
 export interface CommandContract {
   name: string;
   description: string;
+  stable: boolean;
   aliases?: string[];
   args: ArgDef[];
   flags: FlagDef[];

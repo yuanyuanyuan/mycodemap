@@ -6,6 +6,7 @@ import type { CommandContract } from '../types.js';
 export const benchmarkContract: CommandContract = {
   name: 'benchmark',
   description: '比较 WASM 与 Native 性能',
+  stable: true,
   args: [],
   flags: [
     {

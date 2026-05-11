@@ -6,6 +6,7 @@ import type { CommandContract } from '../types.js';
 export const depsContract: CommandContract = {
   name: 'deps',
   description: '分析项目模块依赖关系',
+  stable: true,
   args: [],
   flags: [
     {
