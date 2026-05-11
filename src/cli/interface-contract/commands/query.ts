@@ -6,6 +6,7 @@ import type { CommandContract } from '../types.js';
 export const queryContract: CommandContract = {
   name: 'query',
   description: '查询代码地图中的符号、模块、依赖信息',
+  stable: true,
   args: [],
   flags: [
     {

@@ -6,6 +6,7 @@ import type { CommandContract } from '../types.js';
 export const previewContract: CommandContract = {
   name: 'preview',
   description: 'Zero-config project preview — file count, modules, dependencies, complexity',
+  stable: true,
   args: [],
   flags: [
     {

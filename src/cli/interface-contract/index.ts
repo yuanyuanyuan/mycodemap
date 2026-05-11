@@ -35,6 +35,7 @@ export {
   benchmarkContract,
   initContract,
   envContractContract,
+  agentMetricsContract,
 } from './commands/index.js';
 
 /**
@@ -42,7 +43,7 @@ export {
  */
 export function getFullContract(): InterfaceContract {
   return {
-    version: '0.1.0',
+    version: '1.0.0',
     programName: 'mycodemap',
     aliases: ['codemap'],
     description:

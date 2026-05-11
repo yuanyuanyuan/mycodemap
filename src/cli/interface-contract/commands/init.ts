@@ -6,6 +6,7 @@ import type { CommandContract } from '../types.js';
 export const initContract: CommandContract = {
   name: 'init',
   description: '初始化并收敛 CodeMap 项目状态',
+  stable: true,
   args: [],
   flags: [
     {
