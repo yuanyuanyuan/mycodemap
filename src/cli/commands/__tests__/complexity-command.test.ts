@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs';
 import path from 'node:path';
 import type { CodeMap, ModuleInfo } from '../../../types/index.js';
+import { analyzeFileComplexity } from '../../../core/ast-complexity-analyzer.js';
 
 vi.mock('fs', () => ({
   default: {
@@ -17,6 +18,11 @@ vi.mock('fs', () => ({
 
 vi.mock('../../paths.js', () => ({
   resolveDataPath: vi.fn(() => '/tmp/mock-codemap.json'),
+}));
+
+vi.mock('../../../core/ast-complexity-analyzer.js', () => ({
+  analyzeFileComplexity: vi.fn(),
+  analyzeMultipleFiles: vi.fn(),
 }));
 
 const { complexityCommand } = await import('../complexity.js');
@@ -120,5 +126,91 @@ describe('complexityCommand', () => {
     expect(output).toHaveProperty('file');
     expect(output).not.toHaveProperty('modules');
     expect((output.file as { relativePath: string }).relativePath).toBe('src/cli/commands/analyze.ts');
+  });
+
+  it('prefers persisted module complexity truth for file-scoped JSON output', async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      ...createCodeMap(),
+      modules: [
+        createModule({
+          id: 'src/example.py',
+          path: 'src/example.py',
+          absolutePath: '/repo/src/example.py',
+          complexity: {
+            cyclomatic: 7,
+            cognitive: 11,
+            maintainability: 33,
+            details: {
+              functions: [
+                { name: 'helper', cyclomatic: 3, cognitive: 4, lines: 4 },
+              ],
+            },
+          },
+        }),
+      ],
+    }));
+
+    await complexityCommand({
+      file: 'src/example.py',
+      json: true,
+    });
+
+    const output = JSON.parse(String(consoleLogSpy.mock.calls[0]?.[0])) as {
+      file: { complexity: { cyclomatic: number; cognitive: number; maintainability: number } };
+    };
+
+    expect(output.file.complexity).toEqual(expect.objectContaining({
+      cyclomatic: 7,
+      cognitive: 11,
+      maintainability: 33,
+    }));
+  });
+
+  it('fails explicitly when canonical module complexity truth is missing', async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      ...createCodeMap(),
+      modules: [
+        createModule({
+          id: 'src/missing.ts',
+          path: 'src/missing.ts',
+          absolutePath: '/repo/src/missing.ts',
+          complexity: undefined,
+        }),
+      ],
+    }));
+
+    await expect(complexityCommand({
+      file: 'src/missing.ts',
+      json: true,
+    })).rejects.toThrow('process.exit:1');
+  });
+
+  it('does not silently recompute AST detail when persisted canonical detail is missing', async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      ...createCodeMap(),
+      modules: [
+        createModule({
+          id: 'src/example.py',
+          path: 'src/example.py',
+          absolutePath: '/repo/src/example.py',
+          complexity: {
+            cyclomatic: 7,
+            cognitive: 11,
+            maintainability: 33,
+            details: {
+              functions: [],
+            },
+          },
+          symbols: [],
+        }),
+      ],
+    }));
+
+    await complexityCommand({
+      file: 'src/example.py',
+      detail: true,
+    });
+
+    expect(vi.mocked(analyzeFileComplexity)).not.toHaveBeenCalled();
   });
 });

@@ -7,7 +7,7 @@ import path from 'path';
 import { resolveDataPath } from '../paths.js';
 import type { CodeMap, ModuleInfo, SourceLocation } from '../../types/index.js';
 import type { UnifiedResult } from '../../orchestrator/types.js';
-import { analyzeFileComplexity, analyzeMultipleFiles, type FileComplexity, type FunctionComplexity } from '../../core/ast-complexity-analyzer.js';
+import { analyzeFileComplexity, type FunctionComplexity } from '../../core/ast-complexity-analyzer.js';
 
 interface ComplexityOptions {
   file?: string;
@@ -68,92 +68,55 @@ function loadCodeMap(rootDir: string): CodeMap | null {
   }
 }
 
-/**
- * 计算可维护性指数
- * 
- * 基于微软的可维护性指数公式，进行适应性调整：
- * MI = MAX(0, (171 - 5.2 * ln(Halstead Volume) - 0.23 * Cyclomatic - 16.2 * ln(LOC)) * 100 / 171)
- * 
- * 由于我们没有 Halstead Volume，使用简化但合理的公式：
- * - 基于圈复杂度和代码行数计算
- * - 结果范围 0-100
- * - 考虑了文件大小和复杂度的平衡
- */
-function calculateMaintainabilityIndex(loc: number, cyclomatic: number, commentRatio: number): number {
-  // 规范化输入
-  const normalizedLOC = Math.max(1, loc);
-  const normalizedCC = Math.max(1, cyclomatic);
-  
-  // 基础分 100
-  let mi = 100;
-  
-  // 圈复杂度惩罚（每点复杂度减少2分）
-  mi -= (normalizedCC - 1) * 2;
-  
-  // 代码行数惩罚（对数缩放，避免大文件过度惩罚）
-  // 100行: -5分, 500行: -15分, 1000行: -20分
-  mi -= Math.log(normalizedLOC / 10 + 1) * 5;
-  
-  // 注释奖励（最多+10分）
-  mi += commentRatio * 15;
-  
-  // 确保结果在 0-100 范围内
-  return Math.max(0, Math.min(100, Math.round(mi)));
+function createMissingCanonicalTruthMessage(module: ModuleInfo): string {
+  return `缺少 canonical complexity truth: ${module.absolutePath}。请重新运行 codemap generate 以生成复杂度数据。`;
 }
 
 /**
  * 获取模块复杂度信息
  */
 function getModuleComplexity(module: ModuleInfo): ComplexityInfo {
-  // 如果模块已经有复杂度数据（来自解析器）
-  if (module.complexity && module.complexity.cyclomatic > 0) {
-    const commentRatio = module.stats.commentLines / Math.max(1, module.stats.lines);
-    const maintainability = calculateMaintainabilityIndex(
-      module.stats.codeLines,
-      module.complexity.cyclomatic,
-      commentRatio
-    );
+  if (!module.complexity || module.complexity.cyclomatic <= 0) {
+    throw new Error(createMissingCanonicalTruthMessage(module));
+  }
 
-    return {
-      cyclomatic: module.complexity.cyclomatic,
-      cognitive: module.complexity.cognitive || Math.round(module.complexity.cyclomatic * 1.5),
-      maintainability,
-      functions: module.complexity.details?.functions.length ||
-                 module.symbols.filter(s => s.kind === 'function' || s.kind === 'method').length,
-      classes: module.symbols.filter(s => s.kind === 'class').length,
-      lines: module.stats.codeLines,
-      functionDetails: module.complexity.details?.functions.map(f => ({
+  const symbolFunctionDetails = module.symbols
+    .filter((symbol) => (symbol.kind === 'function' || symbol.kind === 'method') && symbol.complexity)
+    .map((symbol) => ({
+      name: symbol.name,
+      kind: symbol.kind === 'method' ? 'method' as const : 'function' as const,
+      line: symbol.location.line,
+      column: symbol.location.column,
+      cyclomatic: symbol.complexity!.cyclomatic,
+      cognitive: symbol.complexity!.cognitive,
+      lines: symbol.complexity!.lines,
+      nestingDepth: 0,
+      isHighComplexity: symbol.complexity!.cyclomatic >= 10,
+    }));
+  const functionDetails = symbolFunctionDetails.length > 0
+    ? symbolFunctionDetails
+    : module.complexity.details?.functions.map(f => ({
         name: f.name,
         kind: 'function' as const,
         line: 1,
         column: 1,
         cyclomatic: f.cyclomatic,
         cognitive: f.cognitive,
+        lines: f.lines,
         nestingDepth: 0,
         isHighComplexity: f.cyclomatic >= 10
-      }))
-    };
-  }
-
-  // 否则基于符号数量估算
-  const functions = module.symbols.filter(s => s.kind === 'function' || s.kind === 'method').length;
-  const classes = module.symbols.filter(s => s.kind === 'class').length;
-
-  // 更合理的圈复杂度估算：基于函数数量和代码行数
-  // 每个函数基础复杂度1，再加上基于行数的估算
-  const cyclomatic = Math.max(1, functions + Math.floor(module.stats.codeLines / 50));
-  const cognitive = Math.round(cyclomatic * 1.5);
-
-  const commentRatio = module.stats.commentLines / Math.max(1, module.stats.lines);
-  const maintainability = calculateMaintainabilityIndex(module.stats.codeLines, cyclomatic, commentRatio);
+      }));
 
   return {
-    cyclomatic,
-    cognitive,
-    maintainability,
-    functions,
-    classes,
-    lines: module.stats.codeLines
+    cyclomatic: module.complexity.cyclomatic,
+    cognitive: module.complexity.cognitive || Math.round(module.complexity.cyclomatic * 1.5),
+    maintainability: module.complexity.maintainability,
+    functions: symbolFunctionDetails.length ||
+               module.complexity.details?.functions.length ||
+               module.symbols.filter(s => s.kind === 'function' || s.kind === 'method').length,
+    classes: module.symbols.filter(s => s.kind === 'class').length,
+    lines: module.stats.codeLines,
+    functionDetails
   };
 }
 
@@ -566,47 +529,39 @@ export async function complexityCommand(options: ComplexityOptions) {
   let targetModule: ModuleInfo | undefined;
   const allComplexities: Array<{ module: ModuleInfo; complexity: ComplexityInfo }> = [];
 
-  // 使用 AST 分析时，detail 选项自动启用
-  const useAST = options.detail || false;
+  const useASTForAll = false;
 
-  if (options.file) {
-    targetModule = codeMap.modules.find(m =>
-      m.absolutePath.includes(options.file!) ||
-      path.relative(codeMap.project.rootDir, m.absolutePath).includes(options.file!)
-    );
+  try {
+    if (options.file) {
+      targetModule = codeMap.modules.find(m =>
+        m.absolutePath.includes(options.file!) ||
+        path.relative(codeMap.project.rootDir, m.absolutePath).includes(options.file!)
+      );
 
-    if (!targetModule) {
-      console.log(chalk.red(`❌ 未找到文件: ${options.file}`));
-      process.exit(1);
-    }
+      if (!targetModule) {
+        console.log(chalk.red(`❌ 未找到文件: ${options.file}`));
+        process.exit(1);
+      }
 
-    // 如果使用 AST 分析，获取精确的函数级复杂度
-    if (useAST) {
-      const astComplexity = getModuleComplexityWithAST(targetModule);
-      allComplexities.push({
-        module: targetModule,
-        complexity: astComplexity
-      });
-      targetModule = undefined; // 使用 allComplexities 输出
-    } else {
       allComplexities.push({
         module: targetModule,
         complexity: getModuleComplexity(targetModule)
       });
+    } else {
+      for (const module of codeMap.modules) {
+        const complexity = useASTForAll
+          ? getModuleComplexityWithAST(module)
+          : getModuleComplexity(module);
+        allComplexities.push({
+          module,
+          complexity
+        });
+      }
     }
-  } else {
-    // 计算所有模块的复杂度
-    for (const module of codeMap.modules) {
-      const complexity = useAST
-        ? getModuleComplexityWithAST(module)
-        : getModuleComplexity(module);
-      allComplexities.push({
-        module,
-        complexity
-      });
-    }
-  }
 
-  // 输出结果
-  formatComplexity(codeMap, targetModule, allComplexities, options);
+    formatComplexity(codeMap, targetModule, allComplexities, options);
+  } catch (error) {
+    console.log(chalk.red(`❌ ${error instanceof Error ? error.message : String(error)}`));
+    process.exit(1);
+  }
 }

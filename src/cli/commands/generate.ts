@@ -92,8 +92,10 @@ class IncrementalRefreshFailure extends Error {
 interface SymbolRegistryEntry {
   id: string;
   name: string;
+  filePath: string;
   fileKey: string;
   line: number;
+  column: number;
 }
 
 interface SymbolCallSite {
@@ -189,7 +191,7 @@ async function writePluginGeneratedFiles(
   return { writtenFiles, diagnostics };
 }
 
-function createGeneratedId(prefix: 'proj' | 'mod' | 'sym' | 'dep'): string {
+function createGeneratedId(prefix: 'proj' | 'mod' | 'sym'): string {
   return `${prefix}_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
 }
 
@@ -387,6 +389,41 @@ function normalizeSymbolLocation(modulePath: string, location: SourceLocation): 
     ...location,
     file: shouldUseModulePath ? modulePath : location.file,
   };
+}
+
+function createModuleDependencyId(sourceModulePath: string, targetModulePath: string): string {
+  return Dependency.createCanonicalId(
+    Dependency.createModuleReference(sourceModulePath),
+    Dependency.createModuleReference(targetModulePath),
+    'import',
+    'module',
+    'module',
+  );
+}
+
+function createSymbolDependencyId(
+  sourceEntry: SymbolRegistryEntry,
+  targetEntry: SymbolRegistryEntry,
+  filePath: string
+): string {
+  return Dependency.createCanonicalId(
+    Dependency.createSymbolReference(
+      sourceEntry.filePath,
+      sourceEntry.name,
+      sourceEntry.line,
+      sourceEntry.column,
+    ),
+    Dependency.createSymbolReference(
+      targetEntry.filePath,
+      targetEntry.name,
+      targetEntry.line,
+      targetEntry.column,
+    ),
+    'call',
+    'symbol',
+    'symbol',
+    filePath,
+  );
 }
 
 function formatSymbolSignature(symbol: ModuleSymbol): string | undefined {
@@ -1134,8 +1171,10 @@ function convertToCodeGraph(codeMap: {
       const registryEntry: SymbolRegistryEntry = {
         id: symbolEntity.id,
         name: symbolEntity.name,
+        filePath: normalizedLocation.file,
         fileKey: normalizeFileKey(codeMap.project.rootDir, normalizedLocation.file),
         line: normalizedLocation.line,
+        column: normalizedLocation.column,
       };
       registerSymbolEntry(
         symbolRegistryByFileAndName,
@@ -1156,7 +1195,7 @@ function convertToCodeGraph(codeMap: {
       if (!targetId) continue; // 外部依赖，跳过
 
       const dependency = new Dependency(
-        createGeneratedId('dep'),
+        createModuleDependencyId(mod.path, depPath),
         sourceId,
         targetId,
         'import',
@@ -1200,7 +1239,7 @@ function convertToCodeGraph(codeMap: {
 
           try {
             codeGraph.addDependency(new Dependency(
-              createGeneratedId('dep'),
+              createSymbolDependencyId(sourceEntry, targetEntry, mod.path),
               sourceEntry.id,
               targetEntry.id,
               'call',

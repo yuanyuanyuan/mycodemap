@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import path from 'path';
 import fs from 'fs/promises';
 import { analyze } from '../../core/analyzer.js';
+import { Dependency as DomainDependency } from '../../domain/entities/Dependency.js';
 import { generateAIMap, generateJSON, generateContext, generateMermaidGraph } from '../../generator/index.js';
 
 const mockLoadCodemapConfig = vi.fn();
@@ -292,6 +293,14 @@ describe('generate command', () => {
     const callDependencies = savedGraph.dependencies.filter((dependency: { type: string }) => dependency.type === 'call');
     expect(callDependencies).toHaveLength(1);
     expect(callDependencies[0]).toEqual(expect.objectContaining({
+      id: DomainDependency.createCanonicalId(
+        DomainDependency.createSymbolReference('/test/src/a.ts', 'caller', 1, 1),
+        DomainDependency.createSymbolReference('/test/src/b.ts', 'callee', 1, 1),
+        'call',
+        'symbol',
+        'symbol',
+        '/test/src/a.ts',
+      ),
       sourceEntityType: 'symbol',
       targetEntityType: 'symbol',
       confidence: 'EXTRACTED',
