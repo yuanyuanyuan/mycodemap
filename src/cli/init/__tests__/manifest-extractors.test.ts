@@ -106,6 +106,12 @@ describe('extractManifestFacts', () => {
     expect(modItem!.value).toBe('example.com/myapp');
     expect(modItem!.confidence).toBe('high');
     expect(modItem!.source).toBe('go.mod:module');
+
+    const testItem = facts.items.find((i) => i.key === 'testCommand');
+    expect(testItem).toBeDefined();
+    expect(testItem!.value).toBe('go test ./...');
+    expect(testItem!.confidence).toBe('medium');
+    expect(testItem!.source).toBe('go.mod:module');
   });
 
   it('returns packageName from Cargo.toml', () => {
@@ -123,6 +129,12 @@ describe('extractManifestFacts', () => {
     expect(pkgItem!.value).toBe('my-rust-app');
     expect(pkgItem!.confidence).toBe('high');
     expect(pkgItem!.source).toBe('Cargo.toml:package.name');
+
+    const testItem = facts.items.find((i) => i.key === 'testCommand');
+    expect(testItem).toBeDefined();
+    expect(testItem!.value).toBe('cargo test');
+    expect(testItem!.confidence).toBe('medium');
+    expect(testItem!.source).toBe('Cargo.toml:package.name');
   });
 
   it('sets projectType from profileName parameter', () => {

@@ -120,7 +120,7 @@ export default defineConfig({
     expect(ids).toContain('staged-file-limit');
     expect(ids).toContain('source-file-headers');
     expect(ids).toContain('docs-guardrail');
-    expect(ids).toContain('test-entry-vitest');
+    expect(ids).toContain('test-entry-command');
     expect(ids).toContain('codemap-query-priority');
     expect(ids).toContain('real-scenario-validation');
 
@@ -203,9 +203,13 @@ export default defineConfig({
     expect(commitItem).toBeDefined();
     expect(commitItem!.sources[0].authority).toBe('executable');
 
-    const testItem = contract.items.find((item) => item.id === 'test-entry-vitest');
+    const testItem = contract.items.find((item) => item.id === 'test-entry-command');
     expect(testItem).toBeDefined();
     expect(testItem!.sources[0].authority).toBe('executable');
+    expect(testItem!.metadata).toMatchObject({
+      command: 'vitest run',
+      verifyCommand: 'npm test',
+    });
   });
 
   it('falls back to .githooks when managed payloads are missing', () => {
@@ -274,7 +278,7 @@ export default defineConfig({
     expect(ids).toContain('shell-rtk-wrapper');
     expect(ids).toContain('codemap-query-priority');
     expect(ids).not.toContain('commit-format');
-    expect(ids).not.toContain('test-entry-vitest');
+    expect(ids).not.toContain('test-entry-command');
     expect(ids).not.toContain('real-scenario-validation');
   });
 

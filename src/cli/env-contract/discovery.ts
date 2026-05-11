@@ -4,6 +4,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { extractManifestFacts } from '../init/manifest-extractors.js';
 import type {
   ContractConflict,
   ContractItem,
@@ -240,7 +241,7 @@ function buildRtkItem(rootDir: string): ContractItem | undefined {
     id: 'shell-rtk-wrapper',
     category: 'execution',
     severity: 'critical',
-    content: 'Shell commands must be wrapped with `rtk` for token-optimized execution. Prefix commands like `rtk git status`, `rtk npm run build`, `rtk npx vitest run`.',
+    content: 'Shell commands must be wrapped with `rtk` for token-optimized execution. Prefix commands like `rtk git status`, `rtk npm run build`, `rtk npm test`, or `rtk pytest`.',
     sources: [agentsSource],
   };
 }
@@ -394,32 +395,82 @@ function buildDocsGuardrailItem(rootDir: string): ContractItem | undefined {
   };
 }
 
-function buildTestEntryItem(rootDir: string): ContractItem | undefined {
-  const pkgContent = safeReadFile(path.join(rootDir, 'package.json'));
-  if (!pkgContent) return undefined;
-
-  try {
-    const pkg = JSON.parse(pkgContent) as Record<string, unknown>;
-    const scripts = pkg.scripts as Record<string, string> | undefined;
-    if (!scripts?.test) return undefined;
-
-    const pkgSource = makeSource(rootDir, 'package.json');
-    if (!pkgSource) return undefined;
-
-    return {
-      id: 'test-entry-vitest',
-      category: 'execution',
-      severity: 'critical',
-      content: `Tests run with \`${scripts.test}\`. Use \`${scripts.test}\` or \`npx vitest run\` directly, not \`npm test\` when RTK is available.`,
-      metadata: {
-        scriptName: 'test',
-        scriptValue: scripts.test,
-      },
-      sources: [pkgSource],
-    };
-  } catch {
-    return undefined;
+function resolveNodePackageManager(rootDir: string): 'npm' | 'pnpm' | 'yarn' | 'bun' {
+  const packageJsonPath = path.join(rootDir, 'package.json');
+  const packageJson = safeReadFile(packageJsonPath);
+  if (packageJson) {
+    try {
+      const pkg = JSON.parse(packageJson) as { packageManager?: string };
+      const packageManager = pkg.packageManager?.split('@')[0];
+      if (packageManager === 'pnpm' || packageManager === 'yarn' || packageManager === 'bun') {
+        return packageManager;
+      }
+    } catch {
+      // fall through to lockfile detection
+    }
   }
+
+  if (existsSync(path.join(rootDir, 'pnpm-lock.yaml'))) return 'pnpm';
+  if (existsSync(path.join(rootDir, 'yarn.lock'))) return 'yarn';
+  if (existsSync(path.join(rootDir, 'bun.lockb')) || existsSync(path.join(rootDir, 'bun.lock'))) return 'bun';
+  return 'npm';
+}
+
+function resolveTestSourcePath(source: string): string | undefined {
+  if (source.startsWith('package.json')) return 'package.json';
+  if (source.startsWith('pyproject.toml')) return 'pyproject.toml';
+  if (source.startsWith('go.mod')) return 'go.mod';
+  if (source.startsWith('Cargo.toml')) return 'Cargo.toml';
+  return undefined;
+}
+
+function resolveTestVerifyCommand(rootDir: string, source: string, testCommand: string): string {
+  if (source.startsWith('package.json')) {
+    const packageManager = resolveNodePackageManager(rootDir);
+    switch (packageManager) {
+      case 'pnpm':
+        return 'pnpm test';
+      case 'yarn':
+        return 'yarn test';
+      case 'bun':
+        return 'bun test';
+      case 'npm':
+      default:
+        return 'npm test';
+    }
+  }
+
+  if (source.startsWith('pyproject.toml')) return 'pytest';
+  if (source.startsWith('go.mod')) return 'go test ./...';
+  if (source.startsWith('Cargo.toml')) return 'cargo test';
+  return testCommand;
+}
+
+function buildTestEntryItem(rootDir: string): ContractItem | undefined {
+  const manifestFacts = extractManifestFacts(rootDir);
+  const testCommandItem = manifestFacts.items.find((item) => item.key === 'testCommand' && item.value);
+  if (!testCommandItem?.value) return undefined;
+
+  const sourcePath = resolveTestSourcePath(testCommandItem.source);
+  if (!sourcePath) return undefined;
+
+  const source = makeSource(rootDir, sourcePath);
+  if (!source) return undefined;
+
+  const verifyCommand = resolveTestVerifyCommand(rootDir, testCommandItem.source, testCommandItem.value);
+
+  return {
+    id: 'test-entry-command',
+    category: 'execution',
+    severity: 'critical',
+    content: `Tests run with \`${testCommandItem.value}\`. Re-run validation with \`${verifyCommand}\`, and prefer a narrower runner-specific command when the project exposes one.`,
+    metadata: {
+      command: testCommandItem.value,
+      manifestSource: testCommandItem.source,
+      verifyCommand,
+    },
+    sources: [source],
+  };
 }
 
 function buildQueryPriorityItem(rootDir: string): ContractItem | undefined {

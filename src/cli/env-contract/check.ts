@@ -22,7 +22,7 @@ export interface EnvContractCheckResult {
 
 const CRITICAL_ITEM_IDS = [
   'commit-format',
-  'test-entry-vitest',
+  'test-entry-command',
 ] as const;
 
 function sha256(content: string): string {
@@ -67,7 +67,7 @@ export function checkProjectEnvironmentContract(
       id: 'critical-items-present',
       severity: 'error',
       message: `Missing critical contract items: ${missingCritical.join(', ')}`,
-      remediation: 'Ensure the managed hook payloads (.mycodemap/hooks or legacy fallbacks) and package.json scripts.test exist, then regenerate.',
+      remediation: 'Ensure the managed hook payloads exist and the project exposes a detectable test command (package.json scripts.test, pytest, go test, or cargo test), then regenerate.',
     });
   } else {
     diagnostics.push({

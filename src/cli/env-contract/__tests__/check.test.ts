@@ -29,7 +29,7 @@ function validContract(
     projectProfile: { name: 'nodejs', source: 'package.json', confidence: 'high' },
     items: [
       validItem({ id: 'commit-format', category: 'commit' }),
-      validItem({ id: 'test-entry-vitest', category: 'execution' }),
+      validItem({ id: 'test-entry-command', category: 'execution' }),
     ],
     conflicts: [],
     sourceSnapshots: [],
@@ -76,7 +76,7 @@ describe('checkProjectEnvironmentContract', () => {
 
   it('returns status error when commit-format is missing', () => {
     const contract = validContract({
-      items: [validItem({ id: 'test-entry-vitest', category: 'execution' })],
+      items: [validItem({ id: 'test-entry-command', category: 'execution' })],
     });
 
     const result = checkProjectEnvironmentContract(contract);
@@ -88,7 +88,7 @@ describe('checkProjectEnvironmentContract', () => {
     expect(criticalDiag!.message).toContain('commit-format');
   });
 
-  it('returns status error when test-entry-vitest is missing', () => {
+  it('returns status error when test-entry-command is missing', () => {
     const contract = validContract({
       items: [validItem({ id: 'commit-format', category: 'commit' })],
     });
@@ -99,7 +99,7 @@ describe('checkProjectEnvironmentContract', () => {
     expect(result.status).toBe('error');
     const criticalDiag = result.diagnostics.find((d) => d.id === 'critical-items-present');
     expect(criticalDiag!.severity).toBe('error');
-    expect(criticalDiag!.message).toContain('test-entry-vitest');
+    expect(criticalDiag!.message).toContain('test-entry-command');
   });
 
   it('returns status error when a source snapshot hash no longer matches', () => {

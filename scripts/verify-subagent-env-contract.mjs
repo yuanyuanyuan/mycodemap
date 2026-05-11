@@ -96,7 +96,7 @@ Alternate path only if CLI retrieval is unavailable:
 
 After retrieval:
 2. Report the retrieval command and output first.
-3. List the contract items you observed, including \`shell-rtk-wrapper\`, \`commit-format\`, and \`test-entry-vitest\`.
+3. List the contract items you observed, including \`shell-rtk-wrapper\`, \`commit-format\`, and \`test-entry-command\`.
 4. Stop after reporting whether retrieval happened before any other substantive work.
 
 Do not edit repository files.
@@ -119,7 +119,7 @@ Alternate path only if CLI retrieval is unavailable:
 
 After retrieval:
 2. Report the retrieval command and output first.
-3. List the contract items you observed, including shell-rtk-wrapper, commit-format, and test-entry-vitest.
+3. List the contract items you observed, including shell-rtk-wrapper, commit-format, and test-entry-command.
 4. Stop after reporting whether retrieval happened before any other substantive work.
 
 Do not edit repository files.

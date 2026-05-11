@@ -71,7 +71,7 @@ describe('checkEnvContract', () => {
           sources: [{ file: '.githooks/commit-msg', hash: sha256Hex(hookContent), authority: 'executable' }],
         },
         {
-          id: 'test-entry-vitest',
+          id: 'test-entry-command',
           category: 'execution',
           severity: 'critical',
           content: 'vitest run',
@@ -120,7 +120,7 @@ describe('checkEnvContract', () => {
           sources: [{ file: '.githooks/commit-msg', hash: sha256Hex(hookContent), authority: 'executable' }],
         },
         {
-          id: 'test-entry-vitest',
+          id: 'test-entry-command',
           category: 'execution',
           severity: 'critical',
           content: 'vitest run',
@@ -170,7 +170,7 @@ describe('checkEnvContract', () => {
           sources: [{ file: '.githooks/commit-msg', hash: sha256Hex(hookContent), authority: 'executable' }],
         },
         {
-          id: 'test-entry-vitest',
+          id: 'test-entry-command',
           category: 'execution',
           severity: 'critical',
           content: 'vitest run',

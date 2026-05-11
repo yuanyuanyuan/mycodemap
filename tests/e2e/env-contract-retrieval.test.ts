@@ -115,10 +115,10 @@ describe('env-contract retrieval E2E', () => {
     expect(data.schemaVersion).toBe('env-contract.v1');
     expect(data.agentType).toBe('worker');
 
-    // Worker output must include commit-format, test-entry-vitest
+    // Worker output must include commit-format, test-entry-command
     const ids = data.items.map((i: { id: string }) => i.id);
     expect(ids).toContain('commit-format');
-    expect(ids).toContain('test-entry-vitest');
+    expect(ids).toContain('test-entry-command');
 
     // Worker should include execution, commit, style, validation categories
     const categories = new Set(data.items.map((i: { category: string }) => i.category));

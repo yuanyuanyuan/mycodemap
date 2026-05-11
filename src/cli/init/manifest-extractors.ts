@@ -132,6 +132,13 @@ function extractGoMod(rootDir: string, items: ManifestItem[]): void {
         source: 'go.mod:module',
         confidence: 'high',
       });
+      items.push({
+        category: 'execution',
+        key: 'testCommand',
+        value: 'go test ./...',
+        source: 'go.mod:module',
+        confidence: 'medium',
+      });
     }
   } catch {
     // skip malformed go.mod
@@ -153,6 +160,13 @@ function extractCargoToml(rootDir: string, items: ManifestItem[]): void {
         value: String(pkg.name),
         source: 'Cargo.toml:package.name',
         confidence: 'high',
+      });
+      items.push({
+        category: 'execution',
+        key: 'testCommand',
+        value: 'cargo test',
+        source: 'Cargo.toml:package.name',
+        confidence: 'medium',
       });
     }
   } catch {
