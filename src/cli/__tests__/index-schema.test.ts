@@ -26,9 +26,11 @@ describe('cli --schema flag', () => {
     const output = JSON.stringify(getFullContract(), null, 2);
 
     const parsed = JSON.parse(output);
+    expect(parsed.version).toBe('1.0.0');
     expect(parsed.programName).toBe('mycodemap');
     expect(parsed.aliases).toContain('codemap');
     expect(parsed.commands.length).toBeGreaterThanOrEqual(3);
+    expect(parsed.commands.every((command: { stable: boolean }) => command.stable === true)).toBe(true);
 
     const validated = interfaceContractSchema.safeParse(parsed);
     expect(validated.success).toBe(true);

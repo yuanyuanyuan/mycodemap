@@ -28,6 +28,7 @@ import { doctorCommand } from './commands/doctor.js';
 import { benchmarkCommand } from './commands/benchmark.js';
 import { previewCommand } from './commands/preview.js';
 import { envContractCommand } from './commands/env-contract.js';
+import { agentMetricsCommand } from './commands/agent-metrics/index.js';
 import { shipCommand } from './commands/ship/index.js';
 import { ANALYZE_COMMAND_DESCRIPTION, configureAnalyzeCommand } from './commands/analyze-options.js';
 import { setupRuntimeLogging } from './runtime-logger.js';
@@ -251,6 +252,9 @@ program.addCommand(previewCommand);
 
 // Env-contract command
 program.addCommand(envContractCommand);
+
+// Agent-metrics command
+program.addCommand(agentMetricsCommand);
 
 // Benchmark command
 program

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  agentMetricsContract,
   getFullContract,
   validateContract,
   validateCurrentContract,
@@ -21,7 +22,7 @@ describe('interface contract', () => {
 
     it('getFullContract returns a valid structure', () => {
       const contract = getFullContract();
-      expect(contract.version).toBe('0.1.0');
+      expect(contract.version).toBe('1.0.0');
       expect(contract.programName).toBe('mycodemap');
       expect(contract.aliases).toContain('codemap');
       expect(contract.commands.length).toBeGreaterThanOrEqual(3);
@@ -49,7 +50,7 @@ describe('interface contract', () => {
           commands: [
             {
               name: 'bad',
-              // missing description, args, flags, outputShape, errorCodes, examples
+              // missing description, stable, args, flags, outputShape, errorCodes, examples
             },
           ],
         }),
@@ -102,6 +103,54 @@ describe('interface contract', () => {
       expect(flagNames).toContain('json');
     });
 
+    it('agent-metrics contract exposes the additive intelligence fields and gate verdict block', () => {
+      const flagNames = agentMetricsContract.flags.map((flag) => flag.name);
+      expect(flagNames).toContain('max-tokens-per-query');
+
+      const summaryShape = agentMetricsContract.outputShape.properties.find((property) => property.name === 'queryTypeSummaries');
+      expect(summaryShape?.items?.properties).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'historicalSampleCount' }),
+        expect.objectContaining({ name: 'p50EstimatedTotalTokens' }),
+        expect.objectContaining({ name: 'p95EstimatedTotalTokens' }),
+      ]));
+
+      const trendShape = agentMetricsContract.outputShape.properties.find((property) => property.name === 'queryTypeTrends');
+      expect(trendShape?.items?.properties).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'queryType' }),
+        expect.objectContaining({ name: 'latestEstimatedTotalTokens' }),
+        expect.objectContaining({ name: 'previousEstimatedTotalTokens' }),
+        expect.objectContaining({ name: 'deltaEstimatedTotalTokens' }),
+        expect.objectContaining({ name: 'deltaPercent' }),
+        expect.objectContaining({ name: 'baselineAvailable' }),
+      ]));
+
+      const highestCostQueryTypesShape = agentMetricsContract.outputShape.properties.find((property) => property.name === 'highestCostQueryTypes');
+      expect(highestCostQueryTypesShape?.items?.properties).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'queryType' }),
+        expect.objectContaining({ name: 'estimatedTotalTokens' }),
+        expect.objectContaining({ name: 'riskNote' }),
+      ]));
+
+      const highestCostRowsShape = agentMetricsContract.outputShape.properties.find((property) => property.name === 'highestCostRows');
+      expect(highestCostRowsShape?.items?.properties).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'queryType' }),
+        expect.objectContaining({ name: 'commandSlug' }),
+        expect.objectContaining({ name: 'estimatedTotalTokens' }),
+        expect.objectContaining({ name: 'riskNote' }),
+      ]));
+
+      const gateShape = agentMetricsContract.outputShape.properties.find((property) => property.name === 'gate');
+      expect(gateShape).toBeDefined();
+      expect(gateShape?.properties).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'verdict' }),
+        expect.objectContaining({ name: 'warnOnly' }),
+        expect.objectContaining({ name: 'threshold' }),
+        expect.objectContaining({ name: 'violationCount' }),
+        expect.objectContaining({ name: 'maxRow' }),
+        expect.objectContaining({ name: 'violations' }),
+      ]));
+    });
+
     it('each command has at least one example', () => {
       for (const cmd of commandContracts) {
         expect(cmd.examples.length, `${cmd.name} has examples`).toBeGreaterThan(0);
@@ -111,6 +160,12 @@ describe('interface contract', () => {
     it('each command has output shape properties', () => {
       for (const cmd of commandContracts) {
         expect(cmd.outputShape.properties.length, `${cmd.name} has output properties`).toBeGreaterThan(0);
+      }
+    });
+
+    it('each built-in command explicitly declares stable: true', () => {
+      for (const cmd of commandContracts) {
+        expect(cmd.stable, `${cmd.name} is marked stable`).toBe(true);
       }
     });
   });
@@ -192,6 +247,7 @@ describe('interface contract', () => {
           {
             name: 'cmd',
             description: 'a command',
+            stable: true,
             args: [],
             flags: [],
             outputShape: { type: 'object', properties: [] },
