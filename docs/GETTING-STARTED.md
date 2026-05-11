@@ -10,13 +10,31 @@
 
 The tool can run without native build toolchains. When native dependencies are unavailable, the runtime falls back to WASM paths.
 
-## Install
+## Installation
+
+### Install from npm (recommended for users)
 
 ```bash
 npm install -g @mycodemap/mycodemap
 ```
 
 `mycodemap` is the primary binary. `codemap` is kept as an alias.
+
+### Build from source (for contributors)
+
+```bash
+git clone https://github.com/yuanyuanyuan/mycodemap.git
+cd mycodemap
+npm install
+npm run build
+```
+
+After building, run the CLI locally via `node dist/cli/index.js` or link it:
+
+```bash
+npm link
+mycodemap --help
+```
 
 ## First Run
 
@@ -52,6 +70,35 @@ mycodemap doctor
 4. Inspect the output in `.mycodemap/`.
 5. Run `mycodemap doctor` if something looks off.
 
+## Common Setup Issues
+
+### Command not found after global install
+
+If `mycodemap` is not recognized after `npm install -g`, refresh the shell hash or use `npx`:
+
+```bash
+hash -r
+npx mycodemap --help
+```
+
+### Native dependency build failures
+
+Packages like `tree-sitter` and `better-sqlite3` may require a C++ compiler on your system. If the install fails:
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install build-essential
+
+# macOS
+xcode-select --install
+```
+
+When native modules are unavailable, CodeMap falls back to WASM equivalents automatically.
+
+### Node.js version mismatch
+
+CodeMap requires Node.js `>= 20.0.0`. If you see an engine-unsupported error, upgrade Node.js or use a version manager such as `nvm`.
+
 ## Common Follow-Up Commands
 
 - `mycodemap query` to search symbols and modules
@@ -60,3 +107,8 @@ mycodemap doctor
 - `mycodemap benchmark` to compare native and WASM startup paths
 - `mycodemap --schema` to inspect the CLI contract
 
+## Next Steps
+
+- See [DEVELOPMENT.md](DEVELOPMENT.md) for local development setup, build commands, and contribution workflow.
+- See [TESTING.md](TESTING.md) for how to run the test suite and write new tests.
+- See [CONFIGURATION.md](CONFIGURATION.md) for the full config file format, environment variables, and per-environment overrides.
