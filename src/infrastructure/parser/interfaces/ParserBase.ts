@@ -156,6 +156,7 @@ export abstract class ParserBase implements ILanguageParser {
     return {
       calls: [],
       recursive: [],
+      issues: [],
     };
   }
 

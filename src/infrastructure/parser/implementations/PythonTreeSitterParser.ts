@@ -14,13 +14,31 @@ import type {
   ModuleSymbol,
   ImportInfo,
   ExportInfo,
+  ComplexityMetrics,
   DecoratorInfo,
   FunctionSignature,
   ParameterInfo,
-  SymbolKind,
 } from '../../../interface/types/index.js';
+import { analyzeComplexityFromContent } from '../../../core/ast-complexity-analyzer.js';
 import { ParserBase, ParseError } from '../interfaces/ParserBase.js';
 import { TreeSitterParser } from './TreeSitterParser.js';
+
+interface SymbolWalkContext {
+  currentClassName?: string;
+  withinFunction: boolean;
+}
+
+interface CallWalkContext extends SymbolWalkContext {
+  callerName?: string;
+}
+
+interface FunctionComplexityDetail {
+  name: string;
+  line: number;
+  cyclomatic: number;
+  cognitive: number;
+  lines: number;
+}
 
 /**
  * Python Tree-sitter 解析器
@@ -78,7 +96,7 @@ export class PythonTreeSitterParser extends ParserBase {
   async parseFile(
     filePath: string,
     content: string,
-    _options?: ParseOptions
+    options?: ParseOptions
   ): Promise<ParseResult> {
     this.ensureInitialized();
 
@@ -94,6 +112,15 @@ export class PythonTreeSitterParser extends ParserBase {
         this.extractExportsFromAST(root),
         this.extractSymbolsFromAST(root),
       ]);
+      const callGraph = options?.includeCallGraph
+        ? this.buildCallGraphFromAST(root, imports, symbols)
+        : undefined;
+      const complexity = options?.includeComplexity
+        ? analyzeComplexityFromContent({ filePath, content, language: 'python' })
+        : undefined;
+      const symbolsWithComplexity = complexity
+        ? this.attachComplexityToSymbols(symbols, complexity)
+        : symbols;
 
       // 统计行数
       const lineCounts = this.countLinesFromAST(root, content);
@@ -117,10 +144,12 @@ export class PythonTreeSitterParser extends ParserBase {
         filePath,
         language: 'python',
         module,
-        symbols,
+        symbols: symbolsWithComplexity,
         imports,
         exports,
         dependencies: [],
+        callGraph,
+        complexity,
         parseTime,
         parserUsed: 'PythonTreeSitterParser',
       };
@@ -153,6 +182,24 @@ export class PythonTreeSitterParser extends ParserBase {
     this.ensureInitialized();
     const syntaxTree = await this.sharedParser.parseSyntaxTree('/virtual.py', content);
     return this.extractSymbolsFromAST(syntaxTree.rootNode);
+  }
+
+  async buildCallGraph(content: string): Promise<NonNullable<ParseResult['callGraph']>> {
+    this.ensureInitialized();
+    const syntaxTree = await this.sharedParser.parseSyntaxTree('/virtual.py', content);
+    const root = syntaxTree.rootNode;
+    const imports = this.extractImportsFromAST(root);
+    const symbols = this.extractSymbolsFromAST(root);
+    return this.buildCallGraphFromAST(root, imports, symbols);
+  }
+
+  async calculateComplexity(content: string): Promise<ComplexityMetrics> {
+    this.ensureInitialized();
+    return analyzeComplexityFromContent({
+      filePath: '/virtual.py',
+      content,
+      language: 'python',
+    });
   }
 
   // ============================================
@@ -428,33 +475,39 @@ export class PythonTreeSitterParser extends ParserBase {
    */
   private extractSymbolsFromAST(root: any): ModuleSymbol[] {
     const symbols: ModuleSymbol[] = [];
-    this.walkNode(root, symbols, 0);
+    this.walkNode(root, symbols, { withinFunction: false });
     return symbols;
   }
 
   /**
    * 递归遍历 AST 节点提取符号
    */
-  private walkNode(node: any, symbols: ModuleSymbol[], depth: number): void {
+  private walkNode(node: any, symbols: ModuleSymbol[], context: SymbolWalkContext): void {
     if (node.type === 'class_definition') {
-      symbols.push(this.extractClassSymbol(node, null));
-      // 递归 body 中的嵌套定义
+      const classSymbol = this.extractClassSymbol(node, null);
+      symbols.push(classSymbol);
       const body = node.childForFieldName('body');
       if (body) {
         for (const child of body.namedChildren) {
-          this.walkNode(child, symbols, depth + 1);
+          this.walkNode(child, symbols, {
+            currentClassName: classSymbol.name,
+            withinFunction: false,
+          });
         }
       }
       return;
     }
 
     if (node.type === 'function_definition') {
-      symbols.push(this.extractFunctionSymbol(node, null));
-      // 递归 body 中的嵌套定义
+      const isMethod = Boolean(context.currentClassName && !context.withinFunction);
+      symbols.push(this.extractFunctionSymbol(node, null, context.currentClassName, isMethod));
       const body = node.childForFieldName('body');
       if (body) {
         for (const child of body.namedChildren) {
-          this.walkNode(child, symbols, depth + 1);
+          this.walkNode(child, symbols, {
+            currentClassName: context.currentClassName,
+            withinFunction: true,
+          });
         }
       }
       return;
@@ -465,24 +518,36 @@ export class PythonTreeSitterParser extends ParserBase {
       if (definition) {
         const decorators = this.extractDecorators(node);
         if (definition.type === 'class_definition') {
-          symbols.push(this.extractClassSymbol(definition, decorators));
+          const classSymbol = this.extractClassSymbol(definition, decorators);
+          symbols.push(classSymbol);
+          const body = definition.childForFieldName('body');
+          if (body) {
+            for (const child of body.namedChildren) {
+              this.walkNode(child, symbols, {
+                currentClassName: classSymbol.name,
+                withinFunction: false,
+              });
+            }
+          }
         } else if (definition.type === 'function_definition') {
-          symbols.push(this.extractFunctionSymbol(definition, decorators));
-        }
-        // 递归 body
-        const body = definition.childForFieldName('body');
-        if (body) {
-          for (const child of body.namedChildren) {
-            this.walkNode(child, symbols, depth + 1);
+          const isMethod = Boolean(context.currentClassName && !context.withinFunction);
+          symbols.push(this.extractFunctionSymbol(definition, decorators, context.currentClassName, isMethod));
+          const body = definition.childForFieldName('body');
+          if (body) {
+            for (const child of body.namedChildren) {
+              this.walkNode(child, symbols, {
+                currentClassName: context.currentClassName,
+                withinFunction: true,
+              });
+            }
           }
         }
       }
       return;
     }
 
-    // 递归遍历其他节点（不过滤定义类型——顶层 if/return 已处理）
     for (const child of node.namedChildren) {
-      this.walkNode(child, symbols, depth);
+      this.walkNode(child, symbols, context);
     }
   }
 
@@ -520,9 +585,15 @@ export class PythonTreeSitterParser extends ParserBase {
   /**
    * 提取 function 定义的符号信息
    */
-  private extractFunctionSymbol(node: any, decorators: DecoratorInfo[] | null): ModuleSymbol {
+  private extractFunctionSymbol(
+    node: any,
+    decorators: DecoratorInfo[] | null,
+    currentClassName?: string,
+    isMethod: boolean = false
+  ): ModuleSymbol {
     const name = node.childForFieldName('name');
     const nameText = name?.text || '<anonymous>';
+    const symbolName = isMethod && currentClassName ? `${currentClassName}.${nameText}` : nameText;
     const parameters = node.childForFieldName('parameters');
     const returnTypeNode = node.childForFieldName('return_type');
     const isAsync = this.isAsync(node);
@@ -536,8 +607,8 @@ export class PythonTreeSitterParser extends ParserBase {
 
     return {
       id: `sym_${randomUUID().replace(/-/g, '').slice(0, 16)}`,
-      name: nameText,
-      kind: 'function',
+      name: symbolName,
+      kind: isMethod ? 'method' : 'function',
       location: {
         file: '',
         line: node.startPosition.row + 1,
@@ -672,6 +743,411 @@ export class PythonTreeSitterParser extends ParserBase {
       }
     }
     return false;
+  }
+
+  private calculateComplexityFromAST(root: any, content: string): ComplexityMetrics {
+    const fileMetrics = this.measureComplexity(root);
+    const functionDetails = this.collectFunctionComplexities(root);
+    const lines = content.split('\n').length;
+    const commentLines = content
+      .split('\n')
+      .filter((line) => line.trim().startsWith('#'))
+      .length;
+    const commentRatio = commentLines / Math.max(1, lines);
+
+    return {
+      cyclomatic: fileMetrics.cyclomatic,
+      cognitive: fileMetrics.cognitive,
+      maintainability: this.calculateMaintainabilityIndex(lines, fileMetrics.cyclomatic, commentRatio),
+      details: {
+        functions: functionDetails.map((detail) => ({
+          name: detail.name,
+          cyclomatic: detail.cyclomatic,
+          cognitive: detail.cognitive,
+          lines: detail.lines,
+        })),
+      },
+    };
+  }
+
+  private attachComplexityToSymbols(symbols: ModuleSymbol[], complexity: ComplexityMetrics): ModuleSymbol[] {
+    const detailByName = new Map<string, ComplexityMetrics['details']['functions'][number]>();
+    for (const detail of complexity.details.functions) {
+      detailByName.set(detail.name, detail);
+    }
+
+    return symbols.map((symbol) => {
+      if (symbol.kind !== 'function' && symbol.kind !== 'method') {
+        return symbol;
+      }
+
+      const detail = detailByName.get(symbol.name);
+      if (!detail) {
+        return symbol;
+      }
+
+      return {
+        ...symbol,
+        complexity: {
+          cyclomatic: detail.cyclomatic,
+          cognitive: detail.cognitive,
+          lines: detail.lines,
+        },
+      };
+    });
+  }
+
+  private collectFunctionComplexities(root: any): FunctionComplexityDetail[] {
+    const details: FunctionComplexityDetail[] = [];
+    this.walkComplexityNode(root, details, { withinFunction: false });
+    return details;
+  }
+
+  private walkComplexityNode(node: any, details: FunctionComplexityDetail[], context: SymbolWalkContext): void {
+    if (node.type === 'class_definition') {
+      const className = node.childForFieldName('name')?.text;
+      const body = node.childForFieldName('body');
+      if (body) {
+        for (const child of body.namedChildren) {
+          this.walkComplexityNode(child, details, {
+            currentClassName: className,
+            withinFunction: false,
+          });
+        }
+      }
+      return;
+    }
+
+    if (node.type === 'function_definition') {
+      const nameText = node.childForFieldName('name')?.text || '<anonymous>';
+      const isMethod = Boolean(context.currentClassName && !context.withinFunction);
+      const symbolName = isMethod && context.currentClassName
+        ? `${context.currentClassName}.${nameText}`
+        : nameText;
+      details.push(this.measureFunctionComplexity(node, symbolName));
+
+      const body = node.childForFieldName('body');
+      if (body) {
+        for (const child of body.namedChildren) {
+          this.walkComplexityNode(child, details, {
+            currentClassName: context.currentClassName,
+            withinFunction: true,
+          });
+        }
+      }
+      return;
+    }
+
+    if (node.type === 'decorated_definition') {
+      const definition = node.childForFieldName('definition');
+      if (definition) {
+        this.walkComplexityNode(definition, details, context);
+      }
+      return;
+    }
+
+    for (const child of node.namedChildren) {
+      this.walkComplexityNode(child, details, context);
+    }
+  }
+
+  private measureFunctionComplexity(node: any, name: string): FunctionComplexityDetail {
+    const body = node.childForFieldName('body') ?? node;
+    const metrics = this.measureComplexity(body);
+    return {
+      name,
+      line: node.startPosition.row + 1,
+      cyclomatic: metrics.cyclomatic,
+      cognitive: metrics.cognitive,
+      lines: node.endPosition.row - node.startPosition.row + 1,
+    };
+  }
+
+  private measureComplexity(node: any): { cyclomatic: number; cognitive: number } {
+    const counters = { branches: 0, maxDepth: 0 };
+
+    const visit = (current: any, depth: number): void => {
+      const nextDepth = this.isComplexityBranchNode(current) ? depth + 1 : depth;
+
+      if (this.isComplexityBranchNode(current) || current.type === 'boolean_operator') {
+        counters.branches++;
+      }
+      if (this.isComplexityBranchNode(current)) {
+        counters.maxDepth = Math.max(counters.maxDepth, nextDepth);
+      }
+
+      for (const child of current.namedChildren ?? []) {
+        visit(child, nextDepth);
+      }
+    };
+
+    visit(node, 0);
+
+    const cyclomatic = counters.branches + 1;
+    return {
+      cyclomatic,
+      cognitive: cyclomatic + counters.maxDepth * 2,
+    };
+  }
+
+  private isComplexityBranchNode(node: any): boolean {
+    return [
+      'if_statement',
+      'elif_clause',
+      'for_statement',
+      'while_statement',
+      'except_clause',
+      'conditional_expression',
+      'assert_statement',
+      'comprehension_clause',
+    ].includes(node.type);
+  }
+
+  private calculateMaintainabilityIndex(loc: number, cyclomatic: number, commentRatio: number): number {
+    const normalizedLOC = Math.max(1, loc);
+    const normalizedCC = Math.max(1, cyclomatic);
+
+    let mi = 100;
+    mi -= (normalizedCC - 1) * 2;
+    mi -= Math.log(normalizedLOC / 10 + 1) * 5;
+    mi += commentRatio * 15;
+
+    return Math.max(0, Math.min(100, Math.round(mi)));
+  }
+
+  private buildCallGraphFromAST(
+    root: any,
+    imports: ImportInfo[],
+    symbols: ModuleSymbol[]
+  ): NonNullable<ParseResult['callGraph']> {
+    const calls: NonNullable<ParseResult['callGraph']>['calls'] = [];
+    const issues: NonNullable<ParseResult['callGraph']>['issues'] = [];
+    const importedNames = this.collectImportedNames(imports);
+    const localClassNames = new Set(
+      symbols
+        .filter((symbol) => symbol.kind === 'class')
+        .map((symbol) => symbol.name)
+    );
+
+    this.walkCallGraph(root, { withinFunction: false }, calls, issues, localClassNames, importedNames);
+
+    const recursive = [...new Set(
+      calls
+        .filter((call) => call.caller === call.callee)
+        .map((call) => call.caller)
+    )];
+
+    return { calls, recursive, issues };
+  }
+
+  private walkCallGraph(
+    node: any,
+    context: CallWalkContext,
+    calls: NonNullable<ParseResult['callGraph']>['calls'],
+    issues: NonNullable<ParseResult['callGraph']>['issues'],
+    localClassNames: Set<string>,
+    importedNames: Set<string>
+  ): void {
+    if (node.type === 'class_definition') {
+      const className = node.childForFieldName('name')?.text;
+      const body = node.childForFieldName('body');
+      if (className && body) {
+        for (const child of body.namedChildren) {
+          this.walkCallGraph(child, {
+            currentClassName: className,
+            withinFunction: false,
+          }, calls, issues, localClassNames, importedNames);
+        }
+      }
+      return;
+    }
+
+    if (node.type === 'function_definition') {
+      this.collectFunctionCalls(node, context, calls, issues, localClassNames, importedNames);
+      return;
+    }
+
+    if (node.type === 'decorated_definition') {
+      const definition = node.childForFieldName('definition');
+      if (definition?.type === 'class_definition') {
+        this.walkCallGraph(definition, context, calls, issues, localClassNames, importedNames);
+      } else if (definition?.type === 'function_definition') {
+        this.collectFunctionCalls(definition, context, calls, issues, localClassNames, importedNames);
+      }
+      return;
+    }
+
+    for (const child of node.namedChildren) {
+      this.walkCallGraph(child, context, calls, issues, localClassNames, importedNames);
+    }
+  }
+
+  private collectFunctionCalls(
+    node: any,
+    context: CallWalkContext,
+    calls: NonNullable<ParseResult['callGraph']>['calls'],
+    issues: NonNullable<ParseResult['callGraph']>['issues'],
+    localClassNames: Set<string>,
+    importedNames: Set<string>
+  ): void {
+    const nameText = node.childForFieldName('name')?.text || '<anonymous>';
+    const isMethod = Boolean(context.currentClassName && !context.withinFunction);
+    const callerName = isMethod && context.currentClassName
+      ? `${context.currentClassName}.${nameText}`
+      : nameText;
+    const body = node.childForFieldName('body');
+
+    if (!body) {
+      return;
+    }
+
+    this.collectCallsInNode(body, {
+      callerName,
+      currentClassName: context.currentClassName,
+      withinFunction: true,
+    }, calls, issues, localClassNames, importedNames);
+
+    for (const child of body.namedChildren) {
+      this.walkCallGraph(child, {
+        currentClassName: context.currentClassName,
+        withinFunction: true,
+      }, calls, issues, localClassNames, importedNames);
+    }
+  }
+
+  private collectCallsInNode(
+    node: any,
+    context: CallWalkContext,
+    calls: NonNullable<ParseResult['callGraph']>['calls'],
+    issues: NonNullable<ParseResult['callGraph']>['issues'],
+    localClassNames: Set<string>,
+    importedNames: Set<string>
+  ): void {
+    if (node.type === 'class_definition' || node.type === 'function_definition' || node.type === 'decorated_definition') {
+      return;
+    }
+
+    if (node.type === 'call') {
+      this.recordCallNode(node, context, calls, issues, localClassNames, importedNames);
+    }
+
+    const functionChild = node.type === 'call' ? node.childForFieldName('function') : null;
+    for (const child of node.namedChildren) {
+      if (functionChild && this.isSameNode(child, functionChild)) {
+        continue;
+      }
+      this.collectCallsInNode(child, context, calls, issues, localClassNames, importedNames);
+    }
+  }
+
+  private recordCallNode(
+    node: any,
+    context: CallWalkContext,
+    calls: NonNullable<ParseResult['callGraph']>['calls'],
+    issues: NonNullable<ParseResult['callGraph']>['issues'],
+    localClassNames: Set<string>,
+    importedNames: Set<string>
+  ): void {
+    const functionNode = node.childForFieldName('function');
+    if (!functionNode || !context.callerName) {
+      return;
+    }
+
+    if (functionNode.type === 'identifier') {
+      calls.push({
+        caller: context.callerName,
+        callee: functionNode.text,
+        line: node.startPosition.row + 1,
+      });
+      return;
+    }
+
+    if (functionNode.type === 'attribute') {
+      const objectNode = functionNode.childForFieldName('object');
+      const attributeNode = functionNode.childForFieldName('attribute');
+      if (!objectNode || !attributeNode) {
+        issues?.push({
+          caller: context.callerName,
+          expression: node.text,
+          line: node.startPosition.row + 1,
+          column: node.startPosition.column,
+          status: 'unresolved',
+        });
+        return;
+      }
+
+      if (objectNode.type !== 'identifier') {
+        issues?.push({
+          caller: context.callerName,
+          expression: node.text,
+          line: node.startPosition.row + 1,
+          column: node.startPosition.column,
+          status: 'unsupported_dynamic',
+        });
+        return;
+      }
+
+      const objectName = objectNode.text;
+      const attributeName = attributeNode.text;
+
+      if ((objectName === 'self' || objectName === 'cls') && context.currentClassName) {
+        calls.push({
+          caller: context.callerName,
+          callee: `${context.currentClassName}.${attributeName}`,
+          line: node.startPosition.row + 1,
+        });
+        return;
+      }
+
+      if (localClassNames.has(objectName) || importedNames.has(objectName)) {
+        calls.push({
+          caller: context.callerName,
+          callee: `${objectName}.${attributeName}`,
+          line: node.startPosition.row + 1,
+        });
+        return;
+      }
+
+      issues?.push({
+        caller: context.callerName,
+        expression: node.text,
+        line: node.startPosition.row + 1,
+        column: node.startPosition.column,
+        status: 'ambiguous',
+      });
+      return;
+    }
+
+    issues?.push({
+      caller: context.callerName,
+      expression: node.text,
+      line: node.startPosition.row + 1,
+      column: node.startPosition.column,
+      status: functionNode.type === 'call' ? 'unsupported_dynamic' : 'unresolved',
+    });
+  }
+
+  private collectImportedNames(imports: ImportInfo[]): Set<string> {
+    const importedNames = new Set<string>();
+
+    for (const imp of imports) {
+      for (const specifier of imp.specifiers) {
+        if (specifier.alias) {
+          importedNames.add(specifier.alias);
+        }
+        if (specifier.name && specifier.name !== '*') {
+          importedNames.add(specifier.name);
+        }
+      }
+    }
+
+    return importedNames;
+  }
+
+  private isSameNode(left: any, right: any): boolean {
+    return left.type === right.type &&
+      left.startIndex === right.startIndex &&
+      left.endIndex === right.endIndex;
   }
 
   // ============================================

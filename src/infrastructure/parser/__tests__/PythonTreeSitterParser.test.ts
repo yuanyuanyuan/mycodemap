@@ -45,6 +45,99 @@ describe('PythonTreeSitterParser', () => {
 
       initializeSpy.mockRestore();
     });
+
+    it('extracts local function and qualified method call graphs conservatively', async () => {
+      const content = [
+        'def helper():',
+        '    return 1',
+        '',
+        'class Service:',
+        '    @staticmethod',
+        '    def utility():',
+        '        return helper()',
+        '',
+        '    @classmethod',
+        '    def build(cls):',
+        '        return cls.utility()',
+        '',
+        '    def run(self):',
+        '        self.utility()',
+        '        Service.utility()',
+        '',
+        'def execute():',
+        '    helper()',
+        '    Service.utility()',
+      ].join('\n');
+
+      const result = await parser.parseFile('/tmp/test.py', content, { includeCallGraph: true });
+
+      expect(result.symbols.some((symbol) => symbol.name === 'Service.utility' && symbol.kind === 'method')).toBe(true);
+      expect(result.symbols.some((symbol) => symbol.name === 'Service.build' && symbol.kind === 'method')).toBe(true);
+      expect(result.symbols.some((symbol) => symbol.name === 'Service.run' && symbol.kind === 'method')).toBe(true);
+      expect(result.callGraph?.calls).toEqual(expect.arrayContaining([
+        expect.objectContaining({ caller: 'Service.utility', callee: 'helper' }),
+        expect.objectContaining({ caller: 'Service.build', callee: 'Service.utility' }),
+        expect.objectContaining({ caller: 'Service.run', callee: 'Service.utility' }),
+        expect.objectContaining({ caller: 'execute', callee: 'helper' }),
+      ]));
+      expect(result.callGraph?.issues ?? []).toEqual([]);
+    });
+
+    it('preserves dynamic Python call shapes as explicit unsupported_dynamic issues', async () => {
+      const content = [
+        'class Service:',
+        '    def run(self, target, method_name):',
+        '        getattr(target, method_name)()',
+      ].join('\n');
+
+      const result = await parser.parseFile('/tmp/test.py', content, { includeCallGraph: true });
+
+      expect(result.callGraph?.calls ?? []).toEqual([]);
+      expect(result.callGraph?.issues).toEqual([
+        expect.objectContaining({
+          caller: 'Service.run',
+          expression: 'getattr(target, method_name)()',
+          status: 'unsupported_dynamic',
+          line: 3,
+        }),
+      ]);
+    });
+
+    it('persists Python complexity truth at module and symbol level when enabled', async () => {
+      const content = [
+        'def helper(value):',
+        '    if value > 0:',
+        '        return value',
+        '    return -value',
+        '',
+        'class Service:',
+        '    def run(self, items):',
+        '        for item in items:',
+        '            if item > 0 and item < 10:',
+        '                return helper(item)',
+        '        return 0',
+      ].join('\n');
+
+      const result = await parser.parseFile('/tmp/test.py', content, { includeComplexity: true });
+
+      expect(result.complexity).toEqual(expect.objectContaining({
+        cyclomatic: expect.any(Number),
+        cognitive: expect.any(Number),
+        maintainability: expect.any(Number),
+        details: expect.objectContaining({
+          functions: expect.arrayContaining([
+            expect.objectContaining({ name: 'helper', cyclomatic: expect.any(Number) }),
+            expect.objectContaining({ name: 'Service.run', cyclomatic: expect.any(Number) }),
+          ]),
+        }),
+      }));
+      expect(result.symbols.find((symbol) => symbol.name === 'helper')?.complexity).toEqual(
+        expect.objectContaining({ cyclomatic: expect.any(Number), cognitive: expect.any(Number) })
+      );
+      expect(result.symbols.find((symbol) => symbol.name === 'Service.run')?.complexity).toEqual(
+        expect.objectContaining({ cyclomatic: expect.any(Number), cognitive: expect.any(Number) })
+      );
+    });
   });
 
   describe('extractImports', () => {
@@ -169,6 +262,20 @@ describe('PythonTreeSitterParser', () => {
       const result = await parser.parseFile('/tmp/test.py', content);
       expect(result.symbols.some(s => s.name === 'outer')).toBe(true);
       expect(result.symbols.some(s => s.name === 'inner')).toBe(true);
+    });
+
+    it('qualifies direct class-body methods without renaming nested helpers inside methods', async () => {
+      const content = [
+        'class Service:',
+        '    def run(self):',
+        '        def inner():',
+        '            return 1',
+        '        return inner()',
+      ].join('\n');
+      const result = await parser.parseFile('/tmp/test.py', content);
+
+      expect(result.symbols.some((symbol) => symbol.name === 'Service.run' && symbol.kind === 'method')).toBe(true);
+      expect(result.symbols.some((symbol) => symbol.name === 'inner' && symbol.kind === 'function')).toBe(true);
     });
   });
 

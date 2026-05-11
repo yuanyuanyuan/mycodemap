@@ -16,6 +16,7 @@ import type {
   ExportInfo,
   ComplexityMetrics,
 } from '../../../interface/types/index.js';
+import { analyzeComplexityFromContent } from '../../../core/ast-complexity-analyzer.js';
 import { ParserBase, ParseError } from '../interfaces/ParserBase.js';
 
 /**
@@ -56,10 +57,14 @@ export class GoParser extends ParserBase {
         imports,
         exports,
         symbols,
+        complexity,
       ] = await Promise.all([
         this.extractImports(content),
         this.extractExports(content),
         this.extractSymbols(content),
+        options?.includeComplexity
+          ? this.calculateComplexity(content, filePath)
+          : Promise.resolve(undefined),
       ]);
 
       const lineCounts = this.countLines(content);
@@ -86,6 +91,7 @@ export class GoParser extends ParserBase {
         imports,
         exports,
         dependencies: [],
+        complexity,
         parseTime,
       };
     } catch (error) {
@@ -197,6 +203,14 @@ export class GoParser extends ParserBase {
     }
     
     return symbols;
+  }
+
+  async calculateComplexity(content: string, filePath: string = '/virtual.go'): Promise<ComplexityMetrics> {
+    return analyzeComplexityFromContent({
+      filePath,
+      content,
+      language: 'go',
+    });
   }
 
   private getLineNumber(content: string, index: number): number {

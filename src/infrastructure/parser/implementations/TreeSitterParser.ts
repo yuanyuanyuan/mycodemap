@@ -21,6 +21,7 @@ import type {
   SymbolKind,
 } from '../../../interface/types/index.js';
 import type { ParserOptions } from '../../../parser/interfaces/IParser.js';
+import { analyzeComplexityFromContent } from '../../../core/ast-complexity-analyzer.js';
 import { loadTreeSitter } from '../../../parser/implementations/tree-sitter-loader.js';
 import { ParserBase, ParseError } from '../interfaces/ParserBase.js';
 
@@ -125,7 +126,7 @@ export class TreeSitterParser extends ParserBase {
       exports: parsed.exports,
       dependencies: this.buildDependencies(parsed.imports),
       callGraph: options?.includeCallGraph ? await this.buildCallGraph(content) : undefined,
-      complexity: options?.includeComplexity ? await this.calculateComplexity(content) : undefined,
+      complexity: options?.includeComplexity ? await this.calculateComplexity(content, filePath) : undefined,
       parseTime: Date.now() - startTime,
       parserUsed: parsed.parserUsed,
     };
@@ -239,46 +240,16 @@ export class TreeSitterParser extends ParserBase {
       }
     }
 
-    return { calls, recursive };
+    return { calls, recursive, issues: [] };
   }
 
-  async calculateComplexity(content: string): Promise<ComplexityMetrics> {
-    let branchCount = 0;
-    const functions: ComplexityMetrics['details']['functions'] = [];
-    const branchRegex = /\b(if|else|while|for|do|switch|case|\?\s*:|&&|\|\|)\b/g;
-    let match: RegExpExecArray | null;
-
-    while ((match = branchRegex.exec(content)) !== null) {
-      branchCount++;
-    }
-
-    const functionRegex = /(?:async\s+)?function\s+(\w+)\s*\([^)]*\)\s*\{/g;
-    while ((match = functionRegex.exec(content)) !== null) {
-      const name = match[1];
-      if (!name) continue;
-      const funcBody = content.slice(match.index, this.findFunctionEnd(content, match.index));
-      let funcBranches = 0;
-      let funcMatch: RegExpExecArray | null;
-      const funcBranchRegex = /\b(if|else|while|for|do|switch|case|\?\s*:|&&|\|\|)\b/g;
-      while ((funcMatch = funcBranchRegex.exec(funcBody)) !== null) {
-        funcBranches++;
-      }
-
-      functions.push({
-        name,
-        cyclomatic: funcBranches + 1,
-        cognitive: Math.min(funcBranches, 10),
-        lines: funcBody.split('\n').length,
-      });
-    }
-
-    const cyclomatic = branchCount + 1;
-    return {
-      cyclomatic,
-      cognitive: Math.min(branchCount, 15),
-      maintainability: Math.max(0, 100 - cyclomatic * 2 - functions.length),
-      details: { functions },
-    };
+  async calculateComplexity(content: string, filePath: string = '/virtual.ts'): Promise<ComplexityMetrics> {
+    const language = this.selectLanguage(filePath).language;
+    return analyzeComplexityFromContent({
+      filePath,
+      content,
+      language,
+    });
   }
 
   private selectLanguage(filePath: string): { grammar: any; language: SharedLanguageId } {
