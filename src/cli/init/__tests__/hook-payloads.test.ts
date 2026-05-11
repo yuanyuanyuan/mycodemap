@@ -142,4 +142,84 @@ describe('managed hook payloads', () => {
     expect(result.output).toContain('// [META] since:YYYY-MM | owner:team | stable:false');
     expect(result.output).toContain('// [WHY] Explain why this file exists');
   });
+
+  it('filters known MCP warning noise and prints a bottom summary for related test failures', () => {
+    const repoDir = createTempRepo();
+    tempRoots.push(repoDir);
+
+    mkdirSync(path.join(repoDir, 'node_modules', 'vitest'), { recursive: true });
+    writeFileSync(
+      path.join(repoDir, 'node_modules', 'vitest', 'vitest.mjs'),
+      [
+        'process.stderr.write(\'Contract tool "codemap_env_contract" renamed to "codemap_env_contract_contract" -- name reserved by native tool\\n\');',
+        'process.stderr.write(\'Contract tool "codemap_env_contract" skipped -- name reserved by native tool and alternative "codemap_env_contract_contract" also taken\\n\');',
+        'process.stderr.write(\' FAIL  src/cli/env-contract/__tests__/discovery.test.ts > discovery > keeps hook topology stable\\n\');',
+        'process.stderr.write(\'AssertionError: expected false to be true\\n\');',
+        'process.exit(1);',
+      ].join('\n'),
+      'utf8',
+    );
+
+    mkdirSync(path.join(repoDir, 'src', 'cli', 'env-contract'), { recursive: true });
+    writeFileSync(path.join(repoDir, 'src', 'cli', 'env-contract', 'discovery.ts'), 'export const discovery = true;\n', 'utf8');
+    execSync('git add src/cli/env-contract/discovery.ts', { cwd: repoDir });
+
+    const result = runCommit(repoDir, '[FEATURE] env-contract: adjust discovery flow');
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain('RULE_ID: related-tests');
+    expect(result.output).toContain('TEST_FAILURE_SUMMARY');
+    expect(result.output).toContain('TEST_STRATEGY: vitest-related');
+    expect(result.output).toContain('TEST_COMMAND: npx vitest related src/cli/env-contract/discovery.ts --watch=false --bail=1');
+    expect(result.output).toContain('FAILED_TEST_FILE: src/cli/env-contract/__tests__/discovery.test.ts');
+    expect(result.output).toContain('LIKELY_CAUSE: This looks like a behavior change near the modified module.');
+    expect(result.output).toContain('TRIGGERED_SOURCE_FILES:');
+    expect(result.output).toContain('src/cli/env-contract/discovery.ts');
+    expect(result.output).toContain('VERIFY: npx vitest run src/cli/env-contract/__tests__/discovery.test.ts');
+    expect(result.output).toContain('VERIFY: npx vitest related src/cli/env-contract/discovery.ts --watch=false --bail=1');
+    expect(result.output).toContain('INFO: Suppressed 2 known MCP contract-tool warning line(s) from test output.');
+    expect(result.output).not.toContain('Contract tool "codemap_env_contract"');
+  });
+
+  it('falls back to the project test command when no safe related-test runner is detected', () => {
+    const repoDir = createTempRepo();
+    tempRoots.push(repoDir);
+
+    mkdirSync(path.join(repoDir, 'scripts'), { recursive: true });
+    writeFileSync(
+      path.join(repoDir, 'package.json'),
+      JSON.stringify({
+        name: 'tmp',
+        scripts: {
+          test: 'node scripts/run-tests.js',
+        },
+      }, null, 2),
+      'utf8',
+    );
+    writeFileSync(
+      path.join(repoDir, 'scripts', 'run-tests.js'),
+      [
+        "console.error('FAILED tests/unit/custom.test.js > custom runner > reports failure');",
+        "console.error('AssertionError: expected 1 to be 2');",
+        'process.exit(1);',
+      ].join('\n'),
+      'utf8',
+    );
+    mkdirSync(path.join(repoDir, 'src'), { recursive: true });
+    writeFileSync(path.join(repoDir, 'src', 'custom.js'), 'export const custom = true;\n', 'utf8');
+    execSync('git add package.json scripts/run-tests.js src/custom.js', { cwd: repoDir });
+
+    const result = runCommit(repoDir, '[FEATURE] hooks: fallback project test command');
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain('RULE_ID: related-tests');
+    expect(result.output).toContain('TEST_FAILURE_SUMMARY');
+    expect(result.output).toContain('TEST_STRATEGY: package-test');
+    expect(result.output).toContain('TEST_COMMAND: npm test');
+    expect(result.output).toContain('FAILED_TEST_FILE: tests/unit/custom.test.js');
+    expect(result.output).toContain('VERIFY: npm test');
+    expect(result.output).toContain('TRIGGERED_SOURCE_FILES:');
+    expect(result.output).toContain('src/custom.js');
+    expect(result.output).not.toContain('npx vitest related');
+  });
 });

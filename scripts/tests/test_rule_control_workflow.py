@@ -52,13 +52,26 @@ class RuleControlWorkflowTests(unittest.TestCase):
 
     def test_pre_commit_report_only_timeout_guard_exists(self):
         for hook_path in [
-            ROOT / ".githooks" / "pre-commit",
+            ROOT / ".mycodemap" / "hooks" / "pre-commit",
             ROOT / "scripts" / "hooks" / "templates" / "pre-commit",
         ]:
             content = hook_path.read_text(encoding="utf-8")
             self.assertIn("RULE_REPORT_ONLY_TIMEOUT_SECONDS", content)
             self.assertIn("Rule validation report-only timed out after", content)
             self.assertIn("subprocess.TimeoutExpired", content)
+
+    def test_pre_commit_contains_generic_test_strategy_fallbacks(self):
+        for hook_path in [
+            ROOT / ".mycodemap" / "hooks" / "pre-commit",
+            ROOT / "scripts" / "hooks" / "templates" / "pre-commit",
+        ]:
+            content = hook_path.read_text(encoding="utf-8")
+            self.assertIn("TRIGGERED_SOURCE_FILES", content)
+            self.assertIn("TEST_STRATEGY", content)
+            self.assertIn("package-test", content)
+            self.assertIn("pytest", content)
+            self.assertIn("go test ./...", content)
+            self.assertIn("cargo test", content)
 
 
 if __name__ == "__main__":

@@ -88,9 +88,9 @@ echo "Format: [TAG] scope: message"
     expect(Array.isArray(content.items)).toBe(true);
     expect(content.items.length).toBeGreaterThan(0);
 
-    // Should include test-entry-vitest from package.json
+    // Should include test-entry-command from package.json
     const testItem = content.items.find(
-      (i: { id: string }) => i.id === 'test-entry-vitest',
+      (i: { id: string }) => i.id === 'test-entry-command',
     );
     expect(testItem).toBeDefined();
   });

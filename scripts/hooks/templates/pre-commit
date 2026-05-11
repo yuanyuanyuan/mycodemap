@@ -2,6 +2,26 @@
 # Pre-commit hook: 运行测试和文件头检查
 
 HOOK_SOURCE=".mycodemap/hooks/pre-commit"
+TEST_OUTPUT_FILE=""
+FILTERED_TEST_OUTPUT_FILE=""
+SUPPRESSED_TEST_WARNING_COUNT=0
+FAILED_TEST_FILE=""
+FAILED_TEST_HEADLINE=""
+FAILED_TEST_HINT=""
+FAILED_TEST_VERIFY_COMMAND=""
+GENERAL_VERIFY_COMMAND=""
+TEST_COMMAND=""
+TEST_STRATEGY=""
+TEST_FAILURE_REASON=""
+TEST_TARGET_KIND=""
+SOURCE_FILE_PATTERN=""
+PACKAGE_MANAGER=""
+PACKAGE_MANAGER_HINT=""
+PACKAGE_TEST_COMMAND=""
+TEST_SCRIPT=""
+VITEST_ARGS=""
+JEST_ARGS=""
+VITEST_ENTRY=""
 
 print_blocked_rule() {
     rule_id="$1"
@@ -13,63 +33,476 @@ print_blocked_rule() {
     echo "WHY: $reason"
 }
 
-echo "Running pre-commit checks..."
+cleanup_related_test_artifacts() {
+    if [ -n "$TEST_OUTPUT_FILE" ] && [ -f "$TEST_OUTPUT_FILE" ]; then
+        rm -f "$TEST_OUTPUT_FILE"
+    fi
+    if [ -n "$FILTERED_TEST_OUTPUT_FILE" ] && [ -f "$FILTERED_TEST_OUTPUT_FILE" ]; then
+        rm -f "$FILTERED_TEST_OUTPUT_FILE"
+    fi
+}
 
-# 1. 运行与变更相关的测试（失败即阻断）
-# 只针对 staged 文件找相关测试，排除未暂存的实验代码，按变更量动态调整并发
-echo "Running tests for staged files..."
+read_package_json_metadata() {
+    if [ ! -f "package.json" ]; then
+        return 1
+    fi
 
-STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep '\.ts$' || true)
-if [ -z "$STAGED" ]; then
-    echo "No TypeScript files staged, skipping tests"
-else
-    STAGED_COUNT=$(echo "$STAGED" | wc -l)
+    PACKAGE_JSON_METADATA=$(python3 - <<'PY'
+import json
+from pathlib import Path
 
-    if [ "$STAGED_COUNT" -le 3 ]; then
-        echo "Staged $STAGED_COUNT TS file(s), running related tests..."
-        VITEST_ARGS="related $STAGED --watch=false"
-    else
-        echo "Staged $STAGED_COUNT TS file(s), running related tests (single fork to reduce CPU load)..."
-        VITEST_ARGS="related $STAGED --watch=false --pool=forks --poolOptions.forks.singleFork"
+try:
+    pkg = json.loads(Path("package.json").read_text(encoding="utf-8"))
+except Exception:
+    raise SystemExit(1)
+
+scripts = pkg.get("scripts") or {}
+package_manager = str(pkg.get("packageManager") or "").strip()
+test_script = str(scripts.get("test") or "").strip()
+
+print(package_manager)
+print(test_script)
+PY
+) || return 1
+
+    PACKAGE_MANAGER_HINT=$(printf '%s\n' "$PACKAGE_JSON_METADATA" | sed -n '1p')
+    TEST_SCRIPT=$(printf '%s\n' "$PACKAGE_JSON_METADATA" | sed -n '2p')
+    return 0
+}
+
+resolve_package_manager() {
+    PACKAGE_MANAGER=""
+    PACKAGE_MANAGER_HINT=""
+    TEST_SCRIPT=""
+
+    read_package_json_metadata || true
+
+    case "$PACKAGE_MANAGER_HINT" in
+        pnpm@*|pnpm)
+            PACKAGE_MANAGER="pnpm"
+            ;;
+        yarn@*|yarn)
+            PACKAGE_MANAGER="yarn"
+            ;;
+        bun@*|bun)
+            PACKAGE_MANAGER="bun"
+            ;;
+        npm@*|npm)
+            PACKAGE_MANAGER="npm"
+            ;;
+    esac
+
+    if [ -z "$PACKAGE_MANAGER" ]; then
+        if [ -f "pnpm-lock.yaml" ]; then
+            PACKAGE_MANAGER="pnpm"
+        elif [ -f "yarn.lock" ]; then
+            PACKAGE_MANAGER="yarn"
+        elif [ -f "bun.lockb" ] || [ -f "bun.lock" ]; then
+            PACKAGE_MANAGER="bun"
+        elif [ -f "package-lock.json" ] || [ -f "package.json" ]; then
+            PACKAGE_MANAGER="npm"
+        fi
+    fi
+}
+
+build_package_test_command() {
+    case "$PACKAGE_MANAGER" in
+        pnpm)
+            PACKAGE_TEST_COMMAND="pnpm test"
+            ;;
+        yarn)
+            PACKAGE_TEST_COMMAND="yarn test"
+            ;;
+        bun)
+            PACKAGE_TEST_COMMAND="bun test"
+            ;;
+        npm|*)
+            PACKAGE_TEST_COMMAND="npm test"
+            ;;
+    esac
+}
+
+ensure_vitest_entry() {
+    VITEST_ENTRY=""
+
+    if [ -f "node_modules/vitest/vitest.mjs" ]; then
+        VITEST_ENTRY="node_modules/vitest/vitest.mjs"
+        return 0
+    fi
+
+    if [ -d "node_modules" ] && [ ! -e "node_modules/vitest" ]; then
+        VITEST_PACKAGE_DIR=$(find node_modules -type d -path '*/.pnpm/*/node_modules/vitest' | head -n 1)
+        if [ -n "$VITEST_PACKAGE_DIR" ]; then
+            ln -sfn "${VITEST_PACKAGE_DIR#node_modules/}" node_modules/vitest
+        fi
     fi
 
     if [ -f "node_modules/vitest/vitest.mjs" ]; then
-        node node_modules/vitest/vitest.mjs $VITEST_ARGS
-    else
-        if [ ! -e "node_modules/vitest" ]; then
-            VITEST_PACKAGE_DIR=$(find node_modules -type d -path '*/.pnpm/*/node_modules/vitest' | head -n 1)
-            if [ -n "$VITEST_PACKAGE_DIR" ]; then
-                ln -sfn "${VITEST_PACKAGE_DIR#node_modules/}" node_modules/vitest
-            fi
+        VITEST_ENTRY="node_modules/vitest/vitest.mjs"
+        return 0
+    fi
+
+    if [ -d "node_modules" ]; then
+        VITEST_ENTRY=$(find node_modules -type f -path '*/.pnpm/*/node_modules/vitest/vitest.mjs' | head -n 1)
+        if [ -z "$VITEST_ENTRY" ]; then
+            VITEST_ENTRY=$(find node_modules -type f -path '*/.vitest-*/vitest.mjs' | head -n 1)
+        fi
+    fi
+
+    if [ -n "$VITEST_ENTRY" ]; then
+        return 0
+    fi
+
+    return 1
+}
+
+build_vitest_related_command() {
+    GENERAL_VERIFY_COMMAND="npx vitest related"
+    for staged_file in $STAGED; do
+        GENERAL_VERIFY_COMMAND="$GENERAL_VERIFY_COMMAND $staged_file"
+    done
+    GENERAL_VERIFY_COMMAND="$GENERAL_VERIFY_COMMAND --watch=false --bail=1"
+    if [ "$STAGED_COUNT" -gt 3 ]; then
+        GENERAL_VERIFY_COMMAND="$GENERAL_VERIFY_COMMAND --pool=forks --poolOptions.forks.singleFork"
+    fi
+    TEST_COMMAND="$GENERAL_VERIFY_COMMAND"
+    VITEST_ARGS=${GENERAL_VERIFY_COMMAND#npx vitest }
+}
+
+build_jest_related_command() {
+    GENERAL_VERIFY_COMMAND="npx jest --findRelatedTests"
+    for staged_file in $STAGED; do
+        GENERAL_VERIFY_COMMAND="$GENERAL_VERIFY_COMMAND $staged_file"
+    done
+    GENERAL_VERIFY_COMMAND="$GENERAL_VERIFY_COMMAND --bail"
+    if [ "$STAGED_COUNT" -gt 3 ]; then
+        GENERAL_VERIFY_COMMAND="$GENERAL_VERIFY_COMMAND --runInBand"
+    fi
+    TEST_COMMAND="$GENERAL_VERIFY_COMMAND"
+    JEST_ARGS=${GENERAL_VERIFY_COMMAND#npx jest }
+}
+
+build_test_precheck_plan() {
+    TEST_COMMAND=""
+    TEST_STRATEGY=""
+    TEST_FAILURE_REASON=""
+    TEST_TARGET_KIND=""
+    SOURCE_FILE_PATTERN=""
+    GENERAL_VERIFY_COMMAND=""
+    FAILED_TEST_VERIFY_COMMAND=""
+    PACKAGE_TEST_COMMAND=""
+
+    resolve_package_manager
+
+    SOURCE_FILE_PATTERN='\.[cm]?[jt]sx?$'
+    TEST_TARGET_KIND="JS/TS source"
+
+    if [ -f "package.json" ]; then
+        if echo "$TEST_SCRIPT" | grep -Eq '^vitest([[:space:]].*)?$'; then
+            TEST_STRATEGY="vitest-related"
+            TEST_FAILURE_REASON="Related Vitest checks for the staged source files failed."
+            return 0
         fi
 
-        if [ -f "node_modules/vitest/vitest.mjs" ]; then
-            node node_modules/vitest/vitest.mjs $VITEST_ARGS
-        else
-            VITEST_ENTRY=$(find node_modules -type f -path '*/.pnpm/*/node_modules/vitest/vitest.mjs' | head -n 1)
-            if [ -z "$VITEST_ENTRY" ]; then
-                VITEST_ENTRY=$(find node_modules -type f -path '*/.vitest-*/vitest.mjs' | head -n 1)
-            fi
+        if echo "$TEST_SCRIPT" | grep -Eq '^jest([[:space:]].*)?$'; then
+            TEST_STRATEGY="jest-related"
+            TEST_FAILURE_REASON="Related Jest checks for the staged source files failed."
+            return 0
+        fi
 
-            if [ -n "$VITEST_ENTRY" ]; then
-                node "$VITEST_ENTRY" $VITEST_ARGS
+        if [ -z "$TEST_SCRIPT" ] && ensure_vitest_entry; then
+            TEST_STRATEGY="vitest-related"
+            TEST_FAILURE_REASON="Related Vitest checks for the staged source files failed."
+            return 0
+        fi
+
+        if [ -n "$TEST_SCRIPT" ]; then
+            build_package_test_command
+            TEST_STRATEGY="package-test"
+            TEST_COMMAND="$PACKAGE_TEST_COMMAND"
+            GENERAL_VERIFY_COMMAND="$PACKAGE_TEST_COMMAND"
+            TEST_FAILURE_REASON="The project test command for the staged source files failed."
+            return 0
+        fi
+    fi
+
+    if ensure_vitest_entry; then
+        TEST_STRATEGY="vitest-related"
+        TEST_FAILURE_REASON="Related Vitest checks for the staged source files failed."
+        return 0
+    fi
+
+    if [ -f "pyproject.toml" ]; then
+        TEST_STRATEGY="pytest"
+        TEST_TARGET_KIND="Python source"
+        SOURCE_FILE_PATTERN='\.py$'
+        TEST_COMMAND="pytest"
+        GENERAL_VERIFY_COMMAND="pytest"
+        TEST_FAILURE_REASON="Pytest failed for the staged source files."
+        return 0
+    fi
+
+    if [ -f "go.mod" ]; then
+        TEST_STRATEGY="go-test"
+        TEST_TARGET_KIND="Go source"
+        SOURCE_FILE_PATTERN='\.go$'
+        TEST_COMMAND="go test ./..."
+        GENERAL_VERIFY_COMMAND="go test ./..."
+        TEST_FAILURE_REASON="Go tests failed for the staged source files."
+        return 0
+    fi
+
+    if [ -f "Cargo.toml" ]; then
+        TEST_STRATEGY="cargo-test"
+        TEST_TARGET_KIND="Rust source"
+        SOURCE_FILE_PATTERN='\.rs$'
+        TEST_COMMAND="cargo test"
+        GENERAL_VERIFY_COMMAND="cargo test"
+        TEST_FAILURE_REASON="Cargo tests failed for the staged source files."
+        return 0
+    fi
+
+    return 1
+}
+
+extract_failed_test_file() {
+    FAILED_TEST_FILE=""
+
+    case "$TEST_STRATEGY" in
+        pytest)
+            FAILED_TEST_FILE=$(grep -Eo '([A-Za-z0-9_./-]+/)?(test_[A-Za-z0-9_./-]+\.py|[A-Za-z0-9_./-]+_test\.py)' "$FILTERED_TEST_OUTPUT_FILE" | head -n 1)
+            ;;
+        go-test)
+            FAILED_TEST_FILE=$(grep -Eo '[A-Za-z0-9_./-]+_test\.go' "$FILTERED_TEST_OUTPUT_FILE" | head -n 1)
+            ;;
+        cargo-test)
+            FAILED_TEST_FILE=""
+            ;;
+        *)
+            FAILED_TEST_FILE=$(grep -Eo '[A-Za-z0-9_./-]+\.(test|spec)\.[cm]?[jt]sx?' "$FILTERED_TEST_OUTPUT_FILE" | head -n 1)
+            ;;
+    esac
+}
+
+build_failed_test_verify_command() {
+    FAILED_TEST_VERIFY_COMMAND=""
+
+    if [ -z "$FAILED_TEST_FILE" ]; then
+        return 0
+    fi
+
+    case "$TEST_STRATEGY" in
+        vitest-related)
+            FAILED_TEST_VERIFY_COMMAND="npx vitest run $FAILED_TEST_FILE"
+            ;;
+        jest-related)
+            FAILED_TEST_VERIFY_COMMAND="npx jest $FAILED_TEST_FILE --runInBand"
+            ;;
+        pytest)
+            FAILED_TEST_VERIFY_COMMAND="pytest $FAILED_TEST_FILE"
+            ;;
+    esac
+}
+
+run_test_precheck_command() {
+    case "$TEST_STRATEGY" in
+        vitest-related)
+            build_vitest_related_command
+            if ensure_vitest_entry; then
+                node "$VITEST_ENTRY" $VITEST_ARGS >"$TEST_OUTPUT_FILE" 2>&1
             else
-                npx --yes vitest $VITEST_ARGS
+                npx --yes vitest $VITEST_ARGS >"$TEST_OUTPUT_FILE" 2>&1
             fi
+            ;;
+        jest-related)
+            build_jest_related_command
+            npx --no-install jest $JEST_ARGS >"$TEST_OUTPUT_FILE" 2>&1
+            ;;
+        package-test)
+            sh -c "$TEST_COMMAND" >"$TEST_OUTPUT_FILE" 2>&1
+            ;;
+        pytest)
+            pytest >"$TEST_OUTPUT_FILE" 2>&1
+            ;;
+        go-test)
+            go test ./... >"$TEST_OUTPUT_FILE" 2>&1
+            ;;
+        cargo-test)
+            cargo test >"$TEST_OUTPUT_FILE" 2>&1
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+}
+
+failing_test_matches_staged_module() {
+    if [ -z "$FAILED_TEST_FILE" ]; then
+        return 1
+    fi
+
+    for staged_file in $STAGED; do
+        staged_name=$(basename "$staged_file")
+        staged_name=${staged_name%.test.ts}
+        staged_name=${staged_name%.test.tsx}
+        staged_name=${staged_name%.test.js}
+        staged_name=${staged_name%.test.jsx}
+        staged_name=${staged_name%.test.mjs}
+        staged_name=${staged_name%.test.cjs}
+        staged_name=${staged_name%.spec.ts}
+        staged_name=${staged_name%.spec.tsx}
+        staged_name=${staged_name%.spec.js}
+        staged_name=${staged_name%.spec.jsx}
+        staged_name=${staged_name%.spec.mjs}
+        staged_name=${staged_name%.spec.cjs}
+        staged_name=${staged_name%.ts}
+        staged_name=${staged_name%.tsx}
+        staged_name=${staged_name%.js}
+        staged_name=${staged_name%.jsx}
+        staged_name=${staged_name%.mjs}
+        staged_name=${staged_name%.cjs}
+        staged_name=${staged_name%.py}
+        staged_name=${staged_name%.go}
+        staged_name=${staged_name%.rs}
+        staged_name=${staged_name#test_}
+        staged_name=${staged_name%_test}
+
+        if [ -n "$staged_name" ] && echo "$FAILED_TEST_FILE" | grep -F "$staged_name" >/dev/null 2>&1; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+build_related_test_failure_hint() {
+    if grep -Eq 'AssertionError|expected .* to (be|equal|deeply equal|match|contain)' "$FILTERED_TEST_OUTPUT_FILE"; then
+        if failing_test_matches_staged_module; then
+            FAILED_TEST_HINT="This looks like a behavior change near the modified module. Check whether the affected test expectations need updating."
+        else
+            FAILED_TEST_HINT="This looks like an assertion mismatch. Check whether the implementation changed or the test expectation drifted."
+        fi
+    elif grep -Eq 'ReferenceError|TypeError|SyntaxError|Cannot find module|is not defined|Unhandled' "$FILTERED_TEST_OUTPUT_FILE"; then
+        FAILED_TEST_HINT="This looks like a code regression or broken test setup. Check the implementation and stack trace."
+    else
+        FAILED_TEST_HINT="Inspect the first failing test and stack trace below."
+    fi
+}
+
+print_related_test_summary() {
+    echo "========================================"
+    echo "TEST_FAILURE_SUMMARY"
+    if [ -n "$TEST_STRATEGY" ]; then
+        echo "TEST_STRATEGY: $TEST_STRATEGY"
+    fi
+    if [ -n "$TEST_COMMAND" ]; then
+        echo "TEST_COMMAND: $TEST_COMMAND"
+    fi
+    if [ -n "$FAILED_TEST_FILE" ]; then
+        echo "FAILED_TEST_FILE: $FAILED_TEST_FILE"
+    fi
+    if [ -n "$FAILED_TEST_HEADLINE" ]; then
+        echo "FAILED_TEST: $FAILED_TEST_HEADLINE"
+    fi
+    if [ "$SUPPRESSED_TEST_WARNING_COUNT" -gt 0 ]; then
+        echo "INFO: Suppressed $SUPPRESSED_TEST_WARNING_COUNT known MCP contract-tool warning line(s) from test output."
+    fi
+    echo "LIKELY_CAUSE: $FAILED_TEST_HINT"
+    if [ -n "$FAILED_TEST_VERIFY_COMMAND" ]; then
+        echo "VERIFY: $FAILED_TEST_VERIFY_COMMAND"
+    fi
+    if [ -n "$GENERAL_VERIFY_COMMAND" ] && [ "$GENERAL_VERIFY_COMMAND" != "$FAILED_TEST_VERIFY_COMMAND" ]; then
+        echo "VERIFY: $GENERAL_VERIFY_COMMAND"
+    fi
+    echo "========================================"
+}
+
+run_related_tests() {
+    TEST_OUTPUT_FILE=$(mktemp "${TMPDIR:-/tmp}/codemap-related-tests-XXXXXX")
+    FILTERED_TEST_OUTPUT_FILE=$(mktemp "${TMPDIR:-/tmp}/codemap-related-tests-filtered-XXXXXX")
+
+    run_test_precheck_command
+
+    RELATED_TEST_EXIT=$?
+    SUPPRESSED_TEST_WARNING_COUNT=$(grep -c '^Contract tool "' "$TEST_OUTPUT_FILE" 2>/dev/null || true)
+    grep -v '^Contract tool "' "$TEST_OUTPUT_FILE" >"$FILTERED_TEST_OUTPUT_FILE" || true
+    if [ ! -s "$FILTERED_TEST_OUTPUT_FILE" ]; then
+        cp "$TEST_OUTPUT_FILE" "$FILTERED_TEST_OUTPUT_FILE"
+    fi
+
+    if [ "$RELATED_TEST_EXIT" -ne 0 ]; then
+        cat "$FILTERED_TEST_OUTPUT_FILE"
+        extract_failed_test_file
+        FAILED_TEST_HEADLINE=$(grep -m 1 -E '^ FAIL |^FAIL |^FAILED |^--- FAIL:' "$FILTERED_TEST_OUTPUT_FILE" || true)
+        build_failed_test_verify_command
+        build_related_test_failure_hint
+        print_related_test_summary
+    fi
+
+    cleanup_related_test_artifacts
+    return "$RELATED_TEST_EXIT"
+}
+
+echo "Running pre-commit checks..."
+
+# 1. 运行 staged source files 对应的测试预检（失败即阻断）
+# 优先使用 runner-specific related tests；否则回退到项目级 test command
+echo "Running tests for staged files..."
+
+if build_test_precheck_plan; then
+    STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E "$SOURCE_FILE_PATTERN" || true)
+    if [ -z "$STAGED" ]; then
+        echo "No $TEST_TARGET_KIND files staged, skipping tests"
+    else
+        STAGED_COUNT=$(printf '%s\n' "$STAGED" | wc -l | tr -d ' ')
+
+        case "$TEST_STRATEGY" in
+            vitest-related)
+                if [ "$STAGED_COUNT" -le 3 ]; then
+                    echo "Staged $STAGED_COUNT $TEST_TARGET_KIND file(s), running related Vitest checks..."
+                else
+                    echo "Staged $STAGED_COUNT $TEST_TARGET_KIND file(s), running related Vitest checks (single fork to reduce CPU load)..."
+                fi
+                ;;
+            jest-related)
+                echo "Staged $STAGED_COUNT $TEST_TARGET_KIND file(s), running related Jest checks..."
+                ;;
+            package-test)
+                echo "Staged $STAGED_COUNT $TEST_TARGET_KIND file(s), running project test command fallback..."
+                ;;
+            pytest)
+                echo "Staged $STAGED_COUNT $TEST_TARGET_KIND file(s), running pytest..."
+                ;;
+            go-test)
+                echo "Staged $STAGED_COUNT $TEST_TARGET_KIND file(s), running go test ./..."
+                ;;
+            cargo-test)
+                echo "Staged $STAGED_COUNT $TEST_TARGET_KIND file(s), running cargo test..."
+                ;;
+        esac
+
+        run_related_tests
+        if [ $? -ne 0 ]; then
+            print_blocked_rule \
+                "related-tests" \
+                "$TEST_FAILURE_REASON"
+            if [ -n "$TEST_STRATEGY" ]; then
+                echo "TEST_STRATEGY: $TEST_STRATEGY"
+            fi
+            if [ -n "$TEST_COMMAND" ]; then
+                echo "TEST_COMMAND: $TEST_COMMAND"
+            fi
+            if [ -n "$STAGED" ]; then
+                echo "TRIGGERED_SOURCE_FILES:"
+                printf '%s\n' "$STAGED"
+            fi
+            echo "FIX: Review the filtered failing test output and summary above."
+            echo "FIX: Repair the code or tests, rerun one of the VERIFY commands, then retry the commit."
+            exit 1
         fi
     fi
-    if [ $? -ne 0 ]; then
-        print_blocked_rule \
-            "related-tests" \
-            "Related tests for the staged TypeScript files failed."
-        if [ -n "$STAGED" ]; then
-            echo "TRIGGERED_TS_FILES:"
-            printf '%s\n' "$STAGED"
-        fi
-        echo "FIX: Review the failing test output above."
-        echo "FIX: Repair the code or tests, rerun the related test command, then retry the commit."
-        exit 1
-    fi
+else
+    echo "No supported staged-source test strategy detected, skipping tests"
 fi
 
 echo "Tests passed"
@@ -170,9 +603,9 @@ case "$RULE_HARD_GATE_MODE" in
         run_rule_validation_report_only
         VALIDATE_EXIT=$?
         if [ "$VALIDATE_EXIT" -eq 124 ]; then
-            echo "WARNING: Rule validation report-only timed out after ${RULE_REPORT_ONLY_TIMEOUT_SECONDS}s, continuing commit"
+            echo "INFO: Rule validation report-only timed out after ${RULE_REPORT_ONLY_TIMEOUT_SECONDS}s (non-blocking), continuing commit"
         elif [ "$VALIDATE_EXIT" -ne 0 ]; then
-            echo "WARNING: Rule validation report-only command exited with $VALIDATE_EXIT, continuing commit"
+            echo "INFO: Rule validation report-only command exited with $VALIDATE_EXIT (non-blocking), continuing commit"
         else
             echo "Rule validation report-only completed"
         fi
