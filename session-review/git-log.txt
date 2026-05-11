@@ -1,0 +1,26 @@
+* 0981a9d chore: migrate release skill to mycodemap-release
+* 2e7b964 [FEATURE] agent-metrics: add agent metrics service and CLI command
+* c937f13 [FEATURE] contract: bump interface version to 1.0.0 and export agent-metrics
+* 70e1c6f [FEATURE] contract: add stable field to CLI command contracts
+* 94b50ff [FEATURE] server: optimize query handler and extend MCP server
+* 3e48bd7 [REFACTOR] parser: simplify smart-parser with canonical IDs
+* 756ba35 [REFACTOR] cli: adopt canonical complexity truth in generate and complexity commands
+* e576bd1 [REFACTOR] core: unify complexity truth and global index
+* 94a4b15 [FEATURE] storage: extend SQLite storage with community and graph helpers
+* 65e524b [FEATURE] parser: enhance Go and Python tree-sitter parsers
+* b85c2de [FEATURE] domain: add canonical ID and storage type extensions
+* 5e28412 [CONFIG] hooks: improve pre-commit checks and rule control workflow
+* 1d0f2b5 [DOCS] docs: add agent-effectiveness-validation ideation and requirements
+* a09aebb docs(83): document query path performance optimization phase
+* 3332b6f docs(82): add interface contract 1.0.0 phase documentation
+* 85cd80f docs(81): capture edge ID normalization phase research
+* b0594df docs(80): add MCP stdio blank-line filtering phase plan
+* f788671 docs(79): capture complexity truth unification phase artifacts
+* 5658df6 docs(77): add CI gate threshold enforcement phase research
+* 18e45ae docs(74-75): complete env-contract validation and token analysis research
+* b5943d6 docs(70): capture phase context for python call graph extraction
+* 43563bc planning: archive v2.5 milestone and bootstrap v2.7 phases
+* 54950af [DOCS] planning: archive v2.6 milestone
+* 9c77f37 docs(79): add phase research and plan
+* 65e4e1b docs(79): capture phase context
+---
