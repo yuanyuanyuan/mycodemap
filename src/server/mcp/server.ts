@@ -3,7 +3,6 @@
 
 import { cwd } from 'node:process';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import type { Readable, Writable } from 'node:stream';
 import type { IStorage } from '../../interface/types/storage.js';
@@ -20,6 +19,7 @@ import {
 import { buildContextRoutingPayload } from './context-tool.js';
 import { CodeMapMcpService } from './service.js';
 import { convertContractToMcpTools } from './schema-adapter.js';
+import { CodeMapStdioServerTransport } from './stdio-transport.js';
 
 const MCP_SERVER_NAME = 'mycodemap-experimental';
 const MCP_SERVER_VERSION = process.env.npm_package_version ?? '0.5.0';
@@ -225,13 +225,13 @@ export async function startCodeMapMcpServer(
 ): Promise<{
   server: McpServer;
   storage: IStorage;
-  transport: StdioServerTransport;
+  transport: CodeMapStdioServerTransport;
   close: () => Promise<void>;
 }> {
   const rootDir = options.rootDir ?? cwd();
   const { storage } = await createConfiguredStorage(rootDir);
   const server = createCodeMapMcpServer(storage, rootDir);
-  const transport = new StdioServerTransport(options.stdin, options.stdout);
+  const transport = new CodeMapStdioServerTransport(options.stdin, options.stdout);
 
   await server.connect(transport);
 

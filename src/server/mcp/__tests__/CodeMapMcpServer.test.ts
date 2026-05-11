@@ -6,6 +6,7 @@ import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { CodeGraph } from '../../../interface/types/index.js';
+import { Dependency as DomainDependency } from '../../../domain/entities/Dependency.js';
 import { MemoryStorage } from '../../../infrastructure/storage/adapters/MemoryStorage.js';
 import { SQLiteStorage } from '../../../infrastructure/storage/adapters/SQLiteStorage.js';
 import { createCodeMapMcpServer } from '../server.js';
@@ -154,6 +155,40 @@ function createGraphFixture(options: {
     failedFileCount: options.failedFileCount ?? 0,
     parseFailureFiles: options.parseFailureFiles ?? [],
   };
+}
+
+function createCanonicalDependencyId(
+  graph: CodeGraph,
+  dependency: CodeGraph['dependencies'][number]
+): string {
+  const modulesById = new Map(graph.modules.map(module => [
+    module.id,
+    DomainDependency.createModuleReference(module.path),
+  ] as const));
+  const symbolsById = new Map(graph.symbols.map(symbol => [
+    symbol.id,
+    DomainDependency.createSymbolReference(
+      modulesById.get(symbol.moduleId) ?? symbol.location.file,
+      symbol.name,
+      symbol.location.line,
+      symbol.location.column
+    ),
+  ] as const));
+  const sourceEntityType = dependency.sourceEntityType ?? 'module';
+  const targetEntityType = dependency.targetEntityType ?? 'module';
+
+  return DomainDependency.createCanonicalId(
+    sourceEntityType === 'symbol'
+      ? (symbolsById.get(dependency.sourceId) ?? dependency.sourceId)
+      : (modulesById.get(dependency.sourceId) ?? dependency.sourceId),
+    targetEntityType === 'symbol'
+      ? (symbolsById.get(dependency.targetId) ?? dependency.targetId)
+      : (modulesById.get(dependency.targetId) ?? dependency.targetId),
+    dependency.type,
+    sourceEntityType,
+    targetEntityType,
+    dependency.filePath
+  );
 }
 
 async function createConnectedClient(options: {
@@ -356,6 +391,18 @@ describe('CodeMap experimental MCP server', () => {
       label: 'community-1',
       top_paths: ['src/caller.ts', 'src/target.ts', 'src/transitive.ts'],
       dominant_edge_kinds: ['call'],
+    }));
+    expect(structured.topology).toEqual(expect.objectContaining({
+      deduped_dependency_count: 2,
+      duplicate_dependency_count: 0,
+      hubs: expect.arrayContaining([
+        expect.objectContaining({
+          module_id: 'mod-caller',
+          module_path: 'src/caller.ts',
+          connected_module_count: 2,
+          dominant_edge_kinds: ['call'],
+        }),
+      ]),
     }));
     expect(communities).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -583,6 +630,9 @@ describe('CodeMap experimental MCP server', () => {
       status: 'ok',
       confidence: 'reduced',
       graph_status: 'partial',
+      topology: expect.objectContaining({
+        deduped_dependency_count: 1,
+      }),
       warnings: expect.arrayContaining([
         expect.objectContaining({ code: 'GRAPH_PARTIAL' }),
         expect.objectContaining({ code: 'LOW_SIGNAL_SPARSE_GRAPH' }),
@@ -596,13 +646,15 @@ describe('CodeMap experimental MCP server', () => {
     tempRoots.push(rootDir);
     const databasePath = '.codemap/governance.sqlite';
     const storage = new SQLiteStorage({ type: 'sqlite', databasePath });
+    const graph = createGraphFixture();
+    const transitiveCallId = createCanonicalDependencyId(graph, graph.dependencies[1]!);
 
     await storage.initialize(rootDir);
-    await storage.saveCodeGraph(createGraphFixture());
+    await storage.saveCodeGraph(graph);
     await storage.close();
 
     const inspector = await createSQLiteInspector(rootDir, databasePath);
-    inspector.prepare('DELETE FROM graph_edges WHERE dependency_id = ?').run('dep-call-2');
+    inspector.prepare('DELETE FROM graph_edges WHERE dependency_id = ?').run(transitiveCallId);
     inspector.close();
 
     const staleStorage = new SQLiteStorage({ type: 'sqlite', databasePath });

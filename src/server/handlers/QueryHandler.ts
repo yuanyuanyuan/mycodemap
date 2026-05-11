@@ -143,44 +143,20 @@ export class QueryHandler {
   async analyzeImpact(request: ImpactAnalysisRequest): Promise<ImpactAnalysisResponse> {
     const depth = request.depth ?? Infinity;
     const result = await this.storage.calculateImpact(request.moduleId, depth);
-    
-    const graph = await this.storage.loadCodeGraph();
-    
-    // 构建受影响模块的层级信息
-    const affectedWithDepth: Array<{ id: string; path: string; depth: number }> = [];
-    const visited = new Set<string>();
-    const queue: Array<{ id: string; level: number }> = [{ id: request.moduleId, level: 0 }];
-
-    while (queue.length > 0) {
-      const { id, level } = queue.shift()!;
-      
-      if (visited.has(id) || level > depth) continue;
-      visited.add(id);
-
-      if (level > 0) {
-        const module = graph.modules.find(m => m.id === id);
-        if (module) {
-          affectedWithDepth.push({
-            id: module.id,
-            path: module.path,
-            depth: level,
-          });
-        }
-      }
-
-      // 查找依赖此模块的其他模块
-      for (const dep of graph.dependencies) {
-        if (dep.targetId === id && !visited.has(dep.sourceId)) {
-          queue.push({ id: dep.sourceId, level: level + 1 });
-        }
-      }
-    }
+    const affectedWithDepth = [
+      ...result.direct,
+      ...result.transitiveLayers.flatMap((layer) => layer.nodes),
+    ].map((node) => ({
+      id: node.id,
+      path: node.filePath,
+      depth: node.depth,
+    }));
 
     return {
       rootModule: result.rootModule ?? request.moduleId,
       affectedModules: affectedWithDepth,
-      totalAffected: affectedWithDepth.length,
-      maxDepth: Math.max(...affectedWithDepth.map(m => m.depth), 0),
+      totalAffected: result.summary.totalCount,
+      maxDepth: result.summary.maxDepth,
     };
   }
 

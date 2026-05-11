@@ -141,6 +141,22 @@ export interface McpCommunityCluster {
   cohesion: number;
 }
 
+export interface McpCommunityTopologyCandidate {
+  module_id: string;
+  module_path: string;
+  score: number;
+  connected_module_count: number;
+  linked_community_labels: string[];
+  dominant_edge_kinds: Array<'import' | 'inherit' | 'implement' | 'call' | 'type-ref'>;
+}
+
+export interface McpCommunityTopology {
+  deduped_dependency_count: number;
+  duplicate_dependency_count: number;
+  hubs: McpCommunityTopologyCandidate[];
+  bridges: McpCommunityTopologyCandidate[];
+}
+
 export interface McpCommunityResult {
   [key: string]: unknown;
   status: McpToolStatus;
@@ -151,6 +167,7 @@ export interface McpCommunityResult {
   parse_failure_files: string[];
   summary: McpCommunitySummary;
   communities: McpCommunityCluster[];
+  topology: McpCommunityTopology;
   warnings: McpCommunityWarning[];
   remediation?: string;
   error?: McpToolError;

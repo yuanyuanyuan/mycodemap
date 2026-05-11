@@ -214,6 +214,7 @@ describe('schema-adapter', () => {
       const contract: CommandContract = {
         name: 'test',
         description: 'A test command',
+        stable: true,
         args: [],
         flags: [
           { name: 'foo', long: 'foo', description: 'Foo flag', type: 'string' },
@@ -238,6 +239,7 @@ describe('schema-adapter', () => {
       const contract: CommandContract = {
         name: 'deps',
         description: 'Deps command',
+        stable: true,
         aliases: ['dependencies', 'd'],
         args: [],
         flags: [],
@@ -257,6 +259,7 @@ describe('schema-adapter', () => {
       const contract: CommandContract = {
         name: 'analyze',
         description: 'Analyze command',
+        stable: true,
         args: [],
         flags: [
           { name: 'intent', long: 'intent', description: 'Intent', type: 'string' },
@@ -282,6 +285,7 @@ describe('schema-adapter', () => {
       const contract: CommandContract = {
         name: 'doctor',
         description: 'Doctor command',
+        stable: true,
         args: [],
         flags: [
           { name: 'category', long: 'category', description: 'Category', type: 'string' },
@@ -300,6 +304,7 @@ describe('schema-adapter', () => {
       const contract: CommandContract = {
         name: 'doctor',
         description: 'Doctor command',
+        stable: true,
         args: [],
         flags: [
           { name: 'checks', long: 'checks', description: 'Checks', type: 'string', multiple: true },
@@ -317,6 +322,7 @@ describe('schema-adapter', () => {
       const contract: CommandContract = {
         name: 'doctor',
         description: 'Doctor command',
+        stable: true,
         args: [],
         flags: [
           { name: 'category', long: 'category', description: 'Category', type: 'string' },
@@ -334,6 +340,7 @@ describe('schema-adapter', () => {
       const contract: CommandContract = {
         name: 'doctor',
         description: 'Doctor command',
+        stable: true,
         args: [],
         flags: [
           { name: 'category', long: 'category', description: 'Category', type: 'string' },
@@ -351,6 +358,7 @@ describe('schema-adapter', () => {
       const contract: CommandContract = {
         name: 'doctor',
         description: 'Doctor command',
+        stable: true,
         args: [],
         flags: [
           { name: 'category', long: 'category', description: 'Category', type: 'string' },

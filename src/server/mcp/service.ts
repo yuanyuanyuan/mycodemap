@@ -17,6 +17,7 @@ import { analyzeImpactInGraph } from '../../infrastructure/storage/graph-helpers
 import type {
   McpCommunityCluster,
   McpCommunityResult,
+  McpCommunityTopologyCandidate,
   McpGraphStatus,
   McpImpactEntrypoint,
   McpImpactEntrypointCandidate,
@@ -195,6 +196,19 @@ function toMcpCommunityCluster(cluster: CommunityCluster): McpCommunityCluster {
   };
 }
 
+function toMcpCommunityTopologyCandidate(
+  candidate: SharedCommunityResult['topology']['hubs'][number]
+): McpCommunityTopologyCandidate {
+  return {
+    module_id: candidate.moduleId,
+    module_path: candidate.modulePath,
+    score: candidate.score,
+    connected_module_count: candidate.connectedModuleCount,
+    linked_community_labels: [...candidate.linkedCommunityLabels],
+    dominant_edge_kinds: [...candidate.dominantEdgeKinds],
+  };
+}
+
 export function mapSharedCommunityResult(
   result: SharedCommunityResult,
   metadata: GraphMetadata
@@ -213,6 +227,12 @@ export function mapSharedCommunityResult(
       largest_community_ratio: result.summary.largestCommunityRatio,
     },
     communities: result.communities.map(toMcpCommunityCluster),
+    topology: {
+      deduped_dependency_count: result.topology.dedupedDependencyCount,
+      duplicate_dependency_count: result.topology.duplicateDependencyCount,
+      hubs: result.topology.hubs.map(toMcpCommunityTopologyCandidate),
+      bridges: result.topology.bridges.map(toMcpCommunityTopologyCandidate),
+    },
     warnings: result.warnings.map((warning) => ({
       code: warning.code,
       message: warning.message,
