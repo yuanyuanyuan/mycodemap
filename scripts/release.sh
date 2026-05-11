@@ -54,6 +54,35 @@ if [ -n "$(git status --porcelain)" ]; then
     echo ""
 fi
 
+# 检查 CHANGELOG 是否包含当前版本条目
+if [ -f "CHANGELOG.md" ]; then
+    # 计算新版本（用于检查）
+    case $VERSION_TYPE in
+        patch)
+            CHECK_VERSION=$(npm version patch --no-git-tag-version 2>/dev/null | sed 's/^v//')
+            npm version $CURRENT_VERSION --no-git-tag-version --allow-same-version 2>/dev/null || true
+            ;;
+        minor)
+            CHECK_VERSION=$(npm version minor --no-git-tag-version 2>/dev/null | sed 's/^v//')
+            npm version $CURRENT_VERSION --no-git-tag-version --allow-same-version 2>/dev/null || true
+            ;;
+        major)
+            CHECK_VERSION=$(npm version major --no-git-tag-version 2>/dev/null | sed 's/^v//')
+            npm version $CURRENT_VERSION --no-git-tag-version --allow-same-version 2>/dev/null || true
+            ;;
+        *)
+            CHECK_VERSION=$VERSION_TYPE
+            ;;
+    esac
+
+    if ! grep -q "## \[$CHECK_VERSION\]" CHANGELOG.md; then
+        echo -e "${RED}❌ 错误: CHANGELOG.md 缺少版本 $CHECK_VERSION 的条目${NC}"
+        echo -e "请在 CHANGELOG.md 顶部添加版本条目后重试"
+        exit 1
+    fi
+    echo -e "${GREEN}✅ CHANGELOG.md 包含版本 $CHECK_VERSION 条目${NC}"
+fi
+
 # 获取当前版本
 CURRENT_VERSION=$(node -p "require('./package.json').version")
 echo -e "${BLUE}📦 当前版本: $CURRENT_VERSION${NC}"
@@ -85,6 +114,16 @@ case $VERSION_TYPE in
 esac
 
 echo -e "${GREEN}🚀 新版本: $NEW_VERSION${NC}"
+echo ""
+
+# 同步版本号到 AI 文档
+echo -e "${BLUE}📋 同步版本号到 AI 文档...${NC}"
+for file in llms.txt ai-document-index.yaml AI_GUIDE.md AI_DISCOVERY.md; do
+  if [ -f "$file" ]; then
+    sed -i "s/$CURRENT_VERSION/$NEW_VERSION/g" "$file"
+    echo -e "   ✅ 已更新 $file"
+  fi
+done
 echo ""
 
 # 确认发布

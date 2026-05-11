@@ -71,6 +71,26 @@ gh run view {run_id} --repo yuanyuanyuan/mycodemap --log
 - 可能原因：缺少系统依赖（如 `ast-grep`）、SQLite 超时、文件系统差异
 - **修复**: 查看 CI 具体失败的 test 名称，针对性修复或调整超时配置
 
+**模式 5: 测试硬编码路径（2026-05-11 发现）**
+- 测试中硬编码 `/data/codemap` 路径，CI 环境路径为 `/home/runner/work/mycodemap/mycodemap`
+- 表现：`expected "/data/codemap" to be "/home/runner/work/mycodemap/mycodemap"`
+- **修复**: 将硬编码路径改为 `process.cwd()` 或动态获取
+
+**模式 6: 测试依赖索引文件不存在（2026-05-11 发现）**
+- 测试期望 `MISSING_QUERY_TYPE` 错误，但 CI 环境没有 `.mycodemap/codemap.json` 索引文件，返回 `INDEX_NOT_FOUND`
+- 测试期望 `status: 'ok'`，但 CI 环境没有索引文件，返回 `status: 'error'`
+- 涉及文件：
+  - `src/server/mcp/__tests__/dynamic-server.test.ts`
+  - `src/server/mcp/__tests__/CodeMapMcpServer.test.ts`
+  - `src/cli/commands/__tests__/env-contract-command.test.ts`
+  - `tests/e2e/headless-subagent-verification.test.ts`
+- **修复**: 修改测试，使其在没有索引文件时也能通过（检查 `INDEX_NOT_FOUND` 错误或跳过测试）
+
+**模式 7: esbuild ETXTBSY 错误（2026-05-11 发现）**
+- CI 中 `npm ci` 时 esbuild 安装失败，报 `ETXTBSY` 错误
+- 这是 GitHub Actions 的临时问题，不是代码问题
+- **修复**: 重新触发 workflow 即可
+
 ### 4. 输出诊断报告
 
 ```text

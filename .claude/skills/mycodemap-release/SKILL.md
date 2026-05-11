@@ -161,6 +161,10 @@ Orchestrator 完成委托后，**不得**自动执行验证。必须向用户明
 | helper 执行失败 | 返回 `scripts/release.sh` 失败摘要，移交 Recovery Agent |
 | Actions 失败（已推送 tag） | Recovery Agent 分析 → 修复 → 删除并重打 tag → 重新验证 |
 | NPM 未更新（Actions success） | 检查 `publish.yml` 的 `npm publish` 步骤，可能是 dist-tag 或 registry 问题 |
+| CHANGELOG 缺失 | 在 `CHANGELOG.md` 顶部添加版本条目 |
+| 测试硬编码路径 | 将 `/data/codemap` 改为 `process.cwd()` |
+| 测试依赖索引文件 | 修改测试以处理 `INDEX_NOT_FOUND` 错误 |
+| esbuild ETXTBSY | 重新触发 workflow（GitHub Actions 临时问题） |
 
 ---
 
