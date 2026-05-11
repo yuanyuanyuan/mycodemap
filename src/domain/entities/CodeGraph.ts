@@ -42,7 +42,7 @@ export class CodeGraph implements CodeGraphInterface {
     this.project = project;
     this.modules = [...modules];
     this.symbols = [...symbols];
-    this.dependencies = [...dependencies];
+    this.dependencies = CodeGraph.deduplicateDependencies(dependencies);
     this.graphStatus = graphStatus;
     this.failedFileCount = failedFileCount;
     this.parseFailureFiles = [...parseFailureFiles];
@@ -212,6 +212,23 @@ export class CodeGraph implements CodeGraphInterface {
     }
     
     this.dependencies.push(dependency);
+  }
+
+  private static deduplicateDependencies(dependencies: Dependency[]): Dependency[] {
+    const seen = new Set<string>();
+    const deduped: Dependency[] = [];
+
+    for (const dependency of dependencies) {
+      const key = dependency.getKey();
+      if (seen.has(key)) {
+        continue;
+      }
+
+      seen.add(key);
+      deduped.push(dependency);
+    }
+
+    return deduped;
   }
 
   /**

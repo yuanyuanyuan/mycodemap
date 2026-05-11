@@ -102,6 +102,13 @@ export interface ComplexityMetrics {
   };
 }
 
+/** 符号级复杂度指标 */
+export interface SymbolComplexityMetrics {
+  cyclomatic: number;
+  cognitive: number;
+  lines: number;
+}
+
 // ============================================
 // Section 3: 类/接口成员
 // ============================================
@@ -166,6 +173,7 @@ export interface ModuleSymbol {
   // 详细签名信息
   signature?: FunctionSignature;  // 用于函数
   members?: MemberInfo[];         // 用于类/接口
+  complexity?: SymbolComplexityMetrics;
   type?: string;                  // 用于类型别名、变量
   extends?: string[];             // 用于类/接口的继承
   implements?: string[];          // 用于类的实现
@@ -259,6 +267,13 @@ export interface ModuleInfo {
     }>;
     recursive: string[];
     callCounts: Record<string, number>;
+    issues?: Array<{
+      caller: string;
+      expression: string;
+      line: number;
+      column?: number;
+      status: 'unresolved' | 'ambiguous' | 'unsupported_dynamic';
+    }>;
     crossFileCalls?: CrossFileCall[];
   };
 

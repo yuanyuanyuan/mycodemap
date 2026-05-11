@@ -13,6 +13,19 @@ export type DependencyType = 'import' | 'inherit' | 'implement' | 'call' | 'type
 export type DependencyEntityType = 'module' | 'symbol';
 export type DependencyConfidence = 'EXTRACTED' | 'INFERRED' | 'AMBIGUOUS';
 
+function normalizeDependencyPath(filePath?: string): string {
+  return filePath ? filePath.replace(/\\/gu, '/') : '';
+}
+
+function normalizeCanonicalSegment(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, '_')
+    .replace(/^_+|_+$/gu, '')
+    .replace(/_+/gu, '_');
+}
+
 /**
  * 依赖领域实体
  *
@@ -203,14 +216,75 @@ export class Dependency implements DependencyInterface {
   /**
    * 创建唯一键（用于去重）
    */
-  static createKey(sourceId: string, targetId: string, type: DependencyType): string {
-    return `${sourceId}::${targetId}::${type}`;
+  static createKey(
+    sourceId: string,
+    targetId: string,
+    type: DependencyType,
+    sourceEntityType: DependencyEntityType = 'module',
+    targetEntityType: DependencyEntityType = 'module',
+    filePath?: string
+  ): string {
+    return [
+      sourceEntityType,
+      sourceId,
+      type,
+      targetEntityType,
+      targetId,
+      normalizeDependencyPath(filePath),
+    ].join('::');
+  }
+
+  static createModuleReference(modulePath: string): string {
+    return normalizeDependencyPath(modulePath);
+  }
+
+  static createSymbolReference(
+    filePath: string,
+    name: string,
+    line: number,
+    column: number
+  ): string {
+    return [
+      normalizeDependencyPath(filePath),
+      name,
+      String(line),
+      String(column),
+    ].join('::');
+  }
+
+  static createCanonicalId(
+    sourceReference: string,
+    targetReference: string,
+    type: DependencyType,
+    sourceEntityType: DependencyEntityType = 'module',
+    targetEntityType: DependencyEntityType = 'module',
+    filePath?: string
+  ): string {
+    const segments = [
+      sourceEntityType,
+      sourceReference,
+      type,
+      targetEntityType,
+      targetReference,
+      normalizeDependencyPath(filePath),
+    ]
+      .map(normalizeCanonicalSegment)
+      .filter(Boolean);
+
+    return `dep_${segments.join('__')}`;
   }
 
   /**
    * 获取当前依赖的唯一键
    */
   getKey(): string {
-    return Dependency.createKey(this.sourceId, this.targetId, this.type);
+    return Dependency.createKey(
+      this.sourceId,
+      this.targetId,
+      this.type,
+      this.sourceEntityType,
+      this.targetEntityType,
+      this.filePath
+    );
   }
 }

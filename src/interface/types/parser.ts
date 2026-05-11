@@ -36,6 +36,16 @@ export interface ParseOptions {
 // ============================================
 
 /** 调用图信息 */
+export type CallGraphIssueStatus = 'unresolved' | 'ambiguous' | 'unsupported_dynamic';
+
+export interface CallGraphIssue {
+  caller: string;
+  expression: string;
+  line: number;
+  column?: number;
+  status: CallGraphIssueStatus;
+}
+
 export interface CallGraphInfo {
   calls: Array<{
     caller: string;
@@ -43,6 +53,7 @@ export interface CallGraphInfo {
     line: number;
   }>;
   recursive: string[];
+  issues?: CallGraphIssue[];
 }
 
 /** 解析错误 */

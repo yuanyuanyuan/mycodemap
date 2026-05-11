@@ -160,12 +160,29 @@ export interface CommunityCluster {
   cohesion: number;
 }
 
+export interface CommunityTopologyCandidate {
+  moduleId: string;
+  modulePath: string;
+  score: number;
+  connectedModuleCount: number;
+  linkedCommunityLabels: string[];
+  dominantEdgeKinds: Dependency['type'][];
+}
+
+export interface CommunityTopology {
+  dedupedDependencyCount: number;
+  duplicateDependencyCount: number;
+  hubs: CommunityTopologyCandidate[];
+  bridges: CommunityTopologyCandidate[];
+}
+
 export interface SharedCommunityResult {
   status: CommunityAnalysisStatus;
   confidence: CommunityAnalysisConfidence;
   graphStatus: ImpactGraphStatus;
   summary: CommunitySummary;
   communities: CommunityCluster[];
+  topology: CommunityTopology;
   warnings: CommunityWarning[];
   remediation?: string;
   error?: CommunityError;
@@ -298,6 +315,52 @@ export interface StorageConfig {
   };
 }
 
+export interface AgentMetricsDetailPayload {
+  id?: string;
+  queryType: string;
+  commandSlug: string;
+  responseSizeBytes: number;
+  rawCharCount: number;
+  estimatedInputTokens: number;
+  estimatedOutputTokens: number;
+  estimatedTotalTokens: number;
+  executionTimeMs?: number;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface AgentMetricsRunPayload {
+  id?: string;
+  recordedAt?: string;
+  sampleSetVersion: string;
+  estimatorVersion: string;
+  metadata?: Record<string, unknown> | null;
+  items: AgentMetricsDetailPayload[];
+}
+
+export interface AgentMetricsRunRecord {
+  id: string;
+  projectId: string;
+  recordedAt: string;
+  sampleSetVersion: string;
+  estimatorVersion: string;
+  detailCount: number;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface AgentMetricsDetailRecord {
+  id: string;
+  runId: string;
+  queryType: string;
+  commandSlug: string;
+  responseSizeBytes: number;
+  rawCharCount: number;
+  estimatedInputTokens: number;
+  estimatedOutputTokens: number;
+  estimatedTotalTokens: number;
+  executionTimeMs?: number;
+  metadata?: Record<string, unknown> | null;
+}
+
 // ============================================
 // Section 5: 存储接口
 // ============================================
@@ -372,6 +435,21 @@ export interface IStorage {
   
   /** 获取项目统计 */
   getStatistics(): Promise<ProjectStatistics>;
+
+  /** Persist one agent-metrics run plus its detail rows when supported */
+  saveAgentMetricsRun?(payload: AgentMetricsRunPayload): Promise<AgentMetricsRunRecord>;
+
+  /** Load latest agent-metrics run metadata when supported */
+  loadLatestAgentMetricsRun?(): Promise<AgentMetricsRunRecord | null>;
+
+  /** Load the most recent agent-metrics runs in descending recency order when supported */
+  listRecentAgentMetricsRuns?(limit: number): Promise<AgentMetricsRunRecord[]>;
+
+  /** Load detail rows for a specific agent-metrics run when supported */
+  listAgentMetricsByRun?(runId: string): Promise<AgentMetricsDetailRecord[]>;
+
+  /** Load historical agent-metrics detail rows for a query type when supported */
+  listAgentMetricsHistoryByQueryType?(queryType: string): Promise<AgentMetricsDetailRecord[]>;
 }
 
 // ============================================
