@@ -3,7 +3,107 @@
 > **Current active planning truth** lives in `.planning/PROJECT.md`, `.planning/ROADMAP.md`, and `.planning/STATE.md`. During an active milestone, `.planning/REQUIREMENTS.md` joins that set; between milestones it may be absent by design.
 > The shipped entries below are **historical snapshots**. Their `What's next` text records closeout-time context and must not override the current active planning surface.
 
-**Current status:** No active milestone selected. Latest shipped milestone is `v2.4 parser-multilang-depth` (2026-05-10).
+**Current status:** No active milestone is open. Latest shipped milestone is `v2.6 polish-and-stabilize` (2026-05-11); `v2.7 agent-effectiveness-validation` remains a historical shipped snapshot from earlier the same day.
+
+## v2.6 polish-and-stabilize (Shipped: 2026-05-11)
+
+**Goal:** 在不重开新能力主线的前提下，统一 complexity truth、清理 MCP stdio 噪音、稳定 edge ID、补齐 Interface Contract `1.0.0`，并给高频 graph read path 加上有界性能优化。
+
+**Phases completed:** 79, 80, 81, 82, 83 (5 plans total)
+
+**Delivered:**
+
+- TS/JS/Python/Go 的 complexity truth 已统一到单一 canonical analyzer seam
+- MCP stdio transport 已在输入边界过滤空白行，并对 malformed non-blank payload 返回显式 parse-error
+- graph edge ID 已在 generate / SQLite / query / impact 路径统一为稳定 canonical form
+- core interface contract 已升级为 `1.0.0`，注册命令显式 `stable: true`
+- 高频 graph read path 已复用 bounded eager cache 与 prebuilt adjacency index，同时保持 SQLite-only truth 语义
+
+**Key accomplishments:**
+
+- `Phase 79` 收口 active parser / CLI complexity truth 到单一 canonical analyzer，并移除默认 estimate drift
+- `Phase 80` 收口 repo-owned MCP stdio transport seam、blank-line filtering 与 explicit parse-error framing
+- `Phase 81` 收口 canonical edge identity、legacy SQLite edge-ID backfill 与 query-facing parity proof
+- `Phase 82` 收口 required `stable` schema field、`1.0.0` contract version 与 built-in command stability declarations
+- `Phase 83` 收口 prebuilt read index、bounded module-impact cache 和 QueryHandler no-second-walk projection
+
+**Stats:**
+
+- `5/5` milestone requirements satisfied
+- `5/5` plans complete across `5` shipped phases
+- Timeline: `2026-05-11 → 2026-05-11`
+- Milestone audit: `passed`
+- Open artifact audit: `clear` before archival
+- Git range was not captured as a clean isolated slice because milestone work finished on a dirty workspace with mixed in-flight changes
+
+**What's next:** Define the next active milestone. Current candidates remain `v3.0 architecture-intelligence` and follow-up contract/output migration work.
+
+---
+
+## v2.7 agent-effectiveness-validation (Shipped: 2026-05-11)
+
+**Goal:** 为 CodeMap 建立第一套 agent-effectiveness validation 基础设施：`codemap agent-metrics` 命令提供 token 成本分析、报告聚合、CI threshold gate，以及趋势 / 分布 / 高成本 advisory。
+
+**Phases completed:** 75, 76, 77, 78 (4 plans total)
+
+**Delivered:**
+
+- `codemap agent-metrics` 已作为独立命令家族交付 `token` / `report` 表面，并持久化 run/detail truth
+- report surface 已支持 grouped summary、summary-first human output 与 explicit latest-run-only semantics
+- row-level threshold gate 已进入 report/root 路径，显式阈值失败返回非零退出码，默认保持 warn-only
+- intelligence layer 已提供 latest-vs-previous 趋势、`p50/p95/max` 分布与 highest-cost advisory，且不改变 Phase 77 gate 语义
+
+**Key accomplishments:**
+
+- `Phase 75` 收口 fixed built-in sample set、estimated-token truth separation、SQLite persistence 与 interface-contract entry
+- `Phase 76` 收口 grouped query-type summaries、summary-first human layout 与 explicit report-vs-root semantics split
+- `Phase 77` 收口 row-level threshold gating、warn/pass/fail gate contract 与 CLI-edge non-zero exit behavior
+- `Phase 78` 收口 latest-vs-previous trend truth、distribution depth、highest-cost advisory，并重建 `dist/` 消除 runtime drift
+
+**Stats:**
+
+- `13/13` milestone requirements satisfied
+- `4/4` plans complete across `4` shipped phases
+- Timeline: `2026-05-10 → 2026-05-11`
+- Milestone audit: `passed`
+- Open artifact audit: `clear` before archival
+- Git range was not captured as a clean isolated slice because milestone work finished on a dirty workspace with mixed in-flight changes
+
+**What's next:** Define the next active milestone. Current candidates remain `v3.0 architecture-intelligence` and follow-up contract/output migration work.
+
+---
+
+## v2.5 deep-analysis-hooks (Shipped: 2026-05-10)
+
+**Goal:** 在 `v2.4` 已收敛的 Python AST / shared parser/type baseline 之上，交付 Python call-graph / complexity 真相，并补齐 hub / bridge、dedup 与 env-contract reminder hook follow-ups。
+
+**Phases completed:** 70, 72, 73, 74 (4 plans total)
+
+**Delivered:**
+
+- Python parser/analyzer 现在能产出 conservative call-graph truth，跨文件 imported callee 解析继续走 shared global-index / analyzer seam
+- Python complexity 已进入 shared module/symbol truth，`complexity` CLI 默认优先读取 persisted truth
+- persisted graph/community truth 现在暴露 bounded hub / bridge insight，并在 materialization、SQLite writeback、projection 三层压制重复 graph artifact
+- delegated-start hook 现在按 parent session × role 只提醒一次 `env-contract` retrieval，并把 retrieval failure 保持为可见 warn-and-continue 输出
+
+**Key accomplishments:**
+
+- `Phase 70` 收口 qualified method symbol naming、explicit non-edge call issues、Python-aware imported callee resolution
+- `Phase 72` 收口 AST-based Python complexity persistence、symbol-level backfill 与 persisted-read CLI proof
+- `Phase 73` 收口 canonical dependency dedup key、module-level hub / bridge insight 与 warning-aware MCP exposure
+- `Phase 74` 收口 shared reminder engine、temp session-role ledger、Codex/Claude runtime adapters 与 visible retrieval-remediation output
+
+**Stats:**
+
+- `5/5` milestone requirements satisfied
+- `4/4` plans complete across `4` shipped phases
+- Timeline: `2026-05-10 → 2026-05-10`
+- Milestone audit: `passed`
+- Git range was not captured as a clean isolated slice because milestone work finished on a dirty workspace with mixed in-flight changes
+
+**What's next:** Continue `v2.7 agent-effectiveness-validation`; keep `v2.6` polish items and `v3.0` architecture-intelligence as later candidates.
+
+---
 
 ## v2.4 parser-multilang-depth (Shipped: 2026-05-10)
 
