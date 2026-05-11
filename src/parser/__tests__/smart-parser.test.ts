@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs/promises';
 import { SmartParser } from '../implementations/smart-parser.js';
+import { analyzeComplexityFromContent } from '../../core/ast-complexity-analyzer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -195,6 +196,18 @@ export { TestClass, TestInterface };
         f => f.cognitive !== undefined
       );
       expect(hasCognitive).toBe(true);
+    });
+
+    it('should delegate complexity output to the canonical analyzer', async () => {
+      const content = await fs.readFile(testFile, 'utf-8');
+      const result = await parser.parseFile(testFile);
+      const expected = analyzeComplexityFromContent({
+        filePath: testFile,
+        language: 'typescript',
+        content,
+      });
+
+      expect(result.complexity).toEqual(expected);
     });
   });
 

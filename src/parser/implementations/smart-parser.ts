@@ -9,6 +9,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import type { IParser, ParseResult, ParserOptions, TypeInfo, CallGraph, ComplexityMetrics } from '../interfaces/IParser.js';
 import type { ExportInfo, ImportInfo, ModuleSymbol, SymbolKind, DecoratorInfo, FunctionSignature, ParameterInfo, MemberInfo, JSDocComment, CodeSnippet, CodeSnippetType } from '../../types/index.js';
+import { analyzeComplexityFromContent } from '../../core/ast-complexity-analyzer.js';
 
 /**
  * 将构建路径转换为源代码路径
@@ -1466,78 +1467,12 @@ export class SmartParser implements IParser {
   /**
    * 计算复杂度
    */
-  private calculateComplexity(sourceFile: ts.SourceFile, content: string): ComplexityMetrics {
-    let cyclomatic = 1;
-    let cognitive = 0;
-    const details: ComplexityMetrics['details']['functions'] = [];
-
-    const visit = (node: ts.Node, depth: number) => {
-      let funcName: string | undefined;
-      let funcNode: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | undefined;
-
-      if (ts.isFunctionDeclaration(node) && node.name) {
-        funcName = node.name.text;
-        funcNode = node;
-      } else if (ts.isMethodDeclaration(node) && node.name) {
-        // 获取方法名
-        const methodName = node.name;
-        if (ts.isIdentifier(methodName)) {
-          funcName = methodName.text;
-        } else if (ts.isStringLiteral(methodName)) {
-          funcName = methodName.text;
-        }
-        funcNode = node;
-      } else if (ts.isArrowFunction(node)) {
-        // 箭头函数通常没有名字，跳过详细信息但仍计算复杂度
-        funcName = '(arrow)';
-        funcNode = node;
-      }
-
-      if (funcNode && funcName) {
-        const funcCyclomatic = this.calculateFunctionCyclomatic(funcNode);
-        const funcCognitive = this.calculateFunctionCognitive(funcNode);
-        cyclomatic += funcCyclomatic;
-        cognitive += funcCognitive;
-
-        // 只为有名字的函数添加详情
-        if (funcName !== '(arrow)') {
-          details.push({
-            name: funcName,
-            cyclomatic: funcCyclomatic,
-            cognitive: funcCognitive,
-            lines: funcNode.getEnd() - funcNode.getStart()
-          });
-        }
-      }
-      ts.forEachChild(node, n => visit(n, depth + 1));
-    };
-
-    visit(sourceFile, 0);
-
-    // 计算代码行数和注释比例
-    const lines = content.split('\n');
-    let codeLines = 0;
-    let commentLines = 0;
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed === '') continue;
-      if (trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
-        commentLines++;
-      } else {
-        codeLines++;
-      }
-    }
-    const commentRatio = codeLines > 0 ? commentLines / (codeLines + commentLines) : 0;
-    
-    // 计算可维护性指数
-    const maintainability = this.calculateMaintainabilityIndex(codeLines, cyclomatic, commentRatio);
-
-    return {
-      cyclomatic,
-      cognitive,
-      maintainability,
-      details: { functions: details.slice(0, 10) }
-    };
+  private calculateComplexity(_sourceFile: ts.SourceFile, content: string): ComplexityMetrics {
+    return analyzeComplexityFromContent({
+      filePath: '/virtual.ts',
+      content,
+      language: 'typescript',
+    });
   }
 
   /**
