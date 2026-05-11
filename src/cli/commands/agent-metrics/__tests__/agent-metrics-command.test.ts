@@ -169,7 +169,7 @@ describe('agent-metrics command', () => {
 
     await command.parseAsync(['node', 'agent-metrics', 'token', '--json']);
 
-    expect(mockService.executeTokenRun).toHaveBeenCalledWith('/data/codemap');
+    expect(mockService.executeTokenRun).toHaveBeenCalledWith(process.cwd());
     expect(mockService.runReportFlow).not.toHaveBeenCalled();
   });
 
@@ -178,7 +178,7 @@ describe('agent-metrics command', () => {
 
     await command.parseAsync(['node', 'agent-metrics', 'report', '--json']);
 
-    expect(mockService.requireLatestReport).toHaveBeenCalledWith('/data/codemap');
+    expect(mockService.requireLatestReport).toHaveBeenCalledWith(process.cwd());
     expect(mockService.executeTokenRun).not.toHaveBeenCalled();
   });
 
@@ -187,7 +187,7 @@ describe('agent-metrics command', () => {
 
     await command.parseAsync(['node', 'agent-metrics', '--json']);
 
-    expect(mockService.runReportFlow).toHaveBeenCalledWith('/data/codemap');
+    expect(mockService.runReportFlow).toHaveBeenCalledWith(process.cwd());
   });
 
   it('emits JSON output with schemaVersion and explicit estimated-token field names', async () => {
@@ -258,7 +258,7 @@ describe('agent-metrics command', () => {
 
     await command.parseAsync(['node', 'agent-metrics', 'report', '--json']);
 
-    expect(mockService.requireLatestReport).toHaveBeenCalledWith('/data/codemap');
+    expect(mockService.requireLatestReport).toHaveBeenCalledWith(process.cwd());
     expect(mockService.runReportFlow).not.toHaveBeenCalled();
     expect(process.exitCode).toBe(1);
   });
@@ -295,7 +295,7 @@ describe('agent-metrics command', () => {
       .find((line) => line.includes('agent-metrics.report.v1'));
     const parsed = JSON.parse(String(output).trim()) as Record<string, unknown>;
 
-    expect(mockService.runReportFlow).toHaveBeenCalledWith('/data/codemap');
+    expect(mockService.runReportFlow).toHaveBeenCalledWith(process.cwd());
     expect(parsed.gate).toEqual(expect.objectContaining({
       verdict: 'fail',
       warnOnly: false,
@@ -315,7 +315,7 @@ describe('agent-metrics command', () => {
       .find((line) => line.includes('agent-metrics.report.v1'));
     const parsed = JSON.parse(String(output).trim()) as Record<string, unknown>;
 
-    expect(mockService.requireLatestReport).toHaveBeenCalledWith('/data/codemap');
+    expect(mockService.requireLatestReport).toHaveBeenCalledWith(process.cwd());
     expect(parsed.gate).toEqual(expect.objectContaining({
       verdict: 'pass',
       warnOnly: false,
@@ -334,7 +334,7 @@ describe('agent-metrics command', () => {
 
     await command.parseAsync(['node', 'agent-metrics', 'report', '--json', '--max-tokens-per-query', '20']);
 
-    expect(mockService.requireLatestReport).toHaveBeenCalledWith('/data/codemap');
+    expect(mockService.requireLatestReport).toHaveBeenCalledWith(process.cwd());
     expect(mockService.runReportFlow).not.toHaveBeenCalled();
     expect(process.exitCode).toBe(1);
   });
