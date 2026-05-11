@@ -31,6 +31,7 @@ The build emits compiled output into `dist/`, and the package ships the CLI from
 | `npm test` | Run the Vitest suite |
 | `npm run test:all` | Run tests and benchmarks together |
 | `npm run test:e2e` | Run workflow and integration-style tests |
+| `npm run hooks:smoke` | Run real git commit smoke cases for the managed hook payloads |
 | `npm run benchmark` | Run benchmark checks |
 | `npm run docs:check` | Validate human and AI documentation |
 | `npm run docs:check:human` | Validate human-facing docs only |

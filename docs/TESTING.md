@@ -16,6 +16,7 @@ No global setup file is required; install dependencies with `npm ci` (or `npm in
 |---|---|
 | `npm test` | Run the default Vitest suite (all `src/**/*.test.ts` files) |
 | `npm run test:e2e` | Run the end-to-end workflow suite (`tests/e2e/**/*.test.ts`) |
+| `npm run hooks:smoke` | Run real git commit smoke cases for the managed hook payloads |
 | `npx vitest` | Start Vitest in watch mode |
 | `npm run benchmark` | Run benchmark validation |
 | `npm run test:all` | Run tests followed by benchmarks |
@@ -68,6 +69,8 @@ Tests run in the **CI Gateway** workflow (`.github/workflows/ci-gateway.yml`), w
 Relevant CI steps:
 1. `npm test` — runs the default Vitest suite
 2. `npm run test:e2e` — runs the E2E workflow guardrail
+
+For changes that touch `.githooks/`, `.mycodemap/hooks/`, or `scripts/hooks/templates/`, also run `npm run hooks:smoke` to verify both blocker paths and a valid commit pass with a real temporary Git repository.
 
 The same workflow also runs typecheck, lint, docs validation, contract gate checks, and CLI guardrails before considering the build green.
 

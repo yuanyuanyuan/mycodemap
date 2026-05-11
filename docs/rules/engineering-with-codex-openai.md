@@ -81,10 +81,10 @@
 ## 5. 当前项目的 CI 护栏
 
 - 本地护栏：
-  - `.githooks/pre-commit` 会执行变更相关测试、文件头检查，并尝试生成 AI feed。
-  - `.githooks/pre-commit` 还会读取 `.claude/rule-system.config.json` 的 `hard_gate.mode`：`report-only` 时执行 `python3 scripts/validate-rules.py code --report-only` 并继续；`enforce` 时执行 `python3 scripts/validate-rules.py code`，其中 `1/4` 阻断、`2/3` 只告警。
-  - 当变更涉及 README、`docs/`、CLI 入口、测试配置或 CI 配置时，`.githooks/pre-commit` 还会执行 `npm run docs:check`。
-  - `.githooks/commit-msg` 只校验 `[TAG] scope: message` 格式；单次 commit 文件数量限制只保留在 `.githooks/pre-commit`。
+  - `.githooks/pre-commit` 是 Git 入口 shim；canonical payload 位于 `.mycodemap/hooks/pre-commit`，由它执行变更相关测试、文件头检查，并尝试生成 AI feed。
+  - `.mycodemap/hooks/pre-commit` 还会读取 `.claude/rule-system.config.json` 的 `hard_gate.mode`：`report-only` 时执行 `python3 scripts/validate-rules.py code --report-only` 并继续；`enforce` 时执行 `python3 scripts/validate-rules.py code`，其中 `1/4` 阻断、`2/3` 只告警。
+  - 当变更涉及 README、`docs/`、CLI 入口、测试配置或 CI 配置时，`.mycodemap/hooks/pre-commit` 会执行 `npm run docs:check`。
+  - `.githooks/commit-msg` 同样只作为入口 shim；`.mycodemap/hooks/commit-msg` 负责校验 `[TAG] scope: message` 格式。单次 commit 文件数量限制只保留在 `.mycodemap/hooks/pre-commit`。
 - 服务端护栏：
   - `.github/workflows/ci-gateway.yml` 包含固定命名的 `Rule validation backstop` step；即使本地使用 `git commit --no-verify` 绕过 hooks，CI 仍会运行 `python3 scripts/validate-rules.py code`，并仅在退出码 `1` 或 `4` 时 fail，`2/3` 只输出 warn-only / notice-only。
   - `.github/workflows/ci-gateway.yml` 会执行 `npm run docs:check`、`npm run typecheck`、`npm test`、`npm run test:e2e`、`npm run build`，并通过 `node dist/cli/index.js ci ...` 执行 `check-docs-sync`（含 docs guardrail + analyze generated block）、`check-commits`、`check-commit-size`、`check-headers`、`assess-risk`、`check-output-contract` 与 AI feed 同步检查。

@@ -48,6 +48,15 @@ if ! echo "$MSG" | grep -qE '^\\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\\]
 fi
 `;
 
+  const SAMPLE_PRE_COMMIT = `#!/bin/sh
+MAX_FILES_PER_COMMIT=10
+MAX_FILES_WITH_DOCS=20
+echo "Checking file headers..."
+echo "[META]"
+echo "[WHY]"
+DOC_GUARDRAIL_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(README\\.md|package\\.json|docs/|src/cli/index\\.ts|vitest\\.config\\.ts|vitest\\.benchmark\\.config\\.ts|\\.github/workflows/ci-gateway\\.yml)$' || true)
+`;
+
   const SAMPLE_PACKAGE = JSON.stringify(
     {
       name: 'test-project',
@@ -78,10 +87,21 @@ export default defineConfig({
 });
 `;
 
-  it('produces all five critical/high items when all sources are present', () => {
+  const SAMPLE_DEVELOPMENT = `## PR process
+
+- Use the commit format [TAG] scope: message. Valid tags: \`BUGFIX\`, \`FEATURE\`, \`REFACTOR\`, \`CONFIG\`, \`DOCS\`, \`DELETE\`.
+`;
+
+  const SAMPLE_README_ZH_CONFLICT = `## 提交规范
+
+支持的提交 TAG 类型：\`[REFACTOR]\`, \`[TEST]\`, \`[DOCS]\`, \`[FEAT]\`, \`[FIX]\`
+`;
+
+  it('produces runtime, commit, execution, retrieval, and validation items when all sources are present', () => {
     const dir = createTempDir();
     writeFile(dir, 'AGENTS.md', SAMPLE_AGENTS);
     writeFile(dir, '.githooks/commit-msg', SAMPLE_HOOK);
+    writeFile(dir, '.githooks/pre-commit', SAMPLE_PRE_COMMIT);
     writeFile(dir, 'package.json', SAMPLE_PACKAGE);
     writeFile(dir, 'docs/rules/testing.md', SAMPLE_TESTING);
     writeFile(dir, 'vitest.config.ts', SAMPLE_VITEST_CONFIG);
@@ -95,15 +115,19 @@ export default defineConfig({
 
     const ids = contract.items.map((item) => item.id);
     expect(ids).toContain('shell-rtk-wrapper');
+    expect(ids).toContain('hook-runtime-topology');
     expect(ids).toContain('commit-format');
+    expect(ids).toContain('staged-file-limit');
+    expect(ids).toContain('source-file-headers');
+    expect(ids).toContain('docs-guardrail');
     expect(ids).toContain('test-entry-vitest');
     expect(ids).toContain('codemap-query-priority');
     expect(ids).toContain('real-scenario-validation');
 
-    expect(contract.items.length).toBeGreaterThanOrEqual(5);
+    expect(contract.items.length).toBeGreaterThanOrEqual(9);
   });
 
-  it('commit-format item includes validTags from hook', () => {
+  it('commit-format item includes validTags from managed hook payload', () => {
     const dir = createTempDir();
     writeFile(dir, 'AGENTS.md', SAMPLE_AGENTS);
     writeFile(dir, '.githooks/commit-msg', SAMPLE_HOOK);
@@ -122,12 +146,14 @@ export default defineConfig({
       'DOCS',
       'DELETE',
     ]);
+    expect(commitItem!.sources[0]?.file).toBe('.githooks/commit-msg');
   });
 
   it('every discovered item has at least one source with file, hash, and authority', () => {
     const dir = createTempDir();
     writeFile(dir, 'AGENTS.md', SAMPLE_AGENTS);
     writeFile(dir, '.githooks/commit-msg', SAMPLE_HOOK);
+    writeFile(dir, '.githooks/pre-commit', SAMPLE_PRE_COMMIT);
     writeFile(dir, 'package.json', SAMPLE_PACKAGE);
 
     const contract = discoverProjectEnvironmentContract(dir);
@@ -142,10 +168,11 @@ export default defineConfig({
     }
   });
 
-  it('sourceSnapshots includes package.json, .githooks/commit-msg, AGENTS.md, and docs/rules/testing.md when present', () => {
+  it('sourceSnapshots include managed hook payloads and governance sources when present', () => {
     const dir = createTempDir();
     writeFile(dir, 'AGENTS.md', SAMPLE_AGENTS);
     writeFile(dir, '.githooks/commit-msg', SAMPLE_HOOK);
+    writeFile(dir, '.githooks/pre-commit', SAMPLE_PRE_COMMIT);
     writeFile(dir, 'package.json', SAMPLE_PACKAGE);
     writeFile(dir, 'docs/rules/testing.md', SAMPLE_TESTING);
 
@@ -154,6 +181,7 @@ export default defineConfig({
     const snapshotFiles = contract.sourceSnapshots.map((s) => s.file);
     expect(snapshotFiles).toContain('AGENTS.md');
     expect(snapshotFiles).toContain('.githooks/commit-msg');
+    expect(snapshotFiles).toContain('.githooks/pre-commit');
     expect(snapshotFiles).toContain('package.json');
     expect(snapshotFiles).toContain('docs/rules/testing.md');
 
@@ -163,9 +191,10 @@ export default defineConfig({
     }
   });
 
-  it('classifies .githooks/* and package.json as executable authority', () => {
+  it('classifies managed hooks, legacy hooks, and package.json as executable authority', () => {
     const dir = createTempDir();
     writeFile(dir, '.githooks/commit-msg', SAMPLE_HOOK);
+    writeFile(dir, '.githooks/pre-commit', SAMPLE_PRE_COMMIT);
     writeFile(dir, 'package.json', SAMPLE_PACKAGE);
 
     const contract = discoverProjectEnvironmentContract(dir);
@@ -177,6 +206,45 @@ export default defineConfig({
     const testItem = contract.items.find((item) => item.id === 'test-entry-vitest');
     expect(testItem).toBeDefined();
     expect(testItem!.sources[0].authority).toBe('executable');
+  });
+
+  it('falls back to .githooks when managed payloads are missing', () => {
+    const dir = createTempDir();
+    writeFile(dir, '.githooks/commit-msg', SAMPLE_HOOK);
+
+    const contract = discoverProjectEnvironmentContract(dir);
+    const commitItem = contract.items.find((item) => item.id === 'commit-format');
+
+    expect(commitItem).toBeDefined();
+    expect(commitItem!.sources[0]?.file).toBe('.githooks/commit-msg');
+  });
+
+  it('does not report commit-tag conflicts from unrelated lowercase governance text', () => {
+    const dir = createTempDir();
+    writeFile(dir, 'AGENTS.md', `# AGENTS.md\n- docs/rules/\n- config changes need validation\n`);
+    writeFile(dir, '.githooks/commit-msg', SAMPLE_HOOK);
+    writeFile(dir, 'docs/DEVELOPMENT.md', SAMPLE_DEVELOPMENT);
+
+    const contract = discoverProjectEnvironmentContract(dir);
+
+    expect(contract.conflicts).toEqual([]);
+  });
+
+  it('reports commit-tag conflicts when a documented tag list drifts from the hook', () => {
+    const dir = createTempDir();
+    writeFile(dir, '.githooks/commit-msg', SAMPLE_HOOK);
+    writeFile(dir, 'README.zh-CN.md', SAMPLE_README_ZH_CONFLICT);
+
+    const contract = discoverProjectEnvironmentContract(dir);
+
+    expect(contract.conflicts).toHaveLength(1);
+    expect(contract.conflicts[0]).toMatchObject({
+      id: 'commit-tag-case',
+      sources: [
+        { file: '.githooks/commit-msg', value: 'BUGFIX CONFIG DELETE DOCS FEATURE REFACTOR' },
+        { file: 'README.zh-CN.md', value: 'DOCS FEAT FIX REFACTOR TEST' },
+      ],
+    });
   });
 
   it('classifies AGENTS.md and docs/rules/ as governance authority', () => {

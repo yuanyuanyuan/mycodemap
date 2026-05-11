@@ -53,7 +53,8 @@ const REQUIRED_FIXTURE_FILES = [
   'vitest.config.ts',
   'vitest.benchmark.config.ts',
   '.github/workflows/ci-gateway.yml',
-  '.githooks/pre-commit'
+  '.githooks/pre-commit',
+  '.mycodemap/hooks/pre-commit'
 ];
 
 function createFixtureRoot(): string {

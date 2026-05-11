@@ -1632,6 +1632,9 @@ function validateGuardrailDocs(rootDir, failures) {
   const validationRule = readText(rootDir, 'docs/rules/validation.md', failures);
   const ciWorkflow = readText(rootDir, '.github/workflows/ci-gateway.yml', failures);
   const preCommitHook = readText(rootDir, '.githooks/pre-commit', failures);
+  const managedPreCommitHook = existsSync(path.join(rootDir, '.mycodemap/hooks/pre-commit'))
+    ? readText(rootDir, '.mycodemap/hooks/pre-commit', failures)
+    : '';
 
   if (readme) {
     const requiredReadmeGuardrails = [
@@ -1648,6 +1651,7 @@ function validateGuardrailDocs(rootDir, failures) {
   if (engineeringRule) {
     const requiredReferences = [
       '.githooks/pre-commit',
+      '.mycodemap/hooks/pre-commit',
       '.githooks/commit-msg',
       '.github/workflows/ci-gateway.yml',
       '.github/workflows/publish.yml',
@@ -1684,7 +1688,19 @@ function validateGuardrailDocs(rootDir, failures) {
   }
 
   if (preCommitHook) {
-    expectIncludes(preCommitHook, 'npm run docs:check', '.githooks/pre-commit', failures);
+    const isManagedShim =
+      preCommitHook.includes('CODEMAP_HOOK=') &&
+      preCommitHook.includes('.mycodemap/hooks/pre-commit');
+
+    if (isManagedShim) {
+      if (!managedPreCommitHook) {
+        failures.push('.githooks/pre-commit forwards to .mycodemap/hooks/pre-commit, but the canonical payload is missing');
+      } else {
+        expectIncludes(managedPreCommitHook, 'npm run docs:check', '.mycodemap/hooks/pre-commit', failures);
+      }
+    } else {
+      expectIncludes(preCommitHook, 'npm run docs:check', '.githooks/pre-commit', failures);
+    }
   }
 }
 

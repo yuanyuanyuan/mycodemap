@@ -1093,4 +1093,4 @@ mycodemap ci check-commit-size -m 15
 > `mycodemap ship` 的 CHECK 阶段现在复用 `ci check-working-tree`、`ci check-branch`、`ci check-scripts` 作为 must-pass 事实源，而不是重复实现这些检查。
 > `mycodemap ci check-headers -d <dir>` 与 `generate` / `analyze` 共享同一套 `.gitignore` 感知排除模块；若仓库没有 `.gitignore`，则回退到默认 `exclude` 列表。
 
-支持的提交 TAG 类型：`[REFACTOR]`, `[TEST]`, `[DOCS]`, `[FEAT]`, `[FIX]`, `[CHORE]`, `[PERF]`, `[SECURITY]`, `[BREAKING]`, `[HOTFIX]`, `[MIGRATION]`, `[WIP]`
+支持的提交 TAG 类型：`[BUGFIX]`, `[FEATURE]`, `[REFACTOR]`, `[CONFIG]`, `[DOCS]`, `[DELETE]`

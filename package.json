@@ -37,6 +37,7 @@
     "docs:check:pre-release": "node scripts/pre-release-check.js",
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "hooks:smoke": "bash scripts/smoke-commit-hooks.sh",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "benchmark": "bash scripts/run-benchmark.sh",

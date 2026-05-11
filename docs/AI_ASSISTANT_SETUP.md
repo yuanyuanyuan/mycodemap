@@ -129,18 +129,18 @@ codemap_env_contract(agentType="explore")
 
 ### Claude Code SubagentStart Hook 示例
 
-在 `.claude/settings.json` 中配置 `SubagentStart` hook，让子代理在启动时自动检索契约：
+在 `.claude/settings.json` 中配置 `SubagentStart` hook，让子代理在启动时使用 runtime reminder hook：
 
 ```json
 {
   "hooks": {
     "SubagentStart": [
       {
-        "matcher": "Explore",
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SubagentStart\",\"additionalContext\":\"Before exploring, query project rules: mycodemap env-contract --for explore --json\"}}'"
+            "command": "mycodemap env-contract --run-reminder-hook claude"
           }
         ]
       }
@@ -151,7 +151,7 @@ codemap_env_contract(agentType="explore")
 
 ### Codex developer_instructions 示例
 
-在 `.codex/agents/worker.toml` 中配置检索指引：
+在 `.codex/agents/worker.toml` 中配置 delegated-start reminder + 检索指引：
 
 ```toml
 name = "worker"
@@ -159,13 +159,17 @@ description = "Execution-focused agent for implementation and fixes"
 developer_instructions = """
 You are a worker agent responsible for implementing and fixing code.
 
-Before starting any task, query the project environment contract:
+Enable the delegated-start reminder hook:
+- Run: mycodemap env-contract --run-reminder-hook codex
+
+When you need the project environment contract:
 - Run: mycodemap env-contract --for worker --json
 - Or use the MCP tool: codemap_env_contract(agentType="worker")
 
 The contract contains project-specific rules that you MUST follow, including:
 - Shell command wrappers (e.g., rtk)
 - Commit message format
+- Commit precheck guardrails and recovery hints
 - Test entry commands
 - Code style requirements
 """

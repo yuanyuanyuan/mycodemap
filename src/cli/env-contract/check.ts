@@ -67,7 +67,7 @@ export function checkProjectEnvironmentContract(
       id: 'critical-items-present',
       severity: 'error',
       message: `Missing critical contract items: ${missingCritical.join(', ')}`,
-      remediation: 'Ensure .githooks/commit-msg and package.json scripts.test exist, then regenerate.',
+      remediation: 'Ensure the managed hook payloads (.mycodemap/hooks or legacy fallbacks) and package.json scripts.test exist, then regenerate.',
     });
   } else {
     diagnostics.push({

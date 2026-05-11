@@ -7,7 +7,7 @@
 | 场景 | 先跑什么 | 为什么 |
 |---|---|---|
 | 改 rules / CLAUDE / README / AI 文档 / 测试事实 | `npm run docs:check` | 先挡住文档漂移 |
-| 改 repo-local 规则控制脚本或 hook 路由 | `python3 scripts/validate-rules.py code --report-only` | 先看 contract，不先硬阻断 |
+| 改 repo-local 规则控制脚本或 hook 路由 | `python3 scripts/validate-rules.py code --report-only` → `npm run hooks:smoke` | 先看 contract，再验证真实 commit 阻断/放行 |
 | 改 CLI 文档入口或统一 guardrail | `node dist/cli/index.js ci check-docs-sync` | 同时验证 docs guardrail 与 analyze generated block |
 | 改实现代码 | `npm run typecheck` → `npm run lint` → `npm test` | 从最小相关验证扩到基础回归 |
 | 改发布/打包边界 | `npm run docs:check:pre-release` → `npm run build` → `npm run validate-pack` | 先锁版本/发布契约，再确认 shipped artifact 仍成立 |
@@ -17,6 +17,7 @@
 - 文档/入口变更先跑 `npm run docs:check`。
 - 统一 docs/AI guardrail 入口：`node dist/cli/index.js ci check-docs-sync`（产品命令等价于 `mycodemap ci check-docs-sync`）。
 - repo-local rules 预检：`python3 scripts/validate-rules.py code --report-only` 只报告，不阻断。
+- 改 `.githooks/`、`.mycodemap/hooks/` 或 `scripts/hooks/templates/` 后，再跑 `npm run hooks:smoke`，确认真实 commit 的失败场景和成功场景都成立。
 - CI / PR 超窗、fallback 或 false-positive 漂移时，`warn-only / fallback` 不是 hard gate success。
 
 ## Repo-local rule validator
@@ -94,6 +95,7 @@
 
 ```bash
 python3 scripts/validate-rules.py code --report-only
+npm run hooks:smoke
 npm run docs:check
 node dist/cli/index.js ci check-docs-sync
 node scripts/calibrate-contract-gate.mjs --max-changed-files 10 --max-false-positive-rate 0.10

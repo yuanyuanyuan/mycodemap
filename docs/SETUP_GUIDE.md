@@ -117,8 +117,8 @@ mycodemap init -y
 
 `mycodemap init` 还会生成 `.mycodemap/env-contract.json`，这是一个结构化的项目规则索引，包含：
 
-- **执行规则**：shell 命令包装（rtk）、测试入口命令（vitest run）
-- **提交规则**：commit message 格式（`[TAG] scope: message`）、有效标签列表
+- **执行规则**：shell 命令包装（rtk）、测试入口命令（vitest run）、hook runtime 入口拓扑
+- **提交规则**：commit message 格式（`[TAG] scope: message`）、有效标签列表、staged file limit、docs guardrail 触发条件
 - **验证规则**：真实场景验证要求、代码质量标准
 - **来源追踪**：每条规则的源文件和 hash，用于漂移检测
 
@@ -385,16 +385,18 @@ npm run postinstall  # 如果 package.json 中配置了
 sh scripts/hooks/install-hooks.sh
 ```
 
+> 当前 canonical hook payload 位于 `.mycodemap/hooks/`。`mycodemap init` 默认安装 `.git/hooks/*` shim；`scripts/hooks/install-hooks.sh` 使用 `.githooks/*` shim。两者都会转发到同一份 `.mycodemap/hooks/*` payload。
+
 #### 手动配置
 
-如果项目没有提供 hooks 安装脚本，可以手动配置：
+如果项目没有提供 hooks 安装脚本，可以手动配置 canonical payload + shim：
 
 ```bash
-# 创建 .githooks 目录
-mkdir -p .githooks
+# 创建 canonical payload 目录
+mkdir -p .mycodemap/hooks .githooks
 
-# 创建 pre-commit hook
-cat > .githooks/pre-commit << 'EOF'
+# 创建 canonical pre-commit payload
+cat > .mycodemap/hooks/pre-commit << 'EOF'
 #!/bin/sh
 # MyCodeMap pre-commit check
 
@@ -414,9 +416,41 @@ fi
 exit 0
 EOF
 
-chmod +x .githooks/pre-commit
+# 创建 legacy shim（转发到 canonical payload）
+cat > .githooks/pre-commit << 'EOF'
+#!/bin/sh
+set -eu
 
-# 配置 git 使用自定义 hooks 目录
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+"$REPO_ROOT/.mycodemap/hooks/pre-commit" "$@"
+EOF
+
+chmod +x .mycodemap/hooks/pre-commit .githooks/pre-commit
+
+# 创建 canonical commit-msg payload
+cat > .mycodemap/hooks/commit-msg << 'EOF'
+#!/bin/sh
+MSG_FILE=$1
+MSG=$(head -1 "$MSG_FILE")
+
+echo "$MSG" | grep -qE '^\[(BUGFIX|FEATURE|REFACTOR|CONFIG|DOCS|DELETE)\]\s+[^:]+:\s+.+' || {
+  echo "Commit message must use: [TAG] scope: message"
+  exit 1
+}
+EOF
+
+# 创建 legacy commit-msg shim
+cat > .githooks/commit-msg << 'EOF'
+#!/bin/sh
+set -eu
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+"$REPO_ROOT/.mycodemap/hooks/commit-msg" "$@"
+EOF
+
+chmod +x .mycodemap/hooks/commit-msg .githooks/commit-msg
+
+# 配置 git 使用 shim 目录
 git config core.hookspath .githooks
 ```
 
