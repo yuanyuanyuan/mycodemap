@@ -201,4 +201,120 @@ describe("analyze", () => {
     expect(ambiguousModule?.typeInfo?.unionTypes).toEqual([]);
     expect(ambiguousModule?.typeInfo?.typeDefinitions).toEqual([]);
   });
+
+  it("persists Python callGraph truth, cross-file calls, and unsupported dynamic issues", async () => {
+    const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "codemap-python-callgraph-"));
+    tempDirs.push(rootDir);
+    await fs.mkdir(path.join(rootDir, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(rootDir, "src", "helpers.py"),
+      [
+        "def helper_run():",
+        "    return 1",
+        "",
+        "class Service:",
+        "    @staticmethod",
+        "    def utility():",
+        "        return helper_run()",
+      ].join("\n"),
+      "utf-8",
+    );
+    await fs.writeFile(
+      path.join(rootDir, "src", "main.py"),
+      [
+        "from helpers import helper_run, Service",
+        "",
+        "def execute():",
+        "    helper_run()",
+        "    Service.utility()",
+        "",
+        "def dynamic(target, method_name):",
+        "    getattr(target, method_name)()",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    const codeMap = await analyze(withAnalysisContext({
+      rootDir,
+      mode: "tree-sitter",
+      include: ["src/**/*.py"],
+      enhanceTypes: true,
+    }));
+
+    const mainModule = codeMap.modules.find((module) => module.path.endsWith("/src/main.py"));
+
+    expect(mainModule?.callGraph?.calls).toEqual(expect.arrayContaining([
+      expect.objectContaining({ caller: "execute", callee: "helper_run" }),
+      expect.objectContaining({ caller: "execute", callee: "Service.utility" }),
+    ]));
+    expect(mainModule?.callGraph?.crossFileCalls).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        callee: "helper_run",
+        resolved: true,
+        calleeLocation: expect.objectContaining({ file: "src/helpers.py" }),
+      }),
+      expect.objectContaining({
+        callee: "Service.utility",
+        resolved: true,
+        calleeLocation: expect.objectContaining({ file: "src/helpers.py" }),
+      }),
+    ]));
+    expect(mainModule?.callGraph?.issues).toEqual([
+      expect.objectContaining({
+        caller: "dynamic",
+        expression: "getattr(target, method_name)()",
+        status: "unsupported_dynamic",
+      }),
+    ]);
+  });
+
+  it("persists Python complexity truth at module and symbol level", async () => {
+    const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "codemap-python-complexity-"));
+    tempDirs.push(rootDir);
+    await fs.mkdir(path.join(rootDir, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(rootDir, "src", "complex.py"),
+      [
+        "def helper(value):",
+        "    if value > 0:",
+        "        return value",
+        "    return -value",
+        "",
+        "class Service:",
+        "    def run(self, items):",
+        "        for item in items:",
+        "            if item > 0 and item < 10:",
+        "                return helper(item)",
+        "        return 0",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    const codeMap = await analyze(withAnalysisContext({
+      rootDir,
+      mode: "tree-sitter",
+      include: ["src/**/*.py"],
+      enhanceTypes: true,
+    }));
+
+    const complexModule = codeMap.modules.find((module) => module.path.endsWith("/src/complex.py"));
+
+    expect(complexModule?.complexity).toEqual(expect.objectContaining({
+      cyclomatic: expect.any(Number),
+      cognitive: expect.any(Number),
+      maintainability: expect.any(Number),
+      details: expect.objectContaining({
+        functions: expect.arrayContaining([
+          expect.objectContaining({ name: "helper", cyclomatic: expect.any(Number) }),
+          expect.objectContaining({ name: "Service.run", cyclomatic: expect.any(Number) }),
+        ]),
+      }),
+    }));
+    expect(complexModule?.symbols.find((symbol) => symbol.name === "helper")?.complexity).toEqual(
+      expect.objectContaining({ cyclomatic: expect.any(Number), cognitive: expect.any(Number) })
+    );
+    expect(complexModule?.symbols.find((symbol) => symbol.name === "Service.run")?.complexity).toEqual(
+      expect.objectContaining({ cyclomatic: expect.any(Number), cognitive: expect.any(Number) })
+    );
+  });
 });

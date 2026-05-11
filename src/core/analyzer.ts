@@ -157,6 +157,7 @@ function convertToModuleInfo(result: ParseResult): ModuleInfo {
       ? {
           calls: result.callGraph.calls,
           recursive: result.callGraph.recursive,
+          issues: result.callGraph.issues,
           callCounts: result.callGraph.calls.reduce<Record<string, number>>((counts, call) => {
             counts[call.callee] = (counts[call.callee] ?? 0) + 1;
             return counts;

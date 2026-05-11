@@ -3,9 +3,93 @@
 // ============================================
 
 import { describe, it, expect } from 'vitest';
-import { analyzeFileComplexity, analyzeMultipleFiles } from '../ast-complexity-analyzer.js';
+import {
+  analyzeComplexityFromContent,
+  analyzeFileComplexity,
+  analyzeMultipleFiles,
+} from '../ast-complexity-analyzer.js';
 
 describe('AST Complexity Analyzer', () => {
+  describe('analyzeComplexityFromContent', () => {
+    it('exposes a canonical TypeScript content entrypoint', () => {
+      const result = analyzeComplexityFromContent({
+        filePath: '/tmp/example.ts',
+        language: 'typescript',
+        content: `function pick(a, b) {
+  if (a > b) {
+    return a;
+  }
+  return b;
+}`,
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        cyclomatic: 2,
+        cognitive: expect.any(Number),
+        maintainability: expect.any(Number),
+        details: expect.objectContaining({
+          functions: expect.arrayContaining([
+            expect.objectContaining({ name: 'pick', cyclomatic: 2 }),
+          ]),
+        }),
+      }));
+    });
+
+    it('exposes a canonical Python content entrypoint with qualified method names', () => {
+      const result = analyzeComplexityFromContent({
+        filePath: '/tmp/example.py',
+        language: 'python',
+        content: [
+          'def helper(value):',
+          '    if value > 0:',
+          '        return value',
+          '    return -value',
+          '',
+          'class Service:',
+          '    def run(self, items):',
+          '        for item in items:',
+          '            if item > 0 and item < 10:',
+          '                return helper(item)',
+          '        return 0',
+        ].join('\n'),
+      });
+
+      expect(result.details.functions).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'helper', cyclomatic: expect.any(Number) }),
+        expect.objectContaining({ name: 'Service.run', cyclomatic: expect.any(Number) }),
+      ]));
+    });
+
+    it('exposes a canonical Go content entrypoint', () => {
+      const result = analyzeComplexityFromContent({
+        filePath: '/tmp/example.go',
+        language: 'go',
+        content: [
+          'package service',
+          '',
+          'func Handle(items []int) int {',
+          '  total := 0',
+          '  for _, item := range items {',
+          '    if item > 0 {',
+          '      total += item',
+          '    }',
+          '  }',
+          '  return total',
+          '}',
+        ].join('\n'),
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        cyclomatic: expect.any(Number),
+        cognitive: expect.any(Number),
+        maintainability: expect.any(Number),
+      }));
+      expect(result.details.functions).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'Handle', cyclomatic: expect.any(Number) }),
+      ]));
+    });
+  });
+
   describe('analyzeFileComplexity', () => {
     it('should analyze a simple file with no control flow', () => {
       const code = `function hello() {

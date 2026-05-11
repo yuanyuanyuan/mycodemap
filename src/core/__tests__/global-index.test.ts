@@ -127,4 +127,135 @@ describe('GlobalSymbolIndexBuilder', () => {
       }),
     ]);
   });
+
+  it('resolves imported Python functions and qualified class methods conservatively', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'codemap-global-index-py-'));
+    tempRoots.push(root);
+
+    mkdirSync(path.join(root, 'src'), { recursive: true });
+    writeFileSync(path.join(root, 'src/helpers.py'), 'def helper_run():\n    return 1\n');
+    writeFileSync(path.join(root, 'src/main.py'), 'from helpers import helper_run, Service\n');
+
+    const helpersPath = path.join(root, 'src/helpers.py');
+    const mainPath = path.join(root, 'src/main.py');
+    const results: ParseResult[] = [
+      {
+        filePath: helpersPath,
+        language: 'python',
+        module: {
+          id: 'module-helpers',
+          path: helpersPath,
+          absolutePath: helpersPath,
+          type: 'source',
+          stats: { lines: 4, codeLines: 4, commentLines: 0, blankLines: 0 },
+          exports: [],
+          imports: [],
+          symbols: [],
+          dependencies: [],
+          dependents: [],
+        },
+        dependencies: [],
+        imports: [],
+        exports: [
+          { name: 'helper_run', kind: 'function', isDefault: false, isTypeOnly: false },
+          { name: 'Service', kind: 'class', isDefault: false, isTypeOnly: false },
+        ],
+        symbols: [
+          {
+            id: 'sym-helper-run',
+            name: 'helper_run',
+            kind: 'function',
+            location: { file: helpersPath, line: 1, column: 0 },
+            visibility: 'public',
+            relatedSymbols: [],
+          },
+          {
+            id: 'sym-service',
+            name: 'Service',
+            kind: 'class',
+            location: { file: helpersPath, line: 3, column: 0 },
+            visibility: 'public',
+            relatedSymbols: [],
+          },
+          {
+            id: 'sym-service-utility',
+            name: 'Service.utility',
+            kind: 'method',
+            location: { file: helpersPath, line: 4, column: 4 },
+            visibility: 'public',
+            relatedSymbols: [],
+          },
+        ],
+        parseTime: 1,
+      },
+      {
+        filePath: mainPath,
+        language: 'python',
+        module: {
+          id: 'module-main',
+          path: mainPath,
+          absolutePath: mainPath,
+          type: 'source',
+          stats: { lines: 4, codeLines: 4, commentLines: 0, blankLines: 0 },
+          exports: [],
+          imports: [],
+          symbols: [],
+          dependencies: [],
+          dependents: [],
+        },
+        dependencies: [],
+        imports: [{
+          source: 'helpers',
+          sourceType: 'absolute',
+          specifiers: [
+            { name: 'helper_run', isTypeOnly: false },
+            { name: 'Service', isTypeOnly: false },
+          ],
+          isTypeOnly: false,
+        }],
+        exports: [],
+        symbols: [{
+          id: 'sym-execute',
+          name: 'execute',
+          kind: 'function',
+          location: { file: mainPath, line: 1, column: 0 },
+          visibility: 'public',
+          relatedSymbols: [],
+        }],
+        callGraph: {
+          calls: [
+            { caller: 'execute', callee: 'helper_run', line: 2 },
+            { caller: 'execute', callee: 'Service.utility', line: 3 },
+          ],
+          recursive: [],
+          issues: [],
+        },
+        parseTime: 1,
+      },
+    ];
+
+    const builder = new GlobalSymbolIndexBuilder(root);
+    builder.build(results);
+
+    expect(builder.getCrossFileCalls('src/main.py')).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        callee: 'helper_run',
+        importPath: 'helpers',
+        resolved: true,
+        calleeLocation: expect.objectContaining({
+          file: 'src/helpers.py',
+          line: 1,
+        }),
+      }),
+      expect.objectContaining({
+        callee: 'Service.utility',
+        importPath: 'helpers',
+        resolved: true,
+        calleeLocation: expect.objectContaining({
+          file: 'src/helpers.py',
+          line: 4,
+        }),
+      }),
+    ]));
+  });
 });

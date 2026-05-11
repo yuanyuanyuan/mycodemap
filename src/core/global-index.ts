@@ -230,6 +230,30 @@ export class GlobalSymbolIndexBuilder {
             }
           }
         }
+
+        const parts = calleeName.split('.');
+        if (parts.length > 1 && (spec.name === parts[0] || spec.alias === parts[0])) {
+          const memberName = parts.slice(1).join('.');
+          const targetFile = this.findFileByImport(imp.source, fileIndex.filePath);
+          if (targetFile) {
+            const targetIndex = this.index.files.get(targetFile);
+            if (targetIndex) {
+              const targetSymbol = targetIndex.localSymbols.get(`${spec.name}.${memberName}`) ||
+                                   targetIndex.exports.get(memberName) ||
+                                   targetIndex.localSymbols.get(memberName);
+              if (targetSymbol) {
+                return {
+                  location: {
+                    file: targetFile,
+                    line: targetSymbol.line,
+                    column: targetSymbol.column
+                  },
+                  importPath: imp.source
+                };
+              }
+            }
+          }
+        }
       }
     }
 
@@ -276,6 +300,11 @@ export class GlobalSymbolIndexBuilder {
       if (matchedFile) {
         return matchedFile;
       }
+    }
+
+    const pythonMatchedFile = this.findPythonFileByImport(importPath, importingFilePath);
+    if (pythonMatchedFile) {
+      return pythonMatchedFile;
     }
 
     if (!importPath.startsWith('./') && !importPath.startsWith('../')) {
@@ -356,8 +385,51 @@ export class GlobalSymbolIndexBuilder {
   private normalizeFileKey(filePath: string): string {
     return path.normalize(filePath)
       .replace(/\\/g, '/')
-      .replace(/\.(d\.)?(ts|tsx|js|jsx|mts|cts|mjs|cjs)$/, '')
-      .replace(/\/index$/, '');
+      .replace(/\.(d\.)?(ts|tsx|js|jsx|mts|cts|mjs|cjs|py)$/, '')
+      .replace(/\/(__init__|index)$/, '');
+  }
+
+  private findPythonFileByImport(importPath: string, importingFilePath?: string): string | null {
+    const normalizedImportPath = importPath.replace(/\\/g, '/');
+    const candidates = new Set<string>();
+    const importerDir = importingFilePath ? path.dirname(importingFilePath) : '';
+    const dottedRelativeMatch = normalizedImportPath.match(/^(\.+)(.*)$/);
+
+    if (dottedRelativeMatch) {
+      const leadingDots = dottedRelativeMatch[1]?.length ?? 0;
+      const remainder = (dottedRelativeMatch[2] || '').replace(/^\./, '');
+      const importerParts = importerDir.split('/').filter(Boolean);
+      const packageParts = importerParts.slice(0, Math.max(0, importerParts.length - Math.max(leadingDots - 1, 0)));
+      const baseDir = path.resolve(this.rootDir, ...packageParts);
+      const modulePath = remainder ? path.join(...remainder.split('.')) : '';
+      this.addPythonCandidates(candidates, modulePath ? path.join(baseDir, modulePath) : baseDir);
+    } else {
+      const modulePath = path.join(...normalizedImportPath.split('.'));
+      if (importerDir) {
+        this.addPythonCandidates(candidates, path.resolve(this.rootDir, importerDir, modulePath));
+      }
+      this.addPythonCandidates(candidates, path.resolve(this.rootDir, modulePath));
+
+      const topLevelDir = importingFilePath?.split('/').filter(Boolean)[0];
+      if (topLevelDir) {
+        this.addPythonCandidates(candidates, path.resolve(this.rootDir, topLevelDir, modulePath));
+      }
+    }
+
+    for (const candidate of candidates) {
+      const matched = this.matchIndexedFile(candidate);
+      if (matched) {
+        return matched;
+      }
+    }
+
+    return null;
+  }
+
+  private addPythonCandidates(candidates: Set<string>, basePath: string): void {
+    candidates.add(basePath);
+    candidates.add(`${basePath}.py`);
+    candidates.add(path.join(basePath, '__init__.py'));
   }
 
   /**
