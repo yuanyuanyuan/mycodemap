@@ -3,12 +3,15 @@ import type { CodeGraph } from '../../../interface/types/index.js';
 import {
   analyzeImpactInGraph,
   calculateImpactInGraph,
+  createGraphReadIndex,
   createEmptyCodeGraph,
   deserializeCodeGraphSnapshot,
   deleteModuleFromGraph,
   detectCyclesInGraph,
   findCalleesInGraph,
   findCallersInGraph,
+  findDependenciesInGraph,
+  findDependentsInGraph,
   getProjectStatisticsFromGraph,
   serializeCodeGraphSnapshot,
   upsertModuleInGraph,
@@ -141,6 +144,30 @@ describe('graph-helpers', () => {
       totalLines: 60,
       averageComplexity: 0,
     });
+  });
+
+  it('keeps dependency and impact truth identical when reusing a prebuilt read index', () => {
+    const graph = createGraphFixture();
+    const index = createGraphReadIndex(graph);
+
+    expect(findDependenciesInGraph(graph, 'mod-a', index)).toEqual(
+      findDependenciesInGraph(graph, 'mod-a')
+    );
+    expect(findDependentsInGraph(graph, 'mod-a', index)).toEqual(
+      findDependentsInGraph(graph, 'mod-a')
+    );
+    expect(calculateImpactInGraph(graph, 'mod-c', 2, index)).toEqual(
+      calculateImpactInGraph(graph, 'mod-c', 2)
+    );
+    expect(analyzeImpactInGraph(graph, {
+      kind: 'file',
+      filePath: 'src/c.ts',
+      depth: 2,
+    }, index)).toEqual(analyzeImpactInGraph(graph, {
+      kind: 'file',
+      filePath: 'src/c.ts',
+      depth: 2,
+    }));
   });
 
   it('serializes and deserializes graph snapshots with Date fields restored', () => {

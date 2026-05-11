@@ -6,11 +6,14 @@ import louvain from 'graphology-communities-louvain';
 import { relative } from 'node:path';
 import type {
   CommunityCluster,
+  CommunityTopology,
+  CommunityTopologyCandidate,
   CommunitySummary,
   GraphMetadata,
   SharedCommunityResult,
 } from '../../interface/types/storage.js';
 import type { CodeGraph, Dependency, Module } from '../../interface/types/index.js';
+import { Dependency as DomainDependency } from '../../domain/entities/Dependency.js';
 
 const COMMUNITY_EDGE_WEIGHTS: Record<Dependency['type'], number> = {
   call: 1,
@@ -64,6 +67,12 @@ function createMissingGraphResult(): SharedCommunityResult {
     graphStatus: 'missing',
     summary: createEmptySummary(),
     communities: [],
+    topology: {
+      dedupedDependencyCount: 0,
+      duplicateDependencyCount: 0,
+      hubs: [],
+      bridges: [],
+    },
     warnings: [],
     remediation: 'Run `mycodemap generate --symbol-level` to rebuild graph truth before querying communities.',
     error: {
@@ -89,12 +98,30 @@ function buildProjection(graph: CodeGraph): {
   moduleById: Map<string, Module>;
   edges: AggregatedProjectionEdge[];
   projectedEdgeCount: number;
+  dedupedDependencyCount: number;
+  duplicateDependencyCount: number;
 } {
   const moduleById = new Map(graph.modules.map((module) => [module.id, module] as const));
   const symbolToModuleId = new Map(graph.symbols.map((symbol) => [symbol.id, symbol.moduleId] as const));
   const aggregated = new Map<string, AggregatedProjectionEdge>();
+  const seenDependencies = new Set<string>();
+  let duplicateDependencyCount = 0;
 
   for (const dependency of graph.dependencies) {
+    const dependencyKey = DomainDependency.createKey(
+      dependency.sourceId,
+      dependency.targetId,
+      dependency.type,
+      dependency.sourceEntityType ?? 'module',
+      dependency.targetEntityType ?? 'module',
+      dependency.filePath
+    );
+    if (seenDependencies.has(dependencyKey)) {
+      duplicateDependencyCount += 1;
+      continue;
+    }
+
+    seenDependencies.add(dependencyKey);
     const weight = COMMUNITY_EDGE_WEIGHTS[dependency.type];
     if (weight === undefined) {
       continue;
@@ -145,6 +172,8 @@ function buildProjection(graph: CodeGraph): {
     moduleById,
     edges: Array.from(aggregated.values()),
     projectedEdgeCount: aggregated.size,
+    dedupedDependencyCount: seenDependencies.size,
+    duplicateDependencyCount,
   };
 }
 
@@ -239,6 +268,120 @@ function calculateCohesion(moduleIds: Set<string>, edges: AggregatedProjectionEd
   }
 
   return Number((internalWeight / (internalWeight + boundaryWeight)).toFixed(3));
+}
+
+function getIncidentEdgeKinds(
+  moduleId: string,
+  edges: AggregatedProjectionEdge[]
+): CommunityTopologyCandidate['dominantEdgeKinds'] {
+  const kindWeights = new Map<Dependency['type'], number>();
+
+  for (const edge of edges) {
+    if (edge.sourceId !== moduleId && edge.targetId !== moduleId) {
+      continue;
+    }
+
+    for (const [kind, weight] of edge.kinds) {
+      kindWeights.set(kind, (kindWeights.get(kind) ?? 0) + weight);
+    }
+  }
+
+  return Array.from(kindWeights.entries())
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, 3)
+    .map(([kind]) => kind);
+}
+
+function buildTopology(
+  communities: CommunityCluster[],
+  moduleById: Map<string, Module>,
+  edges: AggregatedProjectionEdge[],
+  dedupedDependencyCount: number,
+  duplicateDependencyCount: number,
+  projectRoot: string
+): CommunityTopology {
+  const communityByModuleId = new Map<string, CommunityCluster>();
+  for (const community of communities) {
+    for (const moduleId of community.moduleIds) {
+      communityByModuleId.set(moduleId, community);
+    }
+  }
+
+  const candidates = Array.from(moduleById.values())
+    .map((module) => {
+      const neighborIds = new Set<string>();
+      const linkedCommunityLabels = new Set<string>();
+      let weightedDegree = 0;
+      let boundaryWeight = 0;
+
+      for (const edge of edges) {
+        const neighborId = edge.sourceId === module.id
+          ? edge.targetId
+          : edge.targetId === module.id
+            ? edge.sourceId
+            : null;
+        if (!neighborId) {
+          continue;
+        }
+
+        neighborIds.add(neighborId);
+        weightedDegree += edge.weight;
+
+        const ownCommunity = communityByModuleId.get(module.id);
+        const neighborCommunity = communityByModuleId.get(neighborId);
+        if (ownCommunity && neighborCommunity && ownCommunity.id !== neighborCommunity.id) {
+          linkedCommunityLabels.add(neighborCommunity.label);
+          boundaryWeight += edge.weight;
+        }
+      }
+
+      return {
+        moduleId: module.id,
+        modulePath: toDisplayPath(projectRoot, module.path),
+        connectedModuleCount: neighborIds.size,
+        weightedDegree,
+        boundaryWeight,
+        linkedCommunityLabels: Array.from(linkedCommunityLabels).sort(),
+        dominantEdgeKinds: getIncidentEdgeKinds(module.id, edges),
+      };
+    })
+    .filter((candidate) => candidate.connectedModuleCount > 0);
+
+  const hubs: CommunityTopologyCandidate[] = [...candidates]
+    .map((candidate) => ({
+      moduleId: candidate.moduleId,
+      modulePath: candidate.modulePath,
+      score: Number(candidate.weightedDegree.toFixed(3)),
+      connectedModuleCount: candidate.connectedModuleCount,
+      linkedCommunityLabels: candidate.linkedCommunityLabels,
+      dominantEdgeKinds: candidate.dominantEdgeKinds,
+    }))
+    .sort((left, right) => right.score - left.score
+      || right.connectedModuleCount - left.connectedModuleCount
+      || left.modulePath.localeCompare(right.modulePath))
+    .slice(0, 3);
+
+  const bridges: CommunityTopologyCandidate[] = [...candidates]
+    .filter((candidate) => candidate.linkedCommunityLabels.length > 0)
+    .map((candidate) => ({
+      moduleId: candidate.moduleId,
+      modulePath: candidate.modulePath,
+      score: Number((candidate.linkedCommunityLabels.length + candidate.boundaryWeight).toFixed(3)),
+      connectedModuleCount: candidate.connectedModuleCount,
+      linkedCommunityLabels: candidate.linkedCommunityLabels,
+      dominantEdgeKinds: candidate.dominantEdgeKinds,
+    }))
+    .sort((left, right) => right.score - left.score
+      || right.connectedModuleCount - left.connectedModuleCount
+      || left.modulePath.localeCompare(right.modulePath))
+    .slice(0, 3);
+
+  return {
+    dedupedDependencyCount,
+    duplicateDependencyCount,
+    hubs,
+    bridges,
+  };
 }
 
 function buildCommunities(
@@ -339,7 +482,13 @@ export function analyzeCommunitiesInGraph(
   const graphStatus = metadata?.generatedAt
     ? metadata.graphStatus
     : (graph.graphStatus ?? 'complete');
-  const { moduleById, edges, projectedEdgeCount } = buildProjection(graph);
+  const {
+    moduleById,
+    edges,
+    projectedEdgeCount,
+    dedupedDependencyCount,
+    duplicateDependencyCount,
+  } = buildProjection(graph);
   const projected = new UndirectedGraph();
 
   for (const module of graph.modules) {
@@ -375,6 +524,14 @@ export function analyzeCommunitiesInGraph(
       : 0,
   };
   const warnings = buildWarnings(graphStatus, summary);
+  const topology = buildTopology(
+    communities,
+    moduleById,
+    edges,
+    dedupedDependencyCount,
+    duplicateDependencyCount,
+    graph.project.rootPath
+  );
 
   return {
     status: 'ok',
@@ -382,6 +539,7 @@ export function analyzeCommunitiesInGraph(
     graphStatus,
     summary,
     communities,
+    topology,
     warnings,
   };
 }

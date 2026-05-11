@@ -8,6 +8,9 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type {
   StorageConfig,
+  AgentMetricsDetailRecord,
+  AgentMetricsRunPayload,
+  AgentMetricsRunRecord,
   Cycle,
   GraphMetadata,
   IncrementalRefreshSummary,
@@ -22,6 +25,7 @@ import type {
   Dependency,
   DependencyConfidence,
 } from '../../../interface/types/index.js';
+import { Dependency as DomainDependency } from '../../../domain/entities/Dependency.js';
 import type {
   FileHistorySignal,
   HistoryRiskSnapshotPayload,
@@ -163,6 +167,113 @@ function normalizeParseFailureFiles(value: unknown): string[] {
   return parsedValue.filter((item): item is string => typeof item === 'string');
 }
 
+function deduplicateDependenciesForStorage(
+  dependencies: Dependency[],
+  symbolIds: ReadonlySet<string>
+): Dependency[] {
+  const seen = new Set<string>();
+  const deduped: Dependency[] = [];
+
+  for (const dependency of dependencies) {
+    const sourceEntityType = resolveEntityType(dependency.sourceEntityType, dependency.sourceId, symbolIds);
+    const targetEntityType = resolveEntityType(dependency.targetEntityType, dependency.targetId, symbolIds);
+    const key = DomainDependency.createKey(
+      dependency.sourceId,
+      dependency.targetId,
+      dependency.type,
+      sourceEntityType,
+      targetEntityType,
+      dependency.filePath
+    );
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    deduped.push({
+      ...dependency,
+      sourceEntityType,
+      targetEntityType,
+    });
+  }
+
+  return deduped;
+}
+
+function buildModuleReferenceById(modules: readonly Module[]): Map<string, string> {
+  return new Map(
+    modules.map(module => [
+      module.id,
+      DomainDependency.createModuleReference(module.path),
+    ] as const)
+  );
+}
+
+function buildSymbolReferenceById(
+  symbols: readonly Symbol[],
+  moduleReferenceById: ReadonlyMap<string, string>
+): Map<string, string> {
+  return new Map(
+    symbols.map(symbol => {
+      const symbolFilePath = moduleReferenceById.get(symbol.moduleId) ?? symbol.location.file;
+      return [
+        symbol.id,
+        DomainDependency.createSymbolReference(
+          symbolFilePath,
+          symbol.name,
+          symbol.location.line,
+          symbol.location.column
+        ),
+      ] as const;
+    })
+  );
+}
+
+function resolveDependencyReference(
+  entityId: string,
+  entityType: Dependency['sourceEntityType'],
+  moduleReferenceById: ReadonlyMap<string, string>,
+  symbolReferenceById: ReadonlyMap<string, string>
+): string {
+  const stableReference = entityType === 'symbol'
+    ? symbolReferenceById.get(entityId)
+    : moduleReferenceById.get(entityId);
+
+  return stableReference ?? entityId;
+}
+
+function normalizeDependencyIdsForStorage(
+  dependencies: Dependency[],
+  modules: readonly Module[],
+  symbols: readonly Symbol[]
+): Dependency[] {
+  const moduleReferenceById = buildModuleReferenceById(modules);
+  const symbolReferenceById = buildSymbolReferenceById(symbols, moduleReferenceById);
+
+  return dependencies.map((dependency) => ({
+    ...dependency,
+    id: DomainDependency.createCanonicalId(
+      resolveDependencyReference(
+        dependency.sourceId,
+        dependency.sourceEntityType ?? 'module',
+        moduleReferenceById,
+        symbolReferenceById
+      ),
+      resolveDependencyReference(
+        dependency.targetId,
+        dependency.targetEntityType ?? 'module',
+        moduleReferenceById,
+        symbolReferenceById
+      ),
+      dependency.type,
+      dependency.sourceEntityType ?? 'module',
+      dependency.targetEntityType ?? 'module',
+      dependency.filePath
+    ),
+  }));
+}
+
 function readGraphIntegrityMetadata(database: SQLiteDatabaseLike): Required<
   Pick<CodeGraph, 'graphStatus' | 'failedFileCount' | 'parseFailureFiles'>
 > {
@@ -256,6 +367,12 @@ function createHistorySnapshotId(recordedAt: string): string {
   const compactTimestamp = recordedAt.replace(/[^0-9]/g, '');
   const entropy = Math.random().toString(16).slice(2, 10);
   return `history-${compactTimestamp}-${entropy}`;
+}
+
+function createAgentMetricsRunId(recordedAt: string): string {
+  const compactTimestamp = recordedAt.replace(/[^0-9]/g, '');
+  const entropy = Math.random().toString(16).slice(2, 10);
+  return `agent-metrics-run-${compactTimestamp}-${entropy}`;
 }
 
 function inferEntityType(entityId: string, symbolIds: ReadonlySet<string>): SQLiteEntityType {
@@ -422,6 +539,7 @@ export class SQLiteStorage extends StorageBase {
         .run('schema_version', CURRENT_SQLITE_SCHEMA_VERSION);
 
       this.backfillLegacySnapshotIfNeeded(this.database);
+      this.backfillCanonicalDependencyIdsIfNeeded(this.database);
       this.refreshGovernanceGraphCache(this.database);
     } catch (error) {
       throw new StorageError(
@@ -456,6 +574,8 @@ export class SQLiteStorage extends StorageBase {
   async deleteProject(): Promise<void> {
     const database = this.getDatabase();
     this.runInTransaction(database, () => {
+      database.prepare('DELETE FROM agent_metrics').run();
+      database.prepare('DELETE FROM agent_metrics_runs').run();
       database.prepare('DELETE FROM history_relations').run();
       database.prepare('DELETE FROM history_snapshots').run();
       database.prepare('DELETE FROM dependencies').run();
@@ -891,6 +1011,134 @@ export class SQLiteStorage extends StorageBase {
     };
   }
 
+  async saveAgentMetricsRun(
+    payload: AgentMetricsRunPayload
+  ): Promise<AgentMetricsRunRecord> {
+    const database = this.getDatabase();
+    const recordedAt = payload.recordedAt ?? new Date().toISOString();
+    const runId = payload.id ?? createAgentMetricsRunId(recordedAt);
+    const projectId = toStringValue(
+      database.prepare('SELECT id FROM projects LIMIT 1').get()?.id,
+      'agent-metrics-project'
+    );
+    const insertRun = database.prepare(`
+      INSERT INTO agent_metrics_runs (
+        id, project_id, recorded_at, sample_set_version, estimator_version, detail_count, metadata_json
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    const insertDetail = database.prepare(`
+      INSERT INTO agent_metrics (
+        id, run_id, query_type, command_slug, response_size_bytes, raw_char_count,
+        estimated_input_tokens, estimated_output_tokens, estimated_total_tokens,
+        execution_time_ms, metadata_json
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    this.runInTransaction(database, () => {
+      insertRun.run(
+        runId,
+        projectId,
+        recordedAt,
+        payload.sampleSetVersion,
+        payload.estimatorVersion,
+        payload.items.length,
+        payload.metadata ? JSON.stringify(payload.metadata) : null
+      );
+
+      payload.items.forEach((item, index) => {
+        insertDetail.run(
+          item.id ?? `${runId}:${index + 1}`,
+          runId,
+          item.queryType,
+          item.commandSlug,
+          item.responseSizeBytes,
+          item.rawCharCount,
+          item.estimatedInputTokens,
+          item.estimatedOutputTokens,
+          item.estimatedTotalTokens,
+          item.executionTimeMs ?? null,
+          item.metadata ? JSON.stringify(item.metadata) : null
+        );
+      });
+    });
+
+    return {
+      id: runId,
+      projectId,
+      recordedAt,
+      sampleSetVersion: payload.sampleSetVersion,
+      estimatorVersion: payload.estimatorVersion,
+      detailCount: payload.items.length,
+      metadata: payload.metadata ?? null,
+    };
+  }
+
+  async loadLatestAgentMetricsRun(): Promise<AgentMetricsRunRecord | null> {
+    const row = this.getDatabase()
+      .prepare(`
+        SELECT id, project_id, recorded_at, sample_set_version, estimator_version, detail_count, metadata_json
+        FROM agent_metrics_runs
+        ORDER BY recorded_at DESC, id DESC
+        LIMIT 1
+      `)
+      .get();
+
+    return row ? this.mapAgentMetricsRunRow(row) : null;
+  }
+
+  async listRecentAgentMetricsRuns(limit: number): Promise<AgentMetricsRunRecord[]> {
+    const normalizedLimit = Math.max(0, Math.floor(limit));
+    if (normalizedLimit === 0) {
+      return [];
+    }
+
+    const rows = this.getDatabase()
+      .prepare(`
+        SELECT id, project_id, recorded_at, sample_set_version, estimator_version, detail_count, metadata_json
+        FROM agent_metrics_runs
+        ORDER BY recorded_at DESC, id DESC
+        LIMIT ?
+      `)
+      .all(normalizedLimit);
+
+    return rows.map((row) => this.mapAgentMetricsRunRow(row));
+  }
+
+  async listAgentMetricsByRun(runId: string): Promise<AgentMetricsDetailRecord[]> {
+    const rows = this.getDatabase()
+      .prepare(`
+        SELECT id, run_id, query_type, command_slug, response_size_bytes, raw_char_count,
+               estimated_input_tokens, estimated_output_tokens, estimated_total_tokens,
+               execution_time_ms, metadata_json
+        FROM agent_metrics
+        WHERE run_id = ?
+        ORDER BY id
+      `)
+      .all(runId);
+
+    return rows.map((row) => this.mapAgentMetricsDetailRow(row));
+  }
+
+  async listAgentMetricsHistoryByQueryType(queryType: string): Promise<AgentMetricsDetailRecord[]> {
+    const rows = this.getDatabase()
+      .prepare(`
+        SELECT agent_metrics.id, agent_metrics.run_id, agent_metrics.query_type, agent_metrics.command_slug,
+               agent_metrics.response_size_bytes, agent_metrics.raw_char_count,
+               agent_metrics.estimated_input_tokens, agent_metrics.estimated_output_tokens,
+               agent_metrics.estimated_total_tokens, agent_metrics.execution_time_ms,
+               agent_metrics.metadata_json
+        FROM agent_metrics
+        INNER JOIN agent_metrics_runs ON agent_metrics_runs.id = agent_metrics.run_id
+        WHERE agent_metrics.query_type = ?
+        ORDER BY agent_metrics_runs.recorded_at DESC, agent_metrics_runs.id DESC, agent_metrics.id ASC
+      `)
+      .all(queryType);
+
+    return rows.map((row) => this.mapAgentMetricsDetailRow(row));
+  }
+
   getGovernanceGraphRuntimeStats(): GovernanceGraphRuntimeStats {
     return this.governanceGraphCache?.getStats() ?? {
       cacheMode: 'sqlite-direct',
@@ -1002,6 +1250,32 @@ export class SQLiteStorage extends StorageBase {
     database
       .prepare(SQLITE_SCHEMA_VERSION_UPSERT_SQL)
       .run('legacy_snapshot_backfilled_at', recordedAt);
+  }
+
+  private backfillCanonicalDependencyIdsIfNeeded(database: SQLiteDatabaseLike): void {
+    const dependencyCount = toNumberValue(
+      database.prepare('SELECT COUNT(*) AS count FROM dependencies').get()?.count
+    );
+
+    if (dependencyCount === 0) {
+      return;
+    }
+
+    const currentGraph = this.readCodeGraph(database);
+    const normalizedGraph = this.normalizeGraph(currentGraph);
+    const requiresRewrite = currentGraph.dependencies.some((dependency, index) => (
+      dependency.id !== normalizedGraph.dependencies[index]?.id
+    ));
+
+    if (!requiresRewrite) {
+      return;
+    }
+
+    const recordedAt = new Date().toISOString();
+    this.replaceCurrentGraph(database, currentGraph, 'edge-id-normalization-backfill', recordedAt);
+    database
+      .prepare(SQLITE_SCHEMA_VERSION_UPSERT_SQL)
+      .run('edge_id_normalized_at', recordedAt);
   }
 
   private replaceCurrentGraph(
@@ -1230,6 +1504,23 @@ export class SQLiteStorage extends StorageBase {
 
   private normalizeGraph(graph: CodeGraph): CodeGraph {
     const projectRootPath = graph.project.rootPath || this.projectPath || '';
+    const symbols = graph.symbols.map(symbol => ({
+      ...symbol,
+      location: { ...symbol.location },
+    }));
+    const symbolIds = new Set(symbols.map(symbol => symbol.id));
+    const dependencies = deduplicateDependenciesForStorage(
+      graph.dependencies.map(dependency => ({
+        ...dependency,
+        confidence: normalizeDependencyConfidence(dependency.confidence),
+      })),
+      symbolIds
+    );
+    const canonicalDependencies = normalizeDependencyIdsForStorage(
+      dependencies,
+      graph.modules,
+      symbols
+    );
 
     return {
       project: {
@@ -1242,14 +1533,8 @@ export class SQLiteStorage extends StorageBase {
         ...module,
         stats: { ...module.stats },
       })),
-      symbols: graph.symbols.map(symbol => ({
-        ...symbol,
-        location: { ...symbol.location },
-      })),
-      dependencies: graph.dependencies.map(dependency => ({
-        ...dependency,
-        confidence: normalizeDependencyConfidence(dependency.confidence),
-      })),
+      symbols,
+      dependencies: canonicalDependencies,
       graphStatus: graph.graphStatus ?? 'complete',
       failedFileCount: graph.failedFileCount ?? 0,
       parseFailureFiles: [...(graph.parseFailureFiles ?? [])],
@@ -1361,6 +1646,34 @@ export class SQLiteStorage extends StorageBase {
       filePath: toStringValue(row.file_path) || undefined,
       line: toOptionalNumberValue(row.line),
       confidence: normalizeDependencyConfidence(row.confidence),
+    };
+  }
+
+  private mapAgentMetricsRunRow(row: Record<string, unknown>): AgentMetricsRunRecord {
+    return {
+      id: toStringValue(row.id),
+      projectId: toStringValue(row.project_id),
+      recordedAt: toStringValue(row.recorded_at),
+      sampleSetVersion: toStringValue(row.sample_set_version),
+      estimatorVersion: toStringValue(row.estimator_version),
+      detailCount: toNumberValue(row.detail_count),
+      metadata: parseJsonValue<Record<string, unknown>>(row.metadata_json),
+    };
+  }
+
+  private mapAgentMetricsDetailRow(row: Record<string, unknown>): AgentMetricsDetailRecord {
+    return {
+      id: toStringValue(row.id),
+      runId: toStringValue(row.run_id),
+      queryType: toStringValue(row.query_type),
+      commandSlug: toStringValue(row.command_slug),
+      responseSizeBytes: toNumberValue(row.response_size_bytes),
+      rawCharCount: toNumberValue(row.raw_char_count),
+      estimatedInputTokens: toNumberValue(row.estimated_input_tokens),
+      estimatedOutputTokens: toNumberValue(row.estimated_output_tokens),
+      estimatedTotalTokens: toNumberValue(row.estimated_total_tokens),
+      executionTimeMs: toOptionalNumberValue(row.execution_time_ms),
+      metadata: parseJsonValue<Record<string, unknown>>(row.metadata_json),
     };
   }
 

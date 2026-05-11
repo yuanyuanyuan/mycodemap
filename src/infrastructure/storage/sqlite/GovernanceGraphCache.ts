@@ -13,10 +13,12 @@ import type {
 } from '../../../interface/types/index.js';
 import {
   calculateImpactInGraph,
+  createGraphReadIndex,
   createEmptyCodeGraph,
   detectCyclesInGraph,
   findDependenciesInGraph,
   findDependentsInGraph,
+  type GraphReadIndex,
 } from '../graph-helpers.js';
 import {
   bytesToMb,
@@ -43,6 +45,7 @@ const VALID_DEPENDENCY_CONFIDENCE = new Set<DependencyConfidence>([
   'INFERRED',
   'AMBIGUOUS',
 ]);
+const MAX_CACHED_IMPACT_RESULTS = 256;
 
 function toStringValue(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
@@ -215,6 +218,10 @@ function readGovernanceGraphCounts(database: GovernanceGraphDatabaseLike): {
 export class GovernanceGraphCache {
   private graph: CodeGraph | null = null;
 
+  private readIndex: GraphReadIndex | null = null;
+
+  private impactCache = new Map<string, ImpactResult>();
+
   private stats: GovernanceGraphRuntimeStats = createGovernanceGraphRuntimeStats({
     cacheMode: 'sqlite-direct',
     warning: 'governance graph cache not initialized',
@@ -235,6 +242,8 @@ export class GovernanceGraphCache {
       if (moduleCount > this.thresholds.maxFiles) {
         const loadMs = performance.now() - startedAt;
         this.graph = null;
+        this.readIndex = null;
+        this.impactCache.clear();
         this.stats = createGovernanceGraphRuntimeStats({
           cacheMode: 'sqlite-direct',
           thresholds: this.thresholds,
@@ -253,6 +262,8 @@ export class GovernanceGraphCache {
 
       if (loadMs > this.thresholds.maxLoadMs) {
         this.graph = null;
+        this.readIndex = null;
+        this.impactCache.clear();
         this.stats = createGovernanceGraphRuntimeStats({
           cacheMode: 'sqlite-direct',
           thresholds: this.thresholds,
@@ -267,6 +278,8 @@ export class GovernanceGraphCache {
 
       if (rssDeltaMb > this.thresholds.maxRssMb) {
         this.graph = null;
+        this.readIndex = null;
+        this.impactCache.clear();
         this.stats = createGovernanceGraphRuntimeStats({
           cacheMode: 'sqlite-direct',
           thresholds: this.thresholds,
@@ -280,6 +293,8 @@ export class GovernanceGraphCache {
       }
 
       this.graph = graph;
+      this.readIndex = createGraphReadIndex(graph);
+      this.impactCache.clear();
       this.stats = createGovernanceGraphRuntimeStats({
         cacheMode: 'memory-eager',
         thresholds: this.thresholds,
@@ -293,6 +308,8 @@ export class GovernanceGraphCache {
       const rssDeltaMb = bytesToMb(Math.max(process.memoryUsage().rss - rssBefore, 0));
       const warning = error instanceof Error ? error.message : String(error);
       this.graph = null;
+      this.readIndex = null;
+      this.impactCache.clear();
       this.stats = createGovernanceGraphRuntimeStats({
         cacheMode: 'sqlite-direct',
         thresholds: this.thresholds,
@@ -308,19 +325,19 @@ export class GovernanceGraphCache {
   }
 
   findDependencies(moduleId: string): Dependency[] | null {
-    if (!this.graph) {
+    if (!this.graph || !this.readIndex) {
       return null;
     }
 
-    return findDependenciesInGraph(this.graph, moduleId);
+    return findDependenciesInGraph(this.graph, moduleId, this.readIndex);
   }
 
   findDependents(moduleId: string): Dependency[] | null {
-    if (!this.graph) {
+    if (!this.graph || !this.readIndex) {
       return null;
     }
 
-    return findDependentsInGraph(this.graph, moduleId);
+    return findDependentsInGraph(this.graph, moduleId, this.readIndex);
   }
 
   detectCycles(): Cycle[] | null {
@@ -332,10 +349,27 @@ export class GovernanceGraphCache {
   }
 
   calculateImpact(moduleId: string, depth: number): ImpactResult | null {
-    if (!this.graph) {
+    if (!this.graph || !this.readIndex) {
       return null;
     }
 
-    return calculateImpactInGraph(this.graph, moduleId, depth);
+    const cacheKey = `${moduleId}:${depth}`;
+    const cachedImpact = this.impactCache.get(cacheKey);
+    if (cachedImpact) {
+      this.impactCache.delete(cacheKey);
+      this.impactCache.set(cacheKey, cachedImpact);
+      return globalThis.structuredClone(cachedImpact);
+    }
+
+    const calculated = calculateImpactInGraph(this.graph, moduleId, depth, this.readIndex);
+    this.impactCache.set(cacheKey, calculated);
+    if (this.impactCache.size > MAX_CACHED_IMPACT_RESULTS) {
+      const oldestKey = this.impactCache.keys().next().value;
+      if (oldestKey) {
+        this.impactCache.delete(oldestKey);
+      }
+    }
+
+    return globalThis.structuredClone(calculated);
   }
 }

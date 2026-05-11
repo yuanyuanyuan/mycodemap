@@ -29,6 +29,15 @@ export interface IncrementalNeighborhood {
   reasons: IncrementalRefreshReason[];
 }
 
+export interface GraphReadIndex {
+  moduleById: Map<string, Module>;
+  symbolById: Map<string, Symbol>;
+  dependenciesBySourceId: Map<string, Dependency[]>;
+  dependenciesByTargetId: Map<string, Dependency[]>;
+  moduleReverseAdjacency: Map<string, string[]>;
+  symbolReverseAdjacency: Map<string, string[]>;
+}
+
 interface TraversalState {
   id: string;
   depth: number;
@@ -51,6 +60,10 @@ type ResolvedImpactEntrypoint =
     ok: false;
     result: SharedImpactResult;
   };
+
+function cloneDependencyList(dependencies: readonly Dependency[]): Dependency[] {
+  return dependencies.map((dependency) => ({ ...dependency }));
+}
 
 export function cloneCodeGraph(graph: CodeGraph): CodeGraph {
   return globalThis.structuredClone(graph);
@@ -202,6 +215,30 @@ function createEmptyImpactResult(
     truncated: false,
     remediation: overrides.remediation,
     error: overrides.error,
+  };
+}
+
+export function createGraphReadIndex(graph: CodeGraph): GraphReadIndex {
+  const dependenciesBySourceId = new Map<string, Dependency[]>();
+  const dependenciesByTargetId = new Map<string, Dependency[]>();
+
+  for (const dependency of graph.dependencies) {
+    const sourceDependencies = dependenciesBySourceId.get(dependency.sourceId) ?? [];
+    sourceDependencies.push(dependency);
+    dependenciesBySourceId.set(dependency.sourceId, sourceDependencies);
+
+    const targetDependencies = dependenciesByTargetId.get(dependency.targetId) ?? [];
+    targetDependencies.push(dependency);
+    dependenciesByTargetId.set(dependency.targetId, targetDependencies);
+  }
+
+  return {
+    moduleById: new Map(graph.modules.map((module) => [module.id, module] as const)),
+    symbolById: new Map(graph.symbols.map((symbol) => [symbol.id, symbol] as const)),
+    dependenciesBySourceId,
+    dependenciesByTargetId,
+    moduleReverseAdjacency: buildModuleReverseAdjacency(graph),
+    symbolReverseAdjacency: buildSymbolReverseAdjacency(graph),
   };
 }
 
@@ -546,7 +583,8 @@ function toSymbolImpactNode(symbol: Symbol, depth: number, path: string[]): Symb
 
 export function analyzeImpactInGraph(
   graph: CodeGraph,
-  request: ImpactAnalysisRequest
+  request: ImpactAnalysisRequest,
+  index?: GraphReadIndex
 ): SharedImpactResult {
   const resolved = resolveImpactEntrypointInGraph(graph, request);
   if (!resolved.ok) {
@@ -554,12 +592,12 @@ export function analyzeImpactInGraph(
   }
 
   if (request.kind === 'file') {
-    const moduleMap = new Map(graph.modules.map((module) => [module.id, module] as const));
+    const moduleMap = index?.moduleById ?? new Map(graph.modules.map((module) => [module.id, module] as const));
     const traversal = collectImpactTraversal(
       resolved.rootId,
       request.depth,
       request.limit ?? Number.MAX_SAFE_INTEGER,
-      buildModuleReverseAdjacency(graph),
+      index?.moduleReverseAdjacency ?? buildModuleReverseAdjacency(graph),
       (id, hop, traversalPath) => {
         const module = moduleMap.get(id);
         return module ? toModuleImpactNode(module, hop, traversalPath) : null;
@@ -569,12 +607,12 @@ export function analyzeImpactInGraph(
     return buildSharedImpactResult(graph, request, resolved, traversal);
   }
 
-  const symbolMap = new Map(graph.symbols.map((symbol) => [symbol.id, symbol] as const));
+  const symbolMap = index?.symbolById ?? new Map(graph.symbols.map((symbol) => [symbol.id, symbol] as const));
   const traversal = collectImpactTraversal(
     resolved.rootId,
     request.depth,
     request.limit,
-    buildSymbolReverseAdjacency(graph),
+    index?.symbolReverseAdjacency ?? buildSymbolReverseAdjacency(graph),
     (id, hop, traversalPath) => {
       const symbol = symbolMap.get(id);
       return symbol ? toSymbolImpactNode(symbol, hop, traversalPath) : null;
@@ -710,13 +748,29 @@ export function findCalleesInGraph(graph: CodeGraph, functionId: string): Symbol
     .map(symbol => ({ ...symbol }));
 }
 
-export function findDependenciesInGraph(graph: CodeGraph, moduleId: string): Dependency[] {
+export function findDependenciesInGraph(
+  graph: CodeGraph,
+  moduleId: string,
+  index?: GraphReadIndex
+): Dependency[] {
+  if (index) {
+    return cloneDependencyList(index.dependenciesBySourceId.get(moduleId) ?? []);
+  }
+
   return graph.dependencies
     .filter(dependency => dependency.sourceId === moduleId)
     .map(dependency => ({ ...dependency }));
 }
 
-export function findDependentsInGraph(graph: CodeGraph, moduleId: string): Dependency[] {
+export function findDependentsInGraph(
+  graph: CodeGraph,
+  moduleId: string,
+  index?: GraphReadIndex
+): Dependency[] {
+  if (index) {
+    return cloneDependencyList(index.dependenciesByTargetId.get(moduleId) ?? []);
+  }
+
   return graph.dependencies
     .filter(dependency => dependency.targetId === moduleId)
     .map(dependency => ({ ...dependency }));
@@ -766,11 +820,13 @@ export function detectCyclesInGraph(graph: CodeGraph): Cycle[] {
 export function calculateImpactInGraph(
   graph: CodeGraph,
   moduleId: string,
-  depth: number
+  depth: number,
+  index?: GraphReadIndex
 ): ImpactResult {
-  const module = graph.modules.find((candidate) => candidate.id === moduleId);
+  const module = index?.moduleById.get(moduleId)
+    ?? graph.modules.find((candidate) => candidate.id === moduleId);
   const shared = module
-    ? analyzeImpactInGraph(graph, { kind: 'file', filePath: module.path, depth })
+    ? analyzeImpactInGraph(graph, { kind: 'file', filePath: module.path, depth }, index)
     : createEmptyImpactResult(
       { kind: 'file', filePath: moduleId, depth },
       graph.graphStatus ?? 'complete',
@@ -799,9 +855,11 @@ export function calculateSymbolImpactInGraph(
   graph: CodeGraph,
   symbolId: string,
   depth: number,
-  limit: number
+  limit: number,
+  index?: GraphReadIndex
 ): SymbolImpactResult {
-  const rootSymbol = graph.symbols.find(symbol => symbol.id === symbolId);
+  const rootSymbol = index?.symbolById.get(symbolId)
+    ?? graph.symbols.find(symbol => symbol.id === symbolId);
   if (!rootSymbol) {
     throw new Error(`Symbol ${symbolId} not found`);
   }
@@ -811,7 +869,7 @@ export function calculateSymbolImpactInGraph(
     filePath: rootSymbol.location.file,
     depth,
     limit,
-  });
+  }, index);
   const flattenedNodes = [
     ...shared.direct,
     ...shared.transitiveLayers.flatMap((layer) => layer.nodes),

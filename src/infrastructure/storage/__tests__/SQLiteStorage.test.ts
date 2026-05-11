@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { CodeGraph } from '../../../interface/types/index.js';
+import { Dependency as DomainDependency } from '../../../domain/entities/Dependency.js';
 import { SQLiteStorage } from '../adapters/SQLiteStorage.js';
 import { serializeCodeGraphSnapshot } from '../graph-helpers.js';
 
@@ -129,6 +130,40 @@ function createGraphFixture(): CodeGraph {
   };
 }
 
+function createCanonicalDependencyId(
+  graph: CodeGraph,
+  dependency: CodeGraph['dependencies'][number]
+): string {
+  const modulesById = new Map(graph.modules.map(module => [
+    module.id,
+    DomainDependency.createModuleReference(module.path),
+  ] as const));
+  const symbolsById = new Map(graph.symbols.map(symbol => [
+    symbol.id,
+    DomainDependency.createSymbolReference(
+      modulesById.get(symbol.moduleId) ?? symbol.location.file,
+      symbol.name,
+      symbol.location.line,
+      symbol.location.column
+    ),
+  ] as const));
+  const sourceEntityType = dependency.sourceEntityType ?? 'module';
+  const targetEntityType = dependency.targetEntityType ?? 'module';
+
+  return DomainDependency.createCanonicalId(
+    sourceEntityType === 'symbol'
+      ? (symbolsById.get(dependency.sourceId) ?? dependency.sourceId)
+      : (modulesById.get(dependency.sourceId) ?? dependency.sourceId),
+    targetEntityType === 'symbol'
+      ? (symbolsById.get(dependency.targetId) ?? dependency.targetId)
+      : (modulesById.get(dependency.targetId) ?? dependency.targetId),
+    dependency.type,
+    sourceEntityType,
+    targetEntityType,
+    dependency.filePath
+  );
+}
+
 describe('SQLiteStorage', () => {
   const tempRoots: string[] = [];
 
@@ -145,9 +180,14 @@ describe('SQLiteStorage', () => {
     const rootDir = createTempRoot();
     tempRoots.push(rootDir);
     const storage = new SQLiteStorage({ type: 'sqlite', databasePath: '.codemap/governance.sqlite' });
+    const graph = createGraphFixture();
+    const canonicalIds = graph.dependencies.map(dependency => createCanonicalDependencyId(graph, dependency));
+    const extractedId = canonicalIds[2]!;
+    const inferredId = canonicalIds[3]!;
+    const ambiguousId = canonicalIds[4]!;
 
     await storage.initialize(rootDir);
-    await storage.saveCodeGraph(createGraphFixture());
+    await storage.saveCodeGraph(graph);
 
     const loadedGraph = await storage.loadCodeGraph();
     expect(loadedGraph.modules).toHaveLength(2);
@@ -165,11 +205,11 @@ describe('SQLiteStorage', () => {
     expect(inspector.prepare('SELECT COUNT(*) AS count FROM graph_edges').get()?.count).toBe(5);
     expect(inspector.prepare('SELECT signature FROM symbols WHERE id = ?').get('sym-a')?.signature)
       .toBe('callA() => void');
-    expect(inspector.prepare('SELECT confidence FROM dependencies WHERE id = ?').get('dep-3')?.confidence)
+    expect(inspector.prepare('SELECT confidence FROM dependencies WHERE id = ?').get(extractedId)?.confidence)
       .toBe('EXTRACTED');
-    expect(inspector.prepare('SELECT confidence FROM graph_edges WHERE dependency_id = ?').get('dep-4')?.confidence)
+    expect(inspector.prepare('SELECT confidence FROM graph_edges WHERE dependency_id = ?').get(inferredId)?.confidence)
       .toBe('INFERRED');
-    expect(inspector.prepare('SELECT confidence FROM graph_edges WHERE dependency_id = ?').get('dep-5')?.confidence)
+    expect(inspector.prepare('SELECT confidence FROM graph_edges WHERE dependency_id = ?').get(ambiguousId)?.confidence)
       .toBe('AMBIGUOUS');
     expect(inspector.prepare('SELECT value FROM metadata WHERE key = ?').get('graph_status')?.value)
       .toBe('partial');
@@ -189,16 +229,21 @@ describe('SQLiteStorage', () => {
     const rootDir = createTempRoot();
     tempRoots.push(rootDir);
     const storage = new SQLiteStorage({ type: 'sqlite', databasePath: '.codemap/governance.sqlite' });
+    const graph = createGraphFixture();
+    const canonicalIds = graph.dependencies.map(dependency => createCanonicalDependencyId(graph, dependency));
+    const moduleImportId = canonicalIds[0]!;
+    const callId = canonicalIds[2]!;
+    const typeRefId = canonicalIds[3]!;
 
     await storage.initialize(rootDir);
-    await storage.saveCodeGraph(createGraphFixture());
+    await storage.saveCodeGraph(graph);
 
     expect(await storage.findModuleById('mod-a')).toEqual(expect.objectContaining({ id: 'mod-a' }));
-    expect((await storage.findDependencies('mod-a')).map((dependency) => dependency.id)).toEqual(['dep-1', 'dep-4']);
+    expect((await storage.findDependencies('mod-a')).map((dependency) => dependency.id)).toEqual([moduleImportId, typeRefId]);
     expect(await storage.findSymbolById('sym-a')).toEqual(expect.objectContaining({ signature: 'callA() => void' }));
     expect(await storage.findDependencies('sym-a')).toEqual([
       expect.objectContaining({
-        id: 'dep-3',
+        id: callId,
         sourceEntityType: 'symbol',
         targetEntityType: 'symbol',
         confidence: 'EXTRACTED',
@@ -274,6 +319,36 @@ describe('SQLiteStorage', () => {
     await storage.close();
   });
 
+  it('collapses canonical duplicate dependency artifacts before SQLite row rewrite', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+    const storage = new SQLiteStorage({ type: 'sqlite', databasePath: '.codemap/governance.sqlite' });
+    const duplicateGraph = createGraphFixture();
+    duplicateGraph.dependencies.push(
+      {
+        ...duplicateGraph.dependencies[0]!,
+        id: 'dep-1-duplicate',
+      },
+      {
+        ...duplicateGraph.dependencies[2]!,
+        id: 'dep-3-duplicate',
+      }
+    );
+
+    await storage.initialize(rootDir);
+    await storage.saveCodeGraph(duplicateGraph);
+
+    const loadedGraph = await storage.loadCodeGraph();
+    expect(loadedGraph.dependencies).toHaveLength(5);
+
+    const inspector = await createSQLiteInspector(rootDir);
+    expect(inspector.prepare('SELECT COUNT(*) AS count FROM dependencies').get()?.count).toBe(5);
+    expect(inspector.prepare('SELECT COUNT(*) AS count FROM graph_edges').get()?.count).toBe(5);
+    inspector.close();
+
+    await storage.close();
+  });
+
   it('backfills legacy bootstrap snapshot rows into normalized tables on initialize', async () => {
     const rootDir = createTempRoot();
     tempRoots.push(rootDir);
@@ -327,22 +402,58 @@ describe('SQLiteStorage', () => {
     await storage.close();
   });
 
+  it('backfills legacy edge ids into canonical dependency truth on initialize', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+    const databasePath = '.codemap/governance.sqlite';
+    const storage = new SQLiteStorage({ type: 'sqlite', databasePath });
+    const graph = createGraphFixture();
+    const callId = createCanonicalDependencyId(graph, graph.dependencies[2]!);
+
+    await storage.initialize(rootDir);
+    await storage.saveCodeGraph(graph);
+    await storage.close();
+
+    const legacyInspector = await createSQLiteInspector(rootDir, databasePath);
+    legacyInspector.prepare('UPDATE dependencies SET id = ? WHERE id = ?').run('dep-legacy-call', callId);
+    legacyInspector.prepare('UPDATE graph_edges SET dependency_id = ? WHERE dependency_id = ?').run('dep-legacy-call', callId);
+    legacyInspector.close();
+
+    const reopenedStorage = new SQLiteStorage({ type: 'sqlite', databasePath });
+    await reopenedStorage.initialize(rootDir);
+
+    const normalizedGraph = await reopenedStorage.loadCodeGraph();
+    expect(normalizedGraph.dependencies.map((dependency) => dependency.id)).toContain(callId);
+
+    const normalizedInspector = await createSQLiteInspector(rootDir, databasePath);
+    expect(normalizedInspector.prepare('SELECT COUNT(*) AS count FROM dependencies WHERE id = ?').get(callId)?.count)
+      .toBe(1);
+    expect(normalizedInspector.prepare('SELECT snapshot_source FROM history_snapshots ORDER BY recorded_at DESC LIMIT 1').get()?.snapshot_source)
+      .toBe('edge-id-normalization-backfill');
+    normalizedInspector.close();
+
+    await reopenedStorage.close();
+  });
+
   it('round-trips EXTRACTED, INFERRED, and AMBIGUOUS dependency confidence values', async () => {
     const rootDir = createTempRoot();
     tempRoots.push(rootDir);
     const storage = new SQLiteStorage({ type: 'sqlite', databasePath: '.codemap/governance.sqlite' });
+    const graph = createGraphFixture();
+    const confidenceById = new Map(
+      graph.dependencies.map(dependency => [
+        createCanonicalDependencyId(graph, dependency),
+        dependency.confidence,
+      ] as const)
+    );
 
     await storage.initialize(rootDir);
-    await storage.saveCodeGraph(createGraphFixture());
+    await storage.saveCodeGraph(graph);
 
     const loadedGraph = await storage.loadCodeGraph();
-    expect(loadedGraph.dependencies.map((dependency) => dependency.confidence)).toEqual([
-      undefined,
-      undefined,
-      'EXTRACTED',
-      'INFERRED',
-      'AMBIGUOUS',
-    ]);
+    expect(new Map(
+      loadedGraph.dependencies.map(dependency => [dependency.id, dependency.confidence] as const)
+    )).toEqual(confidenceById);
 
     await storage.close();
   });
@@ -408,13 +519,17 @@ describe('SQLiteStorage', () => {
     tempRoots.push(rootDir);
     const databasePath = '.codemap/governance.sqlite';
     const storage = new SQLiteStorage({ type: 'sqlite', databasePath });
+    const graph = createGraphFixture();
+    const canonicalIds = graph.dependencies.map(dependency => createCanonicalDependencyId(graph, dependency));
+    const callId = canonicalIds[2]!;
+    const ambiguousId = canonicalIds[4]!;
 
     await storage.initialize(rootDir);
-    await storage.saveCodeGraph(createGraphFixture());
+    await storage.saveCodeGraph(graph);
     await storage.close();
 
     const driftInspector = await createSQLiteInspector(rootDir, databasePath);
-    driftInspector.prepare('DELETE FROM graph_edges WHERE dependency_id = ?').run('dep-5');
+    driftInspector.prepare('DELETE FROM graph_edges WHERE dependency_id = ?').run(ambiguousId);
     driftInspector.close();
 
     const driftStorage = new SQLiteStorage({ type: 'sqlite', databasePath });
@@ -429,17 +544,19 @@ describe('SQLiteStorage', () => {
     tempRoots.push(rootDirInvalid);
     const invalidStorage = new SQLiteStorage({ type: 'sqlite', databasePath });
     await invalidStorage.initialize(rootDirInvalid);
-    await invalidStorage.saveCodeGraph(createGraphFixture());
+    await invalidStorage.saveCodeGraph(graph);
     await invalidStorage.close();
 
     const invalidInspector = await createSQLiteInspector(rootDirInvalid, databasePath);
-    invalidInspector.prepare('UPDATE dependencies SET confidence = ? WHERE id = ?').run('HIGH', 'dep-3');
+    invalidInspector.prepare('UPDATE dependencies SET confidence = ? WHERE id = ?').run('HIGH', callId);
     invalidInspector.close();
 
     const invalidReadStorage = new SQLiteStorage({ type: 'sqlite', databasePath });
-    await invalidReadStorage.initialize(rootDirInvalid);
-    await expect(invalidReadStorage.loadCodeGraph()).rejects.toMatchObject({
-      code: 'GRAPH_INVALID_DEPENDENCY_CONFIDENCE',
+    await expect(invalidReadStorage.initialize(rootDirInvalid)).rejects.toMatchObject({
+      code: 'SQLITE_INIT_FAILED',
+      cause: expect.objectContaining({
+        code: 'GRAPH_INVALID_DEPENDENCY_CONFIDENCE',
+      }),
     });
   });
 
@@ -608,6 +725,222 @@ describe('SQLiteStorage', () => {
     expect(symbolSignal.timeline).toHaveLength(1);
     expect(missingSymbolSignal.risk.level).toBe('unavailable');
     expect(missingSymbolSignal.diagnostics.status).toBe('unavailable');
+
+    await storage.close();
+  });
+
+  it('persists and reloads agent-metrics runs with explicit estimate fields', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+    const storage = new SQLiteStorage({ type: 'sqlite', databasePath: '.codemap/governance.sqlite' });
+
+    await storage.initialize(rootDir);
+    await storage.saveCodeGraph(createGraphFixture());
+
+    const run = await storage.saveAgentMetricsRun!({
+      id: 'run-1',
+      recordedAt: '2026-05-10T12:00:00.000Z',
+      sampleSetVersion: 'built-in.v1',
+      estimatorVersion: 'char-v1',
+      metadata: { source: 'test' },
+      items: [
+        {
+          id: 'detail-1',
+          queryType: 'query-symbol',
+          commandSlug: 'codemap query --symbol createHistoryCommand',
+          responseSizeBytes: 512,
+          rawCharCount: 500,
+          estimatedInputTokens: 10,
+          estimatedOutputTokens: 125,
+          estimatedTotalTokens: 135,
+          executionTimeMs: 12,
+          metadata: { sampleId: 'symbol-history' },
+        },
+      ],
+    });
+
+    expect(run).toEqual(expect.objectContaining({
+      id: 'run-1',
+      sampleSetVersion: 'built-in.v1',
+      estimatorVersion: 'char-v1',
+      detailCount: 1,
+      metadata: { source: 'test' },
+    }));
+
+    const latestRun = await storage.loadLatestAgentMetricsRun!();
+    expect(latestRun).toEqual(expect.objectContaining({
+      id: 'run-1',
+      recordedAt: '2026-05-10T12:00:00.000Z',
+      detailCount: 1,
+    }));
+
+    const details = await storage.listAgentMetricsByRun!('run-1');
+    expect(details).toEqual([
+      expect.objectContaining({
+        id: 'detail-1',
+        runId: 'run-1',
+        queryType: 'query-symbol',
+        responseSizeBytes: 512,
+        rawCharCount: 500,
+        estimatedInputTokens: 10,
+        estimatedOutputTokens: 125,
+        estimatedTotalTokens: 135,
+        executionTimeMs: 12,
+        metadata: { sampleId: 'symbol-history' },
+      }),
+    ]);
+
+    const inspector = await createSQLiteInspector(rootDir);
+    expect(inspector.prepare('SELECT COUNT(*) AS count FROM agent_metrics_runs').get()?.count).toBe(1);
+    expect(inspector.prepare('SELECT COUNT(*) AS count FROM agent_metrics').get()?.count).toBe(1);
+    expect(inspector.prepare('SELECT estimated_total_tokens FROM agent_metrics WHERE id = ?').get('detail-1')?.estimated_total_tokens)
+      .toBe(135);
+    inspector.close();
+
+    await storage.close();
+  });
+
+  it('lists recent agent-metrics runs in descending recency order with deterministic id tiebreaks', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+    const storage = new SQLiteStorage({ type: 'sqlite', databasePath: '.codemap/governance.sqlite' });
+
+    await storage.initialize(rootDir);
+    await storage.saveCodeGraph(createGraphFixture());
+
+    await storage.saveAgentMetricsRun!({
+      id: 'run-1',
+      recordedAt: '2026-05-10T10:00:00.000Z',
+      sampleSetVersion: 'built-in.v1',
+      estimatorVersion: 'char-v1',
+      items: [],
+    });
+    await storage.saveAgentMetricsRun!({
+      id: 'run-2a',
+      recordedAt: '2026-05-10T11:00:00.000Z',
+      sampleSetVersion: 'built-in.v1',
+      estimatorVersion: 'char-v1',
+      items: [],
+    });
+    await storage.saveAgentMetricsRun!({
+      id: 'run-3b',
+      recordedAt: '2026-05-10T11:00:00.000Z',
+      sampleSetVersion: 'built-in.v1',
+      estimatorVersion: 'char-v1',
+      items: [],
+    });
+
+    await expect(storage.listRecentAgentMetricsRuns!(2)).resolves.toEqual([
+      expect.objectContaining({ id: 'run-3b', recordedAt: '2026-05-10T11:00:00.000Z' }),
+      expect.objectContaining({ id: 'run-2a', recordedAt: '2026-05-10T11:00:00.000Z' }),
+    ]);
+
+    const singleRoot = createTempRoot();
+    tempRoots.push(singleRoot);
+    const singleStorage = new SQLiteStorage({ type: 'sqlite', databasePath: '.codemap/governance.sqlite' });
+    await singleStorage.initialize(singleRoot);
+    await singleStorage.saveCodeGraph(createGraphFixture());
+    await singleStorage.saveAgentMetricsRun!({
+      id: 'run-only',
+      recordedAt: '2026-05-10T12:00:00.000Z',
+      sampleSetVersion: 'built-in.v1',
+      estimatorVersion: 'char-v1',
+      items: [],
+    });
+
+    await expect(singleStorage.listRecentAgentMetricsRuns!(2)).resolves.toEqual([
+      expect.objectContaining({ id: 'run-only' }),
+    ]);
+
+    await singleStorage.close();
+    await storage.close();
+  });
+
+  it('lists historical agent-metrics rows by query type without aggregating row truth', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+    const storage = new SQLiteStorage({ type: 'sqlite', databasePath: '.codemap/governance.sqlite' });
+
+    await storage.initialize(rootDir);
+    await storage.saveCodeGraph(createGraphFixture());
+
+    await storage.saveAgentMetricsRun!({
+      id: 'run-1',
+      recordedAt: '2026-05-10T10:00:00.000Z',
+      sampleSetVersion: 'built-in.v1',
+      estimatorVersion: 'char-v1',
+      items: [
+        {
+          id: 'detail-1',
+          queryType: 'query-search',
+          commandSlug: 'codemap query --search env-contract',
+          responseSizeBytes: 500,
+          rawCharCount: 420,
+          estimatedInputTokens: 8,
+          estimatedOutputTokens: 105,
+          estimatedTotalTokens: 113,
+          executionTimeMs: 12,
+        },
+        {
+          id: 'detail-2',
+          queryType: 'query-symbol',
+          commandSlug: 'codemap query --symbol createHistoryCommand',
+          responseSizeBytes: 240,
+          rawCharCount: 200,
+          estimatedInputTokens: 9,
+          estimatedOutputTokens: 50,
+          estimatedTotalTokens: 59,
+          executionTimeMs: 7,
+        },
+      ],
+    });
+
+    await storage.saveAgentMetricsRun!({
+      id: 'run-2',
+      recordedAt: '2026-05-10T11:00:00.000Z',
+      sampleSetVersion: 'built-in.v1',
+      estimatorVersion: 'char-v1',
+      items: [
+        {
+          id: 'detail-3',
+          queryType: 'query-search',
+          commandSlug: 'codemap query --search env-contract',
+          responseSizeBytes: 700,
+          rawCharCount: 620,
+          estimatedInputTokens: 8,
+          estimatedOutputTokens: 155,
+          estimatedTotalTokens: 163,
+          executionTimeMs: 16,
+        },
+      ],
+    });
+
+    await expect(storage.listAgentMetricsHistoryByQueryType!('query-search')).resolves.toEqual([
+      expect.objectContaining({
+        id: 'detail-3',
+        runId: 'run-2',
+        queryType: 'query-search',
+        rawCharCount: 620,
+        estimatedTotalTokens: 163,
+      }),
+      expect.objectContaining({
+        id: 'detail-1',
+        runId: 'run-1',
+        queryType: 'query-search',
+        rawCharCount: 420,
+        estimatedTotalTokens: 113,
+      }),
+    ]);
+
+    await expect(storage.listAgentMetricsHistoryByQueryType!('query-symbol')).resolves.toEqual([
+      expect.objectContaining({
+        id: 'detail-2',
+        runId: 'run-1',
+        queryType: 'query-symbol',
+        responseSizeBytes: 240,
+        estimatedTotalTokens: 59,
+      }),
+    ]);
 
     await storage.close();
   });

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { CodeGraph } from '../../../interface/types/index.js';
+import { Dependency as DomainDependency } from '../../../domain/entities/Dependency.js';
 import { SQLiteStorage } from '../adapters/SQLiteStorage.js';
 import { loadSQLite } from '../adapters/sqlite-loader.js';
 
@@ -55,6 +56,25 @@ function createGovernanceGraphFixture(moduleCount = 3): CodeGraph {
   };
 }
 
+function createCanonicalDependencyId(
+  graph: CodeGraph,
+  dependency: CodeGraph['dependencies'][number]
+): string {
+  const modulesById = new Map(graph.modules.map(module => [
+    module.id,
+    DomainDependency.createModuleReference(module.path),
+  ] as const));
+
+  return DomainDependency.createCanonicalId(
+    modulesById.get(dependency.sourceId) ?? dependency.sourceId,
+    modulesById.get(dependency.targetId) ?? dependency.targetId,
+    dependency.type,
+    dependency.sourceEntityType ?? 'module',
+    dependency.targetEntityType ?? 'module',
+    dependency.filePath
+  );
+}
+
 describe('SQLite governance graph runtime', () => {
   const tempRoots: string[] = [];
 
@@ -71,17 +91,19 @@ describe('SQLite governance graph runtime', () => {
     const rootDir = createTempRoot();
     tempRoots.push(rootDir);
     const storage = new SQLiteStorage({ type: 'sqlite', databasePath: '.codemap/governance.sqlite' });
+    const graph = createGovernanceGraphFixture();
+    const canonicalIds = graph.dependencies.map(dependency => createCanonicalDependencyId(graph, dependency));
 
     await storage.initialize(rootDir);
-    await storage.saveCodeGraph(createGovernanceGraphFixture());
+    await storage.saveCodeGraph(graph);
 
     const stats = storage.getGovernanceGraphRuntimeStats();
     expect(stats.cacheMode).toBe('memory-eager');
     expect(stats.thresholds.maxFiles).toBe(10_000);
     expect(stats.thresholds.maxLoadMs).toBe(1_000);
     expect(stats.thresholds.maxRssMb).toBe(200);
-    expect((await storage.findDependencies('mod-1')).map((dependency) => dependency.id)).toEqual(['dep-1']);
-    expect((await storage.findDependents('mod-1')).map((dependency) => dependency.id)).toEqual(['dep-cycle']);
+    expect((await storage.findDependencies('mod-1')).map((dependency) => dependency.id)).toEqual([canonicalIds[0]]);
+    expect((await storage.findDependents('mod-1')).map((dependency) => dependency.id)).toEqual([canonicalIds[2]]);
 
     await storage.close();
   });
@@ -135,13 +157,38 @@ describe('SQLite governance graph runtime', () => {
     await directStorage.close();
   });
 
+  it('returns cloned impact results on repeated eager-cache reads instead of leaking cached mutations', async () => {
+    const rootDir = createTempRoot();
+    tempRoots.push(rootDir);
+    const storage = new SQLiteStorage({ type: 'sqlite', databasePath: '.codemap/governance.sqlite' });
+    const graph = createGovernanceGraphFixture();
+
+    await storage.initialize(rootDir);
+    await storage.saveCodeGraph(graph);
+
+    const first = await storage.calculateImpact('mod-3', 3);
+    first.direct[0]?.path.push('mutated-path');
+    if (first.affectedModules[0]) {
+      first.affectedModules[0].path = 'mutated/module.ts';
+    }
+
+    const second = await storage.calculateImpact('mod-3', 3);
+
+    expect(second.direct[0]?.path).toEqual(['mod-3', 'mod-2']);
+    expect(second.affectedModules[0]?.path).toBe('src/module-2.ts');
+
+    await storage.close();
+  });
+
   it('keeps primary truth and traversal projection/cache parity for EXTRACTED, INFERRED, and AMBIGUOUS edges', async () => {
     const rootDir = createTempRoot();
     tempRoots.push(rootDir);
     const storage = new SQLiteStorage({ type: 'sqlite', databasePath: '.codemap/governance.sqlite' });
+    const graph = createGovernanceGraphFixture();
+    const canonicalIds = graph.dependencies.map(dependency => createCanonicalDependencyId(graph, dependency));
 
     await storage.initialize(rootDir);
-    await storage.saveCodeGraph(createGovernanceGraphFixture());
+    await storage.saveCodeGraph(graph);
 
     const Database = await loadSQLite();
     const inspector = new Database(path.join(rootDir, '.codemap/governance.sqlite'));
@@ -158,17 +205,59 @@ describe('SQLite governance graph runtime', () => {
 
     expect(projectionRows).toHaveLength(dependencyRows.length);
     expect(projectionRows).toEqual([
-      expect.objectContaining({ dependency_id: 'dep-1', confidence: 'EXTRACTED' }),
-      expect.objectContaining({ dependency_id: 'dep-2', confidence: 'INFERRED' }),
-      expect.objectContaining({ dependency_id: 'dep-cycle', confidence: 'AMBIGUOUS' }),
+      expect.objectContaining({ dependency_id: canonicalIds[0], confidence: 'EXTRACTED' }),
+      expect.objectContaining({ dependency_id: canonicalIds[1], confidence: 'INFERRED' }),
+      expect.objectContaining({ dependency_id: canonicalIds[2], confidence: 'AMBIGUOUS' }),
     ]);
     expect(storage.getGovernanceGraphRuntimeStats().cacheMode).toBe('memory-eager');
     expect(await storage.findDependencies('mod-1')).toEqual([
-      expect.objectContaining({ id: 'dep-1', confidence: 'EXTRACTED' }),
+      expect.objectContaining({ id: canonicalIds[0], confidence: 'EXTRACTED' }),
     ]);
 
     inspector.close();
     await storage.close();
+  });
+
+  it('keeps cache and sqlite-direct parity when duplicate dependency artifacts are collapsed on writeback', async () => {
+    const eagerRoot = createTempRoot();
+    const directRoot = createTempRoot();
+    tempRoots.push(eagerRoot, directRoot);
+    const duplicateGraph = createGovernanceGraphFixture();
+    duplicateGraph.dependencies.push({
+      ...duplicateGraph.dependencies[0]!,
+      id: 'dep-1-duplicate',
+    });
+
+    const eagerStorage = new SQLiteStorage({
+      type: 'sqlite',
+      databasePath: '.codemap/governance.sqlite',
+    });
+    const directStorage = new SQLiteStorage(
+      {
+        type: 'sqlite',
+        databasePath: '.codemap/governance.sqlite',
+      },
+      {
+        governanceGraphThresholds: {
+          maxFiles: 1,
+          maxLoadMs: 1_000,
+          maxRssMb: 200,
+        },
+      }
+    );
+
+    await eagerStorage.initialize(eagerRoot);
+    await directStorage.initialize(directRoot);
+    await eagerStorage.saveCodeGraph(duplicateGraph);
+    await directStorage.saveCodeGraph(duplicateGraph);
+
+    expect((await eagerStorage.loadCodeGraph()).dependencies).toHaveLength(3);
+    expect(await eagerStorage.findDependencies('mod-1')).toEqual(
+      await directStorage.findDependencies('mod-1')
+    );
+
+    await eagerStorage.close();
+    await directStorage.close();
   });
 
   it('falls back to sqlite-direct for oversized graphs instead of pretending the cache is active', async () => {

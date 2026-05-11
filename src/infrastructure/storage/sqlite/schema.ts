@@ -104,6 +104,30 @@ export const SQLITE_GOVERNANCE_SCHEMA_SQL = `
     updated_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS agent_metrics_runs (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    recorded_at TEXT NOT NULL,
+    sample_set_version TEXT NOT NULL,
+    estimator_version TEXT NOT NULL,
+    detail_count INTEGER NOT NULL,
+    metadata_json TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS agent_metrics (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    query_type TEXT NOT NULL,
+    command_slug TEXT NOT NULL,
+    response_size_bytes INTEGER NOT NULL,
+    raw_char_count INTEGER NOT NULL,
+    estimated_input_tokens INTEGER NOT NULL,
+    estimated_output_tokens INTEGER NOT NULL,
+    estimated_total_tokens INTEGER NOT NULL,
+    execution_time_ms INTEGER,
+    metadata_json TEXT
+  );
+
   CREATE INDEX IF NOT EXISTS idx_modules_project_id
     ON modules (project_id);
   CREATE INDEX IF NOT EXISTS idx_modules_path
@@ -130,4 +154,8 @@ export const SQLITE_GOVERNANCE_SCHEMA_SQL = `
     ON history_relations (snapshot_id);
   CREATE INDEX IF NOT EXISTS idx_history_relations_source
     ON history_relations (source_id, relation_type);
+  CREATE INDEX IF NOT EXISTS idx_agent_metrics_runs_project
+    ON agent_metrics_runs (project_id, recorded_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_agent_metrics_run
+    ON agent_metrics (run_id, query_type);
 `;

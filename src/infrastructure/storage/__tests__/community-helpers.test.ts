@@ -136,6 +136,162 @@ function createCommunityGraphFixture(): CodeGraph {
   };
 }
 
+function createTopologyGraphFixture(): CodeGraph {
+  return {
+    project: {
+      id: 'proj-topology',
+      name: 'topology-fixture',
+      rootPath: '/fixture',
+      createdAt: new Date('2026-05-10T00:00:00Z'),
+      updatedAt: new Date('2026-05-10T00:00:00Z'),
+    },
+    modules: [
+      {
+        id: 'mod-left-a',
+        projectId: 'proj-topology',
+        path: 'src/left/a.ts',
+        language: 'ts',
+        stats: { lines: 10, codeLines: 8, commentLines: 1, blankLines: 1 },
+      },
+      {
+        id: 'mod-left-b',
+        projectId: 'proj-topology',
+        path: 'src/left/b.ts',
+        language: 'ts',
+        stats: { lines: 10, codeLines: 8, commentLines: 1, blankLines: 1 },
+      },
+      {
+        id: 'mod-bridge',
+        projectId: 'proj-topology',
+        path: 'src/shared/bridge.ts',
+        language: 'ts',
+        stats: { lines: 12, codeLines: 10, commentLines: 1, blankLines: 1 },
+      },
+      {
+        id: 'mod-right-a',
+        projectId: 'proj-topology',
+        path: 'src/right/a.ts',
+        language: 'ts',
+        stats: { lines: 10, codeLines: 8, commentLines: 1, blankLines: 1 },
+      },
+      {
+        id: 'mod-right-b',
+        projectId: 'proj-topology',
+        path: 'src/right/b.ts',
+        language: 'ts',
+        stats: { lines: 10, codeLines: 8, commentLines: 1, blankLines: 1 },
+      },
+    ],
+    symbols: [
+      {
+        id: 'sym-left-a',
+        moduleId: 'mod-left-a',
+        name: 'leftA',
+        kind: 'function',
+        location: { file: 'src/left/a.ts', line: 1, column: 1 },
+        visibility: 'public',
+      },
+      {
+        id: 'sym-left-b',
+        moduleId: 'mod-left-b',
+        name: 'leftB',
+        kind: 'function',
+        location: { file: 'src/left/b.ts', line: 1, column: 1 },
+        visibility: 'public',
+      },
+      {
+        id: 'sym-bridge',
+        moduleId: 'mod-bridge',
+        name: 'bridge',
+        kind: 'function',
+        location: { file: 'src/shared/bridge.ts', line: 1, column: 1 },
+        visibility: 'public',
+      },
+      {
+        id: 'sym-right-a',
+        moduleId: 'mod-right-a',
+        name: 'rightA',
+        kind: 'function',
+        location: { file: 'src/right/a.ts', line: 1, column: 1 },
+        visibility: 'public',
+      },
+      {
+        id: 'sym-right-b',
+        moduleId: 'mod-right-b',
+        name: 'rightB',
+        kind: 'function',
+        location: { file: 'src/right/b.ts', line: 1, column: 1 },
+        visibility: 'public',
+      },
+    ],
+    dependencies: [
+      {
+        id: 'dep-left-a-left-b',
+        sourceId: 'sym-left-a',
+        sourceEntityType: 'symbol',
+        targetId: 'sym-left-b',
+        targetEntityType: 'symbol',
+        type: 'call',
+        confidence: 'EXTRACTED',
+        filePath: 'src/left/a.ts',
+      },
+      {
+        id: 'dep-left-a-bridge',
+        sourceId: 'sym-left-a',
+        sourceEntityType: 'symbol',
+        targetId: 'sym-bridge',
+        targetEntityType: 'symbol',
+        type: 'call',
+        confidence: 'EXTRACTED',
+        filePath: 'src/left/a.ts',
+      },
+      {
+        id: 'dep-left-b-bridge',
+        sourceId: 'sym-left-b',
+        sourceEntityType: 'symbol',
+        targetId: 'sym-bridge',
+        targetEntityType: 'symbol',
+        type: 'call',
+        confidence: 'EXTRACTED',
+        filePath: 'src/left/b.ts',
+      },
+      {
+        id: 'dep-bridge-right-a',
+        sourceId: 'sym-bridge',
+        sourceEntityType: 'symbol',
+        targetId: 'sym-right-a',
+        targetEntityType: 'symbol',
+        type: 'call',
+        confidence: 'EXTRACTED',
+        filePath: 'src/shared/bridge.ts',
+      },
+      {
+        id: 'dep-bridge-right-b',
+        sourceId: 'sym-bridge',
+        sourceEntityType: 'symbol',
+        targetId: 'sym-right-b',
+        targetEntityType: 'symbol',
+        type: 'call',
+        confidence: 'EXTRACTED',
+        filePath: 'src/shared/bridge.ts',
+      },
+      {
+        id: 'dep-right-a-right-b',
+        sourceId: 'sym-right-a',
+        sourceEntityType: 'symbol',
+        targetId: 'sym-right-b',
+        targetEntityType: 'symbol',
+        type: 'call',
+        confidence: 'EXTRACTED',
+        filePath: 'src/right/a.ts',
+      },
+    ],
+    graphStatus: 'complete',
+    failedFileCount: 0,
+    parseFailureFiles: [],
+  };
+}
+
 describe('community-helpers', () => {
   it('projects persisted truth to weighted module communities using only supported dependency kinds', () => {
     const result = analyzeCommunitiesInGraph(createCommunityGraphFixture());
@@ -161,6 +317,46 @@ describe('community-helpers', () => {
         dominantEdgeKinds: ['implement', 'import'],
       }),
     ]);
+    expect(result.topology).toEqual(expect.objectContaining({
+      dedupedDependencyCount: 5,
+      duplicateDependencyCount: 0,
+      hubs: expect.arrayContaining([
+        expect.objectContaining({
+          moduleId: 'mod-auth-service',
+          modulePath: 'src/auth/service.ts',
+          connectedModuleCount: 2,
+          dominantEdgeKinds: ['call', 'inherit', 'type-ref'],
+        }),
+      ]),
+    }));
+  });
+
+  it('keeps module-level topology rankings stable when duplicate dependency artifacts leak into persisted truth', () => {
+    const baseline = createTopologyGraphFixture();
+    const duplicatePolluted = createTopologyGraphFixture();
+    duplicatePolluted.dependencies.push(
+      {
+        ...duplicatePolluted.dependencies[1]!,
+        id: 'dep-left-a-bridge-duplicate',
+      },
+      {
+        ...duplicatePolluted.dependencies[3]!,
+        id: 'dep-bridge-right-a-duplicate',
+      }
+    );
+
+    const baselineResult = analyzeCommunitiesInGraph(baseline);
+    const duplicateResult = analyzeCommunitiesInGraph(duplicatePolluted);
+
+    expect(duplicateResult.summary.totalEdges).toBe(baselineResult.summary.totalEdges);
+    expect(duplicateResult.topology.duplicateDependencyCount).toBe(2);
+    expect(duplicateResult.topology.hubs).toEqual(baselineResult.topology.hubs);
+    expect(duplicateResult.topology.bridges).toEqual(baselineResult.topology.bridges);
+    expect(duplicateResult.topology.bridges[0]).toEqual(expect.objectContaining({
+      moduleId: 'mod-bridge',
+      modulePath: 'src/shared/bridge.ts',
+      linkedCommunityLabels: expect.any(Array),
+    }));
   });
 
   it('degrades sparse and singleton-heavy graphs instead of overclaiming precision', () => {
