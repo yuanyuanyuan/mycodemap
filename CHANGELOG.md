@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.7.0] - 2026-05-11 - Agent Effectiveness Validation
+
+### 🛠️ Infrastructure
+
+- **agent-metrics**: 新增 `codemap agent-metrics` 命令家族，支持 token 成本分析、报告聚合、CI threshold gate
+- **agent-metrics**: `codemap agent-metrics token` 对代表性查询执行 token 成本分析（响应大小、估算 token 数、原始字符数）
+- **agent-metrics**: `codemap agent-metrics report` 输出格式化报告，支持人类可读表格和 JSON 两种模式
+- **agent-metrics**: `codemap agent-metrics gate` CI 管道阈值检测，默认 warn-only 模式
+
+### 📊 Intelligence
+
+- **trends**: 追踪 latest-vs-previous 绝对 token 趋势，按查询类型分组
+- **distribution**: 提供 `p50/p95/max` 分布深度，用于异常值检测
+- **advisory**: 识别最高成本查询类型和样本，提供优化建议
+
+### 📝 Documentation
+
+- **release**: 同步 `llms.txt`、`AI_GUIDE.md`、`AI_DISCOVERY.md`、`ai-document-index.yaml` 到 `v2.7.0`
+- **changelog**: 新增 v2.7.0 发布条目，记录 agent-effectiveness-validation milestone
+
 ## [2.0.0] - 2026-05-01 - Agent-Native Foundation
 
 ### 🏗️ Architecture
