@@ -1,0 +1,10 @@
+{
+  "project_slug": "mycodemap",
+  "project_dir": "/data/codemap",
+  "board_slug": "mycodemap",
+  "workspace_root": "/data/codemap/.hermes/projects/mycodemap",
+  "override_dir": "/data/codemap/.hermes/profiles",
+  "memory_namespace": "project:mycodemap",
+  "profile_catalog_version": "2026-05-11-phase24",
+  "profiles_dir": "/data/codemap/.hermes/projects/mycodemap/profiles"
+}
