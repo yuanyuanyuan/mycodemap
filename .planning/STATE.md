@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: none
 milestone_name: between-milestones
-status: between-milestones; special Phase 84 hook protocol hardening completed
-stopped_at: special Phase 84 closeout complete
-last_updated: "2026-05-12T07:00:35+08:00"
-last_activity: 2026-05-12 — completed special Phase 84 AI agent hook protocol hardening without opening a new milestone
+status: v2.7.1 shipped; ready to define next milestone
+stopped_at: v2.7.1 closeout complete
+last_updated: "2026-05-12T07:37:47+08:00"
+last_activity: 2026-05-12 — shipped v2.7.1 agent-hook-protocol-hardening and returned planning to between-milestones state
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 5
-  completed_plans: 5
+  total_phases: 2
+  completed_phases: 2
+  total_plans: 2
+  completed_plans: 2
   percent: 100
 ---
 
@@ -18,29 +18,30 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-05-11)
+See: `.planning/PROJECT.md` (updated 2026-05-12)
 
 **Core Value:** 为人类与 AI / Agent 提供可信的代码上下文、设计交接边界与后续演化决策依据。
-**Current Focus:** between milestones — special Phase 84 hardening is complete; next step is still define the next milestone and create fresh requirements
+**Current Focus:** between milestones — latest shipped milestone is `v2.7.1`; next step is still define the next milestone and create fresh requirements
 
 ## Current Position
 
-Phase: special follow-up closeout complete
-Plan: Phase 84 archived in live planning surface
-Status: between-milestones; special Phase 84 hook protocol hardening completed
-Last activity: 2026-05-12 — completed Phase 84 AI agent hook protocol hardening and kept planning between milestones
+Phase: milestone closeout complete
+Plan: v2.7.1 archived
+Status: v2.7.1 shipped; ready to define next milestone
+Last activity: 2026-05-12 — shipped v2.7.1 and kept planning between milestones
 
-## Between-Milestones Follow-Up
+## Latest Shipped Milestone
 
-- Phase 84: `ai-agent-hook-control-protocol` — completed 2026-05-12
-- Outcome: installable `pre-commit` / `commit-msg` hooks now emit structured AI-agent control protocols with fail-fast blocker routing
-- Planning consequence: no new milestone opened; next required step is still `$gsd-new-milestone`
+- Milestone: `v2.7.1 agent-hook-protocol-hardening` — shipped 2026-05-12
+- Phases: `84 ai-agent-hook-control-protocol`, `85 hook-protocol-noise-reduction`
+- Outcome: installable `pre-commit` / `commit-msg` hooks now provide fail-fast structured blocker routing, protocol-only mode, explicit log-path recovery, and clearer status semantics
+- Planning consequence: active planning is closed again; next required step is still `$gsd-new-milestone`
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 8
+- Total plans completed: 11
 - Average duration: —
 - Total execution time: —
 
@@ -57,6 +58,8 @@ Last activity: 2026-05-12 — completed Phase 84 AI agent hook protocol hardenin
 | 81 | 1 complete | — | — |
 | 82 | 1 complete | — | — |
 | 83 | 1 complete | — | — |
+| 84 | 1 complete | — | — |
+| 85 | 1 complete | — | — |
 
 ## Accumulated Context
 
@@ -81,12 +84,13 @@ Recent decisions affecting current work:
 - [2026-05-11]: Phase 81 shipped canonical lowercase/underscore-safe edge IDs across generate + SQLite truth and initialize-time legacy ID backfill
 - [2026-05-11]: Phase 82 shipped interface contract `1.0.0`, required `stable` declarations, and test-gated stable built-in command contracts
 - [2026-05-11]: Phase 83 shipped prebuilt eager read indexes, bounded module-impact cache reuse, and QueryHandler impact projection directly from shared truth
-- [2026-05-12]: Treat AI-agent hook hardening as special Phase 84 during between-milestones, rather than incorrectly opening `v3.0`
+- [2026-05-12]: Formalize Phase 84 plus Phase 85 into shipped milestone `v2.7.1 agent-hook-protocol-hardening`
 - [2026-05-12]: Hook protocol truth stays in `scripts/hooks/templates/*`; managed `.mycodemap/hooks/*` copies must preserve protocol parity
+- [2026-05-12]: Add protocol-only mode, explicit log-path fallback, and `not_applicable` status semantics for autonomous agents
 
 ### Blockers/Concerns
 
-- No open blocker remains in the special follow-up; next step is still choosing the next milestone scope
+- No open blocker remains in `v2.7.1`; next step is still choosing the next milestone scope
 
 ## Deferred Items
 
@@ -99,6 +103,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-12T07:00:35+08:00
-Stopped at: special Phase 84 closeout complete
+Last session: 2026-05-12T07:37:47+08:00
+Stopped at: v2.7.1 closeout complete
 Resume file: .planning/PROJECT.md

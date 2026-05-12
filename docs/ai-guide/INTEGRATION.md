@@ -29,7 +29,8 @@
 |--------------|----------|
 | 想让 host 真正通过 MCP 调 CodeMap | 本文第 2-4 节 |
 | host 只会跑命令，不会连 MCP | 本文第 6 节 fallback |
-| 想判断 storage / 运行时是否满足 | 本文第 7 节故障排查 |
+| 想把 `git commit` hooks 接入 autonomous agent | 本文第 7 节 |
+| 想判断 storage / 运行时是否满足 | 本文第 8 节故障排查 |
 
 ---
 
@@ -228,7 +229,66 @@ mycodemap benchmark --json
 
 ---
 
-## 7. 故障排查
+## 7. Git Hook Protocol 集成
+
+> 除了 MCP，CodeMap 现在还会在 installable `git commit` hooks 里输出专门给 Agent 用的 precheck protocol。
+
+### 7.1 入口与安装边界
+
+- canonical runtime payload 在目标仓库的 `.mycodemap/hooks/pre-commit` 与 `.mycodemap/hooks/commit-msg`
+- `mycodemap init` 会把 package 内的 `scripts/hooks/templates/*` 同步到 `.mycodemap/hooks/*`，再通过 `.git/hooks/*` 或 `.githooks/*` shim 接入 Git
+- 共享 contract source 在 `scripts/hooks/templates/protocol-contract.json`
+
+### 7.2 autonomous agent 推荐模式
+
+Agent 触发 commit 时，优先使用纯协议输出：
+
+```bash
+CODEMAP_PROTOCOL_ONLY=1 git commit -m "[FEATURE] scope: message"
+```
+
+解析顺序：
+
+1. 先读取 `CODEMAP_PRECHECK_PROTOCOL:<json>`
+2. 若协议行被截断，再读取 `CODEMAP_PRECHECK_LOG_PATH:<relative-path>` 指向的完整 JSON
+3. 若 `commit_allowed=false`，直接执行 `next_action` / `block.resolution`，不要重新把自然语言提示翻译一遍
+
+### 7.3 agent 应该依赖什么字段
+
+- `schema` / `hook_source`：识别当前是哪一个 hook envelope
+- `checks[]`：权威检查状态数组
+- `next_action`：下一步路由
+- `block.rule_id` / `block.rule`：规则溯源
+- `block.resolution`：机器可执行修复协议
+- `attempt.log_path`：长 JSON 恢复路径
+
+### 7.4 不要假设所有项目都用 Vitest
+
+`pre-commit` 的 related-tests 路由是 framework-aware 的。它可能返回：
+
+- `vitest-related`
+- `jest-related`
+- `pytest`
+- `go-test`
+- `cargo-test`
+- `package-test`
+
+因此 agent 不应写死 “失败后一定跑 Vitest”；应优先消费 `checks[].details.test_strategy`、`checks[].details.test_command` 和 `block.resolution.verify_commands`。
+
+### 7.5 最小恢复循环
+
+```text
+git commit
+-> read CODEMAP_PRECHECK_PROTOCOL
+-> if blocked: execute block.resolution / verify_commands
+-> retry git commit
+```
+
+更完整的字段说明见 `docs/ai-guide/OUTPUT.md` 的 “Git Hook Precheck Protocol” 一节。
+
+---
+
+## 8. 故障排查
 
 ### host 能启动 server，但工具返回 `GRAPH_NOT_FOUND`
 
@@ -278,7 +338,7 @@ npm ls better-sqlite3
 
 ---
 
-## 8. 交叉引用
+## 9. 交叉引用
 
 - 命令参考：`docs/ai-guide/COMMANDS.md`
 - 输出契约：`docs/ai-guide/OUTPUT.md`

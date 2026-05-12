@@ -79,6 +79,7 @@ Follow these guidelines when opening a pull request:
 - Preserve the file headers that carry `[META]` and `[WHY]` annotations in source files.
 - Prefer small, surgical changes that match the surrounding code.
 - If a change touches CLI behavior, configuration, or public APIs, update the corresponding docs in the same change.
+- If a change touches installable Git hook protocol behavior, update `scripts/hooks/templates/protocol-contract.json`, `docs/ai-guide/OUTPUT.md`, and `docs/ai-guide/INTEGRATION.md` in the same change.
 
 ## Local Feedback Loop
 

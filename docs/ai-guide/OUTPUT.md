@@ -28,6 +28,91 @@
 
 ---
 
+## Git Hook Precheck Protocol
+
+> installable `git commit` hooks 也会输出机器可读 contract；共享真相源在 `scripts/hooks/templates/protocol-contract.json`。
+
+### canonical source
+
+- `scripts/hooks/templates/protocol-contract.json` 是 hook protocol 的共享 contract source。
+- `scripts/hooks/templates/pre-commit` 与 `scripts/hooks/templates/commit-msg` 在运行时**不会**读取这个 JSON；它的作用是给文档、测试和维护者提供单一真相源，减少 schema / status / env name 漂移。
+- `mycodemap init` 会把模板同步到目标项目的 `.mycodemap/hooks/`，因此 installable hooks 与仓库模板共享同一协议设计。
+
+### shared envelope
+
+```typescript
+interface HookProtocolEnvelope {
+  schema: string;
+  hook_source: string;
+  output: {
+    protocol_only: boolean;
+    mode: "human-and-protocol" | "protocol-only";
+  };
+  attempt: {
+    attempt_id: string;
+    log_path: string;
+    context_env: "CODEMAP_AGENT_CONTEXT";
+    input_context?: unknown | null;
+    input_context_parse_error?: string | null;
+    parent_commit?: string | null;
+  };
+  commit_allowed: boolean;
+  next_action: string;
+  repo: Record<string, unknown>;
+  checks: HookCheckResult[];
+  block?: HookBlockResult;
+}
+
+interface HookCheckResult {
+  name: string;
+  status: "passed" | "failed" | "warn" | "skipped" | "not_applicable";
+  details: Record<string, unknown>;
+  duration_ms?: number;
+  rule_id?: string;
+  skip_reason?: string;
+}
+
+interface HookBlockResult {
+  rule_id: string;
+  why: string;
+  rule: {
+    id: string;
+    defined_at: string;
+    doc_ref?: string | null;
+    override_process?: string | null;
+  };
+  resolution: Record<string, unknown>;
+}
+```
+
+### protocol line contract
+
+- `CODEMAP_PRECHECK_PROTOCOL:<json>`：主协议行，承载完整 envelope
+- `CODEMAP_PRECHECK_LOG_PATH:<relative-path>`：短恢复指针；当 shell/host 截断长输出时，agent 应读取该路径中的完整 JSON
+- `CODEMAP_PROTOCOL_ONLY=1`：只输出上述两类协议行，抑制人类 banner / warning 噪音
+- `CODEMAP_AGENT_CONTEXT`：允许 agent 把 attempt / split-commit 计划上下文传回 hook
+
+### status 语义
+
+| status | 含义 | Agent 该怎么理解 |
+|--------|------|------------------|
+| `passed` | 检查通过 | 正常继续 |
+| `failed` | 检查已运行且阻断 | 读取 `block.resolution` 执行修复 |
+| `warn` | 检查已运行但非阻断 | 允许 commit，必要时记录告警 |
+| `skipped` | 因上游 blocker 被短路，未运行 | 不要误判为“不适用” |
+| `not_applicable` | 本次 staged 变更不触发该检查 | 不需要补跑 |
+
+### per-hook schema
+
+| hook | schema | 典型 blocker 路由 |
+|------|--------|-------------------|
+| `pre-commit` | `codemap.precommit.v1` | `split_commit`、`edit_headers`、`rerun_docs_check`、`rerun_verify_commands`、`run_rule_validation` |
+| `commit-msg` | `codemap.commitmsg.v1` | `rewrite_commit_message` |
+
+> 具体枚举值和必填字段以 `scripts/hooks/templates/protocol-contract.json` 为准。
+
+---
+
 ## Interface Contract Schema 输出结构
 
 > `mycodemap --schema` 输出整个 CLI 表面的单一真相源（single source of truth）。

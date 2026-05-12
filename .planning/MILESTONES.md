@@ -3,18 +3,19 @@
 > **Current active planning truth** lives in `.planning/PROJECT.md`, `.planning/ROADMAP.md`, and `.planning/STATE.md`. During an active milestone, `.planning/REQUIREMENTS.md` joins that set; between milestones it may be absent by design.
 > The shipped entries below are **historical snapshots**. Their `What's next` text records closeout-time context and must not override the current active planning surface.
 
-**Current status:** No active milestone is open. Latest shipped milestone is `v2.6 polish-and-stabilize` (2026-05-11); `v2.7 agent-effectiveness-validation` remains a historical shipped snapshot from earlier the same day.
-**Between-milestones note:** special `Phase 84 agent-hook-control-protocol` completed on 2026-05-12 to harden installable git hooks for AI agents. This did not open a new milestone.
+**Current status:** No active milestone is open. Latest shipped milestone is `v2.7.1 agent-hook-protocol-hardening` (2026-05-12); `v2.6` and `v2.7` remain earlier historical snapshots.
 
-## Between-Milestones Special Follow-up: Phase 84 agent-hook-control-protocol (Completed: 2026-05-12)
+## v2.7.1 agent-hook-protocol-hardening (Shipped: 2026-05-12)
 
-**Goal:** 把 installable `pre-commit` / `commit-msg` hooks 从人类可读阻断提示升级为 AI Agent 可直接执行的 fail-fast 控制协议，同时保持 generic test-strategy fallback 和 template truth。
+**Goal:** 把 installable `pre-commit` / `commit-msg` hooks 升级成更适合 AI Agent 的 fail-fast 控制协议，并继续降低 autonomous workflow 的解析噪音。
 
 **Delivered:**
 
 - `pre-commit` 输出 `codemap.precommit.v1`，对 staged-file-limit 等 cheap blocker fail fast，并提供结构化 `split_commit` / `verify_commands`
 - `commit-msg` 输出 `codemap.commitmsg.v1`，为 `commit-format` 与 `commit-scope-message` 提供 `rewrite_commit_message` 路由
+- `CODEMAP_PROTOCOL_ONLY=1`、`CODEMAP_PRECHECK_LOG_PATH`、`not_applicable` 状态与 low-noise report-only wording 已补齐 autonomous agent 友好性
 - installable templates 与 managed hook copies 的协议一致性已被 payload test、workflow unittest 和真实 smoke commit 验证锁定
+- shared hook protocol contract source 已固定到 `scripts/hooks/templates/protocol-contract.json`，并在 AI docs 中对安装侧 protocol-only workflow 做了正式说明
 
 **What's next:** 继续保持 `between-milestones` 状态，真正的下一步仍是定义新的 active milestone。
 

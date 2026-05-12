@@ -6,12 +6,9 @@
 - ✅ **v2.5 deep-analysis-hooks** — Phases `70`, `72`, `73`, `74` (shipped `2026-05-10`)
 - ✅ **v2.6 polish-and-stabilize** — Phases `79-83` (shipped `2026-05-11`; archive: [v2.6-ROADMAP](./milestones/v2.6-ROADMAP.md))
 - ✅ **v2.7 agent-effectiveness-validation** — Phases `75-78` (shipped `2026-05-11`; archive: [v2.7-ROADMAP](./milestones/v2.7-ROADMAP.md))
+- ✅ **v2.7.1 agent-hook-protocol-hardening** — Phases `84-85` (shipped `2026-05-12`; archive: [v2.7.1-ROADMAP](./milestones/v2.7.1-ROADMAP.md))
 
 - 📋 **v3.0 architecture-intelligence** — agent integration, architecture intelligence, broader parser coverage (planned)
-
-## Special Follow-up Phases
-
-- ✅ **Phase 84 agent-hook-control-protocol** — between-milestones hardening to upgrade installable git hooks into AI-agent-executable control protocols (completed `2026-05-12`; not a new milestone)
 
 ## Phases
 
@@ -65,4 +62,5 @@
 | 81. Edge ID Normalization | v2.6 | 1/1 | Complete | 2026-05-11 |
 | 82. Interface Contract 1.0.0 | v2.6 | 1/1 | Complete | 2026-05-11 |
 | 83. Query Path Performance Optimization | v2.6 | 1/1 | Complete | 2026-05-11 |
-| 84. AI Agent Hook Control Protocol | between-milestones | 1/1 | Complete | 2026-05-12 |
+| 84. AI Agent Hook Control Protocol | v2.7.1 | 1/1 | Complete | 2026-05-12 |
+| 85. Hook Protocol Noise Reduction | v2.7.1 | 1/1 | Complete | 2026-05-12 |

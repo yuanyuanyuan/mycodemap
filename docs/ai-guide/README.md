@@ -14,10 +14,10 @@
 |------|------|---------|
 | [QUICKSTART.md](./QUICKSTART.md) | 快速开始、决策树、场景映射 | **第 1** |
 | [COMMANDS.md](./COMMANDS.md) | 完整 CLI 命令参考 | 需要时查阅 |
-| [OUTPUT.md](./OUTPUT.md) | JSON 输出结构解析 | 解析输出时查阅 |
+| [OUTPUT.md](./OUTPUT.md) | CLI JSON + Git hook protocol 输出结构解析 | 解析输出时查阅 |
 | [PATTERNS.md](./PATTERNS.md) | 使用模式、最佳实践 | 实现复杂任务时 |
 | [PROMPTS.md](./PROMPTS.md) | 即用型提示词模板 | 直接使用 |
-| [INTEGRATION.md](./INTEGRATION.md) | 集成和错误处理 | 集成到 Agent 时 |
+| [INTEGRATION.md](./INTEGRATION.md) | MCP、Git hook protocol 和错误处理 | 集成到 Agent 时 |
 
 ---
 
