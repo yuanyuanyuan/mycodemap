@@ -44,8 +44,14 @@ function createTempRepo(): string {
 
   cpSync(path.join(process.cwd(), '.githooks', 'pre-commit'), path.join(dir, '.githooks', 'pre-commit'));
   cpSync(path.join(process.cwd(), '.githooks', 'commit-msg'), path.join(dir, '.githooks', 'commit-msg'));
-  cpSync(path.join(process.cwd(), '.mycodemap', 'hooks', 'pre-commit'), path.join(dir, '.mycodemap', 'hooks', 'pre-commit'));
-  cpSync(path.join(process.cwd(), '.mycodemap', 'hooks', 'commit-msg'), path.join(dir, '.mycodemap', 'hooks', 'commit-msg'));
+
+  // .mycodemap/hooks/ is gitignored; fall back to tracked templates in CI
+  const mycodemapHooksDir = path.join(process.cwd(), '.mycodemap', 'hooks');
+  const hookSource = existsSync(path.join(mycodemapHooksDir, 'pre-commit'))
+    ? mycodemapHooksDir
+    : path.join(process.cwd(), 'scripts', 'hooks', 'templates');
+  cpSync(path.join(hookSource, 'pre-commit'), path.join(dir, '.mycodemap', 'hooks', 'pre-commit'));
+  cpSync(path.join(hookSource, 'commit-msg'), path.join(dir, '.mycodemap', 'hooks', 'commit-msg'));
 
   execSync('chmod +x .githooks/pre-commit .githooks/commit-msg .mycodemap/hooks/pre-commit .mycodemap/hooks/commit-msg', { cwd: dir });
   execSync('git config core.hooksPath .githooks', { cwd: dir });

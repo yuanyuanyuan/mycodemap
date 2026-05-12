@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -61,7 +61,18 @@ function createFixtureRoot(): string {
   const root = mkdtempSync(path.join(tmpdir(), 'codemap-docs-check-'));
 
   for (const relativePath of REQUIRED_FIXTURE_FILES) {
-    cpSync(path.join(repoRoot, relativePath), path.join(root, relativePath), { recursive: true });
+    const src = path.join(repoRoot, relativePath);
+    const dest = path.join(root, relativePath);
+    // .mycodemap/hooks/ is gitignored; fall back to tracked templates in CI
+    if (!existsSync(src) && relativePath.startsWith('.mycodemap/hooks/')) {
+      const templateSrc = path.join(repoRoot, 'scripts', 'hooks', 'templates', path.basename(relativePath));
+      if (existsSync(templateSrc)) {
+        mkdirSync(path.dirname(dest), { recursive: true });
+        cpSync(templateSrc, dest);
+        continue;
+      }
+    }
+    cpSync(src, dest, { recursive: true });
   }
 
   return root;
