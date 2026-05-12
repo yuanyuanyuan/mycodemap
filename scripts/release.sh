@@ -156,7 +156,8 @@ if [ -n "$USE_EXISTING_TAG" ]; then
     fi
 
     # 检查 tag 是否指向当前 HEAD 或其祖先
-    TAG_COMMIT=$(git rev-parse "$USE_EXISTING_TAG")
+    # 使用 ^{commit} 解析 annotated tag 到实际 commit
+    TAG_COMMIT=$(git rev-parse "$USE_EXISTING_TAG^{commit}" 2>/dev/null || git rev-parse "$USE_EXISTING_TAG")
     HEAD_COMMIT=$(git rev-parse HEAD)
     MERGE_BASE=$(git merge-base "$TAG_COMMIT" HEAD 2>/dev/null || echo "")
 
