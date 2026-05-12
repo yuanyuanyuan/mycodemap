@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.7.1] - 2026-05-12 - Agent Hook Protocol Hardening
+
+### 🔌 Hook Protocol
+
+- **hook-protocol**: 新增 `codemap.precommit.v1` 和 `codemap.commitmsg.v1` 结构化协议，AI agent 可机器解析 hook 输出
+- **protocol-only**: `CODEMAP_PROTOCOL_ONLY=1` 抑制人类可读日志，仅保留协议行
+- **log-path**: 每次 hook 执行输出 `CODEMAP_PRECHECK_LOG_PATH`，完整 JSON 写入尝试日志
+- **status-semantics**: 新增 `not_applicable` 状态，区分于 `skipped`；report-only limit-reached 路径标记为 `warn` 而非 failure
+
+### 🛠️ Toolchain
+
+- **tsgo**: `build` / `typecheck` 从 `tsc` 切换到 `tsgo`，新增 `@typescript/native-preview`
+- **json-import**: Node 端 JSON import 从 `assert` 语法切换到 `with` 语法
+- **claude-hook**: `.claude/settings.json` 增加 TS 文件编辑后的 `tsgo --noEmit` 快速检查
+
+### 📝 Documentation
+
+- **release**: 同步 `llms.txt`、`AI_GUIDE.md`、`AI_DISCOVERY.md`、`ai-document-index.yaml` 到 `v2.7.1`
+- **changelog**: 新增 v2.7.1 发布条目，记录 agent-hook-protocol-hardening milestone
+
 ## [2.7.0] - 2026-05-11 - Agent Effectiveness Validation
 
 ### 🛠️ Infrastructure
