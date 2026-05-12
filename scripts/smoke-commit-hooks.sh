@@ -15,7 +15,9 @@ Usage: bash scripts/smoke-commit-hooks.sh [--keep-temp]
 
 Runs real git commit smoke cases against the current hook payloads:
 - commit-format blocker
+- commit-format blocker in protocol-only mode
 - staged-file-limit blocker
+- report-only rule validation limit-reached (non-blocking)
 - docs-guardrail blocker
 - source-file-headers blocker
 - valid commit pass
@@ -64,19 +66,24 @@ assert_log_not_contains() {
 
 assert_protocol_python() {
   local expression="$1"
-  python3 - "$CASE_LOG" "$expression" <<'PY'
+  local hook_source="${2:-}"
+  python3 - "$CASE_LOG" "$expression" "$hook_source" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 log_path = Path(sys.argv[1])
 expression = sys.argv[2]
+hook_source = sys.argv[3]
 prefix = "CODEMAP_PRECHECK_PROTOCOL:"
 payload = None
 
 for line in log_path.read_text(encoding="utf-8").splitlines():
     if line.startswith(prefix):
-        payload = json.loads(line[len(prefix):])
+        candidate = json.loads(line[len(prefix):])
+        if hook_source and candidate.get("hook_source") != hook_source:
+            continue
+        payload = candidate
 
 if payload is None:
     raise SystemExit(f"missing protocol line in {log_path.name}")
@@ -171,6 +178,12 @@ EOF
 
 cat > scripts/validate-rules.py <<'EOF'
 #!/usr/bin/env python3
+from pathlib import Path
+import time
+
+if Path('.rule-timeout-should-trigger').exists():
+    time.sleep(2)
+
 raise SystemExit(0)
 EOF
 chmod +x scripts/validate-rules.py
@@ -196,13 +209,28 @@ assert_status 1 commit-format
 assert_log_contains "RULE_ID: commit-format"
 assert_log_contains "HOOK_SOURCE: .mycodemap/hooks/commit-msg"
 assert_log_contains "FIX: Rewrite the first line to match: [TAG] scope: message"
+assert_log_contains "CODEMAP_PRECHECK_LOG_PATH:"
 assert_log_contains "CODEMAP_PRECHECK_PROTOCOL:"
-assert_protocol_python 'payload["hook_source"] == ".mycodemap/hooks/commit-msg"'
-assert_protocol_python 'payload["block"]["rule_id"] == "commit-format"'
-assert_protocol_python 'payload["next_action"] == "rewrite_commit_message"'
+assert_protocol_python 'payload["hook_source"] == ".mycodemap/hooks/commit-msg"' '.mycodemap/hooks/commit-msg'
+assert_protocol_python 'payload["block"]["rule_id"] == "commit-format"' '.mycodemap/hooks/commit-msg'
+assert_protocol_python 'payload["next_action"] == "rewrite_commit_message"' '.mycodemap/hooks/commit-msg'
 SUMMARY_LINES+=("commit-format: PASS")
 git reset HEAD bad.txt >/dev/null 2>&1
 rm -f bad.txt
+
+echo "bad" > bad-protocol-only.txt
+git add bad-protocol-only.txt
+run_case commit-format-protocol-only env CODEMAP_PROTOCOL_ONLY=1 git commit -m "feat: bad message"
+assert_status 1 commit-format-protocol-only
+assert_log_contains "CODEMAP_PRECHECK_LOG_PATH:"
+assert_log_contains "CODEMAP_PRECHECK_PROTOCOL:"
+assert_log_not_contains "Running pre-commit checks..."
+assert_log_not_contains "ERROR: Commit precheck blocked the commit."
+assert_protocol_python 'payload["output"]["protocol_only"] is True' '.mycodemap/hooks/commit-msg'
+assert_protocol_python 'payload["output"]["mode"] == "protocol-only"' '.mycodemap/hooks/commit-msg'
+SUMMARY_LINES+=("commit-format-protocol-only: PASS")
+git reset HEAD bad-protocol-only.txt >/dev/null 2>&1
+rm -f bad-protocol-only.txt
 
 for n in $(seq 1 11); do
   printf 'file %s\n' "$n" > "limit-$n.txt"
@@ -213,19 +241,34 @@ assert_status 1 staged-file-limit
 assert_log_contains "RULE_ID: staged-file-limit"
 assert_log_contains "HOOK_SOURCE: .mycodemap/hooks/pre-commit"
 assert_log_contains "FIX: Split the staged changes into smaller commits, then retry."
+assert_log_contains "CODEMAP_PRECHECK_LOG_PATH:"
 assert_log_contains "CODEMAP_PRECHECK_PROTOCOL:"
 assert_log_not_contains "Running tests for staged files..."
 assert_log_not_contains "Running repo-local rule validation"
-assert_protocol_python 'payload["commit_allowed"] is False'
-assert_protocol_python 'payload["next_action"] == "split_commit"'
-assert_protocol_python 'payload["checks"][0]["name"] == "staged-file-limit" and payload["checks"][0]["status"] == "failed"'
-assert_protocol_python 'payload["checks"][0]["details"]["staged_count"] == 11'
-assert_protocol_python 'payload["block"]["rule_id"] == "staged-file-limit"'
-assert_protocol_python 'payload["block"]["resolution"]["type"] == "split_commit"'
-assert_protocol_python 'len(payload["block"]["resolution"]["suggested_groups"]) >= 2'
+assert_protocol_python 'payload["commit_allowed"] is False' '.mycodemap/hooks/pre-commit'
+assert_protocol_python 'payload["next_action"] == "split_commit"' '.mycodemap/hooks/pre-commit'
+assert_protocol_python 'payload["checks"][0]["name"] == "staged-file-limit" and payload["checks"][0]["status"] == "failed"' '.mycodemap/hooks/pre-commit'
+assert_protocol_python 'payload["checks"][0]["details"]["staged_count"] == 11' '.mycodemap/hooks/pre-commit'
+assert_protocol_python 'payload["block"]["rule_id"] == "staged-file-limit"' '.mycodemap/hooks/pre-commit'
+assert_protocol_python 'payload["block"]["resolution"]["type"] == "split_commit"' '.mycodemap/hooks/pre-commit'
+assert_protocol_python 'len(payload["block"]["resolution"]["suggested_groups"]) >= 2' '.mycodemap/hooks/pre-commit'
 SUMMARY_LINES+=("staged-file-limit: PASS")
 git reset HEAD . >/dev/null 2>&1
 rm -f limit-*.txt
+
+echo "rule timeout" > timeout.txt
+touch .rule-timeout-should-trigger
+git add timeout.txt
+run_case rule-validation-limit-reached env RULE_REPORT_ONLY_TIMEOUT_SECONDS=1 git commit -m "[CONFIG] rules: tolerate report-only limit"
+assert_status 0 rule-validation-limit-reached
+assert_log_contains "INFO: Rule validation report-only completed (1s limit reached, non-blocking)"
+assert_log_not_contains "timed out after"
+assert_protocol_python 'payload["checks"][4]["name"] == "repo-local-rule-validation"' '.mycodemap/hooks/pre-commit'
+assert_protocol_python 'payload["checks"][4]["status"] == "warn"' '.mycodemap/hooks/pre-commit'
+assert_protocol_python 'payload["checks"][4]["details"]["result"] == "limit-reached"' '.mycodemap/hooks/pre-commit'
+assert_protocol_python 'payload["checks"][4]["details"]["non_blocking"] is True' '.mycodemap/hooks/pre-commit'
+SUMMARY_LINES+=("rule-validation-limit-reached: PASS")
+rm -f .rule-timeout-should-trigger
 
 echo "# docs drift" > README.md
 touch .docs-check-should-fail
@@ -236,8 +279,8 @@ assert_log_contains "RULE_ID: docs-guardrail"
 assert_log_contains "TRIGGERED_BY:"
 assert_log_contains "FIX: Run npm run docs:check and resolve the reported documentation drift."
 assert_log_not_contains "Running tests for staged files..."
-assert_protocol_python 'payload["block"]["rule_id"] == "docs-guardrail"'
-assert_protocol_python 'payload["block"]["resolution"]["type"] == "rerun_docs_check"'
+assert_protocol_python 'payload["block"]["rule_id"] == "docs-guardrail"' '.mycodemap/hooks/pre-commit'
+assert_protocol_python 'payload["block"]["resolution"]["type"] == "rerun_docs_check"' '.mycodemap/hooks/pre-commit'
 SUMMARY_LINES+=("docs-guardrail: PASS")
 git reset HEAD README.md >/dev/null 2>&1
 rm -f README.md .docs-check-should-fail
@@ -251,8 +294,8 @@ assert_status 1 source-file-headers
 assert_log_contains "RULE_ID: source-file-headers"
 assert_log_contains "FIX: // [META] since:YYYY-MM | owner:team | stable:false"
 assert_log_contains "FIX: // [WHY] Explain why this file exists"
-assert_protocol_python 'payload["block"]["rule_id"] == "source-file-headers"'
-assert_protocol_python 'payload["block"]["resolution"]["type"] == "edit_headers"'
+assert_protocol_python 'payload["block"]["rule_id"] == "source-file-headers"' '.mycodemap/hooks/pre-commit'
+assert_protocol_python 'payload["block"]["resolution"]["type"] == "edit_headers"' '.mycodemap/hooks/pre-commit'
 SUMMARY_LINES+=("source-file-headers: PASS")
 git reset HEAD src/example.ts >/dev/null 2>&1
 rm -f src/example.ts

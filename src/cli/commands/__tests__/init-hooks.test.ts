@@ -25,6 +25,12 @@ vi.mock('chalk', () => ({
 import { executeInitCommand } from '../init.js';
 import { createHookPlan } from '../../init/hooks.js';
 
+const HOOK_PROTOCOL_CONTRACT = JSON.parse(
+  readFileSync(path.join(process.cwd(), 'scripts/hooks/templates/protocol-contract.json'), 'utf8'),
+) as {
+  hooks: Record<string, { schema: string; hook_source: string }>;
+};
+
 function createTempProject(): string {
   const root = mkdtempSync(path.join(tmpdir(), 'codemap-init-hooks-'));
   // Phase 53: init now requires a project-type marker (D-04).
@@ -70,6 +76,10 @@ describe('init hook reconciliation', () => {
 
     expect(syncedPreCommit).toBe(preCommitTemplate);
     expect(syncedCommitMsg).toBe(commitMsgTemplate);
+    expect(preCommitTemplate).toContain(HOOK_PROTOCOL_CONTRACT.hooks['pre-commit']!.schema);
+    expect(preCommitTemplate).toContain('protocol-contract.json');
+    expect(commitMsgTemplate).toContain(HOOK_PROTOCOL_CONTRACT.hooks['commit-msg']!.schema);
+    expect(commitMsgTemplate).toContain('protocol-contract.json');
     expect(shimPreCommit).toContain('.mycodemap/hooks/pre-commit');
     expect(shimCommitMsg).toContain('.mycodemap/hooks/commit-msg');
     expect(gitignoreText).toContain('.mycodemap/logs/');

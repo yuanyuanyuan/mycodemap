@@ -1,8 +1,37 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cpSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
+
+interface HookProtocolDescriptor {
+  schema: string;
+  hook_source: string;
+  required_top_level_fields: string[];
+  blocking_rules: Record<string, string>;
+}
+
+interface HookProtocolContract {
+  line_prefixes: {
+    protocol: string;
+    log_path: string;
+  };
+  shared_env: {
+    protocol_only: string;
+    attempt_context: string;
+  };
+  output_modes: string[];
+  hooks: {
+    'pre-commit': HookProtocolDescriptor;
+    'commit-msg': HookProtocolDescriptor;
+  };
+}
+
+const HOOK_PROTOCOL_CONTRACT = JSON.parse(
+  readFileSync(path.join(process.cwd(), 'scripts/hooks/templates/protocol-contract.json'), 'utf8'),
+) as HookProtocolContract;
+const PRE_COMMIT_CONTRACT = HOOK_PROTOCOL_CONTRACT.hooks['pre-commit'];
+const COMMIT_MSG_CONTRACT = HOOK_PROTOCOL_CONTRACT.hooks['commit-msg'];
 
 function createTempRepo(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'codemap-hook-payloads-'));
@@ -24,12 +53,16 @@ function createTempRepo(): string {
   return dir;
 }
 
-function runCommit(repoDir: string, message: string): { exitCode: number; output: string } {
+function runCommit(repoDir: string, message: string, extraEnv: Record<string, string> = {}): { exitCode: number; output: string } {
   try {
     const stdout = execSync(`git commit -m ${JSON.stringify(message)}`, {
       cwd: repoDir,
       encoding: 'utf8',
       stdio: 'pipe',
+      env: {
+        ...process.env,
+        ...extraEnv,
+      },
     });
     return { exitCode: 0, output: stdout };
   } catch (error: unknown) {
@@ -43,8 +76,17 @@ function runCommit(repoDir: string, message: string): { exitCode: number; output
   }
 }
 
+function readProtocolLog(repoDir: string, protocol: Record<string, any>): Record<string, any> {
+  const relativePath = protocol.attempt?.log_path as string | undefined;
+  expect(relativePath).toBeTruthy();
+
+  const absolutePath = path.join(repoDir, relativePath!);
+  expect(existsSync(absolutePath)).toBe(true);
+  return JSON.parse(readFileSync(absolutePath, 'utf8'));
+}
+
 function extractProtocolPayloads(output: string): Record<string, any>[] {
-  const prefix = 'CODEMAP_PRECHECK_PROTOCOL:';
+  const prefix = HOOK_PROTOCOL_CONTRACT.line_prefixes.protocol;
   return output
     .split('\n')
     .filter((line) => line.startsWith(prefix))
@@ -68,6 +110,15 @@ function extractProtocolPayload(output: string, hookSource?: string): Record<str
   throw new Error(`Missing protocol payload for hook source: ${hookSource}`);
 }
 
+function expectProtocolToMatchContract(protocol: Record<string, any>, descriptor: HookProtocolDescriptor): void {
+  expect(protocol.schema).toBe(descriptor.schema);
+  expect(protocol.hook_source).toBe(descriptor.hook_source);
+  for (const field of descriptor.required_top_level_fields) {
+    expect(protocol).toHaveProperty(field);
+  }
+  expect(HOOK_PROTOCOL_CONTRACT.output_modes).toContain(protocol.output?.mode);
+}
+
 describe('managed hook payloads', () => {
   const tempRoots: string[] = [];
 
@@ -89,18 +140,19 @@ describe('managed hook payloads', () => {
     execSync('git add notes/todo.txt', { cwd: repoDir });
 
     const result = runCommit(repoDir, 'docs: bad message');
-    const protocol = extractProtocolPayload(result.output, '.mycodemap/hooks/commit-msg');
+    const protocol = extractProtocolPayload(result.output, COMMIT_MSG_CONTRACT.hook_source);
 
     expect(result.exitCode).toBe(1);
     expect(result.output).toContain('RULE_ID: commit-format');
     expect(result.output).toContain('TRIGGERED_BY_NON_DOT_FILES:');
     expect(result.output).toContain('notes/todo.txt');
     expect(result.output).toContain('If you intended the dot-directory exemption');
+    expectProtocolToMatchContract(protocol, COMMIT_MSG_CONTRACT);
     expect(protocol).toMatchObject({
-      schema: 'codemap.commitmsg.v1',
-      hook_source: '.mycodemap/hooks/commit-msg',
+      schema: COMMIT_MSG_CONTRACT.schema,
+      hook_source: COMMIT_MSG_CONTRACT.hook_source,
       commit_allowed: false,
-      next_action: 'rewrite_commit_message',
+      next_action: COMMIT_MSG_CONTRACT.blocking_rules['commit-format'],
       repo: {
         non_dot_files: ['notes/todo.txt'],
         only_dot_dirs: false,
@@ -112,7 +164,7 @@ describe('managed hook payloads', () => {
           doc_ref: 'docs/DEVELOPMENT.md',
         },
         resolution: {
-          type: 'rewrite_commit_message',
+          type: COMMIT_MSG_CONTRACT.blocking_rules['commit-format'],
           expected_format: '[TAG] scope: message',
           example: '[FEATURE] cli: add new command',
           triggered_non_dot_files: ['notes/todo.txt'],
@@ -128,6 +180,8 @@ describe('managed hook payloads', () => {
       status: 'skipped',
       skip_reason: 'blocked-by-commit-format',
     });
+    expect(result.output).toContain(HOOK_PROTOCOL_CONTRACT.line_prefixes.log_path);
+    expect(readProtocolLog(repoDir, protocol)).toEqual(protocol);
   });
 
   it('explains commit scope/message failures with a dedicated rule id and rewrite route', () => {
@@ -139,15 +193,16 @@ describe('managed hook payloads', () => {
     execSync('git add notes/todo.txt', { cwd: repoDir });
 
     const result = runCommit(repoDir, '[FEATURE] missing-scope-separator');
-    const protocol = extractProtocolPayload(result.output, '.mycodemap/hooks/commit-msg');
+    const protocol = extractProtocolPayload(result.output, COMMIT_MSG_CONTRACT.hook_source);
 
     expect(result.exitCode).toBe(1);
     expect(result.output).toContain('RULE_ID: commit-scope-message');
     expect(result.output).toContain('Rewrite the first line to match: [TAG] scope: message');
+    expectProtocolToMatchContract(protocol, COMMIT_MSG_CONTRACT);
     expect(protocol.block).toMatchObject({
       rule_id: 'commit-scope-message',
       resolution: {
-        type: 'rewrite_commit_message',
+        type: COMMIT_MSG_CONTRACT.blocking_rules['commit-scope-message'],
         missing_parts: ['scope', 'colon', 'message'],
       },
     });
@@ -159,6 +214,32 @@ describe('managed hook payloads', () => {
       name: 'commit-scope-message',
       status: 'failed',
     });
+  });
+
+  it('supports protocol-only mode for autonomous agents', () => {
+    const repoDir = createTempRepo();
+    tempRoots.push(repoDir);
+
+    mkdirSync(path.join(repoDir, 'notes'), { recursive: true });
+    writeFileSync(path.join(repoDir, 'notes', 'todo.txt'), 'todo\n', 'utf8');
+    execSync('git add notes/todo.txt', { cwd: repoDir });
+
+    const result = runCommit(repoDir, 'docs: bad message', {
+      [HOOK_PROTOCOL_CONTRACT.shared_env.protocol_only]: '1',
+    });
+    const protocol = extractProtocolPayload(result.output, COMMIT_MSG_CONTRACT.hook_source);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain(HOOK_PROTOCOL_CONTRACT.line_prefixes.log_path);
+    expect(result.output).toContain(HOOK_PROTOCOL_CONTRACT.line_prefixes.protocol);
+    expect(result.output).not.toContain('Running pre-commit checks...');
+    expect(result.output).not.toContain('ERROR: Commit precheck blocked the commit.');
+    expectProtocolToMatchContract(protocol, COMMIT_MSG_CONTRACT);
+    expect(protocol.output).toMatchObject({
+      protocol_only: true,
+      mode: HOOK_PROTOCOL_CONTRACT.output_modes[1],
+    });
+    expect(readProtocolLog(repoDir, protocol)).toEqual(protocol);
   });
 
   it('explains staged-file-limit failures without suggesting --no-verify', () => {
@@ -184,12 +265,13 @@ describe('managed hook payloads', () => {
     expect(result.output).not.toContain('--no-verify');
     expect(result.output).not.toContain('Running tests for staged files...');
     expect(result.output).not.toContain('Running repo-local rule validation');
+    expectProtocolToMatchContract(protocol, PRE_COMMIT_CONTRACT);
     expect(protocol).toMatchObject({
-      schema: 'codemap.precommit.v1',
+      schema: PRE_COMMIT_CONTRACT.schema,
       commit_allowed: false,
-      next_action: 'split_commit',
+      next_action: PRE_COMMIT_CONTRACT.blocking_rules['staged-file-limit'],
       attempt: {
-        context_env: 'CODEMAP_AGENT_CONTEXT',
+        context_env: HOOK_PROTOCOL_CONTRACT.shared_env.attempt_context,
         attempt_id: expect.stringContaining('precommit-'),
       },
       repo: {
@@ -203,7 +285,7 @@ describe('managed hook payloads', () => {
           defined_at: expect.stringContaining('.mycodemap/hooks/pre-commit:'),
         },
         resolution: {
-          type: 'split_commit',
+          type: PRE_COMMIT_CONTRACT.blocking_rules['staged-file-limit'],
           current: 11,
           limit: 10,
           reset_command: 'git reset HEAD',

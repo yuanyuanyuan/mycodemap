@@ -1,0 +1,66 @@
+{
+  "version": "1.0.0",
+  "line_prefixes": {
+    "protocol": "CODEMAP_PRECHECK_PROTOCOL:",
+    "log_path": "CODEMAP_PRECHECK_LOG_PATH:"
+  },
+  "shared_env": {
+    "protocol_only": "CODEMAP_PROTOCOL_ONLY",
+    "attempt_context": "CODEMAP_AGENT_CONTEXT"
+  },
+  "output_modes": [
+    "human-and-protocol",
+    "protocol-only"
+  ],
+  "statuses": {
+    "passed": "check completed successfully",
+    "failed": "check ran and blocked or failed",
+    "warn": "check completed with a non-blocking warning",
+    "skipped": "check did not run because an earlier blocker short-circuited the flow",
+    "not_applicable": "check does not apply to the current staged change set"
+  },
+  "hooks": {
+    "pre-commit": {
+      "schema": "codemap.precommit.v1",
+      "hook_source": ".mycodemap/hooks/pre-commit",
+      "required_top_level_fields": [
+        "schema",
+        "hook_source",
+        "output",
+        "attempt",
+        "commit_allowed",
+        "next_action",
+        "repo",
+        "checks"
+      ],
+      "blocking_rules": {
+        "staged-file-limit": "split_commit",
+        "source-file-headers": "edit_headers",
+        "docs-guardrail": "rerun_docs_check",
+        "related-tests": "rerun_verify_commands",
+        "repo-local-rule-validation": "run_rule_validation",
+        "repo-local-rule-validation-unavailable": "run_rule_validation",
+        "repo-local-rule-validation-unexpected": "run_rule_validation"
+      }
+    },
+    "commit-msg": {
+      "schema": "codemap.commitmsg.v1",
+      "hook_source": ".mycodemap/hooks/commit-msg",
+      "required_top_level_fields": [
+        "schema",
+        "hook_source",
+        "output",
+        "attempt",
+        "commit_allowed",
+        "next_action",
+        "message_preview",
+        "repo",
+        "checks"
+      ],
+      "blocking_rules": {
+        "commit-format": "rewrite_commit_message",
+        "commit-scope-message": "rewrite_commit_message"
+      }
+    }
+  }
+}

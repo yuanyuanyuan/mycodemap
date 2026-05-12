@@ -1,10 +1,13 @@
 #!/bin/sh
 # Pre-commit hook: 运行测试和文件头检查
+# Hook protocol contract source: scripts/hooks/templates/protocol-contract.json
 
 HOOK_SOURCE=".mycodemap/hooks/pre-commit"
 RULE_CONFIG_PATH=".claude/rule-system.config.json"
 RULE_REPORT_ONLY_TIMEOUT_SECONDS="${RULE_REPORT_ONLY_TIMEOUT_SECONDS:-20}"
 RULE_HARD_GATE_MODE="report-only"
+PROTOCOL_ONLY="${CODEMAP_PROTOCOL_ONLY:-0}"
+PROTOCOL_OUTPUT_MODE="human-and-protocol"
 CHECK_RESULTS_FILE=""
 TEST_OUTPUT_FILE=""
 FILTERED_TEST_OUTPUT_FILE=""
@@ -73,6 +76,14 @@ cleanup_temp_artifacts() {
 }
 
 trap cleanup_temp_artifacts EXIT
+
+setup_output_mode() {
+    exec 3>&1 4>&2
+    if [ "$PROTOCOL_ONLY" = "1" ]; then
+        PROTOCOL_OUTPUT_MODE="protocol-only"
+        exec >/dev/null 2>&1
+    fi
+}
 
 count_non_empty_lines() {
     INPUT_TEXT="$1" python3 - <<'PY'
@@ -313,6 +324,8 @@ render_protocol_json() {
     ATTEMPT_LOG_RELATIVE_PATH="$ATTEMPT_LOG_RELATIVE_PATH" \
     AGENT_CONTEXT_RAW="$AGENT_CONTEXT_RAW" \
     PARENT_COMMIT="$PARENT_COMMIT" \
+    PROTOCOL_ONLY_VALUE="$PROTOCOL_ONLY" \
+    PROTOCOL_OUTPUT_MODE_VALUE="$PROTOCOL_OUTPUT_MODE" \
     STAGED_FILES_RAW="$STAGED_FILES" \
     STAGED_FILE_COUNT_VALUE="$STAGED_FILE_COUNT" \
     NON_DOT_FILES_RAW="$NON_DOT_FILES" \
@@ -449,6 +462,10 @@ doc_files = [line for line in os.environ.get('DOC_FILES_RAW', '').splitlines() i
 payload = {
     'schema': 'codemap.precommit.v1',
     'hook_source': os.environ.get('HOOK_SOURCE', '.mycodemap/hooks/pre-commit'),
+    'output': {
+        'protocol_only': os.environ.get('PROTOCOL_ONLY_VALUE', '0') == '1',
+        'mode': os.environ.get('PROTOCOL_OUTPUT_MODE_VALUE', 'human-and-protocol'),
+    },
     'attempt': {
         'attempt_id': os.environ.get('ATTEMPT_ID', ''),
         'log_path': os.environ.get('ATTEMPT_LOG_RELATIVE_PATH', ''),
@@ -496,7 +513,10 @@ emit_protocol_line() {
     if [ -n "$ATTEMPT_LOG_ABSOLUTE_PATH" ]; then
         printf '%s\n' "$PROTOCOL_JSON" >"$ATTEMPT_LOG_ABSOLUTE_PATH" 2>/dev/null || true
     fi
-    printf 'CODEMAP_PRECHECK_PROTOCOL:%s\n' "$PROTOCOL_JSON"
+    if [ -n "$ATTEMPT_LOG_RELATIVE_PATH" ]; then
+        printf 'CODEMAP_PRECHECK_LOG_PATH:%s\n' "$ATTEMPT_LOG_RELATIVE_PATH" >&3
+    fi
+    printf 'CODEMAP_PRECHECK_PROTOCOL:%s\n' "$PROTOCOL_JSON" >&3
 }
 
 print_blocked_rule() {
@@ -1116,6 +1136,7 @@ PY
 record_staged_file_limit_check() {
     check_status="$1"
     duration_ms="$2"
+    skip_reason="${3:-}"
     details_json=$(STAGED_FILES_RAW="$STAGED_FILES" STAGED_FILE_COUNT_VALUE="$STAGED_FILE_COUNT" CURRENT_LIMIT_VALUE="$CURRENT_LIMIT" ONLY_DOT_DIRS_VALUE="$ONLY_DOT_DIRS" IS_INITIAL_COMMIT_VALUE="$IS_INITIAL_COMMIT" CONTAINS_DOC_FILES_VALUE="$CONTAINS_DOC_FILES" python3 - <<'PY'
 import json
 import os
@@ -1131,12 +1152,13 @@ details = {
 print(json.dumps(details, separators=(',', ':')))
 PY
 )
-    append_check_result 'staged-file-limit' "$check_status" "$duration_ms" "$details_json" '' 'staged-file-limit'
+    append_check_result 'staged-file-limit' "$check_status" "$duration_ms" "$details_json" '' 'staged-file-limit' "$skip_reason"
 }
 
 record_source_headers_check() {
     check_status="$1"
     duration_ms="$2"
+    skip_reason="${3:-}"
     details_json=$(STAGED_TS_FILES_RAW="$STAGED_TS_FILES" MISSING_HEADER_FILES_RAW="$MISSING_HEADER_FILES" python3 - <<'PY'
 import json
 import os
@@ -1149,7 +1171,7 @@ payload = {
 print(json.dumps(payload, separators=(',', ':')))
 PY
 )
-    append_check_result 'source-file-headers' "$check_status" "$duration_ms" "$details_json" '' 'source-file-headers'
+    append_check_result 'source-file-headers' "$check_status" "$duration_ms" "$details_json" '' 'source-file-headers' "$skip_reason"
 }
 
 record_docs_guardrail_check() {
@@ -1194,13 +1216,17 @@ PY
 record_rule_validation_check() {
     check_status="$1"
     duration_ms="$2"
-    details_json=$(RULE_HARD_GATE_MODE_VALUE="$RULE_HARD_GATE_MODE" RULE_REPORT_ONLY_TIMEOUT_SECONDS_VALUE="$RULE_REPORT_ONLY_TIMEOUT_SECONDS" RULE_VALIDATE_EXIT_VALUE="$VALIDATE_EXIT" python3 - <<'PY'
+    result_kind="${3:-completed}"
+    non_blocking="${4:-false}"
+    details_json=$(RULE_HARD_GATE_MODE_VALUE="$RULE_HARD_GATE_MODE" RULE_REPORT_ONLY_TIMEOUT_SECONDS_VALUE="$RULE_REPORT_ONLY_TIMEOUT_SECONDS" RULE_VALIDATE_EXIT_VALUE="$VALIDATE_EXIT" RULE_VALIDATE_RESULT_VALUE="$result_kind" RULE_VALIDATE_NON_BLOCKING_VALUE="$non_blocking" python3 - <<'PY'
 import json
 import os
 payload = {
     'mode': os.environ.get('RULE_HARD_GATE_MODE_VALUE', 'report-only'),
     'timeout_seconds': int(os.environ.get('RULE_REPORT_ONLY_TIMEOUT_SECONDS_VALUE', '20') or '20'),
     'exit_code': int(os.environ.get('RULE_VALIDATE_EXIT_VALUE', '0') or '0'),
+    'result': os.environ.get('RULE_VALIDATE_RESULT_VALUE', 'completed'),
+    'non_blocking': os.environ.get('RULE_VALIDATE_NON_BLOCKING_VALUE', 'false') == 'true',
 }
 print(json.dumps(payload, separators=(',', ':')))
 PY
@@ -1263,6 +1289,7 @@ sys.exit(completed.returncode)
 PY
 }
 
+setup_output_mode
 prepare_attempt_context
 load_rule_hard_gate_mode
 
@@ -1292,7 +1319,7 @@ limit_start_ms=$(now_ms)
 if [ "$ONLY_DOT_DIRS" = 'true' ]; then
     echo 'Note: Only dot-directory files staged, skipping count limit check'
     limit_end_ms=$(now_ms)
-    record_staged_file_limit_check 'skipped' "$((limit_end_ms - limit_start_ms))"
+    record_staged_file_limit_check 'not_applicable' "$((limit_end_ms - limit_start_ms))" 'dot-directory-exemption'
 elif [ "$STAGED_FILE_COUNT" -gt "$CURRENT_LIMIT" ] && [ "$IS_INITIAL_COMMIT" = 'false' ]; then
     limit_end_ms=$(now_ms)
     record_staged_file_limit_check 'failed' "$((limit_end_ms - limit_start_ms))"
@@ -1322,13 +1349,13 @@ if [ "$ONLY_DOT_DIRS" = 'true' ]; then
     echo 'Note: Only dot-directory files staged, skipping header check'
     STAGED_TS_FILES=''
     header_end_ms=$(now_ms)
-    record_source_headers_check 'skipped' "$((header_end_ms - header_start_ms))"
+    record_source_headers_check 'not_applicable' "$((header_end_ms - header_start_ms))" 'dot-directory-exemption'
 else
     STAGED_TS_FILES=$(printf '%s\n' "$STAGED_FILES" | grep '\.ts$' | grep -v '\.test\.ts$' | grep -v '\.d\.ts$' || true)
     if [ -z "$STAGED_TS_FILES" ]; then
         echo 'No TypeScript source files staged, skipping header check'
         header_end_ms=$(now_ms)
-        record_source_headers_check 'skipped' "$((header_end_ms - header_start_ms))"
+        record_source_headers_check 'not_applicable' "$((header_end_ms - header_start_ms))" 'no-typescript-source-files'
     else
         MISSING_HEADERS=0
         MISSING_HEADER_FILES=''
@@ -1398,7 +1425,7 @@ if [ -n "$DOC_GUARDRAIL_FILES" ]; then
 else
     echo 'Documentation guardrails skipped'
     docs_end_ms=$(now_ms)
-    record_docs_guardrail_check 'skipped' "$((docs_end_ms - docs_start_ms))" 'no-doc-guardrail-triggers'
+    record_docs_guardrail_check 'not_applicable' "$((docs_end_ms - docs_start_ms))" 'no-doc-guardrail-triggers'
 fi
 
 # 4. related-tests / package test fallback
@@ -1409,7 +1436,7 @@ if build_test_precheck_plan; then
     if [ -z "$STAGED" ]; then
         echo "No $TEST_TARGET_KIND files staged, skipping tests"
         related_end_ms=$(now_ms)
-        record_related_tests_check 'skipped' "$((related_end_ms - related_start_ms))" 'no-matching-staged-source-files'
+        record_related_tests_check 'not_applicable' "$((related_end_ms - related_start_ms))" 'no-matching-staged-source-files'
     else
         STAGED_COUNT=$(count_non_empty_lines "$STAGED")
         case "$TEST_STRATEGY" in
@@ -1467,7 +1494,7 @@ if build_test_precheck_plan; then
 else
     echo 'No supported staged-source test strategy detected, skipping tests'
     related_end_ms=$(now_ms)
-    record_related_tests_check 'skipped' "$((related_end_ms - related_start_ms))" 'no-supported-staged-source-test-strategy'
+    record_related_tests_check 'not_applicable' "$((related_end_ms - related_start_ms))" 'no-supported-staged-source-test-strategy'
 fi
 
 # 5. repo-local rule validation
@@ -1481,10 +1508,10 @@ case "$RULE_HARD_GATE_MODE" in
         case "$VALIDATE_EXIT" in
             0)
                 echo 'Rule validation passed'
-                record_rule_validation_check 'passed' "$((rule_end_ms - rule_start_ms))"
+                record_rule_validation_check 'passed' "$((rule_end_ms - rule_start_ms))" 'completed' 'false'
                 ;;
             1)
-                record_rule_validation_check 'failed' "$((rule_end_ms - rule_start_ms))"
+                record_rule_validation_check 'failed' "$((rule_end_ms - rule_start_ms))" 'blocking-findings' 'false'
                 print_blocked_rule 'repo-local-rule-validation' 'Repo-local rule validation found blocking P0 findings.'
                 echo 'FIX: Run python3 scripts/validate-rules.py code to inspect the blocking findings.'
                 echo 'FIX: Resolve the reported P0 issues, then retry the commit.'
@@ -1495,14 +1522,14 @@ case "$RULE_HARD_GATE_MODE" in
                 ;;
             2)
                 echo 'WARNING: Rule validation reported warn-only P1 findings, continuing commit'
-                record_rule_validation_check 'warn' "$((rule_end_ms - rule_start_ms))"
+                record_rule_validation_check 'warn' "$((rule_end_ms - rule_start_ms))" 'warn-only-findings' 'true'
                 ;;
             3)
                 echo 'WARNING: Rule validation reported notice-only P2 findings, continuing commit'
-                record_rule_validation_check 'warn' "$((rule_end_ms - rule_start_ms))"
+                record_rule_validation_check 'warn' "$((rule_end_ms - rule_start_ms))" 'notice-only-findings' 'true'
                 ;;
             4)
-                record_rule_validation_check 'failed' "$((rule_end_ms - rule_start_ms))"
+                record_rule_validation_check 'failed' "$((rule_end_ms - rule_start_ms))" 'dependencies-unavailable' 'false'
                 print_blocked_rule 'repo-local-rule-validation-unavailable' 'Repo-local rule validation could not run because required dependencies are unavailable.'
                 echo 'FIX: Restore the rule validation dependencies, then rerun python3 scripts/validate-rules.py code.'
                 resolution_json=$(build_rule_validation_resolution_json)
@@ -1511,7 +1538,7 @@ case "$RULE_HARD_GATE_MODE" in
                 exit 1
                 ;;
             *)
-                record_rule_validation_check 'failed' "$((rule_end_ms - rule_start_ms))"
+                record_rule_validation_check 'failed' "$((rule_end_ms - rule_start_ms))" 'unexpected-exit' 'false'
                 print_blocked_rule 'repo-local-rule-validation-unexpected' "Repo-local rule validation returned an unexpected exit code ($VALIDATE_EXIT)."
                 echo 'FIX: Run python3 scripts/validate-rules.py code manually and inspect the failure.'
                 resolution_json=$(build_rule_validation_resolution_json)
@@ -1529,14 +1556,14 @@ case "$RULE_HARD_GATE_MODE" in
         VALIDATE_EXIT=$?
         rule_end_ms=$(now_ms)
         if [ "$VALIDATE_EXIT" -eq 124 ]; then
-            echo "INFO: Rule validation report-only timed out after ${RULE_REPORT_ONLY_TIMEOUT_SECONDS}s (non-blocking), continuing commit"
-            record_rule_validation_check 'timeout' "$((rule_end_ms - rule_start_ms))"
+            echo "INFO: Rule validation report-only completed (${RULE_REPORT_ONLY_TIMEOUT_SECONDS}s limit reached, non-blocking)"
+            record_rule_validation_check 'warn' "$((rule_end_ms - rule_start_ms))" 'limit-reached' 'true'
         elif [ "$VALIDATE_EXIT" -ne 0 ]; then
             echo "INFO: Rule validation report-only command exited with $VALIDATE_EXIT (non-blocking), continuing commit"
-            record_rule_validation_check 'warn' "$((rule_end_ms - rule_start_ms))"
+            record_rule_validation_check 'warn' "$((rule_end_ms - rule_start_ms))" 'non-zero-exit' 'true'
         else
             echo 'Rule validation report-only completed'
-            record_rule_validation_check 'passed' "$((rule_end_ms - rule_start_ms))"
+            record_rule_validation_check 'passed' "$((rule_end_ms - rule_start_ms))" 'completed' 'true'
         fi
         ;;
 esac
@@ -1572,7 +1599,7 @@ if [ -n "$STAGED_TEST_FILES" ]; then
     fi
 else
     pattern_end_ms=$(now_ms)
-    record_real_world_test_patterns_check 'skipped' "$((pattern_end_ms - pattern_start_ms))" 'no-staged-test-files'
+    record_real_world_test_patterns_check 'not_applicable' "$((pattern_end_ms - pattern_start_ms))" 'no-staged-test-files'
 fi
 
 # 7. 生成 AI 饲料（warn-only）

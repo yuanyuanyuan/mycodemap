@@ -7,6 +7,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
+HOOK_PROTOCOL_CONTRACT = json.loads(
+    (ROOT / "scripts" / "hooks" / "templates" / "protocol-contract.json").read_text(encoding="utf-8")
+)
 
 
 class RuleControlWorkflowTests(unittest.TestCase):
@@ -57,7 +60,7 @@ class RuleControlWorkflowTests(unittest.TestCase):
         ]:
             content = hook_path.read_text(encoding="utf-8")
             self.assertIn("RULE_REPORT_ONLY_TIMEOUT_SECONDS", content)
-            self.assertIn("Rule validation report-only timed out after", content)
+            self.assertIn("Rule validation report-only completed (", content)
             self.assertIn("subprocess.TimeoutExpired", content)
 
     def test_pre_commit_contains_generic_test_strategy_fallbacks(self):
@@ -74,27 +77,39 @@ class RuleControlWorkflowTests(unittest.TestCase):
             self.assertIn("cargo test", content)
 
     def test_pre_commit_contains_agent_protocol_contract(self):
+        pre_commit_contract = HOOK_PROTOCOL_CONTRACT["hooks"]["pre-commit"]
         for hook_path in [
             ROOT / ".mycodemap" / "hooks" / "pre-commit",
             ROOT / "scripts" / "hooks" / "templates" / "pre-commit",
         ]:
             content = hook_path.read_text(encoding="utf-8")
-            self.assertIn("CODEMAP_PRECHECK_PROTOCOL:", content)
-            self.assertIn("CODEMAP_AGENT_CONTEXT", content)
-            self.assertIn("schema': 'codemap.precommit.v1'", content)
+            self.assertIn(HOOK_PROTOCOL_CONTRACT["line_prefixes"]["protocol"], content)
+            self.assertIn(HOOK_PROTOCOL_CONTRACT["line_prefixes"]["log_path"], content)
+            self.assertIn(HOOK_PROTOCOL_CONTRACT["shared_env"]["protocol_only"], content)
+            self.assertIn(HOOK_PROTOCOL_CONTRACT["shared_env"]["attempt_context"], content)
+            self.assertIn(f"schema': '{pre_commit_contract['schema']}'", content)
+            self.assertIn("protocol-contract.json", content)
             self.assertIn("suggested_groups", content)
             self.assertIn("attempt_id", content)
+            self.assertIn("'not_applicable'", content)
+            for action in set(pre_commit_contract["blocking_rules"].values()):
+                self.assertIn(action, content)
 
     def test_commit_msg_contains_agent_protocol_contract(self):
+        commit_msg_contract = HOOK_PROTOCOL_CONTRACT["hooks"]["commit-msg"]
         for hook_path in [
             ROOT / ".mycodemap" / "hooks" / "commit-msg",
             ROOT / "scripts" / "hooks" / "templates" / "commit-msg",
         ]:
             content = hook_path.read_text(encoding="utf-8")
-            self.assertIn("CODEMAP_PRECHECK_PROTOCOL:", content)
-            self.assertIn("CODEMAP_AGENT_CONTEXT", content)
-            self.assertIn("schema': 'codemap.commitmsg.v1'", content)
-            self.assertIn("rewrite_commit_message", content)
+            self.assertIn(HOOK_PROTOCOL_CONTRACT["line_prefixes"]["protocol"], content)
+            self.assertIn(HOOK_PROTOCOL_CONTRACT["line_prefixes"]["log_path"], content)
+            self.assertIn(HOOK_PROTOCOL_CONTRACT["shared_env"]["protocol_only"], content)
+            self.assertIn(HOOK_PROTOCOL_CONTRACT["shared_env"]["attempt_context"], content)
+            self.assertIn(f"schema': '{commit_msg_contract['schema']}'", content)
+            self.assertIn("protocol-contract.json", content)
+            for action in set(commit_msg_contract["blocking_rules"].values()):
+                self.assertIn(action, content)
             self.assertIn("commit-scope-message", content)
 
 
