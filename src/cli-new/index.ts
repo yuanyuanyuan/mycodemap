@@ -12,7 +12,7 @@ import { createExportCommand } from './commands/export.js';
 import { createQueryCommand } from './commands/query.js';
 
 // 读取 package.json 版本
-const packageJson = await import('../../package.json', { assert: { type: 'json' } });
+const packageJson = await import('../../package.json', { with: { type: 'json' } });
 const version = packageJson.default.version ?? '0.1.0';
 
 /**

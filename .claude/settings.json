@@ -1,7 +1,17 @@
 {
   "hooks": {
     "SessionStart": [],
-    "PostToolUse": [],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FILE=$(echo \"$TOOL_INPUT\" | jq -r '.file_path // empty' 2>/dev/null); [ -n \"$FILE\" ] && [[ \"$FILE\" == *.ts || \"$FILE\" == *.tsx ]] && node_modules/.bin/tsgo --noEmit 2>&1 | head -15 || true"
+          }
+        ]
+      }
+    ],
     "PreToolUse": []
   },
   "statusLine": {
