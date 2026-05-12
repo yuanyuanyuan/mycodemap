@@ -70,7 +70,7 @@ scripts/release.sh
 - 工作区不干净（`rtk git status --short` 非空）
 - 当前分支不是 `main`
 - milestone readiness 不足：开放项未处理、缺 summary / verification
-- 本地或远程已存在冲突 tag（例如 `v1.9.0`）
+- 远程已存在冲突 tag（例如 `v1.9.0`）— 本地存在冲突 tag 时可选择使用它
 - `package.json` 无法读取当前版本
 
 **版本映射规则**：`vX.Y → X.Y.0`（例如 `v1.9 → 1.9.0`）
@@ -86,6 +86,14 @@ scripts/release.sh
 ### 委托机械发布
 
 只有在 Gate #2 明确通过后：
+
+**使用已有 tag 时：**
+
+```bash
+rtk ./scripts/release.sh {X.Y}.0 --use-tag v{X.Y}.0
+```
+
+**创建新 tag 时：**
 
 ```bash
 rtk ./scripts/release.sh {X.Y}.0
@@ -156,7 +164,8 @@ Orchestrator 完成委托后，**不得**自动执行验证。必须向用户明
 | 无 active / completed milestone | 直接拒绝；要求先完成或归档 milestone |
 | 工作区不干净 | 直接拒绝；先提交、stash 或清理 |
 | major version jump | 继续前必须高亮警告并等待 Gate #2 |
-| tag 冲突 | 直接拒绝；先查明是否重复发布 |
+| 远程 tag 冲突 | 直接拒绝；先查明是否重复发布 |
+| 本地 tag 冲突 | 提供选择：使用已有 tag / 删除并重建 / 取消发布 |
 | closeout 后但发布前失败 | 保留 milestone 归档状态；修复后可重新运行 `/release` |
 | helper 执行失败 | 返回 `scripts/release.sh` 失败摘要，移交 Recovery Agent |
 | Actions 失败（已推送 tag） | Recovery Agent 分析 → 修复 → 删除并重打 tag → 重新验证 |

@@ -13,27 +13,56 @@ NC='\033[0m' # No Color
 
 # 帮助信息
 show_help() {
-    echo "用法: ./scripts/release.sh [选项]"
+    echo "用法: ./scripts/release.sh [选项] [--use-tag <tag>]"
     echo ""
     echo "选项:"
-    echo "  patch    发布 patch 版本 (0.2.0 -> 0.2.1)"
-    echo "  minor    发布 minor 版本 (0.2.0 -> 0.3.0)"
-    echo "  major    发布 major 版本 (0.2.0 -> 1.0.0)"
-    echo "  <版本>   指定具体版本号 (例如: 0.2.1)"
-    echo "  --help   显示此帮助信息"
+    echo "  patch           发布 patch 版本 (0.2.0 -> 0.2.1)"
+    echo "  minor           发布 minor 版本 (0.2.0 -> 0.3.0)"
+    echo "  major           发布 major 版本 (0.2.0 -> 1.0.0)"
+    echo "  <版本>          指定具体版本号 (例如: 0.2.1)"
+    echo "  --use-tag <tag> 使用已有的本地 git tag（跳过创建 tag 步骤）"
+    echo "  --help          显示此帮助信息"
     echo ""
     echo "示例:"
-    echo "  ./scripts/release.sh patch    # 发布 patch 版本"
-    echo "  ./scripts/release.sh 0.3.0    # 发布指定版本"
+    echo "  ./scripts/release.sh patch              # 发布 patch 版本"
+    echo "  ./scripts/release.sh 0.3.0              # 发布指定版本"
+    echo "  ./scripts/release.sh 0.3.0 --use-tag v0.3.0  # 使用已有 tag 发布"
 }
 
-# 检查参数
-if [ $# -eq 0 ] || [ "$1" == "--help" ]; then
+# 解析参数
+USE_EXISTING_TAG=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --help)
+            show_help
+            exit 0
+            ;;
+        --use-tag)
+            if [[ -z "$2" || "$2" == --* ]]; then
+                echo -e "${RED}❌ 错误: --use-tag 需要指定 tag 名称${NC}"
+                exit 1
+            fi
+            USE_EXISTING_TAG="$2"
+            shift 2
+            ;;
+        *)
+            if [[ -z "$VERSION_TYPE" ]]; then
+                VERSION_TYPE="$1"
+            else
+                echo -e "${RED}❌ 错误: 未知参数 $1${NC}"
+                show_help
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+if [ -z "$VERSION_TYPE" ]; then
     show_help
     exit 0
 fi
-
-VERSION_TYPE=$1
 
 # 检查是否在 git 仓库中
 if ! git rev-parse --git-dir > /dev/null 2>&1; then
@@ -116,6 +145,38 @@ esac
 echo -e "${GREEN}🚀 新版本: $NEW_VERSION${NC}"
 echo ""
 
+# 验证 --use-tag 参数
+if [ -n "$USE_EXISTING_TAG" ]; then
+    # 检查 tag 是否存在
+    if ! git tag -l "$USE_EXISTING_TAG" | grep -q "$USE_EXISTING_TAG"; then
+        echo -e "${RED}❌ 错误: 本地 tag '$USE_EXISTING_TAG' 不存在${NC}"
+        echo "可用的本地 tags:"
+        git tag -l "v*" | tail -10
+        exit 1
+    fi
+
+    # 检查 tag 是否指向当前 HEAD 或其祖先
+    TAG_COMMIT=$(git rev-parse "$USE_EXISTING_TAG")
+    HEAD_COMMIT=$(git rev-parse HEAD)
+    MERGE_BASE=$(git merge-base "$TAG_COMMIT" HEAD 2>/dev/null || echo "")
+
+    if [ "$TAG_COMMIT" != "$HEAD_COMMIT" ] && [ "$TAG_COMMIT" != "$MERGE_BASE" ]; then
+        echo -e "${YELLOW}⚠️  警告: tag '$USE_EXISTING_TAG' 不指向当前 HEAD 或其祖先${NC}"
+        echo "Tag commit:   $TAG_COMMIT"
+        echo "Current HEAD: $HEAD_COMMIT"
+        read -p "是否继续使用此 tag? (y/N): " confirm
+        if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+            echo -e "${RED}❌ 发布已取消${NC}"
+            exit 1
+        fi
+    fi
+
+    echo -e "${GREEN}✅ 将使用已有 tag: $USE_EXISTING_TAG${NC}"
+    # 覆盖 NEW_VERSION 为 tag 对应的版本（去掉 v 前缀）
+    NEW_VERSION=${USE_EXISTING_TAG#v}
+    echo ""
+fi
+
 # 同步版本号到 AI 文档
 echo -e "${BLUE}📋 同步版本号到 AI 文档...${NC}"
 for file in llms.txt ai-document-index.yaml AI_GUIDE.md AI_DISCOVERY.md; do
@@ -152,16 +213,24 @@ git commit -m "[CONFIG] version: bump to v$NEW_VERSION"
 echo -e "${GREEN}   ✅ 已提交版本更新${NC}"
 echo ""
 
-# 步骤 3: 创建标签
-echo -e "${BLUE}3/5 创建 git tag...${NC}"
-git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
-echo -e "${GREEN}   ✅ 已创建标签: v$NEW_VERSION${NC}"
+# 步骤 3: 创建或使用标签
+echo -e "${BLUE}3/5 处理 git tag...${NC}"
+if [ -n "$USE_EXISTING_TAG" ]; then
+    echo -e "${GREEN}   ✅ 使用已有标签: $USE_EXISTING_TAG${NC}"
+else
+    git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+    echo -e "${GREEN}   ✅ 已创建标签: v$NEW_VERSION${NC}"
+fi
 echo ""
 
 # 步骤 4: 推送
 echo -e "${BLUE}4/5 推送到远程仓库...${NC}"
 git push origin HEAD
-git push origin "v$NEW_VERSION"
+if [ -n "$USE_EXISTING_TAG" ]; then
+    git push origin "$USE_EXISTING_TAG"
+else
+    git push origin "v$NEW_VERSION"
+fi
 echo -e "${GREEN}   ✅ 已推送到远程${NC}"
 echo ""
 
