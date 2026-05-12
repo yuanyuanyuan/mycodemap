@@ -55,6 +55,7 @@
 ④ 【Confirmation Gate #1】展示归档摘要
 ⑤ 计算并展示版本映射
 ⑥ 【Confirmation Gate #2】展示发布摘要
+⑥½ Pre-Push 本地验证（版本一致性 + pre-release + 测试）
 ⑦ 委托机械发布 helper
 ⑧ 验证 GitHub Actions 触发
 ⑨ 完成报告
@@ -189,6 +190,26 @@ v1.9 → 1.9.0
 
 用户必须输入 `y` 或 `Y` 才继续。任何其他输入都终止流程。未经过此 gate，不得执行 `npm version`、git commit、git tag、`git push` 或任何会触发 `.github/workflows/publish.yml` 的动作。
 
+#### ⑥½ Pre-Push 本地验证（强制）
+
+在触发任何推送前，必须在本地完成以下验证。任何失败都必须先修复再继续，避免"推送后在 CI 中失败"的循环：
+
+```bash
+# 1. 验证 tag 指向的 commit 中 package.json 版本匹配
+git show v{X.Y}.0:package.json | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).version"
+# 必须输出 {X.Y}.0，否则删除旧 tag、修复版本后重建
+
+# 2. 本地运行 pre-release 检查（包含 AI 文档版本一致性）
+npm run docs:check:pre-release
+# 必须通过，否则修复后重试
+
+# 3. 本地运行测试套件
+npm test
+# 必须通过，否则修复后重试
+```
+
+**为什么需要这步**：v2.7.1 发布时因跳过 release.sh 导致 AI 文档版本号未同步，在 CI 中才发现版本不一致。本地验证可以提前捕获此类问题。
+
 #### ⑦ 委托机械发布 helper
 
 用户确认后，`/release` 默认**委托**给现有机械 helper，而不是在 skill 里重写版本 bump / tag / push 逻辑：
@@ -206,7 +227,7 @@ rtk ./scripts/release.sh {X.Y}.0 --dry-run
 
 委托边界如下：
 
-- `/release` 负责前置检查、milestone closeout、版本映射、major 跳跃高亮与 **Confirmation Gate #2**
+- `/release` 负责前置检查、milestone closeout、版本映射、major 跳跃高亮、**Confirmation Gate #2** 与 **Pre-Push 本地验证**
 - `scripts/release.sh` 负责执行既有的 pre-release 检查、`npm run check:all`、版本写入、git commit、git tag、`git push`
 - `.github/workflows/publish.yml` 负责 tag push 后的构建、测试、NPM 发布、发布验证与 GitHub Release
 

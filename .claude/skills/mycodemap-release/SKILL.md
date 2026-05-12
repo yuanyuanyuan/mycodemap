@@ -45,6 +45,7 @@ user-invocable: true
 ④ 【Confirmation Gate #1】展示归档摘要
 ⑤ 计算版本映射并高亮 major jump
 ⑥ 【Confirmation Gate #2】展示发布摘要
+⑥½ Pre-Push 本地验证（版本一致性 + pre-release + 测试）
 ⑦ 委托机械发布 helper
 ⑧ 移交验证
 ```
@@ -77,15 +78,40 @@ scripts/release.sh
 
 **Major Jump 警告**：如果是 major 跳跃（包括 `0.x → 1.x`），必须额外高亮警告。
 
+**版本一致性检查**（在任何推送前本地执行）：
+- 检查 tag 指向的 commit 中 `package.json` 版本是否匹配目标版本
+- 运行 `npm run docs:check:pre-release` 本地验证 AI 文档版本一致性
+- 如发现不一致，先修复再继续，不要推送后在 CI 中失败
+
 ### Confirmation Gates
 
 **Gate #1**：展示 milestone 归档摘要，等待用户确认（默认 No）
 
 **Gate #2**：展示完整发布摘要，只接受单独的 `y` 或 `Y`
 
+### ⑥½ Pre-Push 本地验证（强制）
+
+在触发任何推送前，必须在本地完成以下验证。任何失败都必须先修复再继续：
+
+```bash
+# 1. 验证 tag 指向的 commit 中 package.json 版本匹配
+git show v{X.Y}.0:package.json | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).version"
+# 必须输出 {X.Y}.0，否则删除旧 tag、修复版本后重建
+
+# 2. 本地运行 pre-release 检查（包含 AI 文档版本一致性）
+npm run docs:check:pre-release
+# 必须通过，否则修复后重试
+
+# 3. 本地运行测试套件
+npm test
+# 必须通过，否则修复后重试
+```
+
+**为什么需要这步**：CI 中的 pre-release 检查和测试失败会导致整个发布流程中断。本地验证可以提前发现问题，避免"推送后才发现"的循环（删除 tag → 修复 → 重建 → 推送）。
+
 ### 委托机械发布
 
-只有在 Gate #2 明确通过后：
+只有在 Gate #2 明确通过 **且** Pre-Push 本地验证全部通过后：
 
 **使用已有 tag 时：**
 
@@ -176,6 +202,7 @@ Orchestrator 完成委托后，**不得**自动执行验证。必须向用户明
 | 本地 tag 冲突 | 提供选择：使用已有 tag / 删除并重建 / 取消发布 |
 | closeout 后但发布前失败 | 保留 milestone 归档状态；修复后可重新运行 `/release` |
 | helper 执行失败 | 返回 `scripts/release.sh` 失败摘要，移交 Recovery Agent |
+| tag 指向的 commit 版本不匹配 | 本地验证发现 → 修复 package.json/文档版本 → 重建 tag → 再推送 |
 | Actions 失败（已推送 tag） | Recovery Agent 分析 → 修复 → 删除并重打 tag → 重新验证 |
 | NPM 未更新（Actions success） | 检查 `publish.yml` 的 `npm publish` 步骤，可能是 dist-tag 或 registry 问题 |
 | CHANGELOG 缺失 | 在 `CHANGELOG.md` 顶部添加版本条目 |
