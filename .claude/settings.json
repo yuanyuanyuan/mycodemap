@@ -1,6 +1,31 @@
 {
+  "env": {
+    "ORCHESTRA_PROJECT_ID": "mycodemap",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "0"
+  },
   "hooks": {
-    "SessionStart": [],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /tmp/hermes-orchestra/hooks/notify-hook.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /tmp/hermes-orchestra/hooks/permission-hook.sh"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
@@ -12,7 +37,17 @@
         ]
       }
     ],
-    "PreToolUse": []
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /tmp/hermes-orchestra/hooks/notify-hook.sh"
+          }
+        ]
+      }
+    ]
   },
   "statusLine": {
     "type": "command",

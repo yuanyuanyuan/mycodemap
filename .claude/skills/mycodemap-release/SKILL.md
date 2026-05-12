@@ -90,13 +90,21 @@ scripts/release.sh
 **使用已有 tag 时：**
 
 ```bash
-rtk ./scripts/release.sh {X.Y}.0 --use-tag v{X.Y}.0
+rtk ./scripts/release.sh {X.Y}.0 --use-tag v{X.Y}.0 --yes
 ```
 
 **创建新 tag 时：**
 
 ```bash
-rtk ./scripts/release.sh {X.Y}.0
+rtk ./scripts/release.sh {X.Y}.0 --yes
+```
+
+> **说明**：`--yes` 跳过 release.sh 的内置确认，因为 Gate #2 已经确认过了。避免确认疲劳。
+
+**预览模式（不实际执行）：**
+
+```bash
+rtk ./scripts/release.sh {X.Y}.0 --dry-run
 ```
 
 ### 移交验证

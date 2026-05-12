@@ -138,6 +138,23 @@ jobs:
             npx npm@11.5.1 publish --access public --tag "$DIST_TAG" --registry https://registry.npmjs.org
           fi
 
+      - name: Verify NPM publish
+        run: |
+          VERSION="${{ steps.package-version.outputs.version }}"
+          echo "⏳ Waiting 15s for NPM registry propagation..."
+          sleep 15
+
+          # 查询 NPM 验证版本
+          PUBLISHED_VERSION=$(npm view @mycodemap/mycodemap version 2>/dev/null || echo "")
+          if [ "$PUBLISHED_VERSION" = "$VERSION" ]; then
+            echo "✅ NPM publish verified: @mycodemap/mycodemap@$VERSION"
+          else
+            echo "⚠️ NPM version mismatch: expected $VERSION, got $PUBLISHED_VERSION"
+            echo "This may be a propagation delay. Check manually:"
+            echo "  npm view @mycodemap/mycodemap version"
+            # 不阻断 workflow，只警告
+          fi
+
       - name: Generate Release Notes
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         id: release-notes

@@ -194,20 +194,27 @@ v1.9 → 1.9.0
 用户确认后，`/release` 默认**委托**给现有机械 helper，而不是在 skill 里重写版本 bump / tag / push 逻辑：
 
 ```bash
-rtk ./scripts/release.sh {X.Y}.0
+# 标准调用（跳过 release.sh 内置确认，因为 Gate #2 已确认）
+rtk ./scripts/release.sh {X.Y}.0 --yes
+
+# 使用已有 tag 时
+rtk ./scripts/release.sh {X.Y}.0 --use-tag v{X.Y}.0 --yes
+
+# 预览模式（不实际执行）
+rtk ./scripts/release.sh {X.Y}.0 --dry-run
 ```
 
 委托边界如下：
 
 - `/release` 负责前置检查、milestone closeout、版本映射、major 跳跃高亮与 **Confirmation Gate #2**
-- `scripts/release.sh` 负责执行既有的 `npm run check:all`、版本写入、git commit、git tag、`git push`
-- `.github/workflows/publish.yml` 负责 tag push 后的构建、测试、NPM 发布与 GitHub Release
+- `scripts/release.sh` 负责执行既有的 pre-release 检查、`npm run check:all`、版本写入、git commit、git tag、`git push`
+- `.github/workflows/publish.yml` 负责 tag push 后的构建、测试、NPM 发布、发布验证与 GitHub Release
 
-> 说明：`scripts/release.sh` 当前自带交互确认；它只能作为 `/release` 已通过 **Confirmation Gate #2** 之后的机械 helper，不能替代 `/release` 的安全门。
+> **`--yes` 标志**：从 orchestrator 调用时必须传 `--yes`，跳过 release.sh 的内置确认。这避免了 Gate #2 + release.sh 确认的重复确认疲劳。
 >
-> 说明：Phase 31 / Phase 32 / Phase 33 只定义和验证该流程，不会在当前 milestone 内真的执行这些命令。
+> **`--dry-run` 标志**：预览模式，显示将执行的操作但不实际执行。用于验证发布流程。
 
-如需理解 helper 将触发的底层动作，可参考 `scripts/release.sh` 当前事实：它会写入 `package.json` / `package-lock.json` 版本、创建 `[RELEASE]` commit、创建 `v{X.Y}.0` tag，并推送分支与 tag 到远程。
+如需理解 helper 将触发的底层动作，可参考 `scripts/release.sh` 当前事实：它会运行 pre-release 检查、写入 `package.json` / `package-lock.json` 版本、更新 AI 文档版本号、创建 commit、创建 `v{X.Y}.0` tag，并推送分支与 tag 到远程。
 
 #### ⑧ 验证 GitHub Actions 触发
 

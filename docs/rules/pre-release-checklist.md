@@ -177,12 +177,17 @@
 ```bash
 # 只有在完成与 `/release` 等价的 closeout / Gate #1 / Gate #2 后
 # 才允许调用机械 helper
-rtk ./scripts/release.sh 1.9.0
+rtk ./scripts/release.sh 1.9.0 --yes
+
+# 预览模式（不实际执行）
+rtk ./scripts/release.sh 1.9.0 --dry-run
 
 # tag push 后由 GitHub Actions 自动完成:
+# - pre-release 文档检查
 # - 构建项目
 # - 运行测试
 # - 发布到 NPM (通过 OIDC)
+# - 发布验证
 # - 创建 GitHub Release
 ```
 
